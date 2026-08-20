@@ -1,0 +1,23 @@
+Printer info: {
+  connectResult: 3,
+  protocolVersion: 0,
+  modelId: 272,
+  serial: 'H508010165',
+  mac: '65:01:01:08:15:01',
+  charge: 4,
+  autoShutdownTime: 3,
+  labelType: 1,
+  hardwareVersion: '0x0301 (3.01 or 7.69)',
+  softwareVersion: '0x030f (3.15 or 7.83)'
+}
+Model metadata: {
+  model: 'B3S_P',
+  id: [ 272 ],
+  dpi: 203,
+  printDirection: 'top',
+  printheadPixels: 576,
+  paperTypes: [ 1, 2, 3, 5 ],
+  densityMin: 1,
+  densityMax: 5,
+  densityDefault: 3
+}
