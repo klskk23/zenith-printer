@@ -1,5 +1,17 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["packages/*/src/**/*.ts", "packages/*/tests/**/*.ts", "*.ts", "*.mjs"],
+  // The web package is checked through its own config, not this one — see the
+  // `typecheck` script. It needs the DOM library, JSX and bundler resolution,
+  // and it is the only package that does. Folding its files in here checked
+  // them under a configuration they were not written for, and left every .tsx
+  // file — which is to say the entire user interface — checked by nothing at
+  // all.
+  "include": [
+    "packages/cli/**/*.ts",
+    "packages/server/**/*.ts",
+    "packages/shared/**/*.ts",
+    "*.ts",
+    "*.mjs"
+  ],
   "exclude": ["node_modules", "**/dist"]
 }

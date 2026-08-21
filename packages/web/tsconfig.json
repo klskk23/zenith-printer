@@ -4,7 +4,12 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    // bwip-js publishes no default export condition — only browser, node,
+    // electron and react-native. Vite resolves the browser build here, so the
+    // type checker has to be told to resolve the same one, or @zenith/shared
+    // fails to typecheck the moment the web package pulls it in.
+    "customConditions": ["browser"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
 }
