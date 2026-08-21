@@ -240,7 +240,6 @@ export const copy = {
     submitting: '正在提交…',
     queued: '已加入队列',
     queuedDetail: (jobId: string): string => `任务编号 ${jobId}`,
-    selectPrinter: '请先选择一台打印机',
     needsProbe: '这台打印机尚未探测，无法确定可打印范围',
   },
 

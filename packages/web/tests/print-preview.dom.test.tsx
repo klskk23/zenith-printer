@@ -79,9 +79,7 @@ function open(over: Partial<React.ComponentProps<typeof PrintDialog>> = {}): voi
         ir={IR}
         templateId={null}
         profileId="pro-1"
-        printers={[PRINTER as never]}
-        selectedPrinterId="prn-1"
-        onSelectPrinter={() => undefined}
+        printer={PRINTER as never}
         onClose={() => undefined}
         {...over}
       />,
@@ -171,5 +169,30 @@ describe('a design with variables', () => {
 
     await vi.waitFor(() => expect(previews).toHaveLength(1))
     expect(previews[0]).toMatchObject({ variableValues: { serial: '0041' } })
+  })
+})
+
+
+describe('the dialog itself', () => {
+  /**
+   * The printer is chosen on the editor's toolbar, and the print button there
+   * is disabled until it is. Offering the choice again here asked a question
+   * that had already been answered, in a dialog whose whole job is to confirm.
+   */
+  it('does not ask which printer again', () => {
+    open()
+    expect(document.querySelector('select')).toBeNull()
+  })
+
+  it('says which machine this is going to', () => {
+    open()
+    expect(screen.getByText('B3S_P')).toBeDefined()
+  })
+
+  it('is a real dialog, so focus and Escape behave', () => {
+    // Hand-rolled overlays bring none of that, and do not stack with the
+    // confirmations that open on top of them.
+    open()
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
   })
 })

@@ -242,7 +242,6 @@ export const copy: Copy = {
     submitting: 'Submitting…',
     queued: 'Added to the queue',
     queuedDetail: (jobId: string): string => `Job ${jobId}`,
-    selectPrinter: 'Choose a printer first',
     needsProbe: 'This printer has not been probed, so its printable area is unknown',
   },
 

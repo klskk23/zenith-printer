@@ -728,14 +728,12 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
         </div>
       )}
 
-      {printOpen && (
+      {printOpen && printer !== null && (
         <PrintDialog
           ir={ir}
           templateId={template?.id ?? null}
           profileId={profileId}
-          printers={printers.data ?? []}
-          selectedPrinterId={printerId}
-          onSelectPrinter={setPrinterId}
+          printer={printer}
           onClose={() => setPrintOpen(false)}
         />
       )}

@@ -18,8 +18,15 @@ import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog.tsx'
 import { OverflowNotice, type OverflowWarning } from './overflow-notice.tsx'
-import { Select } from '../../components/ui/select.tsx'
 import { usePrintForm } from '../templates/hooks.ts'
 import { FieldForm } from './field-form.tsx'
 import { Preview } from './preview.tsx'
@@ -30,9 +37,14 @@ export interface PrintDialogProps {
   /** When set, the job prints from the saved template rather than this IR. */
   templateId: string | null
   profileId: string | null
-  printers: Printer[]
-  selectedPrinterId: string | null
-  onSelectPrinter: (id: string) => void
+  /**
+   * The machine this is going to.
+   *
+   * Chosen on the editor's toolbar, and the print button there is disabled
+   * until it is — so offering the choice again here asked a question that had
+   * already been answered, in a dialog whose job is to confirm.
+   */
+  printer: Printer
   onClose: () => void
 }
 
@@ -40,9 +52,7 @@ export function PrintDialog({
   ir,
   templateId,
   profileId,
-  printers,
-  selectedPrinterId,
-  onSelectPrinter,
+  printer,
   onClose,
 }: PrintDialogProps): React.JSX.Element {
   const [copies, setCopies] = useState(1)
@@ -59,12 +69,13 @@ export function PrintDialog({
   // same job back rather than a second stack of labels.
   const idempotencyKey = useMemo(() => crypto.randomUUID(), [])
 
-  const printer = printers.find((p) => p.id === selectedPrinterId) ?? null
-  const blocked =
-    printer === null ? copy.print.selectPrinter : printer.capabilities === null ? copy.print.needsProbe : null
+  // A printer that has never been probed has no head width or dpi, so nothing
+  // downstream can decide what fits. That is still reachable from here; a
+  // missing printer is not.
+  const blocked = printer.capabilities === null ? copy.print.needsProbe : null
 
   const jobBody = (): Record<string, unknown> => ({
-    printerId: printer?.id,
+    printerId: printer.id,
     // A saved template prints from the stored design; an unsaved one goes as
     // an ad-hoc IR so User Story 1 still works.
     ...(templateId === null ? { ir } : { templateId }),
@@ -82,7 +93,7 @@ export function PrintDialog({
    * looks fine. This is the only place that can be known.
    */
   useEffect(() => {
-    if (printer === null || printer.capabilities === null) {
+    if (printer.capabilities === null) {
       return
     }
     let cancelled = false
@@ -101,12 +112,9 @@ export function PrintDialog({
     return () => {
       cancelled = true
     }
-  }, [printer?.id, templateId, profileId, copies, JSON.stringify(manualValues)])
+  }, [printer.id, templateId, profileId, copies, JSON.stringify(manualValues)])
 
   const submit = async (): Promise<void> => {
-    if (printer === null) {
-      return
-    }
     setSubmitting(true)
     setError(null)
     try {
@@ -125,9 +133,15 @@ export function PrintDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-lg">
-        <h2 className="text-base font-semibold">{copy.print.heading}</h2>
+    // shadcn's Dialog rather than a hand-rolled overlay: it brings the focus
+    // trap, the Escape key and the scroll lock with it, and it stacks properly
+    // with the confirmations that open on top of it.
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-h-[90vh] space-y-4 overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{copy.print.heading}</DialogTitle>
+          <DialogDescription>{printer.name}</DialogDescription>
+        </DialogHeader>
 
         {result === null ? (
           <>
@@ -135,21 +149,6 @@ export function PrintDialog({
 
             {/* Listed, never enforced: the print button stays enabled. */}
             <OverflowNotice warnings={warnings} />
-
-            <div className="space-y-1">
-              <Label>{copy.print.printer}</Label>
-              <Select
-                value={selectedPrinterId ?? ''}
-                onChange={(event) => onSelectPrinter(event.target.value)}
-              >
-                <option value="">—</option>
-                {printers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
 
             <div className="space-y-1">
               <Label>{copy.print.copies}</Label>
@@ -180,7 +179,7 @@ export function PrintDialog({
             */}
             <Preview
               ir={ir}
-              printerId={selectedPrinterId}
+              printerId={printer.id}
               templateId={templateId}
               profileId={profileId}
               variableValues={
@@ -209,14 +208,14 @@ export function PrintDialog({
               </Alert>
             )}
 
-            <div className="flex justify-end gap-2">
+            <DialogFooter>
               <Button variant="ghost" onClick={onClose}>
                 {copy.print.cancel}
               </Button>
               <Button disabled={blocked !== null || submitting} onClick={() => void submit()}>
                 {submitting ? copy.print.submitting : copy.print.confirm}
               </Button>
-            </div>
+            </DialogFooter>
           </>
         ) : (
           <>
@@ -225,12 +224,12 @@ export function PrintDialog({
             <p className="font-mono text-xs text-muted-foreground">
               {copy.print.queuedDetail(result.jobId)}
             </p>
-            <div className="flex justify-end">
+            <DialogFooter>
               <Button onClick={onClose}>{copy.common.close}</Button>
-            </div>
+            </DialogFooter>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
