@@ -9,6 +9,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { setRequestLocale } from '../../api/client.ts'
 import { setCopyLocale } from '../../i18n/index.ts'
+import { safeLocalStorage } from '../../lib/storage.ts'
 import {
   DEFAULT_PREFERENCES,
   loadPreferences,
@@ -23,17 +24,9 @@ interface PreferencesApi {
 
 const PreferencesContext = createContext<PreferencesApi | null>(null)
 
-function browserStorage(): Pick<Storage, 'getItem' | 'setItem'> {
-  if (typeof window === 'undefined') {
-    // No storage outside a browser; defaults are always valid.
-    return { getItem: () => null, setItem: () => undefined }
-  }
-  return window.localStorage
-}
-
 export function PreferencesProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [preferences, setPreferences] = useState<Preferences>(() => {
-    const loaded = loadPreferences(browserStorage())
+    const loaded = loadPreferences(safeLocalStorage())
     // Applied during initialisation rather than in an effect: an effect runs
     // after the first render, so the first frame would be in the wrong
     // language and then visibly change.
@@ -45,7 +38,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const update = useCallback((changes: Partial<Preferences>) => {
     setPreferences((current) => {
       const next = { ...current, ...changes }
-      savePreferences(browserStorage(), next)
+      savePreferences(safeLocalStorage(), next)
       return next
     })
   }, [])

@@ -13,9 +13,21 @@ import { Button } from '../components/ui/button.tsx'
 import { EditorCanvas, type CanvasProps } from './canvas.tsx'
 import { RULER_SIZE, Ruler } from './ruler.tsx'
 
+/** Height of the zoom strip above the canvas, so fitting accounts for it. */
+const TOOLBAR_HEIGHT = 36
+
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 8
 const WHEEL_SENSITIVITY = 0.0015
+
+/**
+ * Fraction of the available area a fitted label occupies.
+ *
+ * Not 1. A label filling its pane edge to edge leaves nowhere to drop an
+ * element beside it, no room for the rotation handle that sits above the top
+ * edge, and no visual separation between the paper and the application.
+ */
+const FIT_MARGIN = 0.86
 
 export type ViewportProps = Omit<CanvasProps, 'zoom'> & { ir: LabelIR }
 
@@ -30,12 +42,20 @@ export function CanvasViewport(props: ViewportProps): React.JSX.Element {
     if (frame === null) {
       return
     }
-    const available = frame.clientWidth - RULER_SIZE - 16
-    if (available <= 0) {
+    // Both axes, not just width. Fitting on width alone makes a tall label
+    // overflow downwards, which is the one direction a scroll container hides.
+    const availableWidth = frame.clientWidth - RULER_SIZE
+    const availableHeight = frame.clientHeight - RULER_SIZE - TOOLBAR_HEIGHT
+    if (availableWidth <= 0) {
       return
     }
-    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, available / grid.widthDots)))
-  }, [grid.widthDots])
+
+    const byWidth = availableWidth / grid.widthDots
+    const byHeight = availableHeight > 0 ? availableHeight / grid.heightDots : byWidth
+    const fitted = Math.min(byWidth, byHeight) * FIT_MARGIN
+
+    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, fitted)))
+  }, [grid.widthDots, grid.heightDots])
 
   useLayoutEffect(fitToWindow, [fitToWindow])
 

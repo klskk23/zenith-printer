@@ -23,7 +23,9 @@ import { copy } from '../i18n/index.ts'
 import { FONT_FAMILIES, type FontFamilyKey } from './elements.ts'
 import { dotStepMm } from './guards.ts'
 import { Button } from '../components/ui/button.tsx'
+import { Checkbox } from '../components/ui/checkbox.tsx'
 import { Input } from '../components/ui/input.tsx'
+import { Textarea } from '../components/ui/textarea.tsx'
 import { Label } from '../components/ui/label.tsx'
 import { Select } from '../components/ui/select.tsx'
 
@@ -223,11 +225,10 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
               // renderer never wraps to the box width: wrapping needs glyph
               // metrics, and the browser's are not the print renderer's, so the
               // two would break at different words.
-              <textarea
+              <Textarea
                 rows={3}
                 value={element.content}
                 onChange={(event) => patch({ content: event.target.value } as never)}
-                className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
               />
             ) : (
               <Input
@@ -268,14 +269,13 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
               </Select>
             </Field>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          <Label className="flex items-center gap-2 text-sm text-foreground">
+            <Checkbox
               checked={element.bold}
-              onChange={(event) => patch({ bold: event.target.checked } as never)}
+              onCheckedChange={(checked) => patch({ bold: checked === true } as never)}
             />
             {copy.editor.fields.bold}
-          </label>
+          </Label>
         </>
       )}
 
@@ -293,14 +293,13 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
               ))}
             </Select>
           </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          <Label className="flex items-center gap-2 text-sm text-foreground">
+            <Checkbox
               checked={element.showHumanReadable}
-              onChange={(event) => patch({ showHumanReadable: event.target.checked } as never)}
+              onCheckedChange={(checked) => patch({ showHumanReadable: checked === true } as never)}
             />
             {copy.editor.fields.showHumanReadable}
-          </label>
+          </Label>
         </>
       )}
 
@@ -309,14 +308,13 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
       )}
 
       {(element.type === 'rect' || element.type === 'ellipse') && (
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={element.filled}
-            onChange={(event) => patch({ filled: event.target.checked } as never)}
-          />
-          {copy.editor.fields.filled}
-        </label>
+        <Label className="flex items-center gap-2 text-sm text-foreground">
+            <Checkbox
+              checked={element.filled}
+              onCheckedChange={(checked) => patch({ filled: checked === true } as never)}
+            />
+            {copy.editor.fields.filled}
+          </Label>
       )}
 
       <p className="text-[11px] text-muted-foreground">

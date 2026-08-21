@@ -55,14 +55,17 @@ function Workspace({ connection }: { connection: ConnectionState }): React.JSX.E
   ).length
 
   return (
-    <div className="flex min-h-screen flex-col">
+    // Fixed to the viewport rather than growing with content: the editor's
+    // resizable columns need a height to divide, and a page that scrolls as a
+    // whole would give them an unbounded one.
+    <div className="flex h-screen flex-col overflow-hidden">
       <StatusBar connection={connection} />
       <TabBar />
 
-      <div className="flex flex-1">
+      <div className="flex min-h-0 flex-1">
         <Sidebar pendingJobCount={pending} />
 
-        <main className="min-w-0 flex-1">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           {connection === 'disconnected' && <DisconnectedBanner />}
           {atSoftLimit && (
             <Alert variant="warning" className="m-4 text-xs">
@@ -77,7 +80,16 @@ function Workspace({ connection }: { connection: ConnectionState }): React.JSX.E
             when they switch back.
           */}
           {tabs.map((tab) => (
-            <div key={tab.id} className={cn('p-4', tab.id === state.activeId ? '' : 'hidden')}>
+            <div
+              key={tab.id}
+              className={cn(
+                'min-h-0 flex-1 p-4',
+                // `hidden` rather than unmounting: an inactive tab keeps its
+                // selection, zoom and undo history, which is the whole promise
+                // of switching away and back.
+                tab.id === state.activeId ? 'overflow-auto' : 'hidden',
+              )}
+            >
               <TabContent tab={tab} />
             </div>
           ))}

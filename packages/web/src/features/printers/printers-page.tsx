@@ -16,11 +16,13 @@ import type { Printer, PrinterKind, TransportKind } from '../../api/types.ts'
 import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
+import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
 import { Select } from '../../components/ui/select.tsx'
 import { OffsetPanel } from './offset-panel.tsx'
+import { ProfilesPanel } from '../profiles/profiles-panel.tsx'
 import {
   useAddPrinter,
   useDeletePrinter,
@@ -184,6 +186,18 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
 
         <OffsetPanel printer={printer} />
 
+        {/*
+          Profiles are edited here, with the machine they belong to. The editor
+          only picks one from a dropdown: which roll is loaded is a property of
+          the printer, not a decision taken while designing a label.
+        */}
+        <ProfilesPanel
+          printerId={printer.id}
+          capabilities={printer.capabilities}
+          selectedProfileId={null}
+          onSelect={() => undefined}
+        />
+
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" disabled={probe.isPending} onClick={() => probe.mutate(printer.id)}>
             {probe.isPending ? copy.printers.probing : copy.printers.probe}
@@ -200,17 +214,17 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
           >
             {printer.queueState === 'running' ? copy.printers.queue.pause : copy.printers.queue.resume}
           </Button>
-          <Button
+          <ConfirmButton
             size="sm"
             variant="ghost"
-            onClick={() => {
-              if (window.confirm(copy.printers.confirmRemove)) {
-                remove.mutate(printer.id)
-              }
-            }}
+            title={copy.common.confirmTitle}
+            description={copy.printers.confirmRemove}
+            cancelLabel={copy.common.cancel}
+            confirmLabel={copy.printers.remove}
+            onConfirm={() => remove.mutate(printer.id)}
           >
             {copy.printers.remove}
-          </Button>
+          </ConfirmButton>
         </div>
 
         <ErrorNotice error={probe.error ?? remove.error} />

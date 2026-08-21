@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { copy } from '../i18n/index.ts'
 import { Alert } from '../components/ui/alert.tsx'
 import { Button } from '../components/ui/button.tsx'
+import { ConfirmButton } from '../components/ui/confirm-button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { useDeleteTemplate, useTemplates, type Template } from '../features/templates/hooks.ts'
@@ -57,17 +58,17 @@ export function TemplatesPage(): React.JSX.Element {
                 <Button size="sm" onClick={() => open({ kind: 'design', templateId: template.id })}>
                   {copy.templates.open}
                 </Button>
-                <Button
+                <ConfirmButton
                   size="sm"
                   variant="ghost"
-                  onClick={() => {
-                    if (window.confirm(copy.templates.confirmDelete)) {
-                      remove.mutate(template.id)
-                    }
-                  }}
+                  title={copy.common.confirmTitle}
+                  description={copy.templates.confirmDelete}
+                  cancelLabel={copy.common.cancel}
+                  confirmLabel={copy.templates.remove}
+                  onConfirm={() => remove.mutate(template.id)}
                 >
                   {copy.templates.remove}
-                </Button>
+                </ConfirmButton>
               </div>
             </CardContent>
           </Card>

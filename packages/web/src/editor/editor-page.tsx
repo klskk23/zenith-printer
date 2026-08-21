@@ -14,16 +14,20 @@ import { usePreferences } from '../features/preferences/context.tsx'
 import { Alert } from '../components/ui/alert.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { Card, CardContent, CardHeader } from '../components/ui/card.tsx'
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+  useRememberedLayout,
+} from '../components/ui/resizable.tsx'
+import { Separator } from '../components/ui/separator.tsx'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { Label } from '../components/ui/label.tsx'
 import { Select } from '../components/ui/select.tsx'
 import { usePrinters } from '../features/printers/hooks.ts'
 import { PrintDialog } from '../features/print/print-dialog.tsx'
-import { Preview } from '../features/print/preview.tsx'
-import { JobList } from '../features/jobs/job-list.tsx'
-import { JobHistory } from '../features/jobs/history.tsx'
 import { TemplateBar } from '../features/templates/template-bar.tsx'
-import { ProfilesPanel } from '../features/profiles/profiles-panel.tsx'
 import { useProfiles } from '../features/profiles/hooks.ts'
 import type { Template, VariableField } from '../features/templates/hooks.ts'
 import type { Profile } from '../features/profiles/hooks.ts'
@@ -37,7 +41,7 @@ import { VariableFieldPanel } from './variable-field-panel.tsx'
 import { ELEMENT_TYPES, createBlankLabel, createElement, type ElementType } from './elements.ts'
 import { blockingViolations, inspect } from './guards.ts'
 
-type SidePanel = 'element' | 'layers' | 'fields' | 'profiles'
+type SidePanel = 'element' | 'fields'
 
 export function EditorPage(): React.JSX.Element {
   const printers = usePrinters()
@@ -65,6 +69,10 @@ export function EditorPage(): React.JSX.Element {
 
   /** Replace the design outright — loading a template is not an undo step. */
   const resetIr = useCallback((next: LabelIR) => setHistory(initUndo(next)), [])
+
+  // Column widths persist per browser; see resizable.tsx for why they are not
+  // part of the preferences store.
+  const columnLayout = useRememberedLayout('zenith.editor.columns')
 
   const doUndo = useCallback(() => setHistory((current) => undo(current)), [])
   const doRedo = useCallback(() => setHistory((current) => redo(current)), [])
@@ -216,191 +224,245 @@ export function EditorPage(): React.JSX.Element {
   })
 
   return (
-    <div className="space-y-4" onKeyDown={onKeyDown} tabIndex={-1}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 className="text-lg font-semibold">{copy.editor.heading}</h2>
-        <div className="flex items-end gap-2">
-          <div className="space-y-1">
-            <Label>{copy.print.printer}</Label>
-            <Select
-              value={printerId ?? ''}
-              onChange={(event) => {
-                setPrinterId(event.target.value || null)
-                setProfileId(null)
-              }}
-            >
-              <option value="">—</option>
-              {printers.data?.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="flex gap-1">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!canUndo(history)}
-              title={copy.editor.undo}
-              onClick={doUndo}
-            >
-              ↶
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!canRedo(history)}
-              title={copy.editor.redo}
-              onClick={doRedo}
-            >
-              ↷
-            </Button>
-          </div>
-          {/* Overflow warns but never blocks (FR-067); only faults that make the
-              job impossible disable this. */}
+    <div className="flex h-full flex-col" onKeyDown={onKeyDown} tabIndex={-1}>
+      {/* Top bar: what this design is for, and the two irreversible actions. */}
+      <div className="flex flex-wrap items-end gap-3 border-b border-border pb-3">
+        <TemplateBar
+          current={template}
+          buildBody={templateBody}
+          onLoad={loadTemplate}
+          onSaved={(saved) => {
+            setTemplate(saved)
+            setFields(saved.variableFields)
+          }}
+        />
+
+        <div className="space-y-1">
+          <Label>{copy.print.printer}</Label>
+          <Select
+            value={printerId ?? ''}
+            onChange={(event) => {
+              setPrinterId(event.target.value || null)
+              setProfileId(null)
+            }}
+          >
+            <option value="">—</option>
+            {printers.data?.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        {/*
+          A profile is chosen here, not edited here: it belongs to the printer
+          and its settings live on the printer page. Choosing one resizes the
+          canvas to that stock, because designing on a canvas that is not the
+          paper produces a label nobody notices is wrong until it prints.
+        */}
+        <div className="space-y-1">
+          <Label>{copy.profiles.heading}</Label>
+          <Select
+            value={profileId ?? ''}
+            disabled={printerId === null}
+            onChange={(event) => {
+              const id = event.target.value || null
+              setProfileId(id)
+              applyProfileStock(profiles.data?.find((p) => p.id === id) ?? null)
+            }}
+          >
+            <option value="">—</option>
+            {profiles.data?.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="ml-auto flex items-end gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canUndo(history)}
+            title={copy.editor.undo}
+            onClick={doUndo}
+          >
+            ↶
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canRedo(history)}
+            title={copy.editor.redo}
+            onClick={doRedo}
+          >
+            ↷
+          </Button>
+          {/* Overflow warns but never blocks (FR-067); only faults that make
+              the job impossible disable this. */}
           <Button disabled={blocking.length > 0 || printerId === null} onClick={() => setPrintOpen(true)}>
             {copy.print.action}
           </Button>
         </div>
       </div>
 
-      <TemplateBar
-        current={template}
-        buildBody={templateBody}
-        onLoad={loadTemplate}
-        onSaved={(saved) => {
-          setTemplate(saved)
-          setFields(saved.variableFields)
-        }}
-      />
+      {/*
+        Three resizable columns. Their useful widths depend on the label being
+        worked on — many elements wants a taller layer list, a barcode-heavy
+        design wants a wider property panel — so fixed widths would be wrong for
+        both. Sizes persist per browser.
+      */}
+      <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1 pt-3" {...columnLayout}>
+        {/* Left: what the label is, what can go on it, and what is on it. */}
+        <ResizablePanel id="left" defaultSize="16" minSize="12" maxSize="30">
+          <aside className="h-full space-y-4 overflow-y-auto pr-3">
+            <section className="space-y-1.5">
+              <h3 className="text-xs font-semibold">{copy.editor.canvas}</h3>
+              <div className="space-y-1">
+                <Label className="text-[11px]">{copy.editor.canvasWidth}</Label>
+                <Input
+                  type="number"
+                  step={0.5}
+                  value={ir.widthMm}
+                  onChange={(e) => setIr({ ...ir, widthMm: Math.max(1, Number(e.target.value) || 1) })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px]">{copy.editor.canvasHeight}</Label>
+                <Input
+                  type="number"
+                  step={0.5}
+                  value={ir.heightMm}
+                  onChange={(e) => setIr({ ...ir, heightMm: Math.max(1, Number(e.target.value) || 1) })}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">{ir.dpi} dpi</p>
+            </section>
 
-      {/* Blocking problems are explained before the print button is reachable;
-          overflow is only marked on the canvas. */}
-      {violations.map((violation, index) => (
-        <Alert key={`${violation.code}-${index}`} variant={violation.blocking ? 'destructive' : 'warning'}>
-          {copy.violations[violation.code](violation.values ?? {})}
-        </Alert>
-      ))}
+            <Separator />
 
-      <div className="grid gap-4 lg:grid-cols-[auto_340px]">
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="space-y-1">
-              <Label>{copy.editor.canvasWidth}</Label>
-              <Input
-                type="number"
-                step={0.5}
-                value={ir.widthMm}
-                onChange={(e) => setIr({ ...ir, widthMm: Math.max(1, Number(e.target.value) || 1) })}
-                className="w-24"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{copy.editor.canvasHeight}</Label>
-              <Input
-                type="number"
-                step={0.5}
-                value={ir.heightMm}
-                onChange={(e) => setIr({ ...ir, heightMm: Math.max(1, Number(e.target.value) || 1) })}
-                className="w-24"
-              />
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {ELEMENT_TYPES.map((type) => (
-                <Button key={type} size="sm" variant="outline" onClick={() => addElement(type)}>
-                  {copy.editor.elements[type]}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <ElementContextMenu
-            ir={ir}
-            selectedId={selectedId}
-            onDelete={deleteElement}
-            onChange={setIr}
-          >
-            <CanvasViewport
-              ir={ir}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onChange={setIr}
-              resolveImage={(assetId) => `/api/images/${assetId}/content`}
-              snapBarcodeWidthMm={snapBarcodeWidthMm}
-              // Advice, not a boundary: elements can still be placed here.
-              margins={profile}
-              // A drag emits a state per pointer move; without this the whole
-              // history is one drag.
-              onGestureStart={() => {
-                coalescing.current = false
-              }}
-              onGestureEnd={() => {
-                coalescing.current = false
-              }}
-            />
-          </ElementContextMenu>
-
-          <Preview ir={ir} printerId={printerId} />
-        </div>
-
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex gap-1">
-                {(['element', 'layers', 'fields', 'profiles'] as SidePanel[]).map((tab) => (
-                  <Button
-                    key={tab}
-                    size="sm"
-                    variant={panel === tab ? 'default' : 'ghost'}
-                    onClick={() => setPanel(tab)}
-                    disabled={tab === 'profiles' && printerId === null}
-                  >
-                    {tab === 'element'
-                      ? copy.editor.heading
-                      : tab === 'layers'
-                        ? copy.editor.layers.heading
-                        : tab === 'fields'
-                          ? copy.fields.heading
-                          : copy.profiles.heading}
+            <section className="space-y-1.5">
+              <h3 className="text-xs font-semibold">{copy.editor.addElement}</h3>
+              <div className="grid grid-cols-2 gap-1">
+                {ELEMENT_TYPES.map((type) => (
+                  <Button key={type} size="sm" variant="outline" onClick={() => addElement(type)}>
+                    {copy.editor.elements[type]}
                   </Button>
                 ))}
               </div>
-            </CardHeader>
-            <CardContent>
-              {panel === 'element' && (
-                <Inspector ir={ir} element={selected} onChange={updateElement} onDelete={deleteElement} />
-              )}
-              {panel === 'layers' && (
-                <LayersPanel ir={ir} selectedId={selectedId} onSelect={setSelectedId} onChange={setIr} />
-              )}
-              {panel === 'fields' && (
-                <VariableFieldPanel
-                  element={selected}
-                  fields={fields}
-                  onChangeFields={setFields}
-                  onBindElement={bindElement}
-                />
-              )}
-              {panel === 'profiles' && printerId !== null && (
-                <ProfilesPanel
-                  printerId={printerId}
-                  capabilities={limits}
-                  selectedProfileId={profileId}
-                  onSelect={(id) => {
-                    setProfileId(id)
-                    applyProfileStock(profiles.data?.find((p) => p.id === id) ?? null)
-                  }}
-                />
-              )}
-            </CardContent>
-          </Card>
+            </section>
 
-          <JobList printerId={printerId} />
+            <Separator />
 
-          <JobHistory printerId={printerId} />
+            <section className="space-y-1.5">
+              <h3 className="text-xs font-semibold">{copy.editor.layers.heading}</h3>
+              <LayersPanel ir={ir} selectedId={selectedId} onSelect={setSelectedId} onChange={setIr} />
+            </section>
+          </aside>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
+
+        {/* Centre: rulers, canvas, zoom. */}
+        <ResizablePanel id="canvas" defaultSize="60" minSize="30">
+          <div className="h-full overflow-auto px-3">
+            <ElementContextMenu
+              ir={ir}
+              selectedId={selectedId}
+              onDelete={deleteElement}
+              onChange={setIr}
+            >
+              <CanvasViewport
+                ir={ir}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onChange={setIr}
+                resolveImage={(assetId) => `/api/images/${assetId}/content`}
+                snapBarcodeWidthMm={snapBarcodeWidthMm}
+                // Advice, not a boundary: elements can still be placed here.
+                margins={profile}
+                // A drag emits a state per pointer move; without this the whole
+                // history is one drag.
+                onGestureStart={() => {
+                  coalescing.current = false
+                }}
+                onGestureEnd={() => {
+                  coalescing.current = false
+                }}
+              />
+            </ElementContextMenu>
+
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {profile === null ? copy.profiles.noProfileSelected : copy.profiles.marginHint}
+            </p>
+
+            {/*
+              Breathing room under the canvas. Without it the label sits flush
+              against the bottom of the scroll area, which makes the rotation
+              handle of an element near the lower edge awkward to reach.
+            */}
+            <div className="h-24" aria-hidden />
+          </div>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
+
+        {/* Right: the selected element, and the fields it can be bound to. */}
+        <ResizablePanel id="right" defaultSize="24" minSize="16" maxSize="40">
+          <aside className="h-full overflow-y-auto pl-3">
+            <Card>
+              {/*
+                Radix Tabs unmounts the inactive panel, which is fine here — both
+                panels read from state that lives above them, so there is nothing
+                in either one to lose. The workspace tab bar is the opposite case
+                and deliberately does not use this.
+              */}
+              <Tabs value={panel} onValueChange={(value) => setPanel(value as SidePanel)}>
+                <CardHeader className="pb-2">
+                  <TabsList>
+                    <TabsTrigger value="element">{copy.editor.properties}</TabsTrigger>
+                    <TabsTrigger value="fields">{copy.fields.heading}</TabsTrigger>
+                  </TabsList>
+                </CardHeader>
+                <CardContent>
+                  <TabsContent value="element" className="mt-0">
+                    <Inspector ir={ir} element={selected} onChange={updateElement} onDelete={deleteElement} />
+                  </TabsContent>
+                  <TabsContent value="fields" className="mt-0">
+                    <VariableFieldPanel
+                      element={selected}
+                      fields={fields}
+                      onChangeFields={setFields}
+                      onBindElement={bindElement}
+                    />
+                  </TabsContent>
+                </CardContent>
+              </Tabs>
+            </Card>
+          </aside>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+
+      {/*
+        Problems along the bottom rather than pushing the canvas down. A design
+        being dragged around produces and clears warnings constantly, and a
+        banner that reflows the editor each time is unusable.
+      */}
+      {violations.length > 0 && (
+        <div className="mt-3 space-y-1 border-t border-border pt-2">
+          {violations.map((violation, index) => (
+            <Alert
+              key={`${violation.code}-${index}`}
+              variant={violation.blocking ? 'destructive' : 'warning'}
+              className="py-1.5 text-xs"
+            >
+              {copy.violations[violation.code](violation.values ?? {})}
+            </Alert>
+          ))}
         </div>
-      </div>
+      )}
 
       {printOpen && (
         <PrintDialog
