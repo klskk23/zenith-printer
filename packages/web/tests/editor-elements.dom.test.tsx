@@ -699,3 +699,72 @@ describe('the warning strip under the canvas', () => {
     expect(screen.getByText('还没有为这个图片元素选择图片')).toBeDefined()
   })
 })
+
+describe('the rulers', () => {
+  function highlights(): SVGElement[] {
+    return [...document.querySelectorAll('[data-ruler-highlight]')] as SVGElement[]
+  }
+
+  it('shows nothing while nothing is selected', () => {
+    openDesign()
+    expect(highlights()).toHaveLength(0)
+  })
+
+  /**
+   * One band per axis. A frame on the canvas says where an element is relative
+   * to the other elements; the rulers say where it is relative to the paper,
+   * which is the question a ruler exists to answer.
+   */
+  it('bands both axes for the selected element', () => {
+    openDesign()
+    addElement('矩形')
+    expect(highlights()).toHaveLength(2)
+  })
+
+  it('spells out the extent in dots', () => {
+    openDesign()
+    addElement('矩形')
+    const spans = [...document.querySelectorAll('[data-ruler-span]')].map((n) => n.textContent)
+    // A new rectangle is 20x10 mm, which at 203 dpi is 160x80 dots.
+    expect(spans).toContain('160')
+    expect(spans).toContain('80')
+  })
+
+  it('follows the element as it moves', () => {
+    openDesign()
+    addElement('矩形')
+    const before = highlights()[0]!.querySelector('rect')!.getAttribute('x')
+
+    const xField = [...document.querySelectorAll('label')].find((l) => l.textContent === 'X 坐标')!
+    fireEvent.change(xField.parentElement!.querySelector('input')!, { target: { value: '20' } })
+
+    expect(highlights()[0]!.querySelector('rect')!.getAttribute('x')).not.toBe(before)
+  })
+
+  it('reports the space a rotated element actually occupies', () => {
+    // A 20x10 turned a quarter turn covers 10x20; a ruler saying otherwise
+    // would contradict the frame drawn around it on the canvas.
+    openDesign()
+    addElement('矩形')
+    fireEvent.click(screen.getByRole('radio', { name: '90°' }))
+
+    const spans = [...document.querySelectorAll('[data-ruler-span]')].map((n) => n.textContent)
+    expect(spans).toContain('80')
+    expect(spans).toContain('160')
+  })
+
+  it('clears when the element is deleted', () => {
+    openDesign()
+    addElement('矩形')
+    fireEvent.keyDown(screen.getByRole('toolbar', { name: '标签设计' }).closest('[tabindex]')!, {
+      key: 'Delete',
+    })
+    expect(highlights()).toHaveLength(0)
+  })
+
+  it('does not take pointer events from the ruler', () => {
+    openDesign()
+    addElement('矩形')
+    expect(highlights()[0]!.getAttribute('pointer-events')).toBe('none')
+  })
+})

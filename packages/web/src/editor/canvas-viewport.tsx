@@ -11,7 +11,7 @@
  * zooms deliberately — after which their choice stands, because a view that
  * silently undoes a deliberate zoom is worse than one that never fits at all.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { layoutGrid, type LabelIR } from '@zenith/shared'
 import { copy } from '../i18n/index.ts'
 import { Input } from '../components/ui/input.tsx'
@@ -19,6 +19,7 @@ import { Label } from '../components/ui/label.tsx'
 import { EditorCanvas, type CanvasProps } from './canvas.tsx'
 import { MAX_ZOOM, MIN_ZOOM, clampZoom, fitZoom, isZoomGesture, zoomFromWheel } from './zoom.ts'
 import { RULER_SIZE, Ruler } from './ruler.tsx'
+import { selectionSpans } from './ruler-span.ts'
 
 export type ViewportProps = Omit<CanvasProps, 'zoom'> & {
   ir: LabelIR
@@ -31,6 +32,13 @@ export function CanvasViewport({ marginNote, ...props }: ViewportProps): React.J
   const grid = layoutGrid({ widthMm: ir.widthMm, heightMm: ir.heightMm, dpi: ir.dpi })
   const areaRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
+
+  // Recomputed as the element moves, so the band follows a drag rather than
+  // reporting where the element used to be.
+  const spans = useMemo(
+    () => selectionSpans(props.ir, props.selectedId),
+    [props.ir, props.selectedId],
+  )
 
   /** Once someone zooms on purpose, stop re-fitting behind their back. */
   const manual = useRef(false)
@@ -114,10 +122,22 @@ export function CanvasViewport({ marginNote, ...props }: ViewportProps): React.J
         <div className="inline-block">
           <div className="flex">
             <div style={{ width: RULER_SIZE, height: RULER_SIZE }} />
-            <Ruler lengthMm={ir.widthMm} dpi={ir.dpi} zoom={zoom} orientation="horizontal" />
+            <Ruler
+              lengthMm={ir.widthMm}
+              dpi={ir.dpi}
+              zoom={zoom}
+              orientation="horizontal"
+              highlight={spans?.x ?? null}
+            />
           </div>
           <div className="flex">
-            <Ruler lengthMm={ir.heightMm} dpi={ir.dpi} zoom={zoom} orientation="vertical" />
+            <Ruler
+              lengthMm={ir.heightMm}
+              dpi={ir.dpi}
+              zoom={zoom}
+              orientation="vertical"
+              highlight={spans?.y ?? null}
+            />
             <EditorCanvas {...props} zoom={zoom} />
           </div>
         </div>

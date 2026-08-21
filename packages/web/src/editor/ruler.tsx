@@ -11,6 +11,7 @@
  */
 import { useMemo } from 'react'
 import { mmToDots } from '@zenith/shared'
+import { spanLengthDots, type Span } from './ruler-span.ts'
 
 const RULER_THICKNESS = 18
 
@@ -30,9 +31,20 @@ export interface RulerProps {
   /** Screen pixels per printer dot. */
   zoom: number
   orientation: 'horizontal' | 'vertical'
+  /** The selected element's extent on this axis, in dots. */
+  highlight?: Span | null
 }
 
-export function Ruler({ lengthMm, dpi, zoom, orientation }: RulerProps): React.JSX.Element {
+/** Below this the dot count has nowhere to sit without covering the ticks. */
+const MIN_LABEL_PX = 26
+
+export function Ruler({
+  lengthMm,
+  dpi,
+  zoom,
+  orientation,
+  highlight = null,
+}: RulerProps): React.JSX.Element {
   const pixelsPerMm = (mmToDots(1, dpi) || 1) * zoom
   const lengthPx = mmToDots(lengthMm, dpi) * zoom
   const horizontal = orientation === 'horizontal'
@@ -55,6 +67,53 @@ export function Ruler({ lengthMm, dpi, zoom, orientation }: RulerProps): React.J
       className="shrink-0 text-muted-foreground"
       aria-hidden
     >
+      {/*
+        The selection, as a band across the ruler.
+        Translucent and behind the ticks: it says where the element is and how
+        wide it is without hiding the scale it is being read against. The dot
+        count is the number that decides whether a barcode's quiet zone
+        survives or a rule lands on a whole row, so it is spelled out — but
+        only when the band is wide enough to hold it, since a number lying
+        across the tick marks is worse than no number.
+      */}
+      {highlight !== null && (
+        <g data-ruler-highlight pointerEvents="none">
+          <rect
+            x={horizontal ? highlight.startDots * zoom : 0}
+            y={horizontal ? 0 : highlight.startDots * zoom}
+            width={horizontal ? Math.max(spanLengthDots(highlight) * zoom, 1) : RULER_THICKNESS}
+            height={horizontal ? RULER_THICKNESS : Math.max(spanLengthDots(highlight) * zoom, 1)}
+            fill="currentColor"
+            opacity={0.18}
+          />
+          {[highlight.startDots, highlight.endDots].map((edge, index) => (
+            <line
+              key={index}
+              x1={horizontal ? edge * zoom : 0}
+              y1={horizontal ? 0 : edge * zoom}
+              x2={horizontal ? edge * zoom : RULER_THICKNESS}
+              y2={horizontal ? RULER_THICKNESS : edge * zoom}
+              stroke="currentColor"
+              strokeWidth={1}
+              opacity={0.55}
+            />
+          ))}
+          {spanLengthDots(highlight) * zoom >= MIN_LABEL_PX && (
+            <text
+              x={horizontal ? ((highlight.startDots + highlight.endDots) / 2) * zoom : RULER_THICKNESS / 2}
+              y={horizontal ? RULER_THICKNESS - 5 : ((highlight.startDots + highlight.endDots) / 2) * zoom}
+              fontSize={8}
+              fill="currentColor"
+              textAnchor="middle"
+              dominantBaseline={horizontal ? 'auto' : 'middle'}
+              data-ruler-span
+            >
+              {spanLengthDots(highlight)}
+            </text>
+          )}
+        </g>
+      )}
+
       {ticks.map(({ mm, isMajor }) => {
         const offset = mmToDots(mm, dpi) * zoom
         const size = isMajor ? RULER_THICKNESS * 0.55 : RULER_THICKNESS * 0.28
