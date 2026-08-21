@@ -30,12 +30,18 @@ export interface ProfilesPanelProps {
 }
 
 
-const MARGIN_KEYS = [
-  { key: 'marginTopMm', label: copy.profiles.marginTop },
-  { key: 'marginRightMm', label: copy.profiles.marginRight },
-  { key: 'marginBottomMm', label: copy.profiles.marginBottom },
-  { key: 'marginLeftMm', label: copy.profiles.marginLeft },
-] as const
+/**
+ * Keys only; labels are read at render time. A module-level constant holding
+ * the text would freeze it at import, before a language has been chosen.
+ */
+const MARGIN_KEYS = ['marginTopMm', 'marginRightMm', 'marginBottomMm', 'marginLeftMm'] as const
+
+const MARGIN_LABELS = {
+  marginTopMm: 'marginTop',
+  marginRightMm: 'marginRight',
+  marginBottomMm: 'marginBottom',
+  marginLeftMm: 'marginLeft',
+} as const
 
 export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): React.JSX.Element {
   const profiles = useProfiles(printerId)
@@ -153,9 +159,9 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
           <div className="space-y-1">
             <Label>{copy.profiles.margins}</Label>
             <div className="grid grid-cols-4 gap-1.5">
-              {MARGIN_KEYS.map(({ key, label }) => (
+              {MARGIN_KEYS.map((key) => (
                 <div key={key} className="space-y-1">
-                  <Label className="text-[11px]">{label}</Label>
+                  <Label className="text-[11px]">{copy.profiles[MARGIN_LABELS[key]]}</Label>
                   <Input
                     type="number"
                     step={0.5}

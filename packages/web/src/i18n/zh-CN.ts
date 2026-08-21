@@ -126,7 +126,7 @@ export const copy = {
     },
     zoom: {
       label: '缩放',
-      hint: 'Ctrl + 滚轮可缩放',
+      hint: 'Alt + 滚轮可缩放',
     },
     contextMenu: {
       delete: '删除',
@@ -379,6 +379,23 @@ export const copy = {
     // someone to reprint the whole batch.
     progressUnknown: (total: number): string => `已打印份数未知 / 共 ${total}`,
     countManually: '服务在打印过程中重启，实际打出的份数无法确认。请清点实物后再决定补打数量。',
+    paused: {
+      heading: (printer: string) => `${printer} 的打印队列已暂停`,
+      note: '排队中的任务不会开始，直到你恢复队列。请先确认故障已经处理。',
+      reasons: {
+        JOB_INTERRUPTED_BY_RESTART: '上一个任务因服务重启而中断，已打印份数未知。',
+        DEVICE_LACK_PAPER: '上一个任务因缺纸而失败。',
+        DEVICE_COVER_OPEN: '上一个任务因上盖未合上而失败。',
+        PRINTER_UNREACHABLE: '上一个任务因无法连接打印机而失败。',
+      } as Record<string, string>,
+    },
+    reprint: {
+      action: '补打',
+      heading: '补打这个任务',
+      unknownCount: '这次打印的实际份数无法确认。请清点已打出的标签，填入还需要补打的数量。',
+      knownCount: (printed: number, total: number) => `已打出 ${printed} 张，原计划 ${total} 张。默认补打差额，可自行调整。`,
+      confirm: (copies: number) => `打印 ${copies} 张`,
+    },
   },
 
   history: {

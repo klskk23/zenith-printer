@@ -263,7 +263,17 @@ describe('zoom', () => {
 
   it('says how to zoom with the wheel', () => {
     openDesign()
-    expect(screen.getAllByText(/Ctrl/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Alt/).length).toBeGreaterThan(0)
+  })
+
+  /**
+   * Not Ctrl: that is the browser's own page zoom and it wins. React's wheel
+   * listener is passive, so preventDefault inside an onWheel prop is ignored —
+   * the page zoomed anyway and nothing reported a problem.
+   */
+  it('does not claim Ctrl, which the browser owns', () => {
+    openDesign()
+    expect(screen.queryByText(/Ctrl \+/)).toBeNull()
   })
 
   it('keeps the margin note in the status strip', () => {

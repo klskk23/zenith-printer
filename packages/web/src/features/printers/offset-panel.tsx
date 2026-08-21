@@ -39,12 +39,21 @@ import { Select } from '../../components/ui/select.tsx'
 import { useProfiles } from '../profiles/hooks.ts'
 import { usePrintCalibrationPage, useSetOffset } from './hooks.ts'
 
-const DIRECTIONS: { key: keyof OffsetDirections; label: string }[] = [
-  { key: 'upDots', label: copy.offset.up },
-  { key: 'rightDots', label: copy.offset.right },
-  { key: 'downDots', label: copy.offset.down },
-  { key: 'leftDots', label: copy.offset.left },
-]
+/**
+ * Keys only. The labels are read at render time.
+ *
+ * Holding the text here would freeze it at module load: `copy` resolves against
+ * whichever bundle is active *when it is read*, and a module-level constant is
+ * read exactly once, before anyone has chosen a language.
+ */
+const DIRECTIONS = ['upDots', 'rightDots', 'downDots', 'leftDots'] as const satisfies readonly (keyof OffsetDirections)[]
+
+const DIRECTION_LABELS = {
+  upDots: 'up',
+  rightDots: 'right',
+  downDots: 'down',
+  leftDots: 'left',
+} as const
 
 export function OffsetPanel({ printer }: { printer: Printer }): React.JSX.Element {
   const save = useSetOffset()
@@ -101,9 +110,9 @@ export function OffsetPanel({ printer }: { printer: Printer }): React.JSX.Elemen
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {DIRECTIONS.map(({ key, label }) => (
+        {DIRECTIONS.map((key) => (
           <div key={key} className="space-y-1">
-            <Label className="text-[11px]">{label}</Label>
+            <Label className="text-[11px]">{copy.offset[DIRECTION_LABELS[key]]}</Label>
             <Input
               type="number"
               min={0}

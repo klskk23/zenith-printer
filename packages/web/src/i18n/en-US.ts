@@ -129,7 +129,7 @@ export const copy: Copy = {
     },
     zoom: {
       label: 'Zoom',
-      hint: 'Ctrl + scroll to zoom',
+      hint: 'Alt + scroll to zoom',
     },
     contextMenu: {
       delete: 'Delete',
@@ -380,6 +380,26 @@ export const copy: Copy = {
     progressUnknown: (total: number): string => `Printed count unknown, of ${total}`,
     countManually:
       'The service restarted mid-print, so the number actually produced cannot be confirmed. Count the labels before deciding how many to reprint.',
+    paused: {
+      heading: (printer: string) => `${printer}'s print queue is paused`,
+      note: 'Queued jobs will not start until you resume it. Clear the fault first.',
+      reasons: {
+        JOB_INTERRUPTED_BY_RESTART:
+          'The previous job was interrupted by a service restart; the printed count is unknown.',
+        DEVICE_LACK_PAPER: 'The previous job failed because the printer ran out of paper.',
+        DEVICE_COVER_OPEN: 'The previous job failed because the lid was open.',
+        PRINTER_UNREACHABLE: 'The previous job failed because the printer could not be reached.',
+      } as Record<string, string>,
+    },
+    reprint: {
+      action: 'Reprint',
+      heading: 'Reprint this job',
+      unknownCount:
+        'How many were printed cannot be confirmed. Count the labels produced and enter how many are still needed.',
+      knownCount: (printed: number, total: number) =>
+        `${printed} of ${total} were printed. The shortfall is filled in by default; adjust it if you need to.`,
+      confirm: (copies: number) => `Print ${copies}`,
+    },
   },
 
   history: {

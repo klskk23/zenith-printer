@@ -17,23 +17,8 @@ import { copy } from '../i18n/index.ts'
 import { Input } from '../components/ui/input.tsx'
 import { Label } from '../components/ui/label.tsx'
 import { EditorCanvas, type CanvasProps } from './canvas.tsx'
+import { MAX_ZOOM, MIN_ZOOM, clampZoom, fitZoom, isZoomGesture, zoomFromWheel } from './zoom.ts'
 import { RULER_SIZE, Ruler } from './ruler.tsx'
-
-const MIN_ZOOM = 0.25
-const MAX_ZOOM = 8
-const WHEEL_SENSITIVITY = 0.0015
-
-/**
- * Share of the available width a fitted label takes.
- *
- * Not all of it: the rotation handle sits above the top edge, elements are
- * dragged past the sides while being positioned, and a label flush against its
- * container reads as part of the application rather than as a piece of paper.
- */
-const FIT_SHARE = 0.85
-
-/** Never shrink below this share of the width, however tall the label is. */
-const MIN_FIT_SHARE = 0.7
 
 export type ViewportProps = Omit<CanvasProps, 'zoom'> & {
   ir: LabelIR
@@ -56,20 +41,18 @@ export function CanvasViewport({ marginNote, ...props }: ViewportProps): React.J
       return
     }
     const availableWidth = area.clientWidth - RULER_SIZE
-    const availableHeight = area.clientHeight - RULER_SIZE
     if (availableWidth <= 0) {
       return
     }
 
-    const byWidth = (availableWidth * FIT_SHARE) / grid.widthDots
-    const byHeight = availableHeight > 0 ? (availableHeight * FIT_SHARE) / grid.heightDots : byWidth
-
-    // Height must not shrink a wide label below the floor: a long thin label in
-    // a short panel would otherwise end up a sliver.
-    const floor = (availableWidth * MIN_FIT_SHARE) / grid.widthDots
-    const fitted = Math.max(floor, Math.min(byWidth, byHeight))
-
-    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, fitted)))
+    setZoom(
+      fitZoom({
+        availableWidth,
+        availableHeight: area.clientHeight - RULER_SIZE,
+        widthDots: grid.widthDots,
+        heightDots: grid.heightDots,
+      }),
+    )
   }, [grid.widthDots, grid.heightDots])
 
   useLayoutEffect(fit, [fit])
@@ -88,25 +71,46 @@ export function CanvasViewport({ marginNote, ...props }: ViewportProps): React.J
 
   const setManualZoom = useCallback((next: number) => {
     manual.current = true
-    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next)))
+    setZoom(clampZoom(next))
   }, [])
 
-  const onWheel = useCallback(
-    (event: React.WheelEvent) => {
-      // Only with the modifier, so ordinary scrolling still scrolls.
-      if (!event.ctrlKey && !event.metaKey) {
+  // Read inside the native listener, which is registered once and would
+  // otherwise close over the zoom value it saw at mount.
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+
+  /**
+   * The wheel listener is native and non-passive.
+   *
+   * React registers its own at the root as passive, so `preventDefault` inside
+   * an `onWheel` prop is silently ignored — which is what let the page scroll
+   * sideways underneath the zoom. The rule for what counts as a zoom lives in
+   * zoom.ts; this only delivers the event to it.
+   */
+  useEffect(() => {
+    const area = areaRef.current
+    if (area === null) {
+      return
+    }
+    const onWheel = (event: WheelEvent): void => {
+      if (!isZoomGesture(event)) {
         return
       }
       event.preventDefault()
-      setManualZoom(zoom * Math.exp(-event.deltaY * WHEEL_SENSITIVITY))
-    },
-    [zoom, setManualZoom],
-  )
+      setManualZoom(zoomFromWheel(zoomRef.current, event))
+    }
+    area.addEventListener('wheel', onWheel, { passive: false })
+    return () => area.removeEventListener('wheel', onWheel)
+  }, [setManualZoom])
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* The label, centred in whatever space the column has. */}
-      <div ref={areaRef} className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4" onWheel={onWheel}>
+      <div
+        ref={areaRef}
+        data-canvas-area
+        className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4"
+      >
         <div className="inline-block">
           <div className="flex">
             <div style={{ width: RULER_SIZE, height: RULER_SIZE }} />
