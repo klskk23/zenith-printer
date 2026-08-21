@@ -75,10 +75,20 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
     ),
   )
   const ir = history.present
-  const coalescing = useRef(false)
+  /**
+   * The action currently in progress, if any.
+   *
+   * A ref rather than state: it changes on pointer-down and pointer-up and
+   * nothing on screen depends on it, so making it state would re-render the
+   * editor twice per drag for no visible effect.
+   */
+  const gestureKey = useRef<string | null>(null)
+  const gestureCount = useRef(0)
 
-  const setIr = useCallback((next: LabelIR) => {
-    setHistory((current) => commit(current, next, coalescing.current))
+  const setIr = useCallback((next: LabelIR, mergeKey: string | null = null) => {
+    // An explicit key wins; otherwise the change belongs to whatever gesture is
+    // under way, and to nothing when none is.
+    setHistory((current) => commit(current, next, mergeKey ?? gestureKey.current))
   }, [])
 
   /**
@@ -90,7 +100,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
    * seconds ago, silently discarding everything typed in between.
    */
   const updateIr = useCallback((change: (current: LabelIR) => LabelIR) => {
-    setHistory((current) => commit(current, change(current.present), coalescing.current))
+    setHistory((current) => commit(current, change(current.present), gestureKey.current))
   }, [])
 
   /** Replace the design outright — loading a template is not an undo step. */
@@ -226,10 +236,10 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
    * discard a width the user set by hand the next time they nudged the element
    * a millimetre sideways.
    */
-  const updateElement = (next: LabelElement): void => {
+  const updateElement = (next: LabelElement, mergeKey: string | null = null): void => {
     const previous = ir.elements.find((e) => e.id === next.id) ?? null
     const fitted = refit(previous, next, ir.dpi)
-    setIr({ ...ir, elements: ir.elements.map((e) => (e.id === fitted.id ? fitted : e)) })
+    setIr({ ...ir, elements: ir.elements.map((e) => (e.id === fitted.id ? fitted : e)) }, mergeKey)
   }
 
   const deleteElement = (id: string): void => {
@@ -658,13 +668,18 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                 marginNote={
                   profile === null ? copy.profiles.noProfileSelected : copy.profiles.marginHint
                 }
-                // A drag emits a state per pointer move; without this the whole
-                // history is one drag.
+                // One undo entry per gesture. Every pointer move emits a state,
+                // each snapped to the grid, so without a key naming the gesture
+                // undo walked back one grid step at a time.
+                //
+                // A fresh key each time, so two drags of the same element in a
+                // row stay two separate entries.
                 onGestureStart={() => {
-                  coalescing.current = false
+                  gestureCount.current += 1
+                  gestureKey.current = `gesture-${gestureCount.current}`
                 }}
                 onGestureEnd={() => {
-                  coalescing.current = false
+                  gestureKey.current = null
                 }}
               />
             </ElementContextMenu>

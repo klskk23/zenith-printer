@@ -20,30 +20,56 @@ export interface UndoState {
   past: readonly LabelIR[]
   present: LabelIR
   future: readonly LabelIR[]
+  /**
+   * What produced `present`, so the next change can tell whether it continues
+   * the same action or starts a new one. Null means "whatever comes next is a
+   * new action".
+   */
+  mergeKey: string | null
 }
 
 export function initUndo(present: LabelIR): UndoState {
-  return { past: [], present, future: [] }
+  return { past: [], present, future: [], mergeKey: null }
 }
 
 /**
  * Record a new state.
  *
- * `coalesce` merges this change into the previous entry instead of adding one.
- * A drag emits a state per pointer move; without merging, one drag fills the
- * entire history and undo stops meaning anything.
+ * `mergeKey` names the action this change belongs to. Consecutive changes
+ * carrying the same key fold into one entry; a different key, or none, starts
+ * a new one. Null is the default because most edits are single acts — bringing
+ * an element to the front, deleting one, dropping a new one on the canvas.
+ *
+ * The key is what makes undo mean "the thing I just did" rather than "the last
+ * state change the program happened to make". Both of the cases it exists for
+ * were reported as undo being broken:
+ *
+ *   - **a drag** emits a state per pointer move, each snapped to the grid, so
+ *     undo walked back one grid step at a time and a drag across the label
+ *     took twenty presses to reverse.
+ *   - **typing** emits a state per keystroke, so undo deleted one character at
+ *     a time — and the fifty-entry limit meant a long field pushed everything
+ *     else out of the history.
+ *
+ * A pause does not end an action; moving to another field or doing something
+ * else does. That keeps this decidable without a clock, which keeps it
+ * testable and keeps two identical sequences of edits producing two identical
+ * histories.
  */
-export function commit(state: UndoState, next: LabelIR, coalesce = false): UndoState {
+export function commit(state: UndoState, next: LabelIR, mergeKey: string | null = null): UndoState {
   if (next === state.present) {
     return state
   }
 
-  if (coalesce && state.past.length > 0) {
-    return { past: state.past, present: next, future: [] }
+  // The first change of all still has to create an entry: there is nothing
+  // behind `present` to fold into.
+  const continues = mergeKey !== null && mergeKey === state.mergeKey && state.past.length > 0
+  if (continues) {
+    return { past: state.past, present: next, future: [], mergeKey }
   }
 
   const past = [...state.past, state.present].slice(-UNDO_LIMIT)
-  return { past, present: next, future: [] }
+  return { past, present: next, future: [], mergeKey }
 }
 
 export function canUndo(state: UndoState): boolean {
@@ -63,6 +89,9 @@ export function undo(state: UndoState): UndoState {
     past: state.past.slice(0, -1),
     present: previous,
     future: [state.present, ...state.future],
+    // Undoing ends whatever action was in progress. Typing again after an undo
+    // starts a new entry rather than folding into the one just restored.
+    mergeKey: null,
   }
 }
 
@@ -75,5 +104,6 @@ export function redo(state: UndoState): UndoState {
     past: [...state.past, state.present],
     present: next,
     future: state.future.slice(1),
+    mergeKey: null,
   }
 }

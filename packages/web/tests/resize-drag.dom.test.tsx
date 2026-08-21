@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
+import { screen as domScreen } from '@testing-library/react'
 
 function wrap(ui: React.ReactNode): React.JSX.Element {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false } } })
@@ -75,8 +76,15 @@ function frameWidth(): number {
   return Number(document.querySelector('rect[data-element-id]')!.getAttribute('width'))
 }
 
-/** Drag the resize handle by a delta in dots. */
-function dragResizeHandle(deltaXDots: number, deltaYDots: number): void {
+/**
+ * Drag the resize handle by a delta in dots.
+ *
+ * In steps, because a real drag is: a hand moving across a label emits a
+ * pointer move every few milliseconds, and each one commits a state. A single
+ * jump would test a gesture nobody performs — and would quietly pass whether
+ * or not those states are folded into one undo entry.
+ */
+function dragResizeHandle(deltaXDots: number, deltaYDots: number, steps = 8): void {
   const handle = document.querySelector('[data-handle="resize"]')
   expect(handle, 'no resize handle — is anything selected?').not.toBeNull()
 
@@ -85,7 +93,13 @@ function dragResizeHandle(deltaXDots: number, deltaYDots: number): void {
 
   fireEvent.pointerDown(handle!, { clientX: 0, clientY: 0, pointerId: 1 })
   const svg = document.querySelector('[data-label-canvas] svg')!
-  fireEvent.pointerMove(svg, { clientX: deltaXDots, clientY: deltaYDots, pointerId: 1 })
+  for (let step = 1; step <= steps; step += 1) {
+    fireEvent.pointerMove(svg, {
+      clientX: (deltaXDots * step) / steps,
+      clientY: (deltaYDots * step) / steps,
+      pointerId: 1,
+    })
+  }
   fireEvent.pointerUp(svg, { pointerId: 1 })
 }
 
@@ -209,5 +223,98 @@ describe('dragging a rectangle', () => {
     const before = frameWidth()
     dragResizeHandle(40, 40)
     expect(frameWidth()).toBeGreaterThan(before)
+  })
+})
+
+
+/**
+ * What one undo undoes.
+ *
+ * Both cases here were reported as undo being broken, and both come from the
+ * same place: the editor recorded every state it passed through rather than
+ * every action the operator took.
+ */
+describe('undo after a gesture', () => {
+  function undoButton(): HTMLElement {
+    return domScreen.getByRole('button', { name: '撤销' })
+  }
+
+  function frame(): { x: string | null; width: string | null } {
+    const rect = document.querySelector('rect[data-element-id]')!
+    return { x: rect.getAttribute('x'), width: rect.getAttribute('width') }
+  }
+
+  /**
+   * A drag emits a state per pointer move, each snapped to the grid. Undo
+   * therefore walked back one grid step at a time, so reversing a drag across
+   * the label took as many presses as it had crossed millimetres.
+   */
+  it('takes one press to reverse a whole drag', () => {
+    openDesignWithGeometry()
+    fireEvent.click(screen.getByText('矩形'))
+    selectFirstElement()
+    const before = frame()
+
+    dragResizeHandle(120, 80)
+    expect(frame().width).not.toBe(before.width)
+
+    fireEvent.click(undoButton())
+    expect(frame().width).toBe(before.width)
+  })
+
+  it('keeps two drags as two things to undo', () => {
+    openDesignWithGeometry()
+    fireEvent.click(screen.getByText('矩形'))
+    selectFirstElement()
+    const before = frame()
+
+    dragResizeHandle(40, 40)
+    const afterFirst = frame()
+    selectFirstElement()
+    dragResizeHandle(40, 40)
+
+    fireEvent.click(undoButton())
+    expect(frame().width).toBe(afterFirst.width)
+    fireEvent.click(undoButton())
+    expect(frame().width).toBe(before.width)
+  })
+})
+
+describe('undo after typing', () => {
+  function undoButton(): HTMLElement {
+    return domScreen.getByRole('button', { name: '撤销' })
+  }
+
+  /**
+   * Typing emitted a state per keystroke, so undo deleted one character at a
+   * time — and a long field pushed everything else out of a fifty-entry
+   * history.
+   */
+  it('takes one press to reverse a whole field', () => {
+    openDesignWithGeometry()
+    fireEvent.click(screen.getByText('文字'))
+
+    const field = document.querySelector('textarea')!
+    const before = field.value
+    for (const value of ['A', 'AB', 'ABC', 'ABCD']) {
+      fireEvent.change(field, { target: { value } })
+    }
+    expect(document.querySelector('textarea')!.value).toBe('ABCD')
+
+    fireEvent.click(undoButton())
+    expect(document.querySelector('textarea')!.value).toBe(before)
+  })
+
+  it('keeps two different fields as two things to undo', () => {
+    openDesignWithGeometry()
+    fireEvent.click(screen.getByText('文字'))
+
+    fireEvent.change(document.querySelector('textarea')!, { target: { value: 'HELLO' } })
+    const sizeLabel = [...document.querySelectorAll('label')].find((l) => l.textContent === '字号')!
+    fireEvent.change(sizeLabel.parentElement!.querySelector('input')!, { target: { value: '6' } })
+
+    fireEvent.click(undoButton())
+    // The font size is back; the text is not, because they were two actions.
+    expect(document.querySelector('textarea')!.value).toBe('HELLO')
   })
 })

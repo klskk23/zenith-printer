@@ -41,7 +41,11 @@ import { Select } from '../components/ui/select.tsx'
 export interface InspectorProps {
   ir: LabelIR
   element: LabelElement | null
-  onChange: (element: LabelElement) => void
+  /**
+   * `mergeKey` names the action, so consecutive edits of one field fold into a
+   * single undo entry instead of one per keystroke.
+   */
+  onChange: (element: LabelElement, mergeKey: string) => void
   onDelete: (id: string) => void
 }
 
@@ -223,8 +227,21 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
     return <p className="text-sm text-muted-foreground">{copy.editor.noSelection}</p>
   }
 
+  /**
+   * Apply a change, and say which action it belongs to.
+   *
+   * The key is built from the fields the *user* touched, before anything
+   * derived is folded in — a text element's box is refitted from its content,
+   * and keying on the result would make two keystrokes look like two different
+   * actions the moment one of them changed the width.
+   *
+   * Same element, same field, consecutive changes: one undo entry. Typing a
+   * part number used to leave one entry per character, so undo deleted letters
+   * and a long field pushed everything else out of a fifty-entry history.
+   */
   const patch = (changes: Partial<LabelElement>): void => {
-    onChange({ ...element, ...changes } as LabelElement)
+    const fields = Object.keys(changes).sort().join(',')
+    onChange({ ...element, ...changes } as LabelElement, `${element.id}:${fields}`)
   }
 
   return (

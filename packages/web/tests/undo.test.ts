@@ -86,24 +86,98 @@ describe('coverage of edit kinds', () => {
   })
 })
 
-describe('drag coalescing', () => {
+/**
+ * What counts as one action.
+ *
+ * Both cases here were reported as undo being broken. A drag emits a state per
+ * pointer move, each snapped to the grid, so undo walked back one grid step at
+ * a time. Typing emits a state per keystroke, so undo deleted one character at
+ * a time and a long field pushed everything else out of the fifty-entry
+ * history.
+ */
+describe('actions', () => {
   it('records a drag as one step, not one per frame', () => {
     const first = ir()
     let state = initUndo(first)
-    // A drag emits a state per pointer move.
-    state = commit(state, move(first, 3))
-    for (const x of [4, 5, 6, 7, 8]) {
-      state = commit(state, move(first, x), true)
+    for (const x of [3, 4, 5, 6, 7, 8]) {
+      state = commit(state, move(first, x), 'gesture-1')
     }
 
     expect(state.past).toHaveLength(1)
     expect(undo(state).present).toBe(first)
   })
 
-  it('does not coalesce into an empty history', () => {
+  it('records typing in one field as one step', () => {
     const first = ir()
-    const state = commit(initUndo(first), move(first, 3), true)
+    let state = initUndo(first)
+    for (const x of [1, 2, 3, 4]) {
+      state = commit(state, move(first, x), 'text-1:content')
+    }
+
+    expect(state.past).toHaveLength(1)
+    expect(undo(state).present).toBe(first)
+  })
+
+  it('keeps two consecutive drags apart', () => {
+    // The editor mints a fresh key per gesture, so dragging an element twice
+    // is two things done and two things to undo.
+    const first = ir()
+    let state = commit(initUndo(first), move(first, 3), 'gesture-1')
+    state = commit(state, move(first, 9), 'gesture-2')
+    expect(state.past).toHaveLength(2)
+  })
+
+  it('keeps two different fields apart', () => {
+    const first = ir()
+    let state = commit(initUndo(first), move(first, 3), 'text-1:content')
+    state = commit(state, move(first, 9), 'text-1:fontSizeMm')
+    expect(state.past).toHaveLength(2)
+  })
+
+  it('keeps the same field on two different elements apart', () => {
+    const first = ir()
+    let state = commit(initUndo(first), move(first, 3), 'text-1:content')
+    state = commit(state, move(first, 9), 'text-2:content')
+    expect(state.past).toHaveLength(2)
+  })
+
+  it('never merges an unnamed change', () => {
+    // Most edits are single acts — bringing an element forward, deleting one.
+    const first = ir()
+    let state = commit(initUndo(first), move(first, 3))
+    state = commit(state, move(first, 4))
+    expect(state.past).toHaveLength(2)
+  })
+
+  it('does not merge into an empty history', () => {
+    const first = ir()
+    const state = commit(initUndo(first), move(first, 3), 'gesture-1')
     expect(canUndo(state)).toBe(true)
+  })
+
+  /**
+   * Undoing ends whatever was in progress: typing again after an undo starts a
+   * new entry rather than folding into the one just restored, which would make
+   * the undo unrepeatable.
+   */
+  it('ends the action being undone', () => {
+    const first = ir()
+    let state = commit(initUndo(first), move(first, 3), 'text-1:content')
+    state = commit(state, move(first, 4), 'text-1:content')
+    expect(state.past).toHaveLength(1)
+
+    state = undo(state)
+    state = commit(state, move(first, 9), 'text-1:content')
+    expect(state.past).toHaveLength(1)
+    expect(undo(state).present).toBe(first)
+  })
+
+  it('ends the action after a redo, too', () => {
+    const first = ir()
+    let state = commit(initUndo(first), move(first, 3), 'text-1:content')
+    state = redo(undo(state))
+    state = commit(state, move(first, 4), 'text-1:content')
+    expect(state.past).toHaveLength(2)
   })
 })
 
