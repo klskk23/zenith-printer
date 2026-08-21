@@ -1,80 +1,30 @@
 <!--
 Sync Impact Report
 ==================
-Version change: [模板未填充] → 1.0.0
-Bump rationale: 首次批准（初始批准）。将模板占位符替换为具体条款，确立 5 条核心原则与治理规则。
+Version change: 1.2.0 → 1.3.0
+Bump rationale: MINOR —— 实质性扩展既有条款（原则 II）的约束范围，新增界面渲染测试
+要求与「页面可达性」质量门槛；技术栈表新增测试环境两行。未移除或重定义任何原则。
 
 Modified principles:
-- [PRINCIPLE_1_NAME] → I. 代码质量优先（Code Quality First）
-- [PRINCIPLE_2_NAME] → II. 测试标准（Testing Standards）（不可协商）
-- [PRINCIPLE_3_NAME] → III. 用户体验一致性（UX Consistency）
-- [PRINCIPLE_4_NAME] → IV. 语言与本地化规范（Language & Localization）
-- [PRINCIPLE_5_NAME] → V. 可观测性与故障可诊断性（Observability & Diagnosability）
+- II. 测试标准 —— 新增「界面渲染测试」四条，并在理由中记录触发本次修订的事故。
 
 Added sections:
-- 技术约束与质量门槛（原 [SECTION_2_NAME]）
-- 开发工作流与评审流程（原 [SECTION_3_NAME]）
+- 技术约束与质量门槛 → 技术栈表新增「测试运行器」「界面测试环境」两行
+- 技术约束与质量门槛 → 其他约束新增「页面可达性」
 
 Removed sections: 无
 
+修订动因（2026-08-21）：
+002 功能实现期间，项目在 929 个测试全绿的状态下交付了一个白屏的标签设计页。
+覆盖几何、吸附、撤销、越界判定的测试无一挂载过组件，因此渲染期抛出的引用错误
+无人察觉。同期一个端点只被测了「未确认时拒绝」而未测「确认后是否执行」，
+于是它构建完数据即返回、什么也没打印，同样一路绿灯。两者共同的形状是
+「测了拦截路径，没测执行路径」。
+
 Templates requiring updates:
-- ✅ .specify/templates/plan-template.md —— "Constitution Check" 为动态占位，由 /speckit-plan 依据本文件填充，无需改动
-- ✅ .specify/templates/spec-template.md —— "User Scenarios & Testing" 章节已满足原则 II/III，无需改动
-- ✅ .specify/templates/tasks-template.md —— 已更新：测试任务由 "OPTIONAL" 改为受原则 II 约束的强制项
-- ✅ .specify/templates/checklist-template.md —— 通用结构，无原则冲突
-- ✅ CLAUDE.md —— 已追加语言规范与宪章引用（原则 IV）
-
-Follow-up TODOs: 无
-
---- 修订 v1.1.0 (2026-08-20) ---
-Version change: 1.0.0 → 1.1.0
-Bump rationale: MINOR。新增「技术栈（锁定）」「UI 组件规范」两个小节，并扩展「其他约束」
-（渲染确定性、单位约定）。为新增约束，未移除或重定义既有原则，故为 MINOR 而非 MAJOR。
-
-Modified sections:
-- 技术约束与质量门槛 —— 由一段散文式技术栈描述，扩展为锁定选型表 + UI 组件规范 + 其他约束
-
-Added rules:
-- 技术栈锁定表（Fastify / niimbluelib / ZSim / resvg-js / bwip-js / sharp / zod / SQLite /
-  Vite+React+Tailwind+shadcn-ui / SVG DOM），偏离须在计划文档论证
-- UI 组件 MUST 优先 shadcn/ui，无适用组件时方可自建，且须复用其设计令牌
-- 渲染确定性：MUST 使用打包字体 + loadSystemFonts:false，MUST NOT 依赖系统 fontconfig
-- 单位约定：mm 存储、round 取整、基于 dot 网格计算
-
-Removed rules:
-- 原「图像处理使用 sharp」的笼统表述 —— 收窄为「仅用于二值化与格式转换，MUST NOT 用它
-  渲染 SVG 文字」（sharp→librsvg→fontconfig 链路破坏可复现性）
-- 原「CLI 使用 commander」—— 本项目为 web 服务，非 CLI 工具，该条不再适用
-
-Source: docs/design-consensus.md（九个架构分支的可行性共识）
-
-Templates requiring updates (v1.1.0):
-- ✅ 无模板需改动 —— 本次仅新增技术约束，未触及原则编号或任务分类
-
---- 修订 v1.2.0 (2026-08-20) ---
-Version change: 1.1.0 → 1.2.0
-Bump rationale: MINOR。原则 III 由单一列表重组为 III.0 共通 + III.A Web/REST + III.B CLI
-三段式，并新增 REST 专属条款。原则编号与数量不变，无约束被移除（CLI 条款完整保留于
-III.B），故为 MINOR 而非 MAJOR。
-
-Modified principles:
-- III. 用户体验一致性 —— 重组为三段式，明确 Web/REST 为主交付形态、CLI 为辅助形态
-
-Added rules (III.A Web/REST):
-- JSON 字段 camelCase；HTTP 状态码语义正确且同类失败恒定
-- 错误响应统一结构：机器可读错误码 + 人类可读中文文案
-- 长耗时操作 MUST 立即返回可轮询任务标识，MUST NOT 阻塞至物理动作完成
-- 任务状态 MUST 暴露已完成份数，支持部分失败后精确补打
-
-Added rules (III.0 共通):
-- 设备错误 MUST 由错误码映射为可读文案，MUST NOT 透传数字
-- 消耗耗材/不可撤销操作 MUST 显式确认，MUST NOT 由幂等重试触发
-
-Retained (moved to III.B):
-- kebab-case ⟷ camelCase 映射、--json 双格式、stdout/stderr 分流、退出码稳定
-
-Templates requiring updates (v1.2.0):
-- ✅ 无模板需改动 —— 原则编号未变，任务分类未受影响
+- .specify/templates/plan-template.md —— Constitution Check 增加界面渲染测试提示 ✅ 已同步
+- .specify/templates/tasks-template.md —— 测试任务段落增加页面渲染断言与
+  「测执行路径而非仅测拦截路径」提示 ✅ 已同步
 -->
 
 # Zenith Printer Constitution
@@ -111,8 +61,28 @@ Templates requiring updates (v1.2.0):
 - 核心逻辑（协议、图像处理、状态机）的行覆盖率 **MUST** 不低于 80%；覆盖率下降的 PR **MUST** 被拒绝。
 - 测试 **MUST** 确定性：禁止依赖真实时钟、随机数或网络；时间与随机源 **MUST** 可注入。
 
+**界面渲染测试**：
+
+- 每一个可从导航到达的页面 **MUST** 具备一条渲染断言，验证其挂载后不抛异常。
+  一个页面能否显示出来，是它最基本也最廉价可测的属性。
+- 界面测试 **MUST** 与逻辑测试分属不同的测试项目：逻辑测试跑在纯 Node 下，
+  只有需要 DOM 的用例才加载 DOM 环境。新增的测试项目 **MUST** 并入默认测试命令，
+  否则等同于没有增加。
+- 纯逻辑 **MUST** 抽离为不依赖组件的模块并直接测试；**MUST NOT** 为了覆盖一段判断
+  而去渲染组件。前端纯逻辑（坐标换算、吸附、撤销、越界判定等）**MUST** 计入
+  覆盖率门槛——这些代码出错同样会打印出错误的标签。
+- 组件测试 **MUST** 断言行为与结构，**MUST NOT** 断言具体样式类名或标记细节。
+  当页面职责被明确划走时（如某功能已迁至独立页面），**SHOULD** 补一条负向断言
+  锁住它不再出现在原处。
+
 **理由**：打印机固件差异大、真机验证慢且不可自动化。只有可脱机运行的确定性测试套件，
 才能让 CI 真正成为质量门槛。
+
+界面渲染条款的由来是一次实际事故：项目曾有 929 个测试全绿，覆盖几何、吸附、撤销与
+越界判定，却没有任何一条挂载过组件——于是一个渲染期就抛出的引用错误让整个标签设计页
+变成白屏，直到有人打开浏览器才被发现。同期还有一个端点只被测了"未确认时拒绝"，
+没有被测"确认后是否真的执行"，于是它构建完数据就返回、什么也没打印，同样一路绿灯。
+**测试拦截路径而不测执行路径，是一种可预期的疏漏，需要用规则堵住。**
 
 ### III. 用户体验一致性（UX Consistency）
 
@@ -200,6 +170,8 @@ Web 界面、REST API、运维 CLI 与文档必须表现为同一个产品，而
 | 持久化 | **SQLite** | |
 | 前端 | **Vite + React + Tailwind CSS + shadcn/ui** | |
 | 编辑器渲染 | **SVG DOM** | 与后端 resvg 同源，**MUST NOT** 改用 canvas |
+| 测试运行器 | **Vitest** | 逻辑与界面分属不同 project，共用一套配置 |
+| 界面测试环境 | **happy-dom** + **@testing-library/react** | 仅界面 project 加载；逻辑测试保持纯 Node |
 
 ### UI 组件规范
 
@@ -226,6 +198,8 @@ Web 界面、REST API、运维 CLI 与文档必须表现为同一个产品，而
   并发访问同一设备 **MUST** 通过互斥保护。
 - **质量门槛（CI 强制）**：类型检查通过、Lint 无错误、测试全绿、核心逻辑覆盖率 ≥ 80%。
   任一项失败即阻断合并，**MUST NOT** 以"后续修复"为由绕过。
+- **页面可达性**：每个可导航到的页面 **MUST** 有渲染断言。新增页面而不加该断言的 PR
+  **MUST** 被拒绝——白屏是最廉价可测的失败，没有理由让它进到浏览器里才被发现。
 
 ## 开发工作流与评审流程
 
@@ -263,4 +237,4 @@ Web 界面、REST API、运维 CLI 与文档必须表现为同一个产品，而
 - 运行时开发指引参见 `CLAUDE.md` 与当前功能的 `specs/<###-feature-name>/plan.md`。
 - 架构决策依据参见 `docs/design-consensus.md`；与之冲突的实现 **MUST** 先修订该文档。
 
-**Version**: 1.2.0 | **Ratified**: 2026-08-20 | **Last Amended**: 2026-08-20
+**Version**: 1.3.0 | **Ratified**: 2026-08-20 | **Last Amended**: 2026-08-21

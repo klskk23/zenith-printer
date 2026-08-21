@@ -42,6 +42,12 @@
 
 [Gates determined based on constitution file]
 
+<!--
+  If the feature adds or changes any navigable page, the gate table MUST carry
+  a row for the render assertion required by Principle II ("界面渲染测试").
+  A page with no test that mounts it is a blank screen waiting to ship.
+-->
+
 ## Project Structure
 
 ### Documentation (this feature)

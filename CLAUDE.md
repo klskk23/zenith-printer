@@ -17,11 +17,12 @@
 
 ## 项目宪章
 
-本项目的开发受 `.specify/memory/constitution.md`（Zenith Printer Constitution **v1.2.0**）约束。
+本项目的开发受 `.specify/memory/constitution.md`（Zenith Printer Constitution **v1.3.0**）约束。
 开始任何规格、计划、任务或实现工作前，必须先阅读该文件并遵守其五条核心原则：
 
 1. **代码质量优先** —— 严格类型、零 Lint 错误、显式错误处理
-2. **测试标准（不可协商）** —— 测试先行；默认测试套件必须可脱离物理打印机运行
+2. **测试标准（不可协商）** —— 测试先行；默认测试套件必须可脱离物理打印机运行；
+   每个可导航页面必须有渲染断言；测执行路径而非仅测拦截路径
 3. **用户体验一致性** —— 三段式：III.0 共通（术语统一、错误三要素）+ III.A Web/REST
    （主形态：camelCase、状态码稳定、长任务非阻塞）+ III.B CLI（辅助形态：kebab-case、
    `--json`、退出码）
