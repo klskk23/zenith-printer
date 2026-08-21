@@ -8,7 +8,9 @@
  */
 import { ApiRequestError } from '../../api/client.ts'
 import type { JobStatus } from '../../api/types.ts'
+import { useState } from 'react'
 import { copy } from '../../i18n/index.ts'
+import { ReprintDialog } from './reprint-dialog.tsx'
 import { Progress } from '../../components/ui/progress.tsx'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
@@ -51,6 +53,7 @@ function ProgressLabel({ job }: { job: PrintJob }): React.JSX.Element {
 
 function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
   const cancel = useCancelJob()
+  const [reprinting, setReprinting] = useState(false)
   const cancellable = job.status === 'queued'
 
   return (
@@ -69,6 +72,20 @@ function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
             </Button>
           )}
         </div>
+
+        {job.status === 'failed' && (
+          <>
+            <Button size="sm" variant="outline" onClick={() => setReprinting(true)}>
+              {copy.jobs.reprint.action}
+            </Button>
+            <ReprintDialog
+              job={job}
+              open={reprinting}
+              onOpenChange={setReprinting}
+              onDone={() => undefined}
+            />
+          </>
+        )}
 
         {job.status === 'failed' && job.failureCode !== null && (
           <Alert variant={job.failureCode === 'PRINTER_UNREACHABLE' ? 'warning' : 'destructive'} className="text-xs">

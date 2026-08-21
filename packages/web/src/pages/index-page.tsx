@@ -11,7 +11,7 @@
  * shown instead is what the service knows without touching the device: whether
  * it has ever been probed, and what its queue is doing.
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { copy } from '../i18n/index.ts'
 import { Button } from '../components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx'
@@ -20,6 +20,8 @@ import { usePrinters } from '../features/printers/hooks.ts'
 import { useJobs, type PrintJob } from '../features/jobs/hooks.ts'
 import { useTemplates, type Template } from '../features/templates/hooks.ts'
 import { useWorkspace } from '../app/workspace.tsx'
+import { ReprintDialog } from '../features/jobs/reprint-dialog.tsx'
+import { PausedQueueBanner } from '../features/jobs/paused-banner.tsx'
 import type { Printer } from '../api/types.ts'
 import { consumableDisplay } from './consumable.ts'
 
@@ -79,7 +81,7 @@ function TemplateCard({ template }: { template: Template }): React.JSX.Element {
 }
 
 function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
-  const { open } = useWorkspace()
+  const [reprinting, setReprinting] = useState(false)
   return (
     <li className="flex items-center justify-between gap-3 py-1.5 text-xs">
       <span className="truncate">
@@ -88,11 +90,19 @@ function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
       <span className="flex shrink-0 items-center gap-2">
         <span className="text-muted-foreground">{copy.jobs.status[job.status]}</span>
         {job.status === 'failed' && (
-          // Failed jobs are resubmitted by hand on purpose; putting the entry
-          // next to the failure saves hunting for it in history.
-          <Button size="sm" variant="ghost" onClick={() => open({ kind: 'history' })}>
-            {copy.index.resubmit}
-          </Button>
+          <>
+            {/* Reprinting is deliberate and needs a count, so it opens the same
+                dialog as everywhere else rather than resubmitting blindly. */}
+            <Button size="sm" variant="ghost" onClick={() => setReprinting(true)}>
+              {copy.index.resubmit}
+            </Button>
+            <ReprintDialog
+              job={job}
+              open={reprinting}
+              onOpenChange={setReprinting}
+              onDone={() => undefined}
+            />
+          </>
         )}
       </span>
     </li>
@@ -120,6 +130,9 @@ export function IndexPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
+      {/* A paused queue is the first thing worth knowing on this page. */}
+      <PausedQueueBanner />
+
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">{copy.index.printerSection}</h2>

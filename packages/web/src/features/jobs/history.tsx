@@ -10,8 +10,9 @@
  */
 import { useState } from 'react'
 import { copy } from '../../i18n/index.ts'
-import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
+import { ReprintDialog } from './reprint-dialog.tsx'
+import { Alert } from '../../components/ui/alert.tsx'
 import { Card, CardContent } from '../../components/ui/card.tsx'
 import { useJobs, type PrintJob } from './hooks.ts'
 
@@ -32,7 +33,14 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
       <CardContent className="space-y-1 p-3 text-xs">
         <div className="flex items-center justify-between gap-2">
           <span className="font-medium">{job.snapshot.templateName ?? copy.history.adHoc}</span>
-          <span className="text-muted-foreground">{copy.jobs.status[job.status]}</span>
+          <span className="flex items-center gap-2">
+            <span className="text-muted-foreground">{copy.jobs.status[job.status]}</span>
+            {job.status === 'failed' && (
+              // History is where a failed job ends up; without this the advice
+              // to "count and reprint" had nowhere to be acted on.
+              <ReprintEntry job={job} />
+            )}
+          </span>
         </div>
 
         <div className="flex items-center justify-between gap-2 text-muted-foreground">
@@ -86,5 +94,18 @@ export function JobHistory({ printerId }: { printerId: string | null }): React.J
         ))}
       </div>
     </div>
+  )
+}
+
+/** The reprint action plus its dialog, kept together so each row owns its state. */
+function ReprintEntry({ job }: { job: PrintJob }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+        {copy.jobs.reprint.action}
+      </Button>
+      <ReprintDialog job={job} open={open} onOpenChange={setOpen} onDone={() => undefined} />
+    </>
   )
 }

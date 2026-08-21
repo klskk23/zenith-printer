@@ -185,6 +185,78 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
     return job
   })
 
+  /**
+   * Reprint a failed job.
+   *
+   * The copy count is supplied by the caller rather than taken from the
+   * original, because the reason to reprint is usually a shortfall: a job that
+   * failed after 60 of 100 needs 40, and one interrupted by a restart needs
+   * however many the operator counts on the bench. Defaulting to the original
+   * count would reprint the ones already on the roll.
+   *
+   * Content comes from the job's snapshot, not from the template: the design
+   * may have been edited or deleted since, and a reprint has to match what came
+   * out the first time (FR-050).
+   */
+  typed.post(
+    '/api/print-jobs/:id/reprint',
+    {
+      schema: {
+        params: idParams,
+        body: z.object({ copies: z.number().int().min(1).max(100) }),
+        headers: z.object({ 'idempotency-key': z.string().min(1).optional() }).loose(),
+      },
+    },
+    async (request, reply) => {
+      const store = jobs()
+      const original = store.find(request.params.id)
+      if (original === undefined) {
+        throw ApiError.notFound({ jobId: request.params.id })
+      }
+      if (original.printerId === null) {
+        throw ApiError.unprocessable('VALIDATION_FAILED', { jobId: original.id })
+      }
+      const printer = printers().find(original.printerId)
+      if (printer === undefined) {
+        throw ApiError.notFound({ printerId: original.printerId })
+      }
+      if (printer.queueState === 'paused') {
+        // The failure that produced this job paused the queue. Resuming is a
+        // deliberate act — it says the fault has been dealt with — so it is not
+        // done implicitly here.
+        throw ApiError.conflict('QUEUE_PAUSED', { printerId: printer.id })
+      }
+
+      const idempotencyKey = request.headers['idempotency-key'] ?? randomUUID()
+      const { job, created } = store.createOrGet({
+        idempotencyKey: String(idempotencyKey),
+        printerId: printer.id,
+        templateId: original.templateId,
+        profileId: original.profileId,
+        requestedCopies: request.body.copies,
+        manualFieldValues: original.manualFieldValues,
+        // Sequence numbers are deliberately not carried over: a reprint of a
+        // spoiled batch reuses the original range, and that is a decision made
+        // in the print form where the numbers are visible.
+        seqRanges: {},
+        snapshot: original.snapshot,
+      })
+
+      if (created) {
+        void app.ctx.queue?.drain(printer.id).catch((err: unknown) => {
+          request.log.error({ err, printerId: printer.id }, 'queue runner failed')
+        })
+      }
+
+      return reply.status(HttpStatus.Accepted).send({
+        jobId: job.id,
+        status: job.status,
+        requestedCopies: job.requestedCopies,
+        reprintOf: original.id,
+      })
+    },
+  )
+
   typed.delete('/api/print-jobs/:id', { schema: { params: idParams } }, async (request, reply) => {
     const store = jobs()
     const job = store.find(request.params.id)
