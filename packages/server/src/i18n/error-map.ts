@@ -9,7 +9,22 @@
  * the prose comes from the i18n resources.
  */
 import { PrinterErrorCode } from '@mmote/niimbluelib'
-import { APP_ERROR_COPY, DEVICE_ERROR_COPY, type ErrorCopy } from './zh-CN.ts'
+import { ZH_CN } from './zh-CN.ts'
+import { EN_US } from './en-US.ts'
+import {
+  APP_ERROR_CODES,
+  DEFAULT_LOCALE,
+  type AppErrorCode,
+  type ErrorCopy,
+  type Locale,
+  type LocaleBundle,
+} from './types.ts'
+
+const BUNDLES: Record<Locale, LocaleBundle> = { 'zh-CN': ZH_CN, 'en-US': EN_US }
+
+export function bundleFor(locale: Locale = DEFAULT_LOCALE): LocaleBundle {
+  return BUNDLES[locale] ?? BUNDLES[DEFAULT_LOCALE]
+}
 
 export interface UserFacingError extends ErrorCopy {
   /** Stable machine-readable identifier — the REST contract's `code`. */
@@ -35,26 +50,39 @@ export function deviceErrorCode(reasonId: number): string {
 }
 
 /** Map a device fault to readable copy. */
-export function describeDeviceError(reasonId: number): UserFacingError {
-  const copy = DEVICE_ERROR_COPY[reasonId]
+export function describeDeviceError(reasonId: number, locale: Locale = DEFAULT_LOCALE): UserFacingError {
+  const bundle = bundleFor(locale)
+  const copy = bundle.device[reasonId]
   if (copy !== undefined) {
     return { code: deviceErrorCode(reasonId), ...copy }
   }
   // Still no bare number: an unmapped code gets a usable message.
-  return {
-    code: deviceErrorCode(reasonId),
-    ...APP_ERROR_COPY.INTERNAL_ERROR!,
-    what: APP_ERROR_COPY.INTERNAL_ERROR!.what,
+  return { code: deviceErrorCode(reasonId), ...bundle.app.INTERNAL_ERROR }
+}
+
+/** Whether a string is one of the known application error codes. */
+export function isAppErrorCode(code: string): code is AppErrorCode {
+  return (APP_ERROR_CODES as readonly string[]).includes(code)
+}
+
+/**
+ * Map an application-level code to readable copy.
+ *
+ * The `code` is the stable part and never varies with locale — the frontend
+ * branches on it. Only the prose changes.
+ */
+export function describeAppError(code: string, locale: Locale = DEFAULT_LOCALE): UserFacingError {
+  const bundle = bundleFor(locale)
+  // An unknown code becomes INTERNAL_ERROR rather than leaking the raw string:
+  // a code with no copy would reach the user as a blank message.
+  if (!isAppErrorCode(code)) {
+    return { code: 'INTERNAL_ERROR', ...bundle.app.INTERNAL_ERROR }
   }
+  return { code, ...bundle.app[code] }
 }
 
-/** Map an application-level code to readable copy. */
-export function describeAppError(code: string): UserFacingError {
-  const copy = APP_ERROR_COPY[code] ?? APP_ERROR_COPY.INTERNAL_ERROR!
-  return { code: APP_ERROR_COPY[code] !== undefined ? code : 'INTERNAL_ERROR', ...copy }
-}
-
-/** Codes with no translation. Should always be empty; asserted in tests. */
-export function unmappedDeviceErrorCodes(): number[] {
-  return allDeviceErrorCodes().filter((id) => DEVICE_ERROR_COPY[id] === undefined)
+/** Codes with no translation in a given locale. Always empty; asserted in tests. */
+export function unmappedDeviceErrorCodes(locale: Locale = DEFAULT_LOCALE): number[] {
+  const bundle = bundleFor(locale)
+  return allDeviceErrorCodes().filter((id) => bundle.device[id] === undefined)
 }

@@ -16,11 +16,11 @@ const snapshot: ContentSnapshot = {
     heightMm: 30,
     dpi: 203,
     elements: [
-      { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, rotation: 0, content: { $var: 'serial' }, symbology: 'code128', showHumanReadable: true },
+      { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, rotation: 0, content: { $var: 'serial' }, symbology: 'code128', showHumanReadable: true, moduleWidthDots: 2 },
       { id: 'part', type: 'text', xMm: 2, yMm: 16, widthMm: 40, heightMm: 5, rotation: 0, content: { $var: 'partNo' }, fontFamily: 'F', fontSizeMm: 3, bold: false, align: 'left' },
     ],
   },
-  profile: { name: null, density: 3, labelType: 1, offsetXMm: 0, offsetYMm: 0 },
+  profile: { name: null, density: 3, labelType: 1 }, offsetXDots: 0, offsetYDots: 0,
 }
 
 function makeJob(overrides: Partial<PrintJob> = {}): PrintJob {

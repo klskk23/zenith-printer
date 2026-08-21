@@ -25,6 +25,8 @@ export interface Template {
   createdAt: string
   /** Optimistic concurrency token; a save carries the value it loaded with. */
   updatedAt: string
+  /** Optimistic concurrency token; a stale value means somebody saved first. */
+  version: number
 }
 
 export interface PrintFormField {
@@ -52,12 +54,12 @@ export function useTemplates() {
 export function useSaveTemplate() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (input: { id?: string; updatedAt?: string; body: Record<string, unknown> }) =>
+    mutationFn: (input: { id?: string; version?: number; body: Record<string, unknown> }) =>
       input.id === undefined
         ? request<Template>('/templates', { method: 'POST', body: input.body })
         : request<Template>(`/templates/${input.id}`, {
             method: 'PUT',
-            body: { ...input.body, updatedAt: input.updatedAt },
+            body: { ...input.body, version: input.version },
           }),
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })

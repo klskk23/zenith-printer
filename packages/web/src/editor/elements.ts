@@ -8,7 +8,7 @@
  */
 import { DEFAULT_MODULE_WIDTH_DOTS, type LabelElement, type LabelIR } from '@zenith/shared'
 
-export const ELEMENT_TYPES = ['text', 'barcode', 'qrcode', 'image', 'line', 'rect'] as const
+export const ELEMENT_TYPES = ['text', 'barcode', 'qrcode', 'image', 'line', 'rect', 'ellipse'] as const
 export type ElementType = (typeof ELEMENT_TYPES)[number]
 
 export const FONT_FAMILIES = {
@@ -66,6 +66,7 @@ export function createElement(type: ElementType, ir: LabelIR, options: CreateOpt
         content: '123456789',
         symbology: 'code128',
         showHumanReadable: true,
+        moduleWidthDots: DEFAULT_MODULE_WIDTH_DOTS,
       }
 
     case 'qrcode':
@@ -79,6 +80,7 @@ export function createElement(type: ElementType, ir: LabelIR, options: CreateOpt
         rotation: 0,
         content: 'https://example.com',
         errorCorrectionLevel: 'M',
+        moduleWidthDots: DEFAULT_MODULE_WIDTH_DOTS,
       }
 
     case 'image':
@@ -120,12 +122,28 @@ export function createElement(type: ElementType, ir: LabelIR, options: CreateOpt
         filled: false,
         cornerRadiusMm: 0,
       }
+
+    case 'ellipse':
+      return {
+        id,
+        type: 'ellipse',
+        xMm,
+        yMm,
+        widthMm: 20,
+        heightMm: 12,
+        rotation: 0,
+        strokeWidthDots: 2,
+        filled: false,
+      }
   }
 }
 
-/** A blank label sized for the most common stock. */
-export function createBlankLabel(dpi: number): LabelIR {
-  return { widthMm: 50, heightMm: 30, dpi, elements: [] }
+/** A blank label. Defaults suit the most common stock; preferences override them. */
+export function createBlankLabel(
+  dpi: number,
+  size: { widthMm: number; heightMm: number } = { widthMm: 50, heightMm: 30 },
+): LabelIR {
+  return { widthMm: size.widthMm, heightMm: size.heightMm, dpi, elements: [] }
 }
 
 export const DEFAULT_BARCODE_MODULE_WIDTH_DOTS = DEFAULT_MODULE_WIDTH_DOTS

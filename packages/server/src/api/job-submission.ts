@@ -148,9 +148,11 @@ export function buildSnapshot(
       // No profile chosen: fall back to what the device reported about itself.
       density: profile?.density ?? capabilities.densityDefault,
       labelType: profile?.labelType ?? capabilities.paperTypes[0] ?? 1,
-      offsetXMm: profile?.offsetXMm ?? 0,
-      offsetYMm: profile?.offsetYMm ?? 0,
     },
+    // Taken from the printer, which is where correction now lives; captured
+    // here because it will have changed by the time anyone reads this record.
+    offsetXDots: printer.offsetXDots,
+    offsetYDots: printer.offsetYDots,
   }
 }
 

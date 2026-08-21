@@ -28,6 +28,24 @@ export function isVariableRef(content: Content): content is VariableRef {
 }
 
 export const rotationSchema = z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)])
+export type Rotation = z.infer<typeof rotationSchema>
+
+/**
+ * Barcode and QR module width, in whole dots.
+ *
+ * The minimum of 2 comes from the scanning spec, not from what can be drawn:
+ * at 203 dpi 2 dots is 0.25 mm, the usual Code 128 X-dimension, and the spec
+ * floor is around 0.19 mm. A single dot renders perfectly well and simply
+ * cannot be read back.
+ *
+ * Odd widths are fine. An earlier version of this codebase required an even
+ * width; that rule was measured to be unnecessary and has been removed.
+ */
+export const moduleWidthDotsSchema = z
+  .number()
+  .int('module width must be a whole number of dots')
+  .min(2, 'a module narrower than 2 dots is below the scanning floor')
+  .default(2)
 
 /** Whole dots, minimum 1 — see the note at the top of this file. */
 export const strokeWidthDotsSchema = z
@@ -73,6 +91,9 @@ export const barcodeElementSchema = z.object({
   content: contentSchema,
   symbology: symbologySchema,
   showHumanReadable: z.boolean().default(true),
+  // The rendered width is moduleWidthDots x moduleCount; `widthMm` above is a
+  // derived estimate used for overflow checks, not an input to rendering.
+  moduleWidthDots: moduleWidthDotsSchema,
 })
 
 export const qrcodeElementSchema = z.object({
@@ -81,6 +102,9 @@ export const qrcodeElementSchema = z.object({
   type: z.literal('qrcode'),
   content: contentSchema,
   errorCorrectionLevel: eccSchema.default('M'),
+  // Side length is quantised the same way barcodes are: the module count
+  // depends on both the content and the error-correction level.
+  moduleWidthDots: moduleWidthDotsSchema,
 })
 
 export const imageElementSchema = z.object({
@@ -108,6 +132,19 @@ export const rectElementSchema = z.object({
   cornerRadiusMm: z.number().finite().min(0).default(0),
 })
 
+/**
+ * Described by its bounding box rather than centre plus radii, so that the
+ * property panel, selection box and resize handles are shared with `rect`
+ * unchanged. A circle is an ellipse with equal sides — no separate type.
+ */
+export const ellipseElementSchema = z.object({
+  ...baseElement,
+  ...sized,
+  type: z.literal('ellipse'),
+  strokeWidthDots: strokeWidthDotsSchema,
+  filled: z.boolean().default(false),
+})
+
 export const labelElementSchema = z.discriminatedUnion('type', [
   textElementSchema,
   barcodeElementSchema,
@@ -115,6 +152,7 @@ export const labelElementSchema = z.discriminatedUnion('type', [
   imageElementSchema,
   lineElementSchema,
   rectElementSchema,
+  ellipseElementSchema,
 ])
 export type LabelElement = z.infer<typeof labelElementSchema>
 export type TextElement = z.infer<typeof textElementSchema>
@@ -123,6 +161,7 @@ export type QrcodeElement = z.infer<typeof qrcodeElementSchema>
 export type ImageElement = z.infer<typeof imageElementSchema>
 export type LineElement = z.infer<typeof lineElementSchema>
 export type RectElement = z.infer<typeof rectElementSchema>
+export type EllipseElement = z.infer<typeof ellipseElementSchema>
 
 export const labelIrSchema = z
   .object({

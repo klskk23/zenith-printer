@@ -166,3 +166,170 @@ describe('text', () => {
     expect(svg).toContain('font-size="24"')
   })
 })
+
+/**
+ * The three defects this feature exists to fix, pinned as regressions.
+ */
+describe('qrcode elements', () => {
+  const qr = (over: Record<string, unknown> = {}): LabelIR =>
+    labelIrSchema.parse({
+      widthMm: 50, heightMm: 30, dpi: 203,
+      elements: [{
+        id: 'q', type: 'qrcode', xMm: 2, yMm: 2, widthMm: 15, heightMm: 15,
+        content: 'https://example.com', ...over,
+      }],
+    })
+
+  it('renders a QR matrix, not a linear barcode', () => {
+    const svg = irToSvg(qr())
+    // A linear symbology emits several stroked <path> runs; a QR matrix does not.
+    expect(svg).not.toMatch(/<path stroke="[^"]*" stroke-width=/)
+    expect(svg).toMatch(/<path/)
+  })
+
+  it('stays inside the box the element declares', () => {
+    // 15 mm at 203 dpi is 120 dots.
+    const svg = irToSvg(qr({ widthMm: 15, heightMm: 15 }))
+    const xs = [...svg.matchAll(/[ML]([0-9.]+) ([0-9.]+)/g)].flatMap((m) => [Number(m[1]), Number(m[2])])
+    expect(Math.max(...xs)).toBeLessThanOrEqual(120)
+  })
+
+  it('honours the error-correction level', () => {
+    // 'H' needs a bigger matrix, so at a fixed module width it draws wider.
+    const extent = (svg: string): number =>
+      Math.max(...[...svg.matchAll(/M([0-9.]+) /g)].map((m) => Number(m[1])))
+    const m = extent(irToSvg(qr({ errorCorrectionLevel: 'M', widthMm: 40, heightMm: 40, moduleWidthDots: 2 })))
+    const h = extent(irToSvg(qr({ errorCorrectionLevel: 'H', widthMm: 40, heightMm: 40, moduleWidthDots: 2 })))
+    expect(h).toBeGreaterThan(m)
+  })
+})
+
+describe('per-element barcode module width', () => {
+  const twoBarcodes = (aWidth: number, bWidth: number): LabelIR =>
+    labelIrSchema.parse({
+      widthMm: 100, heightMm: 40, dpi: 203,
+      elements: [
+        { id: 'a', type: 'barcode', xMm: 1, yMm: 1, widthMm: 40, heightMm: 10, content: 'ABC-12345', symbology: 'code128', moduleWidthDots: aWidth },
+        { id: 'b', type: 'barcode', xMm: 1, yMm: 20, widthMm: 40, heightMm: 10, content: 'ABC-12345', symbology: 'code128', moduleWidthDots: bWidth },
+      ],
+    })
+
+  it('lets two barcodes on one label differ', () => {
+    const svg = irToSvg(twoBarcodes(2, 4))
+    const widths = new Set([...svg.matchAll(/stroke-width="([0-9.]+)"/g)].map((m) => m[1]))
+    // A single shared module width would collapse these into one set of values.
+    expect(widths.size).toBeGreaterThan(2)
+  })
+
+  it('makes the rendered width a whole multiple of the module count', () => {
+    const extent = (moduleWidthDots: number): number => {
+      const svg = irToSvg(labelIrSchema.parse({
+        widthMm: 100, heightMm: 40, dpi: 203,
+        elements: [{ id: 'a', type: 'barcode', xMm: 0, yMm: 0, widthMm: 40, heightMm: 10, content: 'ABC-12345', symbology: 'code128', moduleWidthDots }],
+      }))
+      return Math.max(...[...svg.matchAll(/M([0-9.]+) /g)].map((m) => Number(m[1])))
+    }
+    // Doubling the module width doubles the drawn extent.
+    expect(extent(4)).toBeCloseTo(extent(2) * 2, 0)
+  })
+})
+
+describe('ellipse elements', () => {
+  const ellipse = (over: Record<string, unknown> = {}): LabelIR =>
+    labelIrSchema.parse({
+      widthMm: 50, heightMm: 30, dpi: 203,
+      elements: [{
+        id: 'e', type: 'ellipse', xMm: 2, yMm: 2, widthMm: 20, heightMm: 10,
+        strokeWidthDots: 2, filled: false, ...over,
+      }],
+    })
+
+  it('insets the stroke so the outer edge meets the declared box', () => {
+    const svg = irToSvg(ellipse({ widthMm: 20, heightMm: 10, strokeWidthDots: 2 }))
+    // 20mm -> 160 dots, rx = 80 - 1 = 79; 10mm -> 80 dots, ry = 40 - 1 = 39.
+    expect(svg).toContain('rx="79"')
+    expect(svg).toContain('ry="39"')
+  })
+
+  it('draws a filled ellipse when asked', () => {
+    expect(irToSvg(ellipse({ filled: true }))).toMatch(/<ellipse[^>]*fill="#000000"/)
+  })
+
+  it('degrades to a solid shape when the stroke is wider than the minor axis', () => {
+    // 1mm tall is 8 dots; a 40-dot stroke has no hole left to draw.
+    const svg = irToSvg(ellipse({ heightMm: 1, strokeWidthDots: 40 }))
+    expect(svg).toMatch(/<ellipse[^>]*fill="#000000"/)
+    expect(svg).not.toContain('stroke-width="40"')
+  })
+
+  it('renders a circle as an ellipse with equal radii', () => {
+    const svg = irToSvg(ellipse({ widthMm: 10, heightMm: 10, filled: true }))
+    const rx = /rx="([0-9.]+)"/.exec(svg)?.[1]
+    const ry = /ry="([0-9.]+)"/.exec(svg)?.[1]
+    expect(rx).toBe(ry)
+  })
+})
+
+describe('multi-line text', () => {
+  const text = (content: string, over: Record<string, unknown> = {}): LabelIR =>
+    labelIrSchema.parse({
+      widthMm: 50, heightMm: 30, dpi: 203,
+      elements: [{
+        id: 't', type: 'text', xMm: 2, yMm: 2, widthMm: 40, heightMm: 20,
+        content, fontFamily: 'Noto Sans CJK SC', fontSizeMm: 3, ...over,
+      }],
+    })
+
+  const spanYs = (svg: string): number[] =>
+    [...svg.matchAll(/<tspan[^>]*y="([0-9.]+)"/g)].map((m) => Number(m[1]))
+
+  it('emits one span per explicit line', () => {
+    expect(spanYs(irToSvg(text('one\ntwo\nthree')))).toHaveLength(3)
+  })
+
+  it('spaces lines at 1.2 times the font size', () => {
+    // 3mm at 203 dpi is 24 dots; 1.2x is 28.8, rounded to 29.
+    const ys = spanYs(irToSvg(text('one\ntwo\nthree')))
+    expect(ys[1]! - ys[0]!).toBe(29)
+    expect(ys[2]! - ys[1]!).toBe(29)
+  })
+
+  it('positions every line absolutely, never with dy', () => {
+    // dy renders identically in resvg, but makes each line depend on the
+    // renderer's accumulation of the one before it.
+    const svg = irToSvg(text('one\ntwo'))
+    expect(svg).not.toContain('dy=')
+    expect(svg).toMatch(/<tspan x="[0-9.]+" y="[0-9.]+"/)
+  })
+
+  it('applies the alignment anchor to every line', () => {
+    const svg = irToSvg(text('one\ntwo', { align: 'center' }))
+    const xs = [...svg.matchAll(/<tspan x="([0-9.]+)"/g)].map((m) => m[1])
+    expect(new Set(xs).size).toBe(1)
+    expect(svg).toContain('text-anchor="middle"')
+  })
+
+  /**
+   * FR-049 as a negative assertion. Auto-wrapping needs per-glyph advance
+   * widths, and the browser's metrics are not resvg's — the same text in the
+   * same box would break at different words on the two sides. This test is
+   * here because that is an easy thing to add later while believing it is an
+   * improvement.
+   */
+  it('does not wrap long text to the box width', () => {
+    const long = 'A'.repeat(500)
+    expect(spanYs(irToSvg(text(long)))).toHaveLength(1)
+  })
+
+  it('keeps a single line rendering as one span', () => {
+    expect(spanYs(irToSvg(text('just one line')))).toHaveLength(1)
+  })
+
+  it('preserves empty lines rather than collapsing them', () => {
+    expect(spanYs(irToSvg(text('a\n\nb')))).toHaveLength(3)
+  })
+
+  it('escapes markup inside every line', () => {
+    expect(irToSvg(text('<b>\n&amp'))).not.toContain('<b>')
+  })
+})

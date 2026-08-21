@@ -37,6 +37,8 @@ const printer: Printer = {
   queueState: 'running',
   queuePausedReason: null,
   lastProbedAt: '2026-08-21T00:00:00Z',
+  offsetXDots: 0,
+  offsetYDots: 0,
   createdAt: '2026-08-21T00:00:00Z',
 }
 

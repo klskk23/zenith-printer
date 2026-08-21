@@ -26,8 +26,13 @@ import { loadFontConfig } from '@zenith/server/src/render/fonts.ts'
 import { countSetDots, isDotSet } from '@zenith/server/src/render/binarize.ts'
 import { BitmapImageSource } from '@zenith/server/src/drivers/niimbot/bitmap-source.ts'
 import { encodeMonochromePng } from '@zenith/server/src/render/png.ts'
-import { sampleLabel } from '../fixtures/sample-label.ts'
-import { ExitCode, emit, run, type CliError, type ExitCodeValue } from '../output.ts'
+import {
+  defaultProbeContent,
+  probeLabel,
+  sampleLabel,
+  type ProbeElement,
+} from '../fixtures/sample-label.ts'
+import { ExitCode, describeError, emit, run, type CliError, type ExitCodeValue } from '../output.ts'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
@@ -47,6 +52,15 @@ function classify(err: unknown): { error: CliError; exitCode: ExitCodeValue } {
   }
 }
 
+const PROBE_ELEMENTS: ProbeElement[] = ['qrcode', 'barcode', 'ellipse', 'multiline']
+
+function assertProbeElement(value: string): ProbeElement {
+  if ((PROBE_ELEMENTS as string[]).includes(value)) {
+    return value as ProbeElement
+  }
+  throw new Error(`unknown element "${value}"; expected one of ${PROBE_ELEMENTS.join(', ')}`)
+}
+
 export function registerPrintTest(program: Command): void {
   program
     .command('print-test')
@@ -54,6 +68,12 @@ export function registerPrintTest(program: Command): void {
     .requiredOption('-a, --address <path>', 'serial device path, e.g. /dev/ttyACM0')
     .requiredOption('-p, --print-task <name>', 'print task; B3S_P uses B1')
     .option('--stroke-dots <n>', 'rule width in dots, the value under test', '1')
+    .option(
+      '--element <kind>',
+      'print a single element instead of the full sample: qrcode | barcode | ellipse | multiline',
+    )
+    .option('--module-width <n>', 'barcode/QR module width in dots, minimum 2', '2')
+    .option('--content <text>', 'content for the probed element')
     .option('--threshold <n>', 'binarisation cut-off, 1-255', '128')
     .option('--density <n>', 'print density', '3')
     .option('--dpi <n>', 'target resolution', '203')
@@ -70,6 +90,9 @@ export function registerPrintTest(program: Command): void {
           dpi: string
           save?: string
           confirm: boolean
+          element?: string
+          moduleWidth: string
+          content?: string
         },
         cmd: Command,
       ) => {
@@ -83,15 +106,9 @@ export function registerPrintTest(program: Command): void {
             async () => {
               throw new Error('refusing to print without --confirm')
             },
-            () => ({
-              exitCode: ExitCode.Usage,
-              error: {
-                code: 'CONFIRMATION_REQUIRED',
-                what: 'This command prints a physical label',
-                why: 'Printing consumes stock and cannot be undone',
-                next: 'Re-run with --confirm once you are ready to spend a label.',
-              },
-            }),
+            // Same table the server uses, so this fault reads identically
+            // whichever tool the operator reached for.
+            () => ({ exitCode: ExitCode.Usage, error: describeError('CONFIRMATION_REQUIRED') }),
           )
           return
         }
@@ -103,11 +120,13 @@ export function registerPrintTest(program: Command): void {
             const strokeWidthDots = Number(opts.strokeDots)
             const fonts = loadFontConfig(join(repoRoot, 'fonts'))
 
-            const result = renderLabel({
-              ir: sampleLabel(dpi, strokeWidthDots),
-              fonts,
-              threshold: Number(opts.threshold),
-            })
+            const element = opts.element === undefined ? undefined : assertProbeElement(opts.element)
+            const ir =
+              element === undefined
+                ? sampleLabel(dpi, strokeWidthDots)
+                : probeLabel(element, dpi, Number(opts.moduleWidth), opts.content ?? defaultProbeContent(element))
+
+            const result = renderLabel({ ir, fonts, threshold: Number(opts.threshold) })
 
             if (opts.save !== undefined) {
               writeFileSync(
@@ -146,6 +165,8 @@ export function registerPrintTest(program: Command): void {
 
               const summary = {
                 printed: true,
+                element: opts.element ?? 'sample',
+                moduleWidthDots: element === undefined ? null : Number(opts.moduleWidth),
                 strokeWidthDots,
                 threshold: Number(opts.threshold),
                 density: Number(opts.density),
@@ -158,13 +179,24 @@ export function registerPrintTest(program: Command): void {
               emit(summary, { json }, () =>
                 [
                   `printed:        yes`,
+                  `element:        ${summary.element}`,
+                  ...(summary.moduleWidthDots === null
+                    ? []
+                    : [`module width:  ${summary.moduleWidthDots} dot(s)`]),
                   `size:           ${summary.sizeDots} dots`,
                   `rule width:     ${summary.strokeWidthDots} dot(s)`,
                   `threshold:      ${summary.threshold}`,
                   `dots set:       ${summary.dotsSet}`,
                   '',
-                  'Now look at the label: is the horizontal rule clearly visible?',
-                  'If it is faint or missing, re-run with a higher --threshold.',
+                  ...(summary.element === 'qrcode'
+                    ? [
+                        'Now scan the label with a real scanner or a phone.',
+                        'If it does not read, this module width is below the usable floor.',
+                      ]
+                    : [
+                        'Now look at the label: is the horizontal rule clearly visible?',
+                        'If it is faint or missing, re-run with a higher --threshold.',
+                      ]),
                 ].join('\n'),
               )
             } finally {

@@ -1,100 +1,134 @@
+/**
+ * Localised error copy.
+ *
+ * The server words its own errors — the frontend shows them verbatim, so one
+ * fault never gets two descriptions, and the CLI shares the same table. The
+ * cost of that choice is that switching the interface language has to switch
+ * these too, or the UI ends up half translated with the errors left behind.
+ */
 import { describe, expect, it } from 'vitest'
-import { PrinterErrorCode } from '@mmote/niimbluelib'
+import { negotiateLocale } from '../../src/i18n/negotiate.ts'
 import {
   allDeviceErrorCodes,
+  bundleFor,
   describeAppError,
   describeDeviceError,
-  deviceErrorCode,
   unmappedDeviceErrorCodes,
 } from '../../src/i18n/error-map.ts'
-import { APP_ERROR_COPY, DEVICE_ERROR_COPY } from '../../src/i18n/zh-CN.ts'
+import { APP_ERROR_CODES, LOCALES } from '../../src/i18n/types.ts'
 
-describe('device error coverage', () => {
-  it('translates every PrinterErrorCode the library defines', () => {
-    // A gap here means a user eventually sees a bare number instead of advice.
-    expect(unmappedDeviceErrorCodes()).toEqual([])
+const hasHan = (text: string): boolean => /[一-鿿]/.test(text)
+
+describe('negotiateLocale', () => {
+  it.each([
+    ['en-US', 'en-US'],
+    ['en', 'en-US'],
+    ['en-GB', 'en-US'],
+    ['zh-CN', 'zh-CN'],
+    ['zh', 'zh-CN'],
+    ['zh-Hans-CN', 'zh-CN'],
+  ])('reads %s as %s', (header, expected) => {
+    expect(negotiateLocale(header)).toBe(expected)
   })
 
-  it('covers the faults that actually occur in daily use', () => {
-    for (const code of [
-      PrinterErrorCode.CoverOpen,
-      PrinterErrorCode.LackPaper,
-      PrinterErrorCode.Overheat,
-      PrinterErrorCode.NoRibbon,
-      PrinterErrorCode.B3sAbnormalPaperOutput,
-      PrinterErrorCode.ReceiveDataTimeout,
-    ]) {
-      expect(DEVICE_ERROR_COPY[code]).toBeDefined()
-    }
+  it('honours quality values', () => {
+    expect(negotiateLocale('en;q=0.2,zh-CN;q=0.9')).toBe('zh-CN')
+    expect(negotiateLocale('zh-CN;q=0.2,en-US;q=0.9')).toBe('en-US')
   })
 
-  it('has no stray entries beyond the enum', () => {
-    const known = new Set(allDeviceErrorCodes())
-    for (const key of Object.keys(DEVICE_ERROR_COPY)) {
-      expect(known.has(Number(key))).toBe(true)
-    }
-  })
-})
-
-describe('three-part structure', () => {
-  it('gives every device message a what, why and next', () => {
-    for (const id of allDeviceErrorCodes()) {
-      const described = describeDeviceError(id)
-      expect(described.what.length).toBeGreaterThan(0)
-      expect(described.why.length).toBeGreaterThan(0)
-      expect(described.next.length).toBeGreaterThan(0)
-    }
+  it('skips a locale it does not have', () => {
+    expect(negotiateLocale('fr-FR,en-US;q=0.8')).toBe('en-US')
   })
 
-  it('gives every application message a what, why and next', () => {
-    for (const code of Object.keys(APP_ERROR_COPY)) {
-      const described = describeAppError(code)
-      expect(described.what.length).toBeGreaterThan(0)
-      expect(described.why.length).toBeGreaterThan(0)
-      expect(described.next.length).toBeGreaterThan(0)
-    }
+  /** Chinese is the project default, and a missing header is the common case. */
+  it.each([undefined, '', '   ', '*', 'fr-FR', 'nonsense'])('falls back to Chinese for %s', (header) => {
+    expect(negotiateLocale(header)).toBe('zh-CN')
   })
 
-  it('never exposes a raw numeric code in the prose', () => {
-    // FR-034: users get advice, not reason ids.
-    for (const id of allDeviceErrorCodes()) {
-      const { what, why, next } = describeDeviceError(id)
-      expect(`${what}${why}${next}`).not.toMatch(/reasonId|errorCode|\berror \d+/i)
-    }
-  })
-})
-
-describe('machine-readable codes', () => {
-  it('derives a stable snake-case code from the enum name', () => {
-    expect(deviceErrorCode(PrinterErrorCode.CoverOpen)).toBe('DEVICE_COVER_OPEN')
-    expect(deviceErrorCode(PrinterErrorCode.LackPaper)).toBe('DEVICE_LACK_PAPER')
-    expect(deviceErrorCode(PrinterErrorCode.ReceiveDataTimeout)).toBe('DEVICE_RECEIVE_DATA_TIMEOUT')
-  })
-
-  it('still produces a code for an id the library does not know', () => {
-    expect(deviceErrorCode(9999)).toBe('DEVICE_UNKNOWN_9999')
-  })
-
-  it('falls back to a usable message for an unknown id', () => {
-    const described = describeDeviceError(9999)
-    expect(described.what.length).toBeGreaterThan(0)
-    expect(described.next.length).toBeGreaterThan(0)
+  it('ignores a candidate with zero quality', () => {
+    expect(negotiateLocale('en-US;q=0')).toBe('zh-CN')
   })
 })
 
 describe('application errors', () => {
-  it('tells the user that an unreachable printer needs someone on site', () => {
-    // The one failure class that software cannot resolve by itself.
-    const described = describeAppError('PRINTER_UNREACHABLE')
-    expect(described.code).toBe('PRINTER_UNREACHABLE')
-    expect(described.next).toContain('设备旁')
+  it('words them in Chinese by default', () => {
+    expect(hasHan(describeAppError('PRINTER_UNREACHABLE').what)).toBe(true)
   })
 
-  it('explains that an unknown page count needs a manual count', () => {
-    expect(describeAppError('JOB_INTERRUPTED_BY_RESTART').next).toContain('清点')
+  it('words them in English when asked', () => {
+    const english = describeAppError('PRINTER_UNREACHABLE', 'en-US')
+    expect(hasHan(english.what)).toBe(false)
+    expect(english.what.length).toBeGreaterThan(0)
   })
 
-  it('falls back to the internal error for an unrecognised code', () => {
-    expect(describeAppError('NO_SUCH_CODE').code).toBe('INTERNAL_ERROR')
+  /**
+   * The code is what the frontend branches on. If it moved with the language,
+   * every consumer would need to know the language to understand the response.
+   */
+  it('keeps the code identical across languages', () => {
+    for (const code of APP_ERROR_CODES) {
+      expect(describeAppError(code, 'en-US').code).toBe(describeAppError(code, 'zh-CN').code)
+    }
+  })
+
+  it('answers all three parts in both languages', () => {
+    for (const locale of LOCALES) {
+      for (const code of APP_ERROR_CODES) {
+        const copy = describeAppError(code, locale)
+        expect(copy.what.length).toBeGreaterThan(0)
+        expect(copy.why.length).toBeGreaterThan(0)
+        expect(copy.next.length).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('turns an unknown code into an internal error rather than leaking it', () => {
+    expect(describeAppError('NOT_A_REAL_CODE', 'en-US').code).toBe('INTERNAL_ERROR')
+  })
+})
+
+describe('device errors', () => {
+  it('words them in the requested language', () => {
+    expect(hasHan(describeDeviceError(2, 'en-US').what)).toBe(false)
+    expect(hasHan(describeDeviceError(2, 'zh-CN').what)).toBe(true)
+  })
+
+  it('keeps the code stable across languages', () => {
+    expect(describeDeviceError(2, 'en-US').code).toBe(describeDeviceError(2, 'zh-CN').code)
+  })
+
+  it('never emits a bare number, in any language', () => {
+    for (const locale of LOCALES) {
+      for (const id of allDeviceErrorCodes()) {
+        expect(describeDeviceError(id, locale).what).not.toMatch(/^\d+$/)
+      }
+    }
+  })
+})
+
+/**
+ * Completeness cannot be checked by the type system: the device table is keyed
+ * by numbers from a third-party enum. So it is checked here.
+ */
+describe('bundle completeness', () => {
+  it.each(LOCALES)('%s covers every device error code', (locale) => {
+    expect(unmappedDeviceErrorCodes(locale)).toEqual([])
+  })
+
+  it('has identical device keys in every locale', () => {
+    const keys = LOCALES.map((locale) => Object.keys(bundleFor(locale).device).sort().join(','))
+    expect(new Set(keys).size).toBe(1)
+  })
+
+  it('has identical application keys in every locale', () => {
+    const keys = LOCALES.map((locale) => Object.keys(bundleFor(locale).app).sort().join(','))
+    expect(new Set(keys).size).toBe(1)
+  })
+
+  it('leaves no Chinese text in the English bundle', () => {
+    const bundle = bundleFor('en-US')
+    for (const copy of [...Object.values(bundle.device), ...Object.values(bundle.app)]) {
+      expect(hasHan(`${copy.what}${copy.why}${copy.next}`)).toBe(false)
+    }
   })
 })

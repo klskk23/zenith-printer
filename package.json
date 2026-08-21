@@ -15,7 +15,7 @@
     "dev": "bash scripts/dev.sh",
     "typecheck": "tsc --build --force",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run --project default --project web",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:hardware": "vitest run --project hardware",
@@ -25,9 +25,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^24.10.1",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.39.0",
+    "happy-dom": "^20.11.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4",
     "vitest": "^3.2.4"

@@ -8,9 +8,14 @@ export interface Profile {
   density: number
   labelType: number
   speed?: number
-  /** Stored in millimetres; the UI steps in dots (FR-029). */
-  offsetXMm: number
-  offsetYMm: number
+  /** Stock dimensions; the canvas follows these when the profile is chosen. */
+  labelWidthMm: number
+  labelHeightMm: number
+  /** Advisory only — drawn on the canvas, never enforced (FR-064). */
+  marginTopMm: number
+  marginRightMm: number
+  marginBottomMm: number
+  marginLeftMm: number
   isDefault: boolean
   createdAt: string
 }

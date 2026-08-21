@@ -75,6 +75,8 @@ describe('driver selection', () => {
     queueState: 'running',
     queuePausedReason: null,
     lastProbedAt: null,
+    offsetXDots: 0,
+    offsetYDots: 0,
     createdAt: '2026-08-21T00:00:00Z',
   }
 

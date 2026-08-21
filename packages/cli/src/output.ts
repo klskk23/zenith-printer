@@ -6,6 +6,10 @@
  * go to stderr; exit codes are stable and documented.
  */
 
+import { describeAppError } from '@zenith/server/src/i18n/error-map.ts'
+import { negotiateLocale } from '@zenith/server/src/i18n/negotiate.ts'
+import type { Locale } from '@zenith/server/src/i18n/types.ts'
+
 /** Stable exit codes. Same class of failure always uses the same code. */
 export const ExitCode = {
   Ok: 0,
@@ -31,6 +35,27 @@ export interface CliError {
   what: string
   why: string
   next: string
+}
+
+/**
+ * Language for shared error copy.
+ *
+ * Read from `ZENITH_LANG` so an operator can switch it without a flag on every
+ * command. Chinese is the default, as everywhere else.
+ */
+export function cliLocale(env: NodeJS.ProcessEnv = process.env): Locale {
+  return negotiateLocale(env.ZENITH_LANG)
+}
+
+/**
+ * Copy for an application error code, from the same tables the server uses.
+ *
+ * Sharing the tables is the point. If the CLI kept its own wording, the same
+ * fault would have two descriptions — and the one an operator saw would depend
+ * on which tool they happened to reach for.
+ */
+export function describeError(code: string, env?: NodeJS.ProcessEnv): CliError {
+  return describeAppError(code, cliLocale(env))
 }
 
 /** Write a successful result to stdout. */

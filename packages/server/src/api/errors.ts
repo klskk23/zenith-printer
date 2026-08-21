@@ -11,6 +11,7 @@
  *         (not enough stock; sequence overflow; template/printer mismatch)
  */
 import { describeAppError, describeDeviceError, type UserFacingError } from '../i18n/error-map.ts'
+import { DEFAULT_LOCALE, type Locale } from '../i18n/types.ts'
 import { PrinterDeviceError, PrinterUnreachableError } from '../drivers/port.ts'
 
 export const HttpStatus = {
@@ -31,15 +32,31 @@ export type HttpStatusValue = (typeof HttpStatus)[keyof typeof HttpStatus]
 /** Every failure surfaced to a client goes through this. */
 export class ApiError extends Error {
   readonly status: HttpStatusValue
+  /**
+   * The stable, machine-readable identifier. This — not the prose — is what
+   * the error *is*; the wording is resolved per request from the caller's
+   * language.
+   */
+  readonly code: string
+  /** Copy in the default language, for logs and for callers inside the process. */
   readonly body: UserFacingError
   readonly details: Record<string, unknown> | undefined
+  /** Set when the failure came from the device, so the right table is used. */
+  readonly deviceReasonId: number | undefined
 
-  constructor(status: HttpStatusValue, body: UserFacingError, details?: Record<string, unknown>) {
+  constructor(
+    status: HttpStatusValue,
+    body: UserFacingError,
+    details?: Record<string, unknown>,
+    deviceReasonId?: number,
+  ) {
     super(`${body.code}: ${body.what}`)
     this.name = 'ApiError'
     this.status = status
+    this.code = body.code
     this.body = body
     this.details = details
+    this.deviceReasonId = deviceReasonId
   }
 
   static fromCode(
@@ -60,6 +77,16 @@ export class ApiError extends Error {
     return ApiError.fromCode(HttpStatus.UnprocessableEntity, code, details)
   }
 
+  /**
+   * The request is missing something it must state explicitly.
+   *
+   * Distinct from `unprocessable`: the request is not wrong about the world,
+   * it simply has not said yes to something irreversible yet.
+   */
+  static badRequest(code: string, details?: Record<string, unknown>): ApiError {
+    return ApiError.fromCode(HttpStatus.BadRequest, code, details)
+  }
+
   static notFound(details?: Record<string, unknown>): ApiError {
     return ApiError.fromCode(HttpStatus.NotFound, 'NOT_FOUND', details)
   }
@@ -74,14 +101,30 @@ export interface ErrorResponseBody extends UserFacingError {
   details?: Record<string, unknown>
 }
 
-export function toErrorResponse(error: unknown): {
+/**
+ * Turn a failure into its wire form, in the caller's language.
+ *
+ * The prose is resolved here rather than where the error was thrown, because
+ * this is the first point that knows who is asking. Threading a locale through
+ * every throw site would put a presentation concern into the middle of the
+ * business logic, and every new throw would be a chance to forget it.
+ */
+export function toErrorResponse(
+  error: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): {
   status: HttpStatusValue
   body: ErrorResponseBody
 } {
   if (error instanceof ApiError) {
+    // Re-resolved from the stable code, so the same failure reads in whichever
+    // language was asked for.
+    const body = error.deviceReasonId === undefined
+      ? describeAppError(error.code, locale)
+      : describeDeviceError(error.deviceReasonId, locale)
     return {
       status: error.status,
-      body: error.details ? { ...error.body, details: error.details } : error.body,
+      body: error.details ? { ...body, details: error.details } : body,
     }
   }
 
@@ -90,7 +133,7 @@ export function toErrorResponse(error: unknown): {
   if (error instanceof PrinterUnreachableError) {
     return {
       status: HttpStatus.ServiceUnavailable,
-      body: { ...describeAppError('PRINTER_UNREACHABLE'), details: { address: error.address } },
+      body: { ...describeAppError('PRINTER_UNREACHABLE', locale), details: { address: error.address } },
     }
   }
 
@@ -99,10 +142,10 @@ export function toErrorResponse(error: unknown): {
     // sends the operator to the logs when the fix is at the machine.
     const body =
       error.reasonId === undefined
-        ? describeAppError('DEVICE_ERROR')
-        : describeDeviceError(error.reasonId)
+        ? describeAppError('DEVICE_ERROR', locale)
+        : describeDeviceError(error.reasonId, locale)
     return { status: HttpStatus.UnprocessableEntity, body }
   }
 
-  return { status: HttpStatus.InternalServerError, body: describeAppError('INTERNAL_ERROR') }
+  return { status: HttpStatus.InternalServerError, body: describeAppError('INTERNAL_ERROR', locale) }
 }

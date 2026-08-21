@@ -8,7 +8,7 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { labelIrSchema, mmToDots } from '@zenith/shared'
+import { labelIrSchema } from '@zenith/shared'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { maxLabelWidthMm } from '../domain/printer.ts'
@@ -26,8 +26,16 @@ const previewBody = z.object({
   printerId: z.string().min(1),
   ir: labelIrSchema,
   profileId: z.string().min(1).optional(),
-  offsetXMm: z.number().finite().default(0),
-  offsetYMm: z.number().finite().default(0),
+  /**
+   * Position correction in dots.
+   *
+   * Optional: when absent the printer's own stored offset is used, which is
+   * what makes the preview show what will actually come out. An explicit value
+   * is for the calibration screen, where the point is to preview a correction
+   * before committing it.
+   */
+  offsetXDots: z.number().int().optional(),
+  offsetYDots: z.number().int().optional(),
   threshold: z.number().int().min(1).max(255).optional(),
 })
 
@@ -67,10 +75,10 @@ export async function registerPreviewRoutes(app: FastifyInstance): Promise<void>
       ir,
       fonts,
       svgOptions: { resolveImage },
-      // Offsets are stored in millimetres and applied in whole dots; the UI
-      // steps in dots so nobody has to type multiples of 0.125mm.
-      offsetXDots: mmToDots(request.body.offsetXMm, ir.dpi),
-      offsetYDots: mmToDots(request.body.offsetYMm, ir.dpi),
+      // Correction belongs to the machine, so it comes from the printer unless
+      // the caller is previewing a candidate value.
+      offsetXDots: request.body.offsetXDots ?? printer.offsetXDots,
+      offsetYDots: request.body.offsetYDots ?? printer.offsetYDots,
       ...(request.body.threshold === undefined ? {} : { threshold: request.body.threshold }),
     })
 

@@ -66,20 +66,21 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
     {
       schema: {
         params: idParams,
-        body: templateInputSchema.and(z.object({ updatedAt: z.string().min(1) })),
+        body: templateInputSchema.and(z.object({ version: z.number().int().positive() })),
       },
     },
     async (request) => {
-      const { updatedAt, ...input } = request.body
+      const { version, ...input } = request.body
       assertFits(input)
       try {
-        return templates().update(request.params.id, input, updatedAt)
+        return templates().update(request.params.id, input, version)
       } catch (err) {
         if (err instanceof TemplateConflictError) {
-          // Last write wins is acceptable; losing work without being told is not.
-          throw ApiError.conflict('VALIDATION_FAILED', {
+          // Nothing is written on this path: the caller still holds their edits
+          // and can reapply them after reloading.
+          throw ApiError.conflict('TEMPLATE_VERSION_CONFLICT', {
             templateId: err.templateId,
-            currentUpdatedAt: err.currentUpdatedAt,
+            currentVersion: err.currentVersion,
           })
         }
         throw err

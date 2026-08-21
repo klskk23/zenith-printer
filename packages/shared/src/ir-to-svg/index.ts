@@ -15,9 +15,16 @@
  *      numbers are formatted through one helper, because SC-010 requires the
  *      same template to render identically after a redeploy.
  */
-import { barcodeInnerMarkup, renderBarcodeSvg } from '../barcode/index.ts'
+import {
+  MIN_MODULE_WIDTH_DOTS,
+  barcodeInnerMarkup,
+  fitModuleWidth,
+  renderBarcodeSvg,
+  renderQrcodeSvg,
+} from '../barcode/index.ts'
 import {
   isVariableRef,
+  type EllipseElement,
   type LabelElement,
   type LabelIR,
   type LineElement,
@@ -33,8 +40,6 @@ export interface IrToSvgOptions {
    * Unresolved images are skipped rather than failing the whole render.
    */
   resolveImage?: (assetId: string) => string | undefined
-  /** Module width for barcodes, in dots. Must be even. */
-  barcodeModuleWidthDots?: number
 }
 
 export class UnresolvedVariableError extends Error {
@@ -81,21 +86,58 @@ function transformFor(element: LabelElement, grid: LayoutGrid): string {
   return `translate(${num(x)} ${num(y)}) rotate(${element.rotation})`
 }
 
+/**
+ * Line spacing, as a multiple of the font size.
+ *
+ * A constant rather than a field. Made configurable it would have to be
+ * interpreted identically by the browser and by resvg, and every knob that
+ * both sides must agree on is another way for them to disagree.
+ */
+export const TEXT_LINE_HEIGHT = 1.2
+
+/**
+ * Split text into lines.
+ *
+ * Explicit newlines only — no wrapping to the box width. Wrapping needs the
+ * advance width of every glyph, and the browser's metrics and resvg's are not
+ * identical, so the same text and the same box would break at different words
+ * on the two sides. The editor would show three lines and the printer would
+ * produce four, with the last one outside the box. Splitting on a character is
+ * the only rule both sides can carry out identically.
+ */
+export function textLines(content: string): string[] {
+  return content.split('\n')
+}
+
 function renderText(element: TextElement, grid: LayoutGrid): string {
   const fontSizeDots = grid.lengthToDots(element.fontSizeMm)
   const widthDots = grid.lengthToDots(element.widthMm)
   const anchor = element.align === 'center' ? 'middle' : element.align === 'right' ? 'end' : 'start'
   const anchorX = element.align === 'center' ? widthDots / 2 : element.align === 'right' ? widthDots : 0
+  const lineHeightDots = Math.round(fontSizeDots * TEXT_LINE_HEIGHT)
+  const lines = textLines(literal(element.content))
+
+  // Every line is positioned absolutely. `dy` would work in resvg — measured
+  // pixel-identical — but it makes each line's position depend on the
+  // renderer's accumulation of the previous one. Absolute y is a constant both
+  // sides compute the same way.
+  const spans = lines
+    .map((line, index) => {
+      const y = fontSizeDots + index * lineHeightDots
+      return `<tspan x="${num(anchorX)}" y="${num(y)}">${escapeXml(line)}</tspan>`
+    })
+    .join('')
+
   // Baseline sits one em below the top edge, which keeps the visual box the
   // editor draws and the glyphs resvg renders in the same place.
   return [
-    `<text x="${num(anchorX)}" y="${num(fontSizeDots)}"`,
+    `<text`,
     ` font-family="${escapeXml(element.fontFamily)}"`,
     ` font-size="${num(fontSizeDots)}"`,
     ` font-weight="${element.bold ? 'bold' : 'normal'}"`,
     ` text-anchor="${anchor}"`,
     ` fill="#000000"`,
-    `>${escapeXml(literal(element.content))}</text>`,
+    `>${spans}</text>`,
   ].join('')
 }
 
@@ -148,6 +190,33 @@ function renderRect(element: RectElement, grid: LayoutGrid): string {
   )
 }
 
+/**
+ * Ellipses mirror rectangles: centre-stroked, inset by half the stroke so the
+ * outer edge coincides with the declared box.
+ *
+ * A stroke at least as wide as the minor axis leaves no hole to draw, so the
+ * shape becomes solid. That is treated as the natural result of "the stroke got
+ * wide enough to fill it" rather than an error, and the user's number is left
+ * exactly as they typed it (FR-085).
+ */
+function renderEllipse(element: EllipseElement, grid: LayoutGrid): string {
+  const w = grid.lengthToDots(element.widthMm)
+  const h = grid.lengthToDots(element.heightMm)
+  const cx = w / 2
+  const cy = h / 2
+
+  if (element.filled || element.strokeWidthDots * 2 >= Math.min(w, h)) {
+    return `<ellipse cx="${num(cx)}" cy="${num(cy)}" rx="${num(w / 2)}" ry="${num(h / 2)}" fill="#000000"/>`
+  }
+
+  const inset = element.strokeWidthDots / 2
+  return (
+    `<ellipse cx="${num(cx)}" cy="${num(cy)}"` +
+    ` rx="${num(Math.max(0, w / 2 - inset))}" ry="${num(Math.max(0, h / 2 - inset))}"` +
+    ` fill="none" stroke="#000000" stroke-width="${num(element.strokeWidthDots)}"/>`
+  )
+}
+
 function renderElement(
   element: LabelElement,
   grid: LayoutGrid,
@@ -164,11 +233,14 @@ function renderElement(
       return renderRect(element, grid)
 
     case 'barcode': {
+      // Module width is the element's own property. It used to be a single
+      // render-wide option, which meant two barcodes on one label could not
+      // differ and the element's declared width did nothing at all.
       const rendered = renderBarcodeSvg({
         symbology: element.symbology,
         content: literal(element.content),
         heightDots: grid.lengthToDots(element.heightMm),
-        moduleWidthDots: options.barcodeModuleWidthDots,
+        moduleWidthDots: element.moduleWidthDots,
         showHumanReadable: element.showHumanReadable,
       })
       // No scaling: a non-integer scale would undo the whole-dot edge
@@ -177,16 +249,38 @@ function renderElement(
     }
 
     case 'qrcode': {
-      const size = Math.min(grid.lengthToDots(element.widthMm), grid.lengthToDots(element.heightMm))
-      const rendered = renderBarcodeSvg({
-        symbology: 'code128',
+      // This used to ask for a Code 128 barcode of the same content. The output
+      // looked like a plausible barcode, so nothing failed loudly — it simply
+      // was not a QR code, and it was far wider than the element declaring it.
+      const declared = Math.min(grid.lengthToDots(element.widthMm), grid.lengthToDots(element.heightMm))
+
+      // A QR side is moduleWidth x moduleCount, so only whole multiples exist.
+      // Probe once at the element's own width to learn the module count, then
+      // pick the largest multiple that still fits the declared box (FR-002).
+      const probe = renderQrcodeSvg({
         content: literal(element.content),
-        heightDots: size,
-        moduleWidthDots: options.barcodeModuleWidthDots,
-        showHumanReadable: false,
+        moduleWidthDots: element.moduleWidthDots,
+        errorCorrectionLevel: element.errorCorrectionLevel,
       })
+      const moduleWidthDots = Math.min(
+        element.moduleWidthDots,
+        fitModuleWidth(declared, probe.moduleCount, MIN_MODULE_WIDTH_DOTS),
+      )
+
+      const rendered =
+        moduleWidthDots === probe.moduleWidthDots
+          ? probe
+          : renderQrcodeSvg({
+              content: literal(element.content),
+              moduleWidthDots,
+              errorCorrectionLevel: element.errorCorrectionLevel,
+            })
+
       return `<g>${barcodeInnerMarkup(rendered)}</g>`
     }
+
+    case 'ellipse':
+      return renderEllipse(element, grid)
 
     case 'image': {
       const href = options.resolveImage?.(element.assetId)

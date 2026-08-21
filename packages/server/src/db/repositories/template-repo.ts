@@ -2,7 +2,7 @@
  * Template persistence.
  *
  * Saves overwrite (no version history, per the spec's assumptions), but a save
- * carries the `updatedAt` it was loaded with. A stale token means somebody
+ * carries the `version` it was loaded with. A stale token means somebody
  * else saved in between, and the caller is told rather than having their work
  * silently replaced.
  */
@@ -56,6 +56,7 @@ export class TemplateRepo {
       variableFields: this.#fields(String(row.id)),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
+      version: Number(row.version),
     }
   }
 
@@ -99,8 +100,8 @@ export class TemplateRepo {
     try {
       this.#db
         .prepare(
-          `INSERT INTO templates (id, name, printer_kind, width_mm, height_mm, dpi, elements, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO templates (id, name, printer_kind, width_mm, height_mm, dpi, elements, created_at, updated_at, version)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         )
         .run(id, input.name, input.printerKind, input.widthMm, input.heightMm, input.dpi, JSON.stringify(input.elements), now, now)
       this.#writeFields(id, input.variableFields)
@@ -117,15 +118,22 @@ export class TemplateRepo {
     return created
   }
 
-  /** `expectedUpdatedAt` is the token the caller loaded with. */
-  update(id: string, input: TemplateInput, expectedUpdatedAt: string): Template {
+  /**
+   * `expectedVersion` is the token the caller loaded with.
+   *
+   * This used to compare `updatedAt`. Two saves inside the same clock tick
+   * produced equal timestamps, so the second was accepted and overwrote the
+   * first without anybody being told — which is the whole thing this check is
+   * supposed to make impossible.
+   */
+  update(id: string, input: TemplateInput, expectedVersion: number): Template {
     const current = this.find(id)
     if (current === undefined) {
       throw new Error(`template ${id} does not exist`)
     }
-    if (current.updatedAt !== expectedUpdatedAt) {
+    if (current.version !== expectedVersion) {
       // Last write wins is fine; last write wins *silently* is not.
-      throw new TemplateConflictError(id, current.updatedAt)
+      throw new TemplateConflictError(id, current.version)
     }
 
     const now = this.#clock.now().toISOString()
@@ -133,7 +141,7 @@ export class TemplateRepo {
     try {
       this.#db
         .prepare(
-          `UPDATE templates SET name = ?, printer_kind = ?, width_mm = ?, height_mm = ?, dpi = ?, elements = ?, updated_at = ?
+          `UPDATE templates SET name = ?, printer_kind = ?, width_mm = ?, height_mm = ?, dpi = ?, elements = ?, updated_at = ?, version = version + 1
            WHERE id = ?`,
         )
         .run(input.name, input.printerKind, input.widthMm, input.heightMm, input.dpi, JSON.stringify(input.elements), now, id)

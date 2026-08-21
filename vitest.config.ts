@@ -16,6 +16,16 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'web',
+          // Components need a DOM. Kept as its own project so the logic suite
+          // stays a plain Node run — and so that "does the page render at all"
+          // is actually asked, which nothing did until a blank screen shipped.
+          include: ['packages/web/tests/**/*.dom.test.tsx'],
+          environment: 'happy-dom',
+        },
+      },
+      {
+        test: {
           name: 'hardware',
           include: [HARDWARE_GLOB],
         },
@@ -33,6 +43,16 @@ export default defineConfig({
         'packages/server/src/queue/**/*.ts',
         'packages/server/src/domain/**/*.ts',
         'packages/shared/src/**/*.ts',
+        // Frontend *logic*, not components. These decide where an element
+        // lands, how wide a barcode is allowed to be and what counts as
+        // overflowing — a defect here prints a wrong label just as surely as
+        // one in the renderer. Components (.tsx) stay out: asserting on markup
+        // buys far less than it costs.
+        'packages/web/src/app/*.ts',
+        'packages/web/src/editor/*.ts',
+        'packages/web/src/features/preferences/store.ts',
+        'packages/web/src/features/printers/offset-directions.ts',
+        'packages/web/src/pages/consumable.ts',
       ],
       exclude: [
         '**/*.d.ts',

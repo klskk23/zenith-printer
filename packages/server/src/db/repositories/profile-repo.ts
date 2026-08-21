@@ -12,8 +12,12 @@ function toProfile(row: Row): Profile {
     name: String(row.name),
     density: Number(row.density),
     labelType: Number(row.label_type),
-    offsetXMm: Number(row.offset_x_mm),
-    offsetYMm: Number(row.offset_y_mm),
+    labelWidthMm: Number(row.label_width_mm),
+    labelHeightMm: Number(row.label_height_mm),
+    marginTopMm: Number(row.margin_top_mm ?? 0),
+    marginRightMm: Number(row.margin_right_mm ?? 0),
+    marginBottomMm: Number(row.margin_bottom_mm ?? 0),
+    marginLeftMm: Number(row.margin_left_mm ?? 0),
     isDefault: Number(row.is_default) === 1,
     createdAt: String(row.created_at),
   }
@@ -64,8 +68,11 @@ export class ProfileRepo {
     }
     this.#db
       .prepare(
-        `INSERT INTO profiles (id, printer_id, name, density, label_type, speed, offset_x_mm, offset_y_mm, is_default, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO profiles (id, printer_id, name, density, label_type, speed,
+                               label_width_mm, label_height_mm,
+                               margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm,
+                               is_default, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -74,8 +81,12 @@ export class ProfileRepo {
         input.density,
         input.labelType,
         input.speed ?? null,
-        input.offsetXMm,
-        input.offsetYMm,
+        input.labelWidthMm,
+        input.labelHeightMm,
+        input.marginTopMm,
+        input.marginRightMm,
+        input.marginBottomMm,
+        input.marginLeftMm,
         input.isDefault ? 1 : 0,
         this.#clock.now().toISOString(),
       )
@@ -96,7 +107,10 @@ export class ProfileRepo {
     }
     this.#db
       .prepare(
-        `UPDATE profiles SET name = ?, density = ?, label_type = ?, speed = ?, offset_x_mm = ?, offset_y_mm = ?, is_default = ?
+        `UPDATE profiles SET name = ?, density = ?, label_type = ?, speed = ?,
+                             label_width_mm = ?, label_height_mm = ?,
+                             margin_top_mm = ?, margin_right_mm = ?, margin_bottom_mm = ?, margin_left_mm = ?,
+                             is_default = ?
          WHERE id = ?`,
       )
       .run(
@@ -104,8 +118,12 @@ export class ProfileRepo {
         input.density,
         input.labelType,
         input.speed ?? null,
-        input.offsetXMm,
-        input.offsetYMm,
+        input.labelWidthMm,
+        input.labelHeightMm,
+        input.marginTopMm,
+        input.marginRightMm,
+        input.marginBottomMm,
+        input.marginLeftMm,
         input.isDefault ? 1 : 0,
         id,
       )

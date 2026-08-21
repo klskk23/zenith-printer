@@ -13,13 +13,14 @@
 import { useState } from 'react'
 import { ApiRequestError } from '../../api/client.ts'
 import type { Printer, PrinterKind, TransportKind } from '../../api/types.ts'
-import { copy } from '../../i18n/zh-CN.ts'
+import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
 import { Select } from '../../components/ui/select.tsx'
+import { OffsetPanel } from './offset-panel.tsx'
 import {
   useAddPrinter,
   useDeletePrinter,
@@ -180,6 +181,8 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
       </CardHeader>
       <CardContent className="space-y-3">
         <CapabilityList printer={printer} />
+
+        <OffsetPanel printer={printer} />
 
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" disabled={probe.isPending} onClick={() => probe.mutate(printer.id)}>

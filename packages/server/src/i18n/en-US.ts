@@ -1,0 +1,134 @@
+/**
+ * English copy.
+ *
+ * Mirrors `zh-CN.ts` key for key. Principle III.0 requires every message to
+ * answer three questions — what happened, why, and what to do next — so the
+ * translation keeps that structure rather than shortening it.
+ */
+import type { AppErrorCode, ErrorCopy, LocaleBundle } from './types.ts'
+
+const DEVICE: Readonly<Record<number, ErrorCopy>> = {
+  1: { what: 'The printer lid is open', why: 'It was not latched after a paper change or cleaning', next: 'Close the lid until it clicks, then resubmit the job' },
+  2: { what: 'The printer is out of paper', why: 'This roll of labels has run out', next: 'Load a new roll, then press Resume on the queue page' },
+  3: { what: 'Printer battery is low', why: 'There is not enough charge to finish printing', next: 'Connect the charger, then resubmit the job' },
+  4: { what: 'Battery fault', why: 'The printer reports an abnormal battery state', next: 'Disconnect power, wait a few minutes, then switch on again; contact service if it repeats' },
+  5: { what: 'Printing was cancelled', why: 'Someone pressed cancel on the printer itself', next: 'Check how many labels were produced, then resubmit the remainder' },
+  6: { what: 'Bad print data', why: 'The printer could not parse what it received', next: 'This is a software defect — give the job id to whoever maintains this service' },
+  7: { what: 'Print head overheated', why: 'Continuous printing raised the head above its safe temperature', next: 'Wait three to five minutes for it to cool, then continue' },
+  8: { what: 'Paper feed fault', why: 'The paper may be jammed or loaded incorrectly', next: 'Open the lid, check the paper path, clear any jam and reload' },
+  9: { what: 'The printer is busy', why: 'It is still working on another job', next: 'Retry shortly; if it persists, check whether someone is operating the printer directly' },
+  10: { what: 'No print head detected', why: 'The printer cannot see its print head', next: 'Power off, reseat the print head, then power on again' },
+  11: { what: 'Ambient temperature too low', why: 'Thermal printing needs the head above its minimum working temperature', next: 'Move the printer somewhere warmer and let it acclimatise before retrying' },
+  12: { what: 'Print head is loose', why: 'The head is not locked in position', next: 'Open the lid, press the head down until it locks, then retry' },
+  13: { what: 'No ribbon', why: 'This model needs a ribbon and none is loaded', next: 'Load a ribbon, then resubmit the job' },
+  14: { what: 'Ribbon type mismatch', why: 'The loaded ribbon does not match what the job requires', next: 'Load the correct ribbon type, or adjust the profile to match' },
+  15: { what: 'Ribbon used up', why: 'The ribbon has reached its end', next: 'Fit a new ribbon, then press Resume on the queue page' },
+  16: { what: 'Paper type mismatch', why: 'The loaded stock does not match the paper type in the profile', next: 'Load matching stock, or change the paper type in the profile' },
+  17: { what: 'Could not apply the paper setting', why: 'The printer rejected the paper type sent to it', next: 'Check the paper type in the profile, then retry' },
+  18: { what: 'Could not apply the print mode', why: 'The printer rejected the print mode sent to it', next: 'Check the print mode in the profile, then retry' },
+  19: { what: 'Could not apply the density setting', why: 'The printer rejected the density value sent to it', next: 'Set a density inside the range this model reports, then retry' },
+  20: { what: 'RFID write failed', why: 'The printer could not write to the tag on this stock', next: 'Check the stock is genuine RFID media, then retry' },
+  21: { what: 'Could not apply the margin setting', why: 'The printer rejected the margins sent to it', next: 'Reduce the margins in the profile, then retry' },
+  22: { what: 'Communication fault', why: 'The link to the printer was disturbed mid-exchange', next: 'Check the cable or network, then retry' },
+  23: { what: 'The printer disconnected', why: 'The connection dropped during the job', next: 'Check power and cabling, then resubmit the job' },
+  24: { what: 'Bad canvas parameters', why: 'The label dimensions sent to the printer are outside what it accepts', next: 'Check the label size against the printer capabilities, then retry' },
+  25: { what: 'Bad rotation parameter', why: 'The printer rejected the print direction sent to it', next: 'This is a software defect — give the job id to whoever maintains this service' },
+  26: { what: 'Malformed parameter', why: 'A value sent to the printer was not in the expected format', next: 'This is a software defect — give the job id to whoever maintains this service' },
+  27: { what: 'Paper feed fault (B3S family)', why: 'The paper may be jammed or loaded incorrectly', next: 'Open the lid, check the paper path, clear any jam and reload' },
+  28: { what: 'Paper detection failed', why: 'The printer could not locate the label gap', next: 'Check that the stock matches the paper type in the profile, then retry' },
+  29: { what: 'RFID tag not written', why: 'The job finished but the tag was left unwritten', next: 'Check the stock is genuine RFID media, then reprint the affected labels' },
+  30: { what: 'This model cannot set density', why: 'The printer does not support a density command', next: 'Remove the density setting from the profile' },
+  31: { what: 'This model cannot set the print mode', why: 'The printer does not support a print-mode command', next: 'Remove the print-mode setting from the profile' },
+  32: { what: 'Bad label material setting', why: 'The printer rejected the label material sent to it', next: 'Check the label material in the profile, then retry' },
+  33: { what: 'This model cannot set label material', why: 'The printer does not support a label-material command', next: 'Remove the label material setting from the profile' },
+  34: { what: 'This model cannot write RFID', why: 'The printer has no RFID writer', next: 'Use a printer that supports RFID, or drop the RFID step' },
+  50: { what: 'Invalid page data', why: 'The printer rejected the page it was sent', next: 'This is a software defect — give the job id to whoever maintains this service' },
+  51: { what: 'Invalid ribbon page data', why: 'The printer rejected the ribbon page it was sent', next: 'This is a software defect — give the job id to whoever maintains this service' },
+  52: { what: 'Timed out receiving data', why: 'The printer stopped acknowledging data mid-job', next: 'Check the cable or network, then resubmit the job' },
+  53: { what: 'Non-genuine ribbon', why: 'The printer does not recognise the ribbon as its own brand', next: 'Fit a genuine ribbon, or accept reduced print quality if the model allows it' },
+}
+
+const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
+  PRINTER_UNREACHABLE: {
+    what: 'Could not reach the printer',
+    why: 'It is powered off, unplugged, or the address is wrong',
+    next: 'Check power and cabling, confirm the address on the printer page, then retry',
+  },
+  PRINTER_HAS_QUEUED_JOBS: {
+    what: 'This printer still has queued jobs',
+    why: 'Removing it now would strand work that has already been accepted',
+    next: 'Wait for the queue to drain, or cancel the remaining jobs first',
+  },
+  JOB_ALREADY_PRINTING: {
+    what: 'That job is already printing',
+    why: 'It left the queue before this request arrived',
+    next: 'Wait for it to finish, or cancel it from the queue page',
+  },
+  INSUFFICIENT_CONSUMABLE: {
+    what: 'Not enough label stock to finish this job',
+    why: 'The roll has fewer labels left than the job requests',
+    next: 'Reduce the quantity, or fit a new roll and resubmit',
+  },
+  SEQUENCE_OVERFLOW: {
+    what: 'The running number exceeds its digit count',
+    why: 'The end of the range needs more digits than the field allows',
+    next: 'Increase the digit count, or start from a smaller value',
+  },
+  FIELD_VALIDATION_FAILED: {
+    what: 'A field value is not acceptable',
+    why: 'It breaks the rules of the chosen barcode symbology, or falls outside the printable area',
+    next: 'Correct the field content, then resubmit',
+  },
+  TEMPLATE_PRINTER_MISMATCH: {
+    what: 'Template and printer do not match',
+    why: 'The template was designed for a different class of printer; canvas size and printable width are incompatible',
+    next: 'Pick a matching printer, or create a template for this model',
+  },
+  TEMPLATE_VERSION_CONFLICT: {
+    what: 'This template was changed somewhere else',
+    why: 'Someone saved a newer version while you were editing',
+    next: 'Reload the template and reapply your changes — your current edits are still on screen',
+  },
+  QUEUE_PAUSED: {
+    what: "This printer's queue is paused",
+    why: 'The previous job failed, or someone paused it manually',
+    next: 'Clear the fault, then press Resume on the queue page',
+  },
+  DEVICE_ERROR: {
+    what: 'The printer refused the operation',
+    why: 'It is connected but did not respond as expected; firmware or state may be at fault',
+    next: 'Power cycle the printer and retry; if it repeats, note the model and firmware version',
+  },
+  RENDER_FAILED: {
+    what: 'Label rendering failed',
+    why: 'The service errored while producing the print image',
+    next: 'This is a software defect — give the job id to whoever maintains this service',
+  },
+  JOB_INTERRUPTED_BY_RESTART: {
+    what: 'The job was interrupted by a service restart; the printed count is unknown',
+    why: 'The service restarted mid-print and cannot confirm how many labels came out',
+    next: 'Count the labels actually produced, then decide how many to reprint',
+  },
+  CONFIRMATION_REQUIRED: {
+    what: 'This action prints physical labels',
+    why: 'Printing consumes stock and cannot be undone',
+    next: 'Confirm once you are ready to spend the labels',
+  },
+  VALIDATION_FAILED: {
+    what: 'The request is not valid',
+    why: 'The submitted data failed validation',
+    next: 'Correct the highlighted fields and retry',
+  },
+  NOT_FOUND: {
+    what: 'The requested item does not exist',
+    why: 'It may have been deleted',
+    next: 'Refresh the page and try again',
+  },
+  INTERNAL_ERROR: {
+    what: 'Internal service error',
+    why: 'Something unexpected went wrong',
+    next: 'Give the time of the action to whoever maintains this service so they can check the logs',
+  },
+}
+
+export const EN_US: LocaleBundle = { device: DEVICE, app: APP }

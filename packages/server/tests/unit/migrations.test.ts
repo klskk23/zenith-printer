@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { appliedMigrationIds, openDatabase, runMigrations, type Migration } from '../../src/db/index.ts'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import {
+  appliedMigrationIds,
+  openDatabase,
+  pendingMigrationIds,
+  runMigrations,
+  type Migration,
+} from '../../src/db/index.ts'
+import { backupBeforeMigrations, isFileBackedLocation } from '../../src/db/backup.ts'
 import { migrations } from '../../src/db/migrations/index.ts'
 
 function tableNames(db: DatabaseSync): string[] {
@@ -126,5 +136,54 @@ describe('initial schema', () => {
 
     db.prepare('DELETE FROM printers WHERE id = ?').run('p1')
     expect(db.prepare('SELECT COUNT(*) AS n FROM profiles').get()?.n).toBe(0)
+  })
+})
+
+describe('pre-migration backup', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'zenith-backup-'))
+
+  it('skips in-memory databases, which is what every test uses', () => {
+    expect(isFileBackedLocation(':memory:')).toBe(false)
+    expect(backupBeforeMigrations(':memory:', '2', true)).toMatchObject({
+      path: null,
+      reason: 'not-file-backed',
+    })
+  })
+
+  it('skips a database that does not exist yet', () => {
+    const location = join(tmp, 'absent.db')
+    expect(backupBeforeMigrations(location, '2', true)).toMatchObject({
+      path: null,
+      reason: 'no-existing-file',
+    })
+  })
+
+  it('skips when the schema is already current', () => {
+    const location = join(tmp, 'current.db')
+    writeFileSync(location, 'not really sqlite, but a file')
+    expect(backupBeforeMigrations(location, '2', false)).toMatchObject({
+      path: null,
+      reason: 'up-to-date',
+    })
+  })
+
+  it('copies the file byte-for-byte before migrations run', () => {
+    const location = join(tmp, 'live.db')
+    const contents = 'original contents'
+    writeFileSync(location, contents)
+
+    const result = backupBeforeMigrations(location, '2', true)
+
+    expect(result.reason).toBe('created')
+    expect(result.path).toBe(`${location}.before-2.bak`)
+    expect(readFileSync(result.path!, 'utf8')).toBe(contents)
+    // The original must still be there — this is a copy, not a move.
+    expect(readFileSync(location, 'utf8')).toBe(contents)
+  })
+
+  it('reports which migrations are pending', () => {
+    const db = openDatabase({ location: ':memory:' })
+    // openDatabase applies everything, so nothing should remain.
+    expect(pendingMigrationIds(db)).toEqual([])
   })
 })

@@ -1,13 +1,13 @@
 /**
  * Template save / load strip.
  *
- * Saving carries the `updatedAt` the design was loaded with, so a concurrent
+ * Saving carries the `version` the design was loaded with, so a concurrent
  * edit produces a clear conflict rather than silently discarding somebody's
  * work. Last write wins is acceptable; last write wins *unannounced* is not.
  */
 import { useState } from 'react'
 import { ApiRequestError } from '../../api/client.ts'
-import { copy } from '../../i18n/zh-CN.ts'
+import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
@@ -34,7 +34,7 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
     save.mutate(
       asNew || current === null
         ? { body }
-        : { id: current.id, updatedAt: current.updatedAt, body },
+        : { id: current.id, version: current.version, body },
       { onSuccess: onSaved },
     )
   }
@@ -91,11 +91,37 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
         )}
       </div>
 
-      {conflict && <Alert variant="destructive">{copy.templates.conflict}</Alert>}
-      {save.error instanceof ApiRequestError && !conflict && (
+      {/*
+        The server already worded this, so it is shown verbatim — rewording it
+        here would give one fault two descriptions. The reload button is the
+        one thing the server cannot offer: FR-081 wants a way back, and FR-082
+        wants the current edits left alone until the user asks.
+      */}
+      {save.error instanceof ApiRequestError && (
         <Alert variant="destructive">
           <p className="font-medium">{save.error.body.what}</p>
-          <p className="mt-1 text-xs">{save.error.body.next}</p>
+          <p className="mt-1 text-xs opacity-90">{save.error.body.why}</p>
+          <p className="mt-1 text-xs font-medium">{save.error.body.next}</p>
+          {conflict && current !== null && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              onClick={() => {
+                // Explicit, never automatic: reloading replaces what is on
+                // screen, and that is the user's call to make.
+                const latest = templates.data?.find((t) => t.id === current.id)
+                if (latest !== undefined) {
+                  void templates.refetch().then(() => {
+                    const fresh = templates.data?.find((t) => t.id === current.id) ?? latest
+                    onLoad(fresh)
+                  })
+                }
+              }}
+            >
+              {copy.templates.reload}
+            </Button>
+          )}
         </Alert>
       )}
     </div>

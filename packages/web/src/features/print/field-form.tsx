@@ -11,7 +11,7 @@
  * The range the batch will consume is shown before submitting, since a serial
  * that turns out wrong is only discovered once the labels are on boxes.
  */
-import { copy } from '../../i18n/zh-CN.ts'
+import { copy } from '../../i18n/index.ts'
 import type { PrintFormField } from '../templates/hooks.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Input } from '../../components/ui/input.tsx'

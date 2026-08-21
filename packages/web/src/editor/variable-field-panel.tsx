@@ -13,7 +13,7 @@
  * those sorts correctly.
  */
 import { isVariableRef, type LabelElement } from '@zenith/shared'
-import { copy } from '../i18n/zh-CN.ts'
+import { copy } from '../i18n/index.ts'
 import type { VariableField } from '../features/templates/hooks.ts'
 import { Button } from '../components/ui/button.tsx'
 import { Input } from '../components/ui/input.tsx'

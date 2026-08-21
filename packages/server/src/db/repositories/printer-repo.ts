@@ -40,6 +40,8 @@ function toPrinter(row: Row): Printer {
     queuePausedReason: row.queue_paused_reason === null ? null : String(row.queue_paused_reason),
     lastProbedAt: row.last_probed_at === null ? null : String(row.last_probed_at),
     createdAt: String(row.created_at),
+    offsetXDots: Number(row.offset_x_dots ?? 0),
+    offsetYDots: Number(row.offset_y_dots ?? 0),
   }
 
   if (row.print_task_name !== null && row.print_task_name !== undefined) {
@@ -136,6 +138,20 @@ export class PrinterRepo {
   }
 
   /** Jobs still waiting on this printer; blocks deletion (FR-052). */
+  /**
+   * Store the position correction.
+   *
+   * Belongs to the machine rather than to a profile: it describes where this
+   * printer currently lays ink down, and reloading a roll — even one of the
+   * identical type — can change that (FR-052).
+   */
+  setOffset(id: string, offsetXDots: number, offsetYDots: number): Printer | undefined {
+    this.#db
+      .prepare('UPDATE printers SET offset_x_dots = ?, offset_y_dots = ? WHERE id = ?')
+      .run(Math.round(offsetXDots), Math.round(offsetYDots), id)
+    return this.find(id)
+  }
+
   queuedJobCount(id: string): number {
     const row = this.#db
       .prepare("SELECT COUNT(*) AS n FROM print_jobs WHERE printer_id = ? AND status IN ('queued','printing')")

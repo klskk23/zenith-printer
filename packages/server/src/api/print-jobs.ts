@@ -16,6 +16,7 @@ import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { TemplateRepo } from '../db/repositories/template-repo.ts'
 import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { SequenceAllocator } from '../domain/sequence-allocator.ts'
+import { checkBatch } from '../domain/overflow.ts'
 import { ApiError, HttpStatus } from './errors.ts'
 import {
   allocateSequences,
@@ -41,6 +42,33 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
   const printers = (): PrinterRepo => new PrinterRepo(ctx())
   const templates = (): TemplateRepo => new TemplateRepo(ctx())
   const profiles = (): ProfileRepo => new ProfileRepo(ctx())
+
+  /**
+   * Report what would be clipped, without submitting anything.
+   *
+   * Always 200: this is a question, not a validation failure. Overflow never
+   * blocks a batch (FR-067), so there is no failure code for it — the point is
+   * to put the facts in front of the operator before they decide, and to list
+   * *every* affected row so one pass is enough.
+   */
+  typed.post(
+    '/api/print-jobs/preflight',
+    { schema: { body: printJobInputSchema } },
+    async (request) => {
+      const input = request.body
+      const printer = printers().find(input.printerId)
+      if (printer === undefined) {
+        throw ApiError.notFound({ printerId: input.printerId })
+      }
+      const template =
+        input.templateId === undefined ? null : (templates().find(input.templateId) ?? null)
+      const profile = input.profileId === undefined ? null : (profiles().find(input.profileId) ?? null)
+      const content = resolveContent(template, input.ir, profile)
+
+      const values = { ...previewValues(template), ...input.manualFieldValues }
+      return { warnings: checkBatch(content.ir, () => values, input.copies) }
+    },
+  )
 
   typed.post(
     '/api/print-jobs',
@@ -85,6 +113,12 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       const values = { ...previewValues(template), ...input.manualFieldValues }
       assertBarcodesEncodable(content.ir, values)
 
+      // Overflow is recorded, not enforced. Content past the edge is clipped,
+      // and whether that is acceptable is a judgement about this label that the
+      // operator is better placed to make. Holding back ninety-nine good labels
+      // because one will be clipped is the worse outcome.
+      const overflowWarnings = checkBatch(content.ir, () => values, input.copies)
+
       if (printer.queueState === 'paused') {
         throw ApiError.conflict('QUEUE_PAUSED', { printerId: printer.id })
       }
@@ -102,7 +136,9 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         requestedCopies: input.copies,
         manualFieldValues: input.manualFieldValues,
         seqRanges: {},
-        snapshot: buildSnapshot(printer, content),
+        // Recorded on the snapshot: the design may be edited afterwards, and
+        // history must show what this run actually produced.
+        snapshot: { ...buildSnapshot(printer, content), overflowWarnings },
       })
 
       const seqRanges = created
@@ -130,6 +166,9 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         requestedCopies: job.requestedCopies,
         seqRanges,
         deduplicated: !created,
+        // Returned so the caller can show what will be clipped; the job is
+        // accepted either way.
+        overflowWarnings,
       })
     },
   )

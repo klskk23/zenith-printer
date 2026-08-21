@@ -7,7 +7,15 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { printerInputSchema, queueStateSchema } from '../domain/printer.ts'
+import { isOffsetWithinHead, maxLabelWidthMm, printerInputSchema, queueStateSchema } from '../domain/printer.ts'
+import { ProfileRepo } from '../db/repositories/profile-repo.ts'
+import { JobRepo } from '../db/repositories/job-repo.ts'
+import { buildSnapshot, resolveContent } from './job-submission.ts'
+import { calibrationPageIr } from '../render/calibration-page.ts'
+import { randomUUID } from 'node:crypto'
+
+/** Used only when no profile says how tall the stock is. */
+const DEFAULT_CALIBRATION_HEIGHT_MM = 30
 import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { ApiError, HttpStatus } from './errors.ts'
 import { createDriver } from '../drivers/factory.ts'
@@ -17,8 +25,8 @@ const idParams = z.object({ id: z.string().min(1) })
 
 export async function registerPrinterRoutes(app: FastifyInstance): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>()
-  const repo = (): PrinterRepo =>
-    new PrinterRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+  const ctx = () => ({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+  const repo = (): PrinterRepo => new PrinterRepo(ctx())
 
   typed.get('/api/printers', async () => ({ printers: repo().list() }))
 
@@ -61,6 +69,41 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
     },
   )
 
+  /**
+   * Position correction.
+   *
+   * Rejected rather than clamped when it exceeds the head: a silently clamped
+   * offset looks like the correction was accepted and simply did nothing,
+   * which sends the operator back to measuring the paper again.
+   */
+  typed.patch(
+    '/api/printers/:id/offset',
+    {
+      schema: {
+        params: idParams,
+        body: z.object({
+          offsetXDots: z.number().int(),
+          offsetYDots: z.number().int(),
+        }),
+      },
+    },
+    async (request) => {
+      const store = repo()
+      const printer = store.find(request.params.id)
+      if (printer === undefined) {
+        throw ApiError.notFound({ printerId: request.params.id })
+      }
+      if (!isOffsetWithinHead(request.body, printer.capabilities)) {
+        throw ApiError.unprocessable('FIELD_VALIDATION_FAILED', {
+          offsetXDots: request.body.offsetXDots,
+          offsetYDots: request.body.offsetYDots,
+          printheadPixels: printer.capabilities?.printheadPixels ?? null,
+        })
+      }
+      return store.setOffset(request.params.id, request.body.offsetXDots, request.body.offsetYDots)
+    },
+  )
+
   typed.patch(
     '/api/printers/:id/queue',
     { schema: { params: idParams, body: z.object({ queueState: queueStateSchema }) } },
@@ -80,6 +123,88 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
       }
 
       return printer
+    },
+  )
+
+  /**
+   * Print a calibration label.
+   *
+   * Consumes stock and cannot be undone, so it refuses without an explicit
+   * confirmation — the same rule the print dialog follows, and for the same
+   * reason: an action that quietly burns labels will eventually burn them by
+   * accident.
+   *
+   * It goes through the ordinary job queue rather than printing inline, so it
+   * queues behind existing work instead of interleaving with it, and so the
+   * offset under correction is applied to it like any other label.
+   */
+  typed.post(
+    '/api/printers/:id/calibration-page',
+    {
+      schema: {
+        params: idParams,
+        body: z.object({
+          profileId: z.string().min(1).optional(),
+          confirmed: z.boolean().default(false),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const store = repo()
+      const printer = store.find(request.params.id)
+      if (printer === undefined) {
+        throw ApiError.notFound({ printerId: request.params.id })
+      }
+      if (!request.body.confirmed) {
+        throw ApiError.badRequest('CONFIRMATION_REQUIRED', { printerId: printer.id })
+      }
+      const capabilities = printer.capabilities
+      if (capabilities === null) {
+        throw ApiError.unprocessable('VALIDATION_FAILED', { printerId: printer.id })
+      }
+
+      const profiles = new ProfileRepo(ctx())
+      const profile =
+        request.body.profileId === undefined
+          ? (profiles.listFor(printer.id).find((p) => p.isDefault) ?? null)
+          : (profiles.find(request.body.profileId) ?? null)
+
+      const ir = calibrationPageIr({
+        // The page has to match the stock to be measurable against its edges.
+        widthMm: profile?.labelWidthMm ?? maxLabelWidthMm(capabilities),
+        heightMm: profile?.labelHeightMm ?? DEFAULT_CALIBRATION_HEIGHT_MM,
+        dpi: capabilities.dpi,
+      })
+
+      if (printer.queueState === 'paused') {
+        throw ApiError.conflict('QUEUE_PAUSED', { printerId: printer.id })
+      }
+
+      // Submitted as an ordinary job rather than printed inline: it queues
+      // behind existing work instead of interleaving with it, and the offset
+      // being corrected is applied to it exactly as to any other label — which
+      // is what makes "print it again to check" mean anything.
+      const content = resolveContent(null, ir, profile)
+      const { job } = new JobRepo(ctx()).createOrGet({
+        idempotencyKey: randomUUID(),
+        printerId: printer.id,
+        templateId: null,
+        profileId: profile?.id ?? null,
+        requestedCopies: 1,
+        manualFieldValues: {},
+        seqRanges: {},
+        snapshot: buildSnapshot(printer, content),
+      })
+
+      void app.ctx.queue?.drain(printer.id).catch((err: unknown) => {
+        request.log.error({ err, printerId: printer.id }, 'queue runner failed')
+      })
+
+      return reply.status(HttpStatus.Accepted).send({
+        printerId: printer.id,
+        jobId: job.id,
+        status: job.status,
+      })
     },
   )
 

@@ -209,3 +209,168 @@ describe('deletion', () => {
     expect((await app.inject({ method: 'DELETE', url: '/api/printers/nope' })).statusCode).toBe(404)
   })
 })
+
+/**
+ * FR-073, end to end. Switching the interface language has to switch the error
+ * prose with it, or the UI is half translated and the errors are the half left
+ * behind — which is the half that matters when something goes wrong.
+ */
+describe('error language', () => {
+  const hasHan = (text: string): boolean => /[一-鿿]/.test(text)
+
+  it('answers in Chinese by default', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/printers/nope' })
+    expect(hasHan(res.json().what)).toBe(true)
+  })
+
+  it('answers in English when the client asks for it', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/printers/nope',
+      headers: { 'accept-language': 'en-US' },
+    })
+    expect(res.json().what.length).toBeGreaterThan(0)
+    expect(hasHan(res.json().what)).toBe(false)
+  })
+
+  it('keeps the code and status identical across languages', async () => {
+    const zh = await app.inject({ method: 'GET', url: '/api/printers/nope' })
+    const en = await app.inject({
+      method: 'GET',
+      url: '/api/printers/nope',
+      headers: { 'accept-language': 'en-US' },
+    })
+    expect(en.statusCode).toBe(zh.statusCode)
+    expect(en.json().code).toBe(zh.json().code)
+  })
+
+  it('localises validation failures too', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/printers',
+      headers: { 'accept-language': 'en-US' },
+      payload: { name: '' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(hasHan(res.json().what)).toBe(false)
+  })
+
+  it('falls back to Chinese for a language it does not have', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/printers/nope',
+      headers: { 'accept-language': 'fr-FR' },
+    })
+    expect(hasHan(res.json().what)).toBe(true)
+  })
+})
+
+/**
+ * The calibration page.
+ *
+ * The earlier test here checked only that an unconfirmed request is refused —
+ * it asserted the guard and never the action, so an endpoint that built the
+ * label and returned it without printing anything passed cleanly. These check
+ * that a job actually comes out the other end.
+ */
+describe('calibration page', () => {
+  async function readyPrinter(): Promise<string> {
+    const printer = (await createPrinter()).json()
+    app.ctx.db
+      .prepare(
+        `UPDATE printers SET dpi = 203, printhead_pixels = 384, density_min = 1, density_max = 5,
+           density_default = 3, paper_types = '[1]', print_direction = 'top',
+           supports_consumable_level = 1, model = 'B3S_P', last_probed_at = '2026-08-21T00:00:00Z'
+         WHERE id = ?`,
+      )
+      .run(printer.id)
+    return printer.id
+  }
+
+  const jobCount = (): number =>
+    Number(
+      (app.ctx.db.prepare('SELECT COUNT(*) AS n FROM print_jobs').get() as { n: number }).n,
+    )
+
+  it('refuses without an explicit confirmation', async () => {
+    const id = await readyPrinter()
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: {},
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().code).toBe('CONFIRMATION_REQUIRED')
+  })
+
+  it('prints nothing when it refuses', async () => {
+    const id = await readyPrinter()
+    await app.inject({ method: 'POST', url: `/api/printers/${id}/calibration-page`, payload: {} })
+    expect(jobCount()).toBe(0)
+  })
+
+  /** The one the previous version of this file did not ask. */
+  it('actually queues a job when confirmed', async () => {
+    const id = await readyPrinter()
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true },
+    })
+
+    expect(res.statusCode).toBe(202)
+    expect(res.json().jobId).toBeTruthy()
+    expect(jobCount()).toBe(1)
+  })
+
+  it('queues exactly one label, not a batch', async () => {
+    const id = await readyPrinter()
+    await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true },
+    })
+    const job = app.ctx.db.prepare('SELECT requested_copies FROM print_jobs').get() as {
+      requested_copies: number
+    }
+    expect(Number(job.requested_copies)).toBe(1)
+  })
+
+  it('records a snapshot carrying the calibration label itself', async () => {
+    const id = await readyPrinter()
+    await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true },
+    })
+    const row = app.ctx.db.prepare('SELECT snapshot FROM print_jobs').get() as { snapshot: string }
+    const snapshot = JSON.parse(row.snapshot)
+    // A centre cross and edge ticks: what the measurement is taken against.
+    expect(snapshot.ir.elements.length).toBeGreaterThan(10)
+  })
+
+  it('refuses on a paused queue rather than silently doing nothing', async () => {
+    const id = await readyPrinter()
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/printers/${id}/queue`,
+      payload: { queueState: 'paused' },
+    })
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(jobCount()).toBe(0)
+  })
+
+  it('404s for a printer that does not exist', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/printers/nope/calibration-page',
+      payload: { confirmed: true },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+})

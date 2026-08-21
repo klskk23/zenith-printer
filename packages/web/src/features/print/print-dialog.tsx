@@ -9,15 +9,16 @@
  *   - an idempotency key minted once per dialog opening, so a retried request
  *     returns the original job instead of producing a second batch
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { LabelIR } from '@zenith/shared'
 import { ApiRequestError, request } from '../../api/client.ts'
 import type { Printer, PrintJobSummary } from '../../api/types.ts'
-import { copy } from '../../i18n/zh-CN.ts'
+import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
+import { OverflowNotice, type OverflowWarning } from './overflow-notice.tsx'
 import { Select } from '../../components/ui/select.tsx'
 import { usePrintForm } from '../templates/hooks.ts'
 import { FieldForm } from './field-form.tsx'
@@ -47,6 +48,7 @@ export function PrintDialog({
   const [sequenceOverrides, setSequenceOverrides] = useState<Record<string, number>>({})
   const form = usePrintForm(templateId)
   const [submitting, setSubmitting] = useState(false)
+  const [warnings, setWarnings] = useState<OverflowWarning[]>([])
   const [error, setError] = useState<ApiRequestError | null>(null)
   const [result, setResult] = useState<PrintJobSummary | null>(null)
 
@@ -59,6 +61,46 @@ export function PrintDialog({
   const blocked =
     printer === null ? copy.print.selectPrinter : printer.capabilities === null ? copy.print.needsProbe : null
 
+  const jobBody = (): Record<string, unknown> => ({
+    printerId: printer?.id,
+    // A saved template prints from the stored design; an unsaved one goes as
+    // an ad-hoc IR so User Story 1 still works.
+    ...(templateId === null ? { ir } : { templateId }),
+    ...(profileId === null ? {} : { profileId }),
+    copies,
+    manualFieldValues: manualValues,
+    sequenceOverrides,
+  })
+
+  /**
+   * Ask what will be clipped before submitting.
+   *
+   * A barcode bound to a variable field has no fixed width — the module count
+   * follows the content — so row 7 of a hundred can overflow while the design
+   * looks fine. This is the only place that can be known.
+   */
+  useEffect(() => {
+    if (printer === null || printer.capabilities === null) {
+      return
+    }
+    let cancelled = false
+    void request<{ warnings: OverflowWarning[] }>('/print-jobs/preflight', {
+      method: 'POST',
+      body: jobBody(),
+    })
+      .then((response) => {
+        if (!cancelled) {
+          setWarnings(response.warnings)
+        }
+      })
+      // A preflight that fails is not a reason to stop someone printing; the
+      // submission itself reports anything that genuinely blocks.
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [printer?.id, templateId, profileId, copies, JSON.stringify(manualValues)])
+
   const submit = async (): Promise<void> => {
     if (printer === null) {
       return
@@ -70,16 +112,7 @@ export function PrintDialog({
         await request<PrintJobSummary>('/print-jobs', {
           method: 'POST',
           idempotencyKey,
-          body: {
-            printerId: printer.id,
-            // A saved template prints from the stored design; an unsaved one
-            // goes as an ad-hoc IR so User Story 1 still works.
-            ...(templateId === null ? { ir } : { templateId }),
-            ...(profileId === null ? {} : { profileId }),
-            copies,
-            manualFieldValues: manualValues,
-            sequenceOverrides,
-          },
+          body: jobBody(),
         }),
       )
     } catch (err) {
@@ -97,6 +130,9 @@ export function PrintDialog({
         {result === null ? (
           <>
             <Alert variant="warning">{copy.print.warning}</Alert>
+
+            {/* Listed, never enforced: the print button stays enabled. */}
+            <OverflowNotice warnings={warnings} />
 
             <div className="space-y-1">
               <Label>{copy.print.printer}</Label>

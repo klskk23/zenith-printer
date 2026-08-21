@@ -19,6 +19,7 @@ import {
   isVariableRef,
   layoutGrid,
   mmToDots,
+  rotatedBounds,
   type LabelElement,
   type LabelIR,
 } from '@zenith/shared'
@@ -35,6 +36,7 @@ export interface Violation {
     | 'STROKE_TOO_THIN'
     | 'ELEMENT_OUT_OF_BOUNDS'
     | 'BARCODE_CONTENT_EMPTY'
+    | 'IMAGE_NOT_CHOSEN'
   elementId?: string
   /** Numbers the message needs, e.g. the limit that was exceeded. */
   values?: Record<string, number | string>
@@ -52,7 +54,19 @@ export function minStrokeWidthMm(limits: PrinterLimits): number {
   return MM_PER_INCH / limits.dpi
 }
 
-/** Bounding box of an element in millimetres. */
+/**
+ * Bounding box of an element in millimetres, **after rotation**.
+ *
+ * The rotation is not optional detail here. A 40x10 mm barcode turned 90
+ * degrees occupies 10x40 mm, and checking it against its unrotated box passes
+ * an element that is half off the label. This used to ignore rotation entirely
+ * — harmless only because nothing could rotate yet.
+ *
+ * `rotatedBounds` lives in @zenith/shared because the same answer is needed by
+ * the pre-print check. Two implementations would eventually disagree, and the
+ * disagreement reads as "the editor said it was fine but printing says it
+ * overflows".
+ */
 export function boundsOf(element: LabelElement): {
   xMm: number
   yMm: number
@@ -60,21 +74,25 @@ export function boundsOf(element: LabelElement): {
   heightMm: number
 } {
   if (element.type === 'line') {
+    // A line's endpoints already describe its extent, and rotating it about
+    // its own centre is the same as moving the endpoints.
     const xMm = Math.min(element.xMm, element.x2Mm)
     const yMm = Math.min(element.yMm, element.y2Mm)
-    return {
+    return rotatedBounds({
       xMm,
       yMm,
       widthMm: Math.abs(element.x2Mm - element.xMm),
       heightMm: Math.abs(element.y2Mm - element.yMm),
-    }
+      rotation: element.rotation,
+    })
   }
-  return {
+  return rotatedBounds({
     xMm: element.xMm,
     yMm: element.yMm,
     widthMm: element.widthMm,
     heightMm: element.heightMm,
-  }
+    rotation: element.rotation,
+  })
 }
 
 /** Whether any part of an element falls outside the canvas. */
@@ -118,6 +136,13 @@ export function inspect(ir: LabelIR, limits: PrinterLimits): Violation[] {
       element.content.length === 0
     ) {
       violations.push({ code: 'BARCODE_CONTENT_EMPTY', elementId: element.id, blocking: true })
+    }
+
+    // A newly added image is a placeholder until a file is picked. Without
+    // this it fails schema validation on save, and the user sees a raw
+    // validation error instead of being told to choose an image.
+    if (element.type === 'image' && element.assetId.length === 0) {
+      violations.push({ code: 'IMAGE_NOT_CHOSEN', elementId: element.id, blocking: true })
     }
 
     if (isOutOfBounds(element, ir)) {

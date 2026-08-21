@@ -124,7 +124,7 @@ const SNAPSHOT: ContentSnapshot = {
   heightMm: 30,
   dpi: 203,
   ir: { widthMm: 50, heightMm: 30, dpi: 203, elements: [] },
-  profile: { name: null, density: 3, labelType: 1, offsetXMm: 0, offsetYMm: 0 },
+  profile: { name: null, density: 3, labelType: 1 }, offsetXDots: 0, offsetYDots: 0,
 }
 
 const BLANK_PAGE: BinaryBitmap = { widthDots: 8, heightDots: 1, data: new Uint8Array(1) }

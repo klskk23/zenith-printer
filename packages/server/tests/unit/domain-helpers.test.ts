@@ -19,7 +19,7 @@ const snapshot: ContentSnapshot = {
   heightMm: 30,
   dpi: 203,
   ir: { widthMm: 50, heightMm: 30, dpi: 203, elements: [] },
-  profile: { name: null, density: 3, labelType: 1, offsetXMm: 0, offsetYMm: 0 },
+  profile: { name: null, density: 3, labelType: 1 }, offsetXDots: 0, offsetYDots: 0,
 }
 
 function job(overrides: Partial<PrintJob> = {}): PrintJob {
@@ -107,6 +107,7 @@ describe('submission schema', () => {
 describe('template field helpers', () => {
   const template: Template = {
     id: 't1',
+    version: 1,
     name: 'label',
     printerKind: 'niimbot',
     widthMm: 50,

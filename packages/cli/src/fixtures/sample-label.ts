@@ -23,3 +23,61 @@ export function sampleLabel(dpi: number, strokeWidthDots: number): LabelIR {
     ],
   })
 }
+
+/**
+ * Single-element probes for verifying one thing at a time.
+ *
+ * `sampleLabel` above is a whole label and good for judging a print as a whole.
+ * These exist because the questions this feature raised are narrower: "is the
+ * QR element actually a QR code", "does the module width change anything".
+ */
+export type ProbeElement = 'qrcode' | 'barcode' | 'ellipse' | 'multiline'
+
+export function probeLabel(
+  element: ProbeElement,
+  dpi: number,
+  moduleWidthDots: number,
+  content: string,
+): LabelIR {
+  const elements: Record<ProbeElement, unknown> = {
+    // Sized to the full label height on purpose. A QR side is quantised to
+    // whole multiples of the module count, so a box too small for the requested
+    // module width silently renders at a smaller one — which would make a
+    // "compare 2 / 3 / 4 dots" experiment produce two identical labels.
+    qrcode: {
+      id: 'probe', type: 'qrcode', xMm: 2, yMm: 1, widthMm: 28, heightMm: 28,
+      content, errorCorrectionLevel: 'M', moduleWidthDots,
+    },
+    barcode: {
+      id: 'probe', type: 'barcode', xMm: 2, yMm: 2, widthMm: 46, heightMm: 14,
+      content, symbology: 'code128', showHumanReadable: true, moduleWidthDots,
+    },
+    ellipse: {
+      id: 'probe', type: 'ellipse', xMm: 2, yMm: 2, widthMm: 30, heightMm: 20,
+      strokeWidthDots: moduleWidthDots, filled: false,
+    },
+    multiline: {
+      id: 'probe', type: 'text', xMm: 2, yMm: 2, widthMm: 46, heightMm: 24,
+      content, fontFamily: FONT_FAMILIES.sans, fontSizeMm: 3,
+    },
+  }
+
+  return labelIrSchema.parse({ widthMm: 50, heightMm: 30, dpi, elements: [elements[element]] })
+}
+
+/**
+ * Default content per probe. Fixture data, not user-facing copy — the Chinese
+ * line is the point: it exercises the bundled CJK font in a multi-line layout.
+ */
+export function defaultProbeContent(element: ProbeElement): string {
+  switch (element) {
+    case 'qrcode':
+      return 'https://example.com'
+    case 'barcode':
+      return 'ABC-12345'
+    case 'multiline':
+      return 'First line\nSecond line\n第三行'
+    case 'ellipse':
+      return ''
+  }
+}

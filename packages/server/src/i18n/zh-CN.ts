@@ -8,11 +8,9 @@
  * happened, why, and what to do next — so a raw error code never reaches a user.
  */
 
-export interface ErrorCopy {
-  what: string
-  why: string
-  next: string
-}
+import type { AppErrorCode, ErrorCopy, LocaleBundle } from './types.ts'
+
+export type { ErrorCopy }
 
 /**
  * Device faults, keyed by niimbluelib's `PrinterErrorCode`.
@@ -60,7 +58,7 @@ export const DEVICE_ERROR_COPY: Readonly<Record<number, ErrorCopy>> = {
 }
 
 /** Application-level errors, keyed by the stable `code` in the REST contract. */
-export const APP_ERROR_COPY: Readonly<Record<string, ErrorCopy>> = {
+export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
   PRINTER_UNREACHABLE: {
     what: '打印机无法连接',
     why: '设备可能已关机、断开数据线，或网络地址不可达。精臣打印机闲置一小时后会自动关机，且无法通过 USB 唤醒',
@@ -116,6 +114,16 @@ export const APP_ERROR_COPY: Readonly<Record<string, ErrorCopy>> = {
     why: '服务在打印过程中重启，无法确认实际已经输出了多少张',
     next: '请清点实际打出的标签数量，再决定补打多少份',
   },
+  TEMPLATE_VERSION_CONFLICT: {
+    what: '该模板已在别处被修改',
+    why: '你编辑期间有人保存了新的版本',
+    next: '重新加载模板后再应用你的改动——当前编辑内容仍保留在页面上',
+  },
+  CONFIRMATION_REQUIRED: {
+    what: '此操作会打印实物标签',
+    why: '打印会消耗纸张且无法撤销',
+    next: '确认后继续，届时将实际消耗标签',
+  },
   VALIDATION_FAILED: {
     what: '请求内容不合法',
     why: '提交的数据未通过校验',
@@ -132,3 +140,5 @@ export const APP_ERROR_COPY: Readonly<Record<string, ErrorCopy>> = {
     next: '请把操作时间提供给维护人员，以便查阅日志',
   },
 }
+
+export const ZH_CN: LocaleBundle = { device: DEVICE_ERROR_COPY, app: APP_ERROR_COPY }

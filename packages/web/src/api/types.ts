@@ -30,6 +30,9 @@ export interface Printer {
   queuePausedReason: string | null
   lastProbedAt: string | null
   createdAt: string
+  /** Position correction in dots; belongs to the machine, not the paper. */
+  offsetXDots: number
+  offsetYDots: number
 }
 
 export interface PrintJobSummary {

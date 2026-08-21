@@ -29,6 +29,51 @@ export const copy = {
     printers: '打印机',
   },
 
+  workspace: {
+    tabs: {
+      index: '首页',
+      design: '标签设计',
+      templates: '模板库',
+      printers: '打印机',
+      queue: '打印队列',
+      history: '打印历史',
+      settings: '设置',
+    },
+    untitledDesign: '未命名设计',
+    close: '关闭',
+    unsavedMark: '有未保存的修改',
+    confirmCloseTitle: '关闭这个标签页？',
+    confirmCloseBody: '该标签页有未保存的修改，关闭后无法恢复。',
+    confirmCloseCancel: '取消',
+    confirmCloseConfirm: '仍然关闭',
+    leavePrompt: '有未保存的修改，确定要离开吗？',
+    softLimitWarning: '已打开 10 个标签页。继续开启可能影响编辑流畅度，但不会被阻止。',
+    disconnectedBanner: '与打印服务的连接已断开。编辑不会中断，但保存和打印会失败。',
+  },
+
+  index: {
+    printerSection: '打印机状态',
+    templateSection: '最近模板',
+    recentJobsSection: '最近打印',
+    managePrinters: '管理打印机',
+    allTemplates: '模板库',
+    allHistory: '打印历史',
+    noPrinters: '还没有添加打印机',
+    noTemplates: '还没有保存的模板',
+    noRecentJobs: '还没有打印记录',
+    queueRunning: '队列运行中',
+    queuePaused: '队列已暂停',
+    pendingJobs: (n: number) => `${n} 个待处理任务`,
+    remaining: (n: number) => `余量 ${n} 张`,
+    // The two printer families differ here and the difference is the user's to
+    // know: a model that cannot count its stock stops mid-batch with no warning.
+    remainingUnsupported: '本机型无法上报余量',
+    online: '在线',
+    offline: '离线',
+    unknownState: '状态未知',
+    resubmit: '重新提交',
+  },
+
   printers: {
     heading: '打印机',
     empty: '还没有添加打印机',
@@ -73,6 +118,29 @@ export const copy = {
   },
 
   editor: {
+    layers: {
+      heading: '图层',
+      empty: '画布上还没有元素',
+      toFront: '置顶',
+      toBack: '置底',
+    },
+    zoom: {
+      fit: '适应窗口',
+      label: '缩放',
+    },
+    contextMenu: {
+      delete: '删除',
+      toFront: '置顶',
+      toBack: '置底',
+    },
+    undo: '撤销',
+    redo: '重做',
+    moduleWidth: '模块宽度',
+    moduleWidthHint: (dots: number, mm: number) => `${dots} dot = ${mm.toFixed(3)} mm`,
+    derivedWidth: '宽度（由模块宽度决定）',
+    variableWidthHint: '内容来自可变字段，实际宽度随每张标签的内容变化',
+    rotation: '旋转',
+    filled: '填充',
     heading: '标签设计',
     canvas: '画布',
     canvasWidth: '宽度',
@@ -86,6 +154,7 @@ export const copy = {
       image: '图片',
       line: '直线',
       rect: '矩形',
+      ellipse: '椭圆',
     },
     fields: {
       content: '内容',
@@ -128,6 +197,7 @@ export const copy = {
       `线宽小于一个点，打印后不可见。最小为 ${v.minWidthMm}mm（1 dot）`,
     ELEMENT_OUT_OF_BOUNDS: (): string => '该元素超出画布，超出部分不会被打印',
     BARCODE_CONTENT_EMPTY: (): string => '条码内容为空',
+    IMAGE_NOT_CHOSEN: (): string => '还没有为这个图片元素选择图片',
   },
 
   preview: {
@@ -189,7 +259,66 @@ export const copy = {
     confirmRemove: '确定删除这个模板吗？已打印的历史记录不受影响。',
     name: '模板名称',
     conflict: '这个模板已被其他人修改。请重新载入后再保存，否则会覆盖对方的改动。',
+    reload: '重新载入',
     boundKind: '适用机型',
+    searchPlaceholder: '搜索模板名称',
+    open: '打开',
+    confirmDelete: '确定删除这个模板吗？已打印的历史记录不受影响。',
+    fieldCount: (n: number) => (n === 0 ? '无可变字段' : `${n} 个可变字段`),
+  },
+
+  settings: {
+    heading: '设置',
+    // The most important sentence on this page: it tells you why the thing you
+    // are looking for is not here.
+    scopeNote: '这里的设置只影响当前浏览器，不会影响其他人。服务端配置（空跑模式、日志级别等）由部署方式决定，界面上不提供。',
+    language: '界面语言',
+    languageNames: { 'zh-CN': '中文', 'en-US': 'English' },
+    defaultSize: '新建标签默认尺寸',
+    defaultWidth: '宽度',
+    defaultHeight: '高度',
+    defaultDpi: '分辨率',
+    defaultFont: '默认字体',
+    displayUnit: '尺寸显示单位',
+    displayUnits: { mm: '毫米', dot: '打印点' },
+    theme: '主题',
+    themes: { light: '浅色', dark: '深色', system: '跟随系统' },
+    pollInterval: '队列刷新间隔（毫秒）',
+    alwaysConfirmTabClose: '关闭标签页时总是确认',
+    localOnlyHint: '换一个浏览器会回到默认值——系统没有账号，无法记住是谁。',
+  },
+
+  offset: {
+    heading: '物理偏移校正',
+    up: '上移',
+    right: '右移',
+    down: '下移',
+    left: '左移',
+    unit: 'dot',
+    // The single most useful sentence on this panel: it explains why the value
+    // is not something you set once.
+    hint: '每次更换纸卷后都可能需要重新校正，即使是同型号纸。',
+    printCalibration: '打印校正页',
+    confirmTitle: '打印校正页？',
+    confirmBody: '这会实际打印一张标签并消耗纸张，无法撤销。',
+    confirmCancel: '取消',
+    confirmPrint: '打印',
+    save: '保存偏移',
+    saved: '偏移已保存',
+  },
+
+  overflow: {
+    heading: '以下标签有内容超出边界',
+    // Overflow warns but never blocks: the judgement belongs to whoever holds
+    // the roll, and holding back a whole batch for one clipped label is worse.
+    note: '超出部分会被裁切。你可以照常打印，也可以修改后重试。',
+    row: (index: number) => `第 ${index + 1} 张`,
+    reasons: {
+      ELEMENT_OUT_OF_BOUNDS: '元素超出标签范围',
+      BARCODE_TOO_WIDE: '条码宽度超出可用宽度',
+    },
+    widths: (actual: number, available: number) => `${actual} mm / 可用 ${available} mm`,
+    inHistory: '本次打印有内容被裁切',
   },
 
   profiles: {
@@ -197,6 +326,17 @@ export const copy = {
     empty: '还没有打印参数，将使用探测到的默认值',
     add: '新建参数',
     name: '名称',
+    labelWidth: '纸张宽度',
+    labelHeight: '纸张高度',
+    margins: '边距',
+    marginLinked: '四边相同',
+    marginTop: '上',
+    marginRight: '右',
+    marginBottom: '下',
+    marginLeft: '左',
+    marginHint: '边距只作提示，不阻止在其中放置元素。',
+    canvasFollowsProfile: '选择参数后画布尺寸会跟随纸张尺寸，已有元素位置不变。',
+    noProfileSelected: '尚未选择打印参数，因此不显示边距。',
     density: '浓度',
     labelType: '介质类型',
     offsetX: '水平偏移',

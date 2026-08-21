@@ -9,8 +9,17 @@
  *   - it does not silently clamp. A value that cannot print is reported by the
  *     guards with an explanation instead.
  */
-import { mmToDots, type LabelElement, type LabelIR } from '@zenith/shared'
-import { copy } from '../i18n/zh-CN.ts'
+import {
+  MIN_MODULE_WIDTH_DOTS,
+  dotsToMm,
+  isVariableRef,
+  mmToDots,
+  type BarcodeElement,
+  type LabelElement,
+  type LabelIR,
+  type QrcodeElement,
+} from '@zenith/shared'
+import { copy } from '../i18n/index.ts'
 import { FONT_FAMILIES, type FontFamilyKey } from './elements.ts'
 import { dotStepMm } from './guards.ts'
 import { Button } from '../components/ui/button.tsx'
@@ -98,6 +107,57 @@ function DotsInput({
   )
 }
 
+/**
+ * Module width, for barcodes and QR codes.
+ *
+ * The primary control, with the resulting width shown read-only beside it. That
+ * inversion is deliberate: width is not something these elements have
+ * independently — it is moduleWidth x moduleCount, and the module count comes
+ * from the content and symbology. Offering "width" as the editable number would
+ * invite values that do not exist.
+ *
+ * Both units are shown because the number that decides whether a scanner can
+ * read the label is the module in millimetres, and 2 dots means nothing without
+ * knowing it is 0.25 mm.
+ */
+function ModuleWidthField({
+  element,
+  dpi,
+  patch,
+}: {
+  element: BarcodeElement | QrcodeElement
+  dpi: number
+  patch: (changes: Partial<LabelElement>) => void
+}): React.JSX.Element {
+  const moduleMm = dotsToMm(element.moduleWidthDots, dpi)
+  const variable = isVariableRef(element.content)
+
+  return (
+    <div className="space-y-1">
+      <Field label={copy.editor.moduleWidth}>
+        <Input
+          type="number"
+          min={MIN_MODULE_WIDTH_DOTS}
+          step={1}
+          value={element.moduleWidthDots}
+          onChange={(event) => {
+            const next = Math.max(MIN_MODULE_WIDTH_DOTS, Math.round(Number(event.target.value) || MIN_MODULE_WIDTH_DOTS))
+            patch({ moduleWidthDots: next } as never)
+          }}
+        />
+      </Field>
+      <p className="text-[11px] text-muted-foreground">
+        {copy.editor.moduleWidthHint(element.moduleWidthDots, moduleMm)}
+      </p>
+      {variable && (
+        // The module count depends on the content, and the content is not known
+        // until print time — so the width shown here is an estimate.
+        <p className="text-[11px] text-muted-foreground">{copy.editor.variableWidthHint}</p>
+      )}
+    </div>
+  )
+}
+
 export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): React.JSX.Element {
   if (element === null) {
     return <p className="text-sm text-muted-foreground">{copy.editor.noSelection}</p>
@@ -158,10 +218,23 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
       {(element.type === 'text' || element.type === 'barcode' || element.type === 'qrcode') &&
         typeof element.content === 'string' && (
           <Field label={copy.editor.fields.content}>
-            <Input
-              value={element.content}
-              onChange={(event) => patch({ content: event.target.value } as never)}
-            />
+            {element.type === 'text' ? (
+              // Multi-line, and only where the user typed a newline. The
+              // renderer never wraps to the box width: wrapping needs glyph
+              // metrics, and the browser's are not the print renderer's, so the
+              // two would break at different words.
+              <textarea
+                rows={3}
+                value={element.content}
+                onChange={(event) => patch({ content: event.target.value } as never)}
+                className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+              />
+            ) : (
+              <Input
+                value={element.content}
+                onChange={(event) => patch({ content: event.target.value } as never)}
+              />
+            )}
           </Field>
         )}
 
@@ -231,7 +304,11 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
         </>
       )}
 
-      {element.type === 'rect' && (
+      {(element.type === 'barcode' || element.type === 'qrcode') && (
+        <ModuleWidthField element={element} dpi={ir.dpi} patch={patch} />
+      )}
+
+      {(element.type === 'rect' || element.type === 'ellipse') && (
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"

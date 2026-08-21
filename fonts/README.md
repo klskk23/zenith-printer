@@ -5,7 +5,11 @@
 
 ```bash
 npm run fetch-fonts
-sha256sum -c fonts/MANIFEST.sha256
+# The manifest lists bare filenames and the fonts live in fonts/full/, so the
+# check must run from that directory. Running it from the repository root
+# reports "FAILED open or read" for every file — a path problem, not a corrupt
+# download.
+(cd fonts/full && sha256sum -c ../MANIFEST.sha256)
 ```
 
 - `full/` —— 后端渲染使用的全量字体。宪章要求 `loadSystemFonts: false`，

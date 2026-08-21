@@ -30,19 +30,28 @@ export type TemplateInput = z.infer<typeof templateInputSchema>
 export interface Template extends TemplateInput {
   id: string
   createdAt: string
-  /** Optimistic concurrency token: a stale value means somebody else saved first. */
   updatedAt: string
+  /**
+   * Optimistic concurrency token: a stale value means somebody else saved first.
+   *
+   * A counter rather than `updatedAt`, which is what this used to be. Two saves
+   * that land on the same timestamp compare equal, so the second one overwrites
+   * the first *and reports success* — the precise failure the token exists to
+   * prevent. Under an injected fixed clock that is not a rare race but the
+   * normal case, which is also why no existing test caught it.
+   */
+  version: number
 }
 
 export class TemplateConflictError extends Error {
   readonly templateId: string
-  readonly currentUpdatedAt: string
+  readonly currentVersion: number
 
-  constructor(templateId: string, currentUpdatedAt: string) {
+  constructor(templateId: string, currentVersion: number) {
     super(`template ${templateId} was modified by someone else`)
     this.name = 'TemplateConflictError'
     this.templateId = templateId
-    this.currentUpdatedAt = currentUpdatedAt
+    this.currentVersion = currentVersion
   }
 }
 

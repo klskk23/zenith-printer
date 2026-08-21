@@ -313,7 +313,7 @@ describe('snapshot immutability', () => {
       await app.inject({
         method: 'POST',
         url: `/api/printers/${printerId}/profiles`,
-        payload: { name: 'thick', density: 5, labelType: 2, offsetXMm: 0.5, offsetYMm: 0 },
+        payload: { name: 'thick', density: 5, labelType: 2, labelWidthMm: 50, labelHeightMm: 30 },
       })
     ).json()
 
@@ -330,6 +330,6 @@ describe('snapshot immutability', () => {
     await app.inject({ method: 'DELETE', url: `/api/profiles/${profile.id}` })
 
     const job = (await app.inject({ method: 'GET', url: `/api/print-jobs/${jobId}` })).json()
-    expect(job.snapshot.profile).toMatchObject({ name: 'thick', density: 5, offsetXMm: 0.5 })
+    expect(job.snapshot.profile).toMatchObject({ name: 'thick', density: 5, labelType: 2 })
   })
 })

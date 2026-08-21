@@ -9,7 +9,7 @@
 import { useState } from 'react'
 import { ApiRequestError } from '../../api/client.ts'
 import type { Capabilities } from '../../api/types.ts'
-import { copy } from '../../i18n/zh-CN.ts'
+import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
@@ -23,7 +23,13 @@ export interface ProfilesPanelProps {
   onSelect: (id: string | null) => void
 }
 
-const MM_PER_INCH = 25.4
+
+const MARGIN_KEYS = [
+  { key: 'marginTopMm', label: copy.profiles.marginTop },
+  { key: 'marginRightMm', label: copy.profiles.marginRight },
+  { key: 'marginBottomMm', label: copy.profiles.marginBottom },
+  { key: 'marginLeftMm', label: copy.profiles.marginLeft },
+] as const
 
 export function ProfilesPanel({
   printerId,
@@ -36,12 +42,7 @@ export function ProfilesPanel({
   const remove = useDeleteProfile(printerId)
   const [draft, setDraft] = useState<Partial<Profile> | null>(null)
 
-  const dpi = capabilities?.dpi ?? 203
-  const dotMm = MM_PER_INCH / dpi
-
   const editing = draft ?? profiles.data?.find((p) => p.id === selectedProfileId) ?? null
-
-  const offsetDots = (mm: number): number => Math.round((mm * dpi) / MM_PER_INCH)
 
   return (
     <div className="space-y-3">
@@ -55,8 +56,12 @@ export function ProfilesPanel({
               name: 'profile',
               density: capabilities?.densityDefault ?? 3,
               labelType: capabilities?.paperTypes[0] ?? 1,
-              offsetXMm: 0,
-              offsetYMm: 0,
+              labelWidthMm: 50,
+              labelHeightMm: 30,
+              marginTopMm: 0,
+              marginRightMm: 0,
+              marginBottomMm: 0,
+              marginLeftMm: 0,
               isDefault: false,
             })
           }
@@ -112,24 +117,63 @@ export function ProfilesPanel({
             </div>
           </div>
 
+          {/* Stock dimensions. Choosing this profile sets the canvas to them,
+              which is the only way to be sure the design matches the paper. */}
           <div className="grid grid-cols-2 gap-2">
-            {(['offsetXMm', 'offsetYMm'] as const).map((key) => (
-              <div key={key} className="space-y-1">
-                <Label>{key === 'offsetXMm' ? copy.profiles.offsetX : copy.profiles.offsetY}</Label>
-                <Input
-                  type="number"
-                  step={1}
-                  value={offsetDots(editing[key] ?? 0)}
-                  onChange={(e) => setDraft({ ...editing, [key]: (Number(e.target.value) || 0) * dotMm })}
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  {copy.editor.units.dotsSuffix(offsetDots(editing[key] ?? 0), editing[key] ?? 0)}
-                </p>
-              </div>
-            ))}
+            <div className="space-y-1">
+              <Label>{copy.profiles.labelWidth}</Label>
+              <Input
+                type="number"
+                step={0.5}
+                min={1}
+                value={editing.labelWidthMm ?? 50}
+                onChange={(e) => setDraft({ ...editing, labelWidthMm: Number(e.target.value) || 1 })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>{copy.profiles.labelHeight}</Label>
+              <Input
+                type="number"
+                step={0.5}
+                min={1}
+                value={editing.labelHeightMm ?? 30}
+                onChange={(e) => setDraft({ ...editing, labelHeightMm: Number(e.target.value) || 1 })}
+              />
+            </div>
           </div>
 
-          <p className="text-[11px] text-muted-foreground">{copy.profiles.offsetHint}</p>
+          <div className="space-y-1">
+            <Label>{copy.profiles.margins}</Label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {MARGIN_KEYS.map(({ key, label }) => (
+                <div key={key} className="space-y-1">
+                  <Label className="text-[11px]">{label}</Label>
+                  <Input
+                    type="number"
+                    step={0.5}
+                    min={0}
+                    value={editing[key] ?? 0}
+                    onChange={(e) => setDraft({ ...editing, [key]: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                </div>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const all = editing.marginTopMm ?? 0
+                setDraft({
+                  ...editing,
+                  marginTopMm: all, marginRightMm: all, marginBottomMm: all, marginLeftMm: all,
+                })
+              }}
+            >
+              {copy.profiles.marginLinked}
+            </Button>
+            {/* Said explicitly, because a shaded region normally means "no". */}
+            <p className="text-[11px] text-muted-foreground">{copy.profiles.marginHint}</p>
+          </div>
 
           <div className="flex gap-2">
             <Button
@@ -143,8 +187,12 @@ export function ProfilesPanel({
                       name: editing.name ?? 'profile',
                       density: editing.density ?? 3,
                       labelType: editing.labelType ?? 1,
-                      offsetXMm: editing.offsetXMm ?? 0,
-                      offsetYMm: editing.offsetYMm ?? 0,
+                      labelWidthMm: editing.labelWidthMm ?? 50,
+                      labelHeightMm: editing.labelHeightMm ?? 30,
+                      marginTopMm: editing.marginTopMm ?? 0,
+                      marginRightMm: editing.marginRightMm ?? 0,
+                      marginBottomMm: editing.marginBottomMm ?? 0,
+                      marginLeftMm: editing.marginLeftMm ?? 0,
                       isDefault: editing.isDefault ?? false,
                     },
                   },

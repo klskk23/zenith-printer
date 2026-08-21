@@ -8,7 +8,7 @@
  */
 import { ApiRequestError } from '../../api/client.ts'
 import type { JobStatus } from '../../api/types.ts'
-import { copy } from '../../i18n/zh-CN.ts'
+import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Card, CardContent } from '../../components/ui/card.tsx'

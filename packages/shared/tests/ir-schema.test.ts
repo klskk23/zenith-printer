@@ -136,3 +136,84 @@ describe('referencedVariables', () => {
     expect(referencedVariables(labelIrSchema.parse({ widthMm: 50, heightMm: 30, dpi: 203, elements: [line] }))).toEqual([])
   })
 })
+
+/**
+ * Module width is a per-element property (FR-004), not a global render option.
+ *
+ * The lower bound of 2 comes from the scanning spec, not from rendering: at
+ * 203 dpi 2 dots is 0.25 mm, the usual Code 128 X-dimension. One dot renders
+ * perfectly well and simply cannot be read.
+ */
+describe('module width', () => {
+  const barcode = (moduleWidthDots: unknown): unknown => ({
+    id: 'b', type: 'barcode', xMm: 1, yMm: 1, widthMm: 30, heightMm: 10,
+    content: '123456789', symbology: 'code128', moduleWidthDots,
+  })
+
+  it.each([2, 3, 4, 5, 7, 12])('accepts a whole module width of %i dots', (width) => {
+    expect(() => labelElementSchema.parse(barcode(width))).not.toThrow()
+  })
+
+  it.each([1, 0, -2])('rejects %i, which is below the scanning floor', (width) => {
+    expect(() => labelElementSchema.parse(barcode(width))).toThrow()
+  })
+
+  it('rejects a fractional module width', () => {
+    expect(() => labelElementSchema.parse(barcode(2.5))).toThrow()
+  })
+
+  it('applies the same rule to qrcodes', () => {
+    const qr = (moduleWidthDots: unknown): unknown => ({
+      id: 'q', type: 'qrcode', xMm: 1, yMm: 1, widthMm: 15, heightMm: 15,
+      content: 'https://example.com', moduleWidthDots,
+    })
+    expect(() => labelElementSchema.parse(qr(3))).not.toThrow()
+    expect(() => labelElementSchema.parse(qr(1))).toThrow()
+  })
+
+  it('defaults to 2 so labels saved before this field render unchanged', () => {
+    const parsed = labelElementSchema.parse({
+      id: 'b', type: 'barcode', xMm: 1, yMm: 1, widthMm: 30, heightMm: 10,
+      content: '123456789', symbology: 'code128',
+    })
+    expect(parsed).toMatchObject({ moduleWidthDots: 2 })
+  })
+})
+
+describe('ellipse', () => {
+  const ellipse = (over: Record<string, unknown> = {}): unknown => ({
+    id: 'e', type: 'ellipse', xMm: 2, yMm: 2, widthMm: 20, heightMm: 10,
+    strokeWidthDots: 2, filled: false, ...over,
+  })
+
+  it('accepts a well-formed ellipse', () => {
+    expect(() => labelElementSchema.parse(ellipse())).not.toThrow()
+  })
+
+  it('treats a circle as an ellipse with equal sides', () => {
+    const parsed = labelElementSchema.parse(ellipse({ widthMm: 12, heightMm: 12 }))
+    expect(parsed).toMatchObject({ type: 'ellipse', widthMm: 12, heightMm: 12 })
+  })
+
+  it.each([0, -5])('rejects a width of %i', (widthMm) => {
+    expect(() => labelElementSchema.parse(ellipse({ widthMm }))).toThrow()
+  })
+
+  it('rejects a stroke thinner than one dot', () => {
+    expect(() => labelElementSchema.parse(ellipse({ strokeWidthDots: 0 }))).toThrow()
+  })
+
+  it('rejects a non-right-angle rotation', () => {
+    expect(() => labelElementSchema.parse(ellipse({ rotation: 45 }))).toThrow()
+  })
+
+  it.each([0, 90, 180, 270])('accepts a rotation of %i degrees', (rotation) => {
+    expect(() => labelElementSchema.parse(ellipse({ rotation }))).not.toThrow()
+  })
+
+  // A stroke wider than the minor axis is a legal input, not an error: it
+  // renders as a solid ellipse and the user's number is left untouched (FR-085).
+  it('accepts a stroke wider than the minor axis', () => {
+    expect(() => labelElementSchema.parse(ellipse({ heightMm: 1, strokeWidthDots: 40 }))).not.toThrow()
+  })
+})

@@ -10,6 +10,7 @@
  *     be edited or deleted without history drifting or breaking (FR-050).
  */
 import { z } from 'zod'
+import type { OverflowWarning } from './overflow.ts'
 import { labelIrSchema, type LabelIR } from '@zenith/shared'
 import type { PrinterKind } from './printer.ts'
 
@@ -77,9 +78,25 @@ export interface ContentSnapshot {
     name: string | null
     density: number
     labelType: number
-    offsetXMm: number
-    offsetYMm: number
   }
+  /**
+   * The position correction in force when this job ran, in dots.
+   *
+   * Recorded on the snapshot rather than read back from the printer, because
+   * the printer's offset is expected to change — it is re-measured on every
+   * paper reload. History has to show what was actually applied at the time,
+   * not what the machine happens to be set to now (FR-050).
+   */
+  offsetXDots: number
+  offsetYDots: number
+  /**
+   * What was clipped on this run.
+   *
+   * Recorded here rather than recomputed on read: the design can be edited or
+   * deleted afterwards, and history has to say what actually happened (FR-050,
+   * FR-091). Absent on jobs submitted before this was recorded.
+   */
+  overflowWarnings?: OverflowWarning[]
 }
 
 export interface PrintJob {

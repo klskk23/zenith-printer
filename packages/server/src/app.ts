@@ -15,6 +15,7 @@ import {
   hasZodFastifySchemaValidationErrors,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod'
+import { negotiateLocale } from './i18n/negotiate.ts'
 import { describeAppError } from './i18n/error-map.ts'
 import { HttpStatus, toErrorResponse } from './api/errors.ts'
 import { systemClock, uuidGenerator, type Clock, type IdGenerator } from './clock.ts'
@@ -72,8 +73,12 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
   app.setErrorHandler((error, request, reply) => {
     // Schema failures are a client problem; report them as such rather than
     // letting Fastify's default 500 swallow the reason.
+    // The first point that knows who is asking, and therefore the only place
+    // the prose can be chosen (FR-073).
+    const locale = negotiateLocale(request.headers['accept-language'])
+
     if (hasZodFastifySchemaValidationErrors(error)) {
-      const body = describeAppError('VALIDATION_FAILED')
+      const body = describeAppError('VALIDATION_FAILED', locale)
       request.log.info({ issues: error.validation }, 'request failed validation')
       return reply.status(HttpStatus.BadRequest).send({
         ...body,
@@ -81,7 +86,7 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
       })
     }
 
-    const { status, body } = toErrorResponse(error)
+    const { status, body } = toErrorResponse(error, locale)
 
     // An unreachable printer is an expected daily condition, not a defect:
     // B3S_P powers itself off after an hour idle and cannot be woken over USB.

@@ -4,6 +4,7 @@ import type { JobStatus } from '../../api/types.ts'
 
 export interface PrintJob {
   id: string
+  printerId: string | null
   status: JobStatus
   requestedCopies: number
   /** null means unknown after a restart — not zero (FR-053). */
@@ -11,6 +12,13 @@ export interface PrintJob {
   failureCode: string | null
   failureMessage: string | null
   snapshot: { templateName: string | null; widthMm: number; heightMm: number }
+  /**
+   * What was clipped on this run, recorded at submission.
+   *
+   * Kept on the job rather than recomputed: the design may have changed since,
+   * and history has to say what actually happened.
+   */
+  overflowWarnings?: { rowIndex: number; elementId: string; reason: string }[]
   createdAt: string
   startedAt: string | null
   finishedAt: string | null

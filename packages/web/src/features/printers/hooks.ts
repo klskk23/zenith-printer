@@ -48,3 +48,27 @@ export function useDeletePrinter() {
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })
 }
+
+/** Position correction lives on the printer, not on a profile (FR-052). */
+export function useSetOffset() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; offsetXDots: number; offsetYDots: number }) =>
+      request<unknown>(`/printers/${input.id}/offset`, {
+        method: 'PATCH',
+        body: { offsetXDots: input.offsetXDots, offsetYDots: input.offsetYDots },
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['printers'] }),
+  })
+}
+
+/** Consumes stock, so the confirmation is required by the server too. */
+export function usePrintCalibrationPage() {
+  return useMutation({
+    mutationFn: (input: { id: string; profileId?: string }) =>
+      request<unknown>(`/printers/${input.id}/calibration-page`, {
+        method: 'POST',
+        body: { confirmed: true, ...(input.profileId === undefined ? {} : { profileId: input.profileId }) },
+      }),
+  })
+}

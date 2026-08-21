@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { LabelIR } from '@zenith/shared'
-import { copy } from '../../i18n/zh-CN.ts'
+import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 
@@ -17,11 +17,9 @@ export interface PreviewProps {
   printerId: string | null
   /** From the selected profile; shown here so nobody has to test-print to
       judge a nudge (FR-028). */
-  offsetXMm?: number
-  offsetYMm?: number
 }
 
-export function Preview({ ir, printerId, offsetXMm = 0, offsetYMm = 0 }: PreviewProps): React.JSX.Element {
+export function Preview({ ir, printerId }: PreviewProps): React.JSX.Element {
   const [url, setUrl] = useState<string | null>(null)
   const [clipped, setClipped] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -35,7 +33,9 @@ export function Preview({ ir, printerId, offsetXMm = 0, offsetYMm = 0 }: Preview
       const response = await fetch('/api/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ printerId, ir, offsetXMm, offsetYMm }),
+        // No offset sent: the server uses the printer's own correction, which is
+        // what will actually be applied when this prints.
+        body: JSON.stringify({ printerId, ir }),
       })
       if (!response.ok) {
         setUrl(null)

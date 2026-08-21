@@ -6,7 +6,7 @@
  * there is no place in the frontend that invents its own wording.
  */
 import { QueryClient } from '@tanstack/react-query'
-import { copy } from '../i18n/zh-CN.ts'
+import { copy } from '../i18n/index.ts'
 
 export interface ApiErrorBody {
   code: string
@@ -58,8 +58,21 @@ export interface RequestOptions {
   signal?: AbortSignal
 }
 
+/**
+ * Language for server-worded copy.
+ *
+ * Module-level rather than a parameter on every call: the server words its own
+ * errors, so *every* request needs this, and threading it through each call
+ * site would mean one forgotten call showing Chinese in an English interface.
+ */
+let requestLocale = 'zh-CN'
+
+export function setRequestLocale(locale: string): void {
+  requestLocale = locale
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = { 'Accept-Language': requestLocale }
   if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json'
   }

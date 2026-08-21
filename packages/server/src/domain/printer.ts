@@ -61,6 +61,41 @@ export interface Printer extends PrinterInput {
   queuePausedReason: string | null
   lastProbedAt: string | null
   createdAt: string
+  /**
+   * Position correction, in **dots**.
+   *
+   * The only position in this system not stored in millimetres, and
+   * deliberately so: an offset translates the whole bitmap, and the natural
+   * granularity of that is the print dot. Going via millimetres would round
+   * twice for no gain.
+   *
+   * It belongs to the machine, not to the paper. Reloading a roll — even one of
+   * the identical type — can shift where the paper sits, so this is expected to
+   * be re-measured after a paper change (FR-052, FR-057).
+   *
+   * Positive x moves right, positive y moves down.
+   */
+  offsetXDots: number
+  offsetYDots: number
+}
+
+/**
+ * An offset larger than the head pushes every dot off the paper.
+ *
+ * Rejected rather than clamped: a silently clamped offset looks like the
+ * correction was accepted and did nothing.
+ */
+export function isOffsetWithinHead(
+  offset: { offsetXDots: number; offsetYDots: number },
+  capabilities: ProbedCapabilities | null,
+): boolean {
+  if (capabilities === null) {
+    return true
+  }
+  return (
+    Math.abs(offset.offsetXDots) < capabilities.printheadPixels &&
+    Math.abs(offset.offsetYDots) < capabilities.printheadPixels
+  )
 }
 
 const MM_PER_INCH = 25.4

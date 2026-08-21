@@ -6,6 +6,7 @@
  * convention.
  */
 import type { Migration } from '../index.ts'
+import { migrateOffsets } from './offset-migration.ts'
 
 const initialSchema = `
   CREATE TABLE printers (
@@ -128,4 +129,68 @@ const initialSchema = `
   CREATE INDEX print_jobs_queue_idx ON print_jobs(printer_id, status, created_at);
 `
 
-export const migrations: Migration[] = [{ id: 1, name: 'initial_schema', up: initialSchema }]
+/**
+ * Optimistic concurrency for templates moves from `updated_at` to a counter.
+ *
+ * Comparing timestamps looks equivalent but is not: two saves that land on the
+ * same instant compare equal, so the second silently overwrites the first while
+ * reporting success. With an injected fixed clock — which is what the tests
+ * use — that is the normal case rather than a rare race.
+ *
+ * Existing rows start at 1; nothing holds an older token, because the previous
+ * token was a timestamp and every comparison against it now goes through the
+ * counter instead.
+ */
+const templateVersion = `
+  ALTER TABLE templates ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+`
+
+/**
+ * Offsets move from the profile to the printer; the profile gains the stock.
+ *
+ * The two describe different things and were conflated. An offset says where
+ * this machine currently lays ink down — it changes when a roll is reloaded,
+ * even a roll of the identical type, because the paper does not sit in exactly
+ * the same place twice. Margins and stock size describe the paper. Keeping the
+ * offset on the profile meant re-entering it on every profile of the same
+ * machine, and switching profiles silently moved the print.
+ *
+ * Offsets are stored in dots here rather than millimetres. This is the only
+ * position in the system stored that way, and deliberately: an offset is a
+ * whole-bitmap translation, whose natural granularity is the print dot. Going
+ * through millimetres would round twice for no gain.
+ *
+ * The existing value is carried over from each printer's default profile.
+ * Where other profiles of the same printer disagree, their values are dropped
+ * and recorded — see `migrateOffsets` in offset-migration.ts, which runs after
+ * the schema change and can log what it discarded.
+ */
+const printerOffsetAndStock = `
+  ALTER TABLE printers ADD COLUMN offset_x_dots INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE printers ADD COLUMN offset_y_dots INTEGER NOT NULL DEFAULT 0;
+
+  ALTER TABLE profiles ADD COLUMN label_width_mm  REAL;
+  ALTER TABLE profiles ADD COLUMN label_height_mm REAL;
+  ALTER TABLE profiles ADD COLUMN margin_top_mm    REAL NOT NULL DEFAULT 0;
+  ALTER TABLE profiles ADD COLUMN margin_right_mm  REAL NOT NULL DEFAULT 0;
+  ALTER TABLE profiles ADD COLUMN margin_bottom_mm REAL NOT NULL DEFAULT 0;
+  ALTER TABLE profiles ADD COLUMN margin_left_mm   REAL NOT NULL DEFAULT 0;
+`
+
+/**
+ * Drop the old offset columns.
+ *
+ * Separate from the migration above so the data move happens in between, with
+ * the old values still readable. SQLite supports DROP COLUMN from 3.35.
+ */
+const dropProfileOffsets = `
+  ALTER TABLE profiles DROP COLUMN offset_x_mm;
+  ALTER TABLE profiles DROP COLUMN offset_y_mm;
+`
+
+export const migrations: Migration[] = [
+  { id: 1, name: 'initial_schema', up: initialSchema },
+  { id: 2, name: 'template_version', up: templateVersion },
+  { id: 3, name: 'printer_offset_and_stock', up: printerOffsetAndStock, apply: migrateOffsets },
+  { id: 4, name: 'drop_profile_offsets', up: dropProfileOffsets },
+]

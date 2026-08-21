@@ -9,7 +9,7 @@
  * came out — including the case where that number is unknown.
  */
 import { useState } from 'react'
-import { copy } from '../../i18n/zh-CN.ts'
+import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Card, CardContent } from '../../components/ui/card.tsx'
@@ -46,6 +46,12 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
 
         <p className="font-mono text-[11px] text-muted-foreground">
           {job.snapshot.widthMm}×{job.snapshot.heightMm}mm · {job.id.slice(0, 8)}
+          {(job.overflowWarnings?.length ?? 0) > 0 && (
+            // Recorded at submission, because the design may have changed since.
+            <span className="ml-2 text-amber-600">
+              {copy.overflow.inHistory} ({job.overflowWarnings!.length})
+            </span>
+          )}
         </p>
 
         {unknown && <Alert variant="warning" className="text-[11px]">{copy.jobs.countManually}</Alert>}
