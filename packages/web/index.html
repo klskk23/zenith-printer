@@ -6,6 +6,39 @@
     <title>Zenith Printer</title>
   </head>
   <body>
+    <!--
+      Set the theme before the first paint.
+
+      The stylesheet's :root is the light palette and dark is applied by
+      attribute, so with a dark default the page would otherwise render light,
+      then flip once React mounted — a white flash on every load, which is
+      exactly the thing a dark theme is chosen to avoid.
+
+      Kept deliberately small and dependency-free: it runs before the bundle,
+      so it cannot import the preferences module, and it must not throw on a
+      browser where storage is blocked. The default here mirrors
+      DEFAULT_PREFERENCES.theme.
+    -->
+    <script>
+      ;(function () {
+        var theme = 'dark'
+        try {
+          var stored = window.localStorage.getItem('zenith.preferences')
+          if (stored) {
+            var parsed = JSON.parse(stored)
+            if (parsed && typeof parsed.theme === 'string') {
+              theme = parsed.theme
+            }
+          }
+        } catch (e) {
+          // Private browsing, blocked storage, corrupt JSON — the default
+          // stands, and the app reapplies the real value once it loads.
+        }
+        if (theme === 'light' || theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', theme)
+        }
+      })()
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

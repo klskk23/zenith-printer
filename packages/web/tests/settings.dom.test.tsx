@@ -32,33 +32,37 @@ function openSettings(): HTMLSelectElement {
   return selects.find((el) => el.textContent?.includes('深色')) as HTMLSelectElement
 }
 
+/**
+ * Changed away from dark, not toward it: dark is the default now, so choosing
+ * it is not a change and these tests would assert nothing.
+ */
 describe('draft editing', () => {
   it('does not apply a change immediately', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'dark' } })
-    expect(document.documentElement.getAttribute('data-theme')).toBeNull()
+    fireEvent.change(theme, { target: { value: 'light' } })
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
   it('reports that something is unsaved', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'dark' } })
+    fireEvent.change(theme, { target: { value: 'light' } })
     expect(screen.getAllByText('有未保存的修改').length).toBeGreaterThan(0)
   })
 
   it('applies the change on save', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'dark' } })
+    fireEvent.change(theme, { target: { value: 'light' } })
     fireEvent.click(screen.getAllByText('保存')[0]!)
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
   })
 
   it('discards the change on cancel', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'dark' } })
+    fireEvent.change(theme, { target: { value: 'light' } })
     fireEvent.click(screen.getAllByText('取消')[0]!)
 
-    expect(theme.value).toBe('system')
-    expect(document.documentElement.getAttribute('data-theme')).toBeNull()
+    expect(theme.value).toBe('dark')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
   it('disables both buttons when nothing has changed', () => {
@@ -73,18 +77,31 @@ describe('draft editing', () => {
 describe('the theme actually takes effect', () => {
   it('marks the document root', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'dark' } })
+    fireEvent.change(theme, { target: { value: 'light' } })
     fireEvent.click(screen.getAllByText('保存')[0]!)
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
   })
 
   it('unmarks it for "follow system"', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'dark' } })
-    fireEvent.click(screen.getAllByText('保存')[0]!)
-
     fireEvent.change(theme, { target: { value: 'system' } })
     fireEvent.click(screen.getAllByText('保存')[0]!)
     expect(document.documentElement.getAttribute('data-theme')).toBeNull()
+  })
+})
+
+describe('the default', () => {
+  /**
+   * A label editor is looked at for hours against a white canvas that cannot
+   * be darkened — the paper has to look like paper — so the surroundings are
+   * the only thing that can rest the eyes.
+   */
+  it('is dark before anyone chooses anything', () => {
+    openSettings()
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+  })
+
+  it('is what the theme selector shows', () => {
+    expect(openSettings().value).toBe('dark')
   })
 })

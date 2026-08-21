@@ -5,6 +5,9 @@
  * nothing that affects anybody else.
  */
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   DEFAULT_PREFERENCES,
   PREFERENCE_KEYS,
@@ -125,5 +128,36 @@ describe('scope', () => {
     const storage = memoryStorage()
     savePreferences(storage, DEFAULT_PREFERENCES)
     expect(storage.getItem('zenith.preferences')).toContain('language')
+  })
+})
+
+
+/** The web package's HTML shell, wherever the runner happens to be rooted. */
+function shellHtml(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), '..', 'index.html')
+}
+
+describe('the pre-paint script in index.html', () => {
+  /**
+   * The stylesheet's `:root` is the light palette and dark is applied by
+   * attribute, so with a dark default the page renders light and flips once
+   * the bundle mounts — a white flash on every load, which is the one thing a
+   * dark theme is chosen to avoid. A small script in the HTML shell sets the
+   * attribute first.
+   *
+   * It carries its own copy of the default because it runs before the bundle
+   * and cannot import this module. The two have to agree, and nothing but a
+   * test can keep them agreeing.
+   */
+  it('carries the same default as the store', () => {
+    const html = readFileSync(shellHtml(), 'utf8')
+    const match = /var theme = '([a-z]+)'/.exec(html)
+    expect(match, 'no pre-paint theme script in index.html').not.toBeNull()
+    expect(match![1]).toBe(DEFAULT_PREFERENCES.theme)
+  })
+
+  it('reads the same storage key the store writes', () => {
+    const html = readFileSync(shellHtml(), 'utf8')
+    expect(html).toContain('zenith.preferences')
   })
 })

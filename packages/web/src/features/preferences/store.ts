@@ -33,7 +33,18 @@ export const DEFAULT_PREFERENCES: Preferences = {
   defaultDpi: 203,
   defaultFontFamily: 'Noto Sans CJK SC',
   displayUnit: 'mm',
-  theme: 'system',
+  /**
+   * Dark by default.
+   *
+   * A label editor is looked at for hours against a white canvas that cannot
+   * be darkened — the paper has to look like paper — so the surroundings are
+   * the only thing that can give the eyes a rest.
+   *
+   * `index.html` carries the same default in the script that runs before the
+   * first paint. The two have to agree, or a fresh visitor gets a dark page
+   * that turns light for a frame and back again.
+   */
+  theme: 'dark',
   queuePollIntervalMs: 2000,
   alwaysConfirmTabClose: false,
 }
