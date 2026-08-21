@@ -37,6 +37,9 @@ function harness() {
 }
 
 const stock = (name: string) => ({
+  // Halftoning is off unless a profile asks for it; these tests are about the
+  // offset and never look at an image.
+  halftone: 'none' as const,
   name,
   density: 3,
   labelType: 1,

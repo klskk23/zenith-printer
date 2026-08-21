@@ -188,9 +188,22 @@ const dropProfileOffsets = `
   ALTER TABLE profiles DROP COLUMN offset_y_mm;
 `
 
+/**
+ * Halftoning, per profile.
+ *
+ * A thermal head has no grey, so a photograph put through the ordinary
+ * threshold comes out as slabs of black and white. Which screen suits depends
+ * on the stock, and the stock is what a profile describes.
+ */
+const profileHalftone = `
+  ALTER TABLE profiles ADD COLUMN halftone TEXT NOT NULL DEFAULT 'none'
+                       CHECK (halftone IN ('none', 'floyd-steinberg', 'ordered'));
+`
+
 export const migrations: Migration[] = [
   { id: 1, name: 'initial_schema', up: initialSchema },
   { id: 2, name: 'template_version', up: templateVersion },
   { id: 3, name: 'printer_offset_and_stock', up: printerOffsetAndStock, apply: migrateOffsets },
   { id: 4, name: 'drop_profile_offsets', up: dropProfileOffsets },
+  { id: 5, name: 'profile_halftone', up: profileHalftone },
 ]

@@ -360,6 +360,13 @@ export const copy = {
     noProfileSelected: '尚未选择打印参数，因此不显示边距。',
     density: '浓度',
     labelType: '介质类型',
+    halftone: '图片色调',
+    halftoneHint: '只作用于图片元素。文字和条码始终用硬阈值——把它们抖动会让笔画发毛，也会在条码的空白区里落下杂点。',
+    halftoneModes: {
+      none: '不处理（硬阈值）',
+      'floyd-steinberg': '误差扩散（照片）',
+      ordered: '有序网点（耐热扩散）',
+    },
     offsetX: '水平偏移',
     offsetY: '垂直偏移',
     isDefault: '设为默认',

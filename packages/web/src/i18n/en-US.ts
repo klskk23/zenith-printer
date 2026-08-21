@@ -362,6 +362,14 @@ export const copy: Copy = {
     noProfileSelected: 'No print settings chosen, so no margins are shown.',
     density: 'Density',
     labelType: 'Media type',
+    halftone: 'Image tone',
+    halftoneHint:
+      'Images only. Text and barcodes always use a hard threshold — dithering them frays the strokes and drops stray dots into a barcode’s quiet zones.',
+    halftoneModes: {
+      none: 'None (hard threshold)',
+      'floyd-steinberg': 'Error diffusion (photos)',
+      ordered: 'Ordered screen (survives heat spread)',
+    },
     offsetX: 'Horizontal offset',
     offsetY: 'Vertical offset',
     isDefault: 'Make default',

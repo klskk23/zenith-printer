@@ -13,9 +13,10 @@
  * the warehouse, and SC-010 requires them to be pixel-identical.
  */
 import { Resvg } from '@resvg/resvg-js'
-import { irToSvg, type IrToSvgOptions, type LabelIR } from '@zenith/shared'
+import { irToSvg, layoutGrid, rotatedBounds, type IrToSvgOptions, type LabelIR } from '@zenith/shared'
 import type { BinaryBitmap } from '../drivers/port.ts'
 import { binarize } from './binarize.ts'
+import type { HalftoneMode, HalftoneRegion } from './dither.ts'
 import { applyOffset, type ClippedRegion } from './offset.ts'
 
 export interface FontConfig {
@@ -32,6 +33,11 @@ export interface RenderRequest {
   offsetYDots?: number
   /** Luminance cut-off; tuned against hardware verification #7. */
   threshold?: number
+  /**
+   * How to render tone inside image elements. Defaults to a hard threshold,
+   * which is right for line art and wrong for photographs.
+   */
+  halftone?: HalftoneMode
   svgOptions?: IrToSvgOptions
 }
 
@@ -83,7 +89,16 @@ export function renderLabel(request: RenderRequest): RenderResult {
     throw new RenderError('failed to rasterise the label', err)
   }
 
-  const binarized = binarize(pixels, widthDots, heightDots, { threshold: request.threshold })
+  const binarized = binarize(pixels, widthDots, heightDots, {
+    threshold: request.threshold,
+    // Only the image elements. resvg has already scaled each one to its final
+    // size in this buffer, so halftoning here happens at exactly the printer's
+    // resolution — which is the only place it can be done correctly, since
+    // resampling a halftoned image destroys the pattern that carries the tone.
+    ...(request.halftone === undefined || request.halftone === 'none'
+      ? {}
+      : { halftone: { mode: request.halftone, regions: imageRegions(request.ir) } }),
+  })
 
   const offset = applyOffset(binarized, {
     offsetXDots: request.offsetXDots ?? 0,
@@ -98,4 +113,39 @@ export function renderLabel(request: RenderRequest): RenderResult {
     widthDots,
     heightDots,
   }
+}
+
+
+/**
+ * Where the image elements land, in dots.
+ *
+ * Measured with the same `rotatedBounds` the editor's frame and the pre-print
+ * overflow check use, so all three describe the same rectangle. Quarter turns
+ * keep it axis-aligned, so the region is exact rather than an enclosing box.
+ *
+ * A label element sitting *on top of* an image has its own pixels halftoned
+ * along with the picture beneath, because provenance is not recoverable from a
+ * flattened buffer. Text over a photograph is rare on a label, and where it
+ * happens the glyph is being read against a dithered background anyway.
+ */
+function imageRegions(ir: LabelIR): HalftoneRegion[] {
+  const grid = layoutGrid({ widthMm: ir.widthMm, heightMm: ir.heightMm, dpi: ir.dpi })
+
+  return ir.elements
+    .filter((element) => element.type === 'image')
+    .map((element) => {
+      const box = rotatedBounds({
+        xMm: element.xMm,
+        yMm: element.yMm,
+        widthMm: element.widthMm,
+        heightMm: element.heightMm,
+        rotation: element.rotation,
+      })
+      return {
+        xDots: grid.xToDots(box.xMm),
+        yDots: grid.yToDots(box.yMm),
+        widthDots: grid.lengthToDots(box.widthMm),
+        heightDots: grid.lengthToDots(box.heightMm),
+      }
+    })
 }

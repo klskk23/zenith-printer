@@ -10,6 +10,7 @@
  *     be edited or deleted without history drifting or breaking (FR-050).
  */
 import { z } from 'zod'
+import type { HalftoneMode } from '../render/dither.ts'
 import type { OverflowWarning } from './overflow.ts'
 import { labelIrSchema, type LabelIR } from '@zenith/shared'
 import type { PrinterKind } from './printer.ts'
@@ -78,6 +79,12 @@ export interface ContentSnapshot {
     name: string | null
     density: number
     labelType: number
+    /**
+     * Optional because jobs submitted before halftoning existed have no such
+     * field, and they must go on reprinting exactly as they printed — which
+     * is with a hard threshold.
+     */
+    halftone?: HalftoneMode
   }
   /**
    * The position correction in force when this job ran, in dots.

@@ -7,6 +7,7 @@
  * touching a design that was already correct (FR-027).
  */
 import { z } from 'zod'
+import { HALFTONE_MODES } from '../render/dither.ts'
 
 /**
  * A profile describes the paper: its size, its margins, and how the machine
@@ -24,6 +25,14 @@ export const profileInputSchema = z
     density: z.number().int().min(1),
     labelType: z.number().int().min(1),
     speed: z.number().int().min(0).optional(),
+    /**
+     * How tone inside image elements is rendered.
+     *
+     * On the profile rather than on the printer or the label: it is a property
+     * of the stock. The same logo wants a hard edge on a coated label and a
+     * screen on rough paper, and the same design is printed on both.
+     */
+    halftone: z.enum(HALFTONE_MODES).default('none'),
     /** Stock dimensions. The canvas follows these when the profile is chosen. */
     labelWidthMm: z.number().finite().positive(),
     labelHeightMm: z.number().finite().positive(),

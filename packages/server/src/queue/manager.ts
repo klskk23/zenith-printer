@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { formatSequence, resolveVariables, type LabelIR } from '@zenith/shared'
 import type { FastifyInstance } from 'fastify'
-import { PrintQueue, type PageOffset } from './print-queue.ts'
+import { PrintQueue, type PageRenderOptions } from './print-queue.ts'
 import { JobRepo } from '../db/repositories/job-repo.ts'
 import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { ImageRepo } from '../db/repositories/image-repo.ts'
@@ -57,7 +57,7 @@ export function createQueue(app: FastifyInstance): PrintQueue {
       }
       return createDriver(printer, { logger, jobId })
     },
-    renderPage: (ir: LabelIR, offset: PageOffset): BinaryBitmap => {
+    renderPage: (ir: LabelIR, options: PageRenderOptions): BinaryBitmap => {
       // Assets must be inlined: resvg has no HTTP client, and an unresolved
       // href is skipped silently — the logo would vanish from the label with
       // nothing anywhere reporting a problem.
@@ -70,8 +70,9 @@ export function createQueue(app: FastifyInstance): PrintQueue {
         ir,
         fonts,
         svgOptions: { resolveImage: createImageResolver(images) },
-        offsetXDots: offset.offsetXDots,
-        offsetYDots: offset.offsetYDots,
+        offsetXDots: options.offsetXDots,
+        offsetYDots: options.offsetYDots,
+        halftone: options.halftone,
       })
       return result.bitmap
     },

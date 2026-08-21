@@ -17,6 +17,11 @@ export interface Profile {
   marginBottomMm: number
   marginLeftMm: number
   isDefault: boolean
+  /**
+   * How tone inside image elements is rendered. Text and barcodes always take
+   * the hard threshold — see the note beside the control.
+   */
+  halftone: 'none' | 'floyd-steinberg' | 'ordered'
   createdAt: string
 }
 

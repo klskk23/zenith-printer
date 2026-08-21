@@ -10,7 +10,7 @@ import { openDatabase, type Database } from '../../src/db/index.ts'
 import { FixedClock, SequentialIdGenerator } from '../../src/clock.ts'
 import { JobRepo } from '../../src/db/repositories/job-repo.ts'
 import { PrinterRepo } from '../../src/db/repositories/printer-repo.ts'
-import { PrintQueue } from '../../src/queue/print-queue.ts'
+import { PrintQueue, type PageRenderOptions } from '../../src/queue/print-queue.ts'
 import {
   PrinterDeviceError,
   PrinterUnreachableError,
@@ -118,6 +118,14 @@ export interface Harness {
   ) => string
   renderCalls: number[]
   /** The correction each render was asked for, in call order. */
+  /**
+   * Everything the render callback was handed, not just the offset.
+   *
+   * The stub used to swallow its arguments, which is precisely why a missing
+   * offset went unnoticed for a whole feature. Recording the argument object
+   * whole means the next setting added to it is checkable the day it is added.
+   */
+  renderOptions: PageRenderOptions[]
   renderOffsets: { offsetXDots: number; offsetYDots: number }[]
 }
 
@@ -143,6 +151,7 @@ export function createHarness(driverOptions: (printerId: string) => FakeDriverOp
   const printers = new PrinterRepo({ db, clock, ids })
   const drivers = new Map<string, FakePrinterDriver>()
   const renderCalls: number[] = []
+  const renderOptions: PageRenderOptions[] = []
   const renderOffsets: { offsetXDots: number; offsetYDots: number }[] = []
 
   const queue = new PrintQueue({
@@ -155,12 +164,13 @@ export function createHarness(driverOptions: (printerId: string) => FakeDriverOp
       drivers.set(printerId, driver)
       return driver
     },
-    renderPage: (_ir, offset) => {
+    renderPage: (_ir, options) => {
       renderCalls.push(renderCalls.length)
       // Recorded rather than ignored: a stub that swallows its arguments
       // cannot notice one going missing, which is how the position correction
       // came to be applied on the preview path and nowhere else.
-      renderOffsets.push(offset)
+      renderOptions.push(options)
+      renderOffsets.push(options)
       return BLANK_PAGE
     },
   })
@@ -174,6 +184,7 @@ export function createHarness(driverOptions: (printerId: string) => FakeDriverOp
     queue,
     drivers,
     renderCalls,
+    renderOptions,
     renderOffsets,
     seedPrinter: (name = 'fake') => {
       const printer = printers.create({

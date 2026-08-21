@@ -22,7 +22,7 @@ describe('the queue passes the correction to the renderer', () => {
 
     await h.queue.drain(printerId)
 
-    expect(h.renderOffsets[0]).toEqual({ offsetXDots: 4, offsetYDots: -3 })
+    expect(h.renderOffsets[0]).toMatchObject({ offsetXDots: 4, offsetYDots: -3 })
   })
 
   it('passes zero when nothing was corrected', async () => {
@@ -32,7 +32,7 @@ describe('the queue passes the correction to the renderer', () => {
 
     await h.queue.drain(printerId)
 
-    expect(h.renderOffsets[0]).toEqual({ offsetXDots: 0, offsetYDots: 0 })
+    expect(h.renderOffsets[0]).toMatchObject({ offsetXDots: 0, offsetYDots: 0 })
   })
 
   it('applies it to every copy in a batch', async () => {
@@ -48,7 +48,7 @@ describe('the queue passes the correction to the renderer', () => {
     // Per-copy content means one render per copy; each must be corrected.
     expect(h.renderOffsets.length).toBeGreaterThan(1)
     for (const offset of h.renderOffsets) {
-      expect(offset).toEqual({ offsetXDots: 2, offsetYDots: 2 })
+      expect(offset).toMatchObject({ offsetXDots: 2, offsetYDots: 2 })
     }
   })
 
@@ -70,5 +70,43 @@ describe('the queue passes the correction to the renderer', () => {
     await h.queue.drain(printerId)
 
     expect(h.renderOffsets[0]?.offsetXDots).toBe(7)
+  })
+})
+
+/**
+ * The same class of defect as the offset above, checked the same way.
+ *
+ * A setting stored on the profile, shown in the form, and never delivered to
+ * the renderer is the failure this project keeps having. The queue's render
+ * callback has to receive it, and it has to come from the job's snapshot
+ * rather than from the profile as it stands now — a reprint completes the
+ * batch it belongs to.
+ */
+describe('the queue passes the halftone to the renderer', () => {
+  async function drainWith(halftone: 'none' | 'floyd-steinberg' | 'ordered' | undefined) {
+    const h = createHarness()
+    const printerId = h.seedPrinter()
+    h.enqueue(printerId, 1, {
+      snapshot: {
+        ...SNAPSHOT,
+        profile: { ...SNAPSHOT.profile, ...(halftone === undefined ? {} : { halftone }) },
+      },
+    })
+    await h.queue.drain(printerId)
+    return h
+  }
+
+  it('passes what the profile said when the job was submitted', async () => {
+    expect((await drainWith('ordered')).renderOptions[0]).toMatchObject({ halftone: 'ordered' })
+  })
+
+  it('passes none when the profile did not ask for any', async () => {
+    expect((await drainWith('none')).renderOptions[0]).toMatchObject({ halftone: 'none' })
+  })
+
+  it('treats a job from before the setting existed as none', async () => {
+    // Old snapshots have no such field, and those jobs must reprint exactly as
+    // they printed.
+    expect((await drainWith(undefined)).renderOptions[0]).toMatchObject({ halftone: 'none' })
   })
 })

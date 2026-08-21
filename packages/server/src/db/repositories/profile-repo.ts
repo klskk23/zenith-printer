@@ -19,6 +19,7 @@ function toProfile(row: Row): Profile {
     marginBottomMm: Number(row.margin_bottom_mm ?? 0),
     marginLeftMm: Number(row.margin_left_mm ?? 0),
     isDefault: Number(row.is_default) === 1,
+    halftone: (row.halftone ?? 'none') as Profile['halftone'],
     createdAt: String(row.created_at),
   }
   if (row.speed !== null) {
@@ -71,8 +72,8 @@ export class ProfileRepo {
         `INSERT INTO profiles (id, printer_id, name, density, label_type, speed,
                                label_width_mm, label_height_mm,
                                margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm,
-                               is_default, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                               is_default, halftone, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -88,6 +89,7 @@ export class ProfileRepo {
         input.marginBottomMm,
         input.marginLeftMm,
         input.isDefault ? 1 : 0,
+        input.halftone,
         this.#clock.now().toISOString(),
       )
     const created = this.find(id)
@@ -110,7 +112,7 @@ export class ProfileRepo {
         `UPDATE profiles SET name = ?, density = ?, label_type = ?, speed = ?,
                              label_width_mm = ?, label_height_mm = ?,
                              margin_top_mm = ?, margin_right_mm = ?, margin_bottom_mm = ?, margin_left_mm = ?,
-                             is_default = ?
+                             is_default = ?, halftone = ?
          WHERE id = ?`,
       )
       .run(
@@ -125,6 +127,7 @@ export class ProfileRepo {
         input.marginBottomMm,
         input.marginLeftMm,
         input.isDefault ? 1 : 0,
+        input.halftone,
         id,
       )
     return this.find(id)

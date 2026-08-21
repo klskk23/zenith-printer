@@ -23,6 +23,7 @@ import { Checkbox } from '../../components/ui/checkbox.tsx'
 import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
+import { Select } from '../../components/ui/select.tsx'
 import { useDeleteProfile, useProfiles, useSaveProfile, type Profile } from './hooks.ts'
 
 export interface ProfilesPanelProps {
@@ -69,6 +70,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
               name: 'profile',
               density: capabilities?.densityDefault ?? 3,
               labelType: capabilities?.paperTypes[0] ?? 1,
+              halftone: 'none',
               labelWidthMm: 50,
               labelHeightMm: 30,
               marginTopMm: 0,
@@ -131,6 +133,26 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                 </p>
               )}
             </div>
+          </div>
+
+          {/*
+            Halftoning, on the profile because it is a property of the stock:
+            the same logo wants a hard edge on a coated label and a screen on
+            rough paper, and the same design is printed on both.
+          */}
+          <div className="space-y-1">
+            <Label>{copy.profiles.halftone}</Label>
+            <Select
+              value={editing.halftone ?? 'none'}
+              onChange={(e) => setDraft({ ...editing, halftone: e.target.value as Profile['halftone'] })}
+            >
+              {(['none', 'floyd-steinberg', 'ordered'] as const).map((mode) => (
+                <option key={mode} value={mode}>
+                  {copy.profiles.halftoneModes[mode]}
+                </option>
+              ))}
+            </Select>
+            <p className="text-[11px] text-muted-foreground">{copy.profiles.halftoneHint}</p>
           </div>
 
           {/* Stock dimensions. Choosing this profile sets the canvas to them,
@@ -226,6 +248,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                       marginBottomMm: editing.marginBottomMm ?? 0,
                       marginLeftMm: editing.marginLeftMm ?? 0,
                       isDefault: editing.isDefault ?? false,
+                      halftone: editing.halftone ?? 'none',
                     },
                   },
                   {

@@ -16,6 +16,8 @@ import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { renderLabel } from '../render/pipeline.ts'
 import { loadFontConfig } from '../render/fonts.ts'
 import { createImageResolver } from '../render/image-resolver.ts'
+import { HALFTONE_MODES, type HalftoneMode } from '../render/dither.ts'
+import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { ImageRepo } from '../db/repositories/image-repo.ts'
 import { encodeMonochromePng } from '../render/png.ts'
 import { ApiError } from './errors.ts'
@@ -37,6 +39,11 @@ const previewBody = z.object({
   offsetXDots: z.number().int().optional(),
   offsetYDots: z.number().int().optional(),
   threshold: z.number().int().min(1).max(255).optional(),
+  /**
+   * Overrides the chosen profile's halftone, so a setting can be compared
+   * against the same artwork before it is saved.
+   */
+  halftone: z.enum(HALFTONE_MODES).optional(),
 })
 
 export async function registerPreviewRoutes(app: FastifyInstance): Promise<void> {
@@ -80,6 +87,7 @@ export async function registerPreviewRoutes(app: FastifyInstance): Promise<void>
       offsetXDots: request.body.offsetXDots ?? printer.offsetXDots,
       offsetYDots: request.body.offsetYDots ?? printer.offsetYDots,
       ...(request.body.threshold === undefined ? {} : { threshold: request.body.threshold }),
+      halftone: halftoneFor(app, request.body),
     })
 
     return reply
@@ -91,4 +99,27 @@ export async function registerPreviewRoutes(app: FastifyInstance): Promise<void>
       .header('X-Size-Dots', `${result.bitmap.widthDots}x${result.bitmap.heightDots}`)
       .send(encodeMonochromePng(result.bitmap))
   })
+}
+
+
+/**
+ * Which halftone the preview should use.
+ *
+ * An explicit value wins, so a setting can be compared against the artwork
+ * before it is saved. Otherwise it comes from the chosen profile, because a
+ * preview that does not match what the profile will print is worse than no
+ * preview: it is a preview that lies.
+ */
+function halftoneFor(
+  app: FastifyInstance,
+  body: { profileId?: string; halftone?: HalftoneMode },
+): HalftoneMode {
+  if (body.halftone !== undefined) {
+    return body.halftone
+  }
+  if (body.profileId === undefined) {
+    return 'none'
+  }
+  const profiles = new ProfileRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+  return profiles.find(body.profileId)?.halftone ?? 'none'
 }

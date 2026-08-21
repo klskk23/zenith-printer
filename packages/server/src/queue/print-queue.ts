@@ -25,14 +25,25 @@ import type { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import type { PrintJob } from '../domain/print-job.ts'
 import { pausesQueue } from '../domain/job-status.ts'
 import { deviceErrorCode } from '../i18n/error-map.ts'
+import type { HalftoneMode } from '../render/dither.ts'
 
-export interface PageOffset {
+export interface PageRenderOptions {
   offsetXDots: number
   offsetYDots: number
+  /**
+   * How tone inside image elements is rendered.
+   *
+   * Carried on the signature rather than read from the printer at render time,
+   * for the same reason as the offset above it: a value the callback cannot
+   * receive is a value that silently never arrives. That is exactly how a
+   * saved position correction once moved the preview and left the printed
+   * label where it was.
+   */
+  halftone: HalftoneMode
 }
 
 export interface RenderPage {
-  (ir: LabelIR, offset: PageOffset): BinaryBitmap
+  (ir: LabelIR, options: PageRenderOptions): BinaryBitmap
 }
 
 export interface QueueDeps {
@@ -201,6 +212,9 @@ export class PrintQueue {
       this.#deps.renderPage(ir, {
         offsetXDots: job.snapshot.offsetXDots,
         offsetYDots: job.snapshot.offsetYDots,
+        // From the snapshot, not from the profile as it stands now: a reprint
+        // has to come out like the batch it is completing.
+        halftone: job.snapshot.profile.halftone ?? 'none',
       }),
     )
   }

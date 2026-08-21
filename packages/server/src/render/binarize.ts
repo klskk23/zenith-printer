@@ -8,6 +8,7 @@
  */
 import type { BinaryBitmap } from '../drivers/port.ts'
 import { RGBA_CHANNELS } from './image-source.ts'
+import { halftone, type HalftoneMode, type HalftoneRegion } from './dither.ts'
 
 export const DEFAULT_THRESHOLD = 128
 
@@ -18,6 +19,14 @@ const B_WEIGHT = 0.114
 export interface BinarizeOptions {
   /** Pixels with luminance below this become print dots. */
   threshold?: number
+  /**
+   * Regions to halftone instead of thresholding — the image elements.
+   *
+   * Everything outside them keeps the hard threshold, which is what makes
+   * glyph edges crisp and keeps stray dots out of the quiet zones between the
+   * bars of a barcode.
+   */
+  halftone?: { mode: HalftoneMode; regions: readonly HalftoneRegion[] }
 }
 
 /** Luminance of one RGBA pixel, composited over white. */
@@ -54,10 +63,31 @@ export function binarize(
   const bytesPerRow = Math.ceil(widthDots / 8)
   const data = new Uint8Array(bytesPerRow * heightDots)
 
+  // Luminance once, not twice: halftoning reads the same values the threshold
+  // does, and a second pass computing them again is a second chance for the
+  // two to disagree.
+  // Float, not bytes: rounding here would move the threshold by half a unit
+  // and change which anti-aliased edge pixels burn, for no gain.
+  const luma = new Float32Array(widthDots * heightDots)
+  for (let i = 0; i < luma.length; i += 1) {
+    // The `* RGBA_CHANNELS` is load-bearing; see render/image-source.ts.
+    luma[i] = luminance(pixels, i * RGBA_CHANNELS)
+  }
+
+  const overlay =
+    options.halftone === undefined
+      ? null
+      : halftone(luma, widthDots, heightDots, options.halftone.regions, options.halftone.mode)
+
   for (let y = 0; y < heightDots; y += 1) {
     for (let x = 0; x < widthDots; x += 1) {
-      // The `* RGBA_CHANNELS` is load-bearing; see render/image-source.ts.
-      if (luminance(pixels, (y * widthDots + x) * RGBA_CHANNELS) < threshold) {
+      const index = y * widthDots + x
+      const burn =
+        overlay !== null && overlay.mask[index] === 1
+          ? overlay.burn[index] === 1
+          : (luma[index] ?? 255) < threshold
+
+      if (burn) {
         const byteIndex = y * bytesPerRow + (x >> 3)
         data[byteIndex] = (data[byteIndex] ?? 0) | (0x80 >> (x & 7))
       }
