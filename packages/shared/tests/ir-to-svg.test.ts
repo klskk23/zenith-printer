@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { UnresolvedVariableError, irToSvg } from '../src/ir-to-svg/index.ts'
 import { labelIrSchema, type LabelIR } from '../src/ir/schema.ts'
+import { rotatedBounds } from '../src/geometry/index.ts'
+import { dotsToMm } from '../src/units.ts'
+
+/** Millimetres to dots at the 203 dpi every case here uses. */
+function mmToDots(mm: number): number {
+  return Math.round((mm * 203) / 25.4)
+}
 
 function ir(elements: unknown[], overrides: Partial<LabelIR> = {}): LabelIR {
   return labelIrSchema.parse({
@@ -331,5 +338,111 @@ describe('multi-line text', () => {
 
   it('escapes markup inside every line', () => {
     expect(irToSvg(text('<b>\n&amp'))).not.toContain('<b>')
+  })
+})
+
+describe('rotation', () => {
+  /**
+   * Apply the emitted `transform` to a local point, by hand.
+   *
+   * The point of the exercise is that nothing here reads the source: the test
+   * takes the transform string the renderer produced and works out where a
+   * corner actually lands, the way a viewer would.
+   */
+  function applyTransform(transform: string, point: { x: number; y: number }): { x: number; y: number } {
+    const rotate = /rotate\(([-\d.]+) ([-\d.]+) ([-\d.]+)\)/.exec(transform)
+    const translate = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(transform)
+    expect(translate).not.toBeNull()
+
+    let { x, y } = point
+    x += Number(translate![1])
+    y += Number(translate![2])
+
+    if (rotate !== null) {
+      const radians = (Number(rotate[1]) * Math.PI) / 180
+      const cx = Number(rotate[2])
+      const cy = Number(rotate[3])
+      const dx = x - cx
+      const dy = y - cy
+      x = cx + dx * Math.cos(radians) - dy * Math.sin(radians)
+      y = cy + dx * Math.sin(radians) + dy * Math.cos(radians)
+    }
+    return { x, y }
+  }
+
+  /**
+   * The transform of the only element, having first insisted it states a
+   * rotation centre when there is a rotation at all.
+   *
+   * Without that insistence `applyTransform` quietly ignores any `rotate()`
+   * form it cannot parse, and a test that ignores the rotation passes on a
+   * renderer that got the rotation wrong.
+   */
+  function transformOf(svg: string, rotated: boolean): string {
+    const match = /<g transform="([^"]+)"/.exec(svg)
+    expect(match).not.toBeNull()
+    const transform = match![1]!
+    expect(/rotate\([-\d.]+ [-\d.]+ [-\d.]+\)/.test(transform)).toBe(rotated)
+    return transform
+  }
+
+  const box = { id: 'box', type: 'rect', xMm: 10, yMm: 5, widthMm: 20, heightMm: 8, strokeWidthDots: 2 }
+
+  it('places an unrotated element at its own coordinates', () => {
+    const svg = irToSvg(ir([box]))
+    const origin = applyTransform(transformOf(svg, false), { x: 0, y: 0 })
+    expect(origin.x).toBeCloseTo(mmToDots(10), 6)
+    expect(origin.y).toBeCloseTo(mmToDots(5), 6)
+  })
+
+  /**
+   * The regression this file did not catch for the whole of feature 002: the
+   * transform was `translate(x y) rotate(deg)`, which turns about the corner.
+   * A quarter turn put this 20x8 box a full 8 mm to the left of the label
+   * position the user set, while the editor frame and the overflow check —
+   * both centre-based — went on describing the box it had left.
+   */
+  it.each([90, 180, 270] as const)('turns about the element centre at %i degrees', (rotation) => {
+    const svg = irToSvg(ir([{ ...box, rotation }]))
+    const transform = transformOf(svg, true)
+    const w = mmToDots(20)
+    const h = mmToDots(8)
+
+    const corners = [
+      applyTransform(transform, { x: 0, y: 0 }),
+      applyTransform(transform, { x: w, y: 0 }),
+      applyTransform(transform, { x: w, y: h }),
+      applyTransform(transform, { x: 0, y: h }),
+    ]
+    const drawn = {
+      xMm: dotsToMm(Math.min(...corners.map((c) => c.x)), 203),
+      yMm: dotsToMm(Math.min(...corners.map((c) => c.y)), 203),
+      widthMm: dotsToMm(Math.max(...corners.map((c) => c.x)) - Math.min(...corners.map((c) => c.x)), 203),
+      heightMm: dotsToMm(Math.max(...corners.map((c) => c.y)) - Math.min(...corners.map((c) => c.y)), 203),
+    }
+
+    // Where the shared geometry — used by the editor frame and the pre-print
+    // overflow check — says the element is.
+    const expected = rotatedBounds({ xMm: 10, yMm: 5, widthMm: 20, heightMm: 8, rotation })
+
+    expect(drawn.xMm).toBeCloseTo(expected.xMm, 1)
+    expect(drawn.yMm).toBeCloseTo(expected.yMm, 1)
+    expect(drawn.widthMm).toBeCloseTo(expected.widthMm, 1)
+    expect(drawn.heightMm).toBeCloseTo(expected.heightMm, 1)
+  })
+
+  it('turns a line about the centre of its own span', () => {
+    const svg = irToSvg(ir([{ ...horizontalRule, rotation: 90 }]))
+    const transform = transformOf(svg, true)
+    const span = mmToDots(48 - 2)
+
+    const start = applyTransform(transform, { x: 0, y: 0 })
+    const end = applyTransform(transform, { x: span, y: 0 })
+
+    // A horizontal rule turned a quarter turn is vertical, and its midpoint
+    // does not move.
+    expect(start.x).toBeCloseTo(end.x, 6)
+    expect(dotsToMm((start.x + end.x) / 2, 203)).toBeCloseTo(25, 1)
+    expect(dotsToMm((start.y + end.y) / 2, 203)).toBeCloseTo(10, 1)
   })
 })

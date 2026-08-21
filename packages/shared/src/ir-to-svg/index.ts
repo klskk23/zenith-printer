@@ -16,7 +16,9 @@
  *      same template to render identically after a redeploy.
  */
 import {
+  BarcodeContentError,
   MIN_MODULE_WIDTH_DOTS,
+  QrcodeContentError,
   barcodeInnerMarkup,
   fitModuleWidth,
   renderBarcodeSvg,
@@ -40,6 +42,24 @@ export interface IrToSvgOptions {
    * Unresolved images are skipped rather than failing the whole render.
    */
   resolveImage?: (assetId: string) => string | undefined
+
+  /**
+   * Draw what can be drawn and leave out what cannot, instead of failing the
+   * whole render.
+   *
+   * For the **editor** only. Content is edited a keystroke at a time, and
+   * several of those keystrokes pass through states no symbology can encode —
+   * an empty QR code, a half-typed EAN-13. Throwing on those took the entire
+   * page down with it, because the editor renders inside React's render pass:
+   * clearing a QR code's content blanked the whole application. The element is
+   * omitted, the guards go on reporting exactly why, and the rest of the label
+   * stays visible and editable.
+   *
+   * Never for **printing**. A label that quietly comes out missing its barcode
+   * is worse than a job that refuses to start, so the print path leaves this
+   * off and takes the exception.
+   */
+  skipUnrenderable?: boolean
 }
 
 export class UnresolvedVariableError extends Error {
@@ -77,13 +97,46 @@ function literal(content: string | { $var: string }): string {
 }
 
 /** Rotation about the element's own top-left corner. */
+/** Centre of the element's own, unrotated box — in absolute dots. */
+function rotationCentreDots(
+  element: LabelElement,
+  grid: LayoutGrid,
+): { x: number; y: number } {
+  if (element.type === 'line') {
+    // Signed spans, so a line drawn right-to-left still centres on its middle.
+    return {
+      x: grid.xToDots(element.xMm) + grid.lengthToDots(element.x2Mm - element.xMm) / 2,
+      y: grid.yToDots(element.yMm) + grid.lengthToDots(element.y2Mm - element.yMm) / 2,
+    }
+  }
+  return {
+    x: grid.xToDots(element.xMm) + grid.lengthToDots(element.widthMm) / 2,
+    y: grid.yToDots(element.yMm) + grid.lengthToDots(element.heightMm) / 2,
+  }
+}
+
+/**
+ * Where an element is placed, and about which point it turns.
+ *
+ * Rotation is about the element's own centre. It used to be
+ * `translate(x y) rotate(deg)`, which turns about the top-left corner and so
+ * throws the element clear of the box it is meant to occupy — a quarter turn
+ * moved it a full height sideways. Both the editor's selection frame and the
+ * pre-print overflow check measure with `rotatedBounds`, which is centre-based,
+ * so the renderer was the odd one out: the frame sat where the element wasn't,
+ * and overflow was judged against a region nothing was drawn in.
+ */
 function transformFor(element: LabelElement, grid: LayoutGrid): string {
   const x = grid.xToDots(element.xMm)
   const y = grid.yToDots(element.yMm)
+  const place = `translate(${num(x)} ${num(y)})`
   if (element.rotation === 0) {
-    return `translate(${num(x)} ${num(y)})`
+    return place
   }
-  return `translate(${num(x)} ${num(y)}) rotate(${element.rotation})`
+  const centre = rotationCentreDots(element, grid)
+  // Applied right to left: the geometry is placed, then turned about a point
+  // expressed in the label's own coordinates.
+  return `rotate(${element.rotation} ${num(centre.x)} ${num(centre.y)}) ${place}`
 }
 
 /**
@@ -299,13 +352,38 @@ function renderElement(
   }
 }
 
+/**
+ * Render one element, honouring `skipUnrenderable`.
+ *
+ * Only content errors are swallowed, and only when asked. Anything else — a
+ * bug in this module, a malformed grid — still propagates, because a blank
+ * element where a rectangle should be is a defect worth seeing.
+ */
+function renderUnlessSkippable(
+  element: LabelElement,
+  grid: LayoutGrid,
+  options: IrToSvgOptions,
+): string | undefined {
+  if (options.skipUnrenderable !== true) {
+    return renderElement(element, grid, options)
+  }
+  try {
+    return renderElement(element, grid, options)
+  } catch (error) {
+    if (error instanceof QrcodeContentError || error instanceof BarcodeContentError) {
+      return undefined
+    }
+    throw error
+  }
+}
+
 /** Render a fully resolved IR (no variable references left) to SVG. */
 export function irToSvg(ir: LabelIR, options: IrToSvgOptions = {}): string {
   const grid = layoutGrid({ widthMm: ir.widthMm, heightMm: ir.heightMm, dpi: ir.dpi })
 
   const body = ir.elements
     .map((element) => {
-      const markup = renderElement(element, grid, options)
+      const markup = renderUnlessSkippable(element, grid, options)
       return markup === undefined
         ? undefined
         : `<g transform="${transformFor(element, grid)}">${markup}</g>`

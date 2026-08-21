@@ -158,6 +158,22 @@ export function renderBarcodeSvg(request: BarcodeRequest): BarcodeSvg {
  * shapes: a QR symbol is square, has no human-readable line, and its module
  * count depends on the error-correction level as well as the content.
  */
+/**
+ * QR module widths come in even dots.
+ *
+ * A consequence of the two-unit grid: only whole values of BWIPP's `scale`
+ * put module edges on whole dots, and each step of it is two dots. An odd
+ * width is not a finer choice — it is the same width with a half-dot edge,
+ * which anti-aliasing smears and thresholding then eats.
+ */
+export const QRCODE_MODULE_WIDTH_STEP = 2
+
+/** The nearest QR module width that can actually be drawn. */
+export function snapQrcodeModuleWidth(moduleWidthDots: number): number {
+  const scale = Math.max(1, Math.round(moduleWidthDots / QRCODE_MODULE_WIDTH_STEP))
+  return scale * QRCODE_MODULE_WIDTH_STEP
+}
+
 export function renderQrcodeSvg(request: QrcodeRequest): QrcodeSvg {
   const moduleWidthDots = request.moduleWidthDots ?? DEFAULT_MODULE_WIDTH_DOTS
   assertModuleWidth(moduleWidthDots)
@@ -165,6 +181,20 @@ export function renderQrcodeSvg(request: QrcodeRequest): QrcodeSvg {
   if (request.content.length === 0) {
     throw new QrcodeContentError(request.content, 'content is empty')
   }
+
+  // BWIPP draws a matrix symbology on a two-unit grid: at `scale: 1` each QR
+  // module comes out two user units across, where a linear symbology's module
+  // comes out one. So `scale` is half the module width, not the module width,
+  // and passing the module width straight through drew every QR at twice the
+  // size the element asked for — the minimum of two dots landed on a 0.5 mm
+  // module while the interface said 0.25 mm, and the smallest possible QR was
+  // twice as large as it needed to be. That is what "the QR can only be made
+  // bigger" turned out to mean.
+  //
+  // Rounded rather than rejected, so a label authored before this — or by hand,
+  // or by the CLI — still renders; the result reports what was actually used.
+  const scale = Math.max(1, Math.round(moduleWidthDots / QRCODE_MODULE_WIDTH_STEP))
+  const effectiveModuleWidthDots = scale * QRCODE_MODULE_WIDTH_STEP
 
   let svg: string
   try {
@@ -175,7 +205,7 @@ export function renderQrcodeSvg(request: QrcodeRequest): QrcodeSvg {
     svg = bwipjs.toSVG({
       bcid: 'qrcode',
       text: request.content,
-      scale: moduleWidthDots,
+      scale,
       eclevel: request.errorCorrectionLevel ?? 'M',
       paddingwidth: 0,
       paddingheight: 0,
@@ -192,8 +222,11 @@ export function renderQrcodeSvg(request: QrcodeRequest): QrcodeSvg {
     svg,
     widthDots: width,
     heightDots: height,
-    moduleWidthDots,
-    moduleCount: width / moduleWidthDots,
+    moduleWidthDots: effectiveModuleWidthDots,
+    // The true module count, now that the width is expressed in whole modules
+    // rather than half-modules. It used to come out doubled: a version 1
+    // symbol, 21 modules across, was reported as 42.
+    moduleCount: width / effectiveModuleWidthDots,
   }
 }
 
