@@ -22,6 +22,8 @@ export interface Profile {
    * the hard threshold — see the note beside the control.
    */
   halftone: 'none' | 'floyd-steinberg' | 'ordered'
+  /** Luminance below which a pixel becomes a print dot; 1-255, 128 is neutral. */
+  threshold: number
   createdAt: string
 }
 

@@ -73,6 +73,7 @@ export function createQueue(app: FastifyInstance): PrintQueue {
         offsetXDots: options.offsetXDots,
         offsetYDots: options.offsetYDots,
         halftone: options.halftone,
+        threshold: options.threshold,
       })
       return result.bitmap
     },

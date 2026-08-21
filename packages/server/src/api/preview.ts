@@ -17,6 +17,7 @@ import { renderLabel } from '../render/pipeline.ts'
 import { loadFontConfig } from '../render/fonts.ts'
 import { createImageResolver } from '../render/image-resolver.ts'
 import { HALFTONE_MODES, type HalftoneMode } from '../render/dither.ts'
+import { DEFAULT_THRESHOLD } from '../render/binarize.ts'
 import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { ImageRepo } from '../db/repositories/image-repo.ts'
 import { encodeMonochromePng } from '../render/png.ts'
@@ -86,7 +87,10 @@ export async function registerPreviewRoutes(app: FastifyInstance): Promise<void>
       // the caller is previewing a candidate value.
       offsetXDots: request.body.offsetXDots ?? printer.offsetXDots,
       offsetYDots: request.body.offsetYDots ?? printer.offsetYDots,
-      ...(request.body.threshold === undefined ? {} : { threshold: request.body.threshold }),
+      // Both come from the chosen profile unless the caller overrides them, so
+      // the preview shows what the print will do rather than what the defaults
+      // would do.
+      threshold: thresholdFor(app, request.body),
       halftone: halftoneFor(app, request.body),
     })
 
@@ -122,4 +126,20 @@ function halftoneFor(
   }
   const profiles = new ProfileRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
   return profiles.find(body.profileId)?.halftone ?? 'none'
+}
+
+
+/** The threshold the preview should use; see `halftoneFor`. */
+function thresholdFor(
+  app: FastifyInstance,
+  body: { profileId?: string; threshold?: number },
+): number {
+  if (body.threshold !== undefined) {
+    return body.threshold
+  }
+  if (body.profileId === undefined) {
+    return DEFAULT_THRESHOLD
+  }
+  const profiles = new ProfileRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+  return profiles.find(body.profileId)?.threshold ?? DEFAULT_THRESHOLD
 }

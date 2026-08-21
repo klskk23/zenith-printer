@@ -20,6 +20,7 @@ function toProfile(row: Row): Profile {
     marginLeftMm: Number(row.margin_left_mm ?? 0),
     isDefault: Number(row.is_default) === 1,
     halftone: (row.halftone ?? 'none') as Profile['halftone'],
+    threshold: Number(row.threshold ?? 128),
     createdAt: String(row.created_at),
   }
   if (row.speed !== null) {
@@ -72,8 +73,8 @@ export class ProfileRepo {
         `INSERT INTO profiles (id, printer_id, name, density, label_type, speed,
                                label_width_mm, label_height_mm,
                                margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm,
-                               is_default, halftone, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                               is_default, halftone, threshold, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -90,6 +91,7 @@ export class ProfileRepo {
         input.marginLeftMm,
         input.isDefault ? 1 : 0,
         input.halftone,
+        input.threshold,
         this.#clock.now().toISOString(),
       )
     const created = this.find(id)
@@ -112,7 +114,7 @@ export class ProfileRepo {
         `UPDATE profiles SET name = ?, density = ?, label_type = ?, speed = ?,
                              label_width_mm = ?, label_height_mm = ?,
                              margin_top_mm = ?, margin_right_mm = ?, margin_bottom_mm = ?, margin_left_mm = ?,
-                             is_default = ?, halftone = ?
+                             is_default = ?, halftone = ?, threshold = ?
          WHERE id = ?`,
       )
       .run(
@@ -128,6 +130,7 @@ export class ProfileRepo {
         input.marginLeftMm,
         input.isDefault ? 1 : 0,
         input.halftone,
+        input.threshold,
         id,
       )
     return this.find(id)

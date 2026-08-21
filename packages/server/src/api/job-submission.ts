@@ -24,6 +24,7 @@ import type { Template } from '../domain/template.ts'
 import type { ContentSnapshot, SequenceRange } from '../domain/print-job.ts'
 import { SequenceAllocator, SequenceOverflowError } from '../domain/sequence-allocator.ts'
 import { ApiError } from './errors.ts'
+import { DEFAULT_THRESHOLD } from '../render/binarize.ts'
 
 export interface ResolvedContent {
   ir: LabelIR
@@ -149,6 +150,7 @@ export function buildSnapshot(
       density: profile?.density ?? capabilities.densityDefault,
       labelType: profile?.labelType ?? capabilities.paperTypes[0] ?? 1,
       halftone: profile?.halftone ?? 'none',
+      threshold: profile?.threshold ?? DEFAULT_THRESHOLD,
     },
     // Taken from the printer, which is where correction now lives; captured
     // here because it will have changed by the time anyone reads this record.

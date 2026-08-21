@@ -26,6 +26,7 @@ import type { PrintJob } from '../domain/print-job.ts'
 import { pausesQueue } from '../domain/job-status.ts'
 import { deviceErrorCode } from '../i18n/error-map.ts'
 import type { HalftoneMode } from '../render/dither.ts'
+import { DEFAULT_THRESHOLD } from '../render/binarize.ts'
 
 export interface PageRenderOptions {
   offsetXDots: number
@@ -40,6 +41,8 @@ export interface PageRenderOptions {
    * label where it was.
    */
   halftone: HalftoneMode
+  /** The luminance below which a pixel becomes a print dot. */
+  threshold: number
 }
 
 export interface RenderPage {
@@ -215,6 +218,7 @@ export class PrintQueue {
         // From the snapshot, not from the profile as it stands now: a reprint
         // has to come out like the batch it is completing.
         halftone: job.snapshot.profile.halftone ?? 'none',
+        threshold: job.snapshot.profile.threshold ?? DEFAULT_THRESHOLD,
       }),
     )
   }

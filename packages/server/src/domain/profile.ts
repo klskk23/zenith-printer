@@ -8,6 +8,7 @@
  */
 import { z } from 'zod'
 import { HALFTONE_MODES } from '../render/dither.ts'
+import { DEFAULT_THRESHOLD } from '../render/binarize.ts'
 
 /**
  * A profile describes the paper: its size, its margins, and how the machine
@@ -33,6 +34,19 @@ export const profileInputSchema = z
      * screen on rough paper, and the same design is printed on both.
      */
     halftone: z.enum(HALFTONE_MODES).default('none'),
+    /**
+     * The luminance below which a pixel becomes a print dot.
+     *
+     * 128 is the midpoint and the right answer for the black-on-white artwork
+     * that most labels are. It matters when they are not: a pale grey logo sits
+     * above it and prints as nothing at all, and a hairline is smeared to grey
+     * by anti-aliasing and then erased. Raising it rescues both, at the cost of
+     * fattening every stroke on the label.
+     *
+     * On the profile for the same reason as the halftone: what survives the
+     * threshold depends on the stock.
+     */
+    threshold: z.number().int().min(1).max(255).default(DEFAULT_THRESHOLD),
     /** Stock dimensions. The canvas follows these when the profile is chosen. */
     labelWidthMm: z.number().finite().positive(),
     labelHeightMm: z.number().finite().positive(),

@@ -85,6 +85,8 @@ export interface ContentSnapshot {
      * is with a hard threshold.
      */
     halftone?: HalftoneMode
+    /** Optional for the same reason as `halftone` above. */
+    threshold?: number
   }
   /**
    * The position correction in force when this job ran, in dots.

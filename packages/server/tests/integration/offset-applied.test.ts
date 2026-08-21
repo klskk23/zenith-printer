@@ -83,30 +83,44 @@ describe('the queue passes the correction to the renderer', () => {
  * batch it belongs to.
  */
 describe('the queue passes the halftone to the renderer', () => {
-  async function drainWith(halftone: 'none' | 'floyd-steinberg' | 'ordered' | undefined) {
+  async function drainWith(
+    profile: { halftone?: 'none' | 'floyd-steinberg' | 'ordered'; threshold?: number },
+  ) {
     const h = createHarness()
     const printerId = h.seedPrinter()
     h.enqueue(printerId, 1, {
-      snapshot: {
-        ...SNAPSHOT,
-        profile: { ...SNAPSHOT.profile, ...(halftone === undefined ? {} : { halftone }) },
-      },
+      snapshot: { ...SNAPSHOT, profile: { ...SNAPSHOT.profile, ...profile } },
     })
     await h.queue.drain(printerId)
     return h
   }
 
   it('passes what the profile said when the job was submitted', async () => {
-    expect((await drainWith('ordered')).renderOptions[0]).toMatchObject({ halftone: 'ordered' })
+    expect((await drainWith({ halftone: 'ordered' })).renderOptions[0]).toMatchObject({
+      halftone: 'ordered',
+    })
   })
 
   it('passes none when the profile did not ask for any', async () => {
-    expect((await drainWith('none')).renderOptions[0]).toMatchObject({ halftone: 'none' })
+    expect((await drainWith({ halftone: 'none' })).renderOptions[0]).toMatchObject({ halftone: 'none' })
   })
 
   it('treats a job from before the setting existed as none', async () => {
     // Old snapshots have no such field, and those jobs must reprint exactly as
     // they printed.
-    expect((await drainWith(undefined)).renderOptions[0]).toMatchObject({ halftone: 'none' })
+    expect((await drainWith({})).renderOptions[0]).toMatchObject({ halftone: 'none' })
+  })
+
+  /**
+   * The same journey for the cut-off, which until now had none: it was
+   * reachable from the preview endpoint and nowhere else, so a value found for
+   * a pale logo could never reach the paper.
+   */
+  it('passes the threshold recorded on the job', async () => {
+    expect((await drainWith({ threshold: 200 })).renderOptions[0]).toMatchObject({ threshold: 200 })
+  })
+
+  it('falls back to the neutral midpoint for a job from before the setting existed', async () => {
+    expect((await drainWith({})).renderOptions[0]).toMatchObject({ threshold: 128 })
   })
 })

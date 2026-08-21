@@ -200,10 +200,22 @@ const profileHalftone = `
                        CHECK (halftone IN ('none', 'floyd-steinberg', 'ordered'));
 `
 
+/**
+ * The binarisation cut-off, per profile.
+ *
+ * 128 preserves exactly what every existing label already does, so this is a
+ * setting that appears without changing anything until somebody moves it.
+ */
+const profileThreshold = `
+  ALTER TABLE profiles ADD COLUMN threshold INTEGER NOT NULL DEFAULT 128
+                       CHECK (threshold BETWEEN 1 AND 255);
+`
+
 export const migrations: Migration[] = [
   { id: 1, name: 'initial_schema', up: initialSchema },
   { id: 2, name: 'template_version', up: templateVersion },
   { id: 3, name: 'printer_offset_and_stock', up: printerOffsetAndStock, apply: migrateOffsets },
   { id: 4, name: 'drop_profile_offsets', up: dropProfileOffsets },
   { id: 5, name: 'profile_halftone', up: profileHalftone },
+  { id: 6, name: 'profile_threshold', up: profileThreshold },
 ]

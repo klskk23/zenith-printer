@@ -190,6 +190,55 @@ describe('creating a profile', () => {
 })
 
 /**
+ * The two settings that decide what survives binarisation.
+ *
+ * Both were reachable from the render pipeline and from nowhere a user could
+ * get to — the cut-off through the preview endpoint alone, which meant a value
+ * could be found for a pale logo and then had nowhere to go.
+ */
+describe('binarisation settings', () => {
+  async function openForm(): Promise<void> {
+    await openPrinters()
+    fireEvent.click(screen.getAllByText('新建参数')[0]!)
+    await screen.findAllByText('纸张宽度')
+  }
+
+  function fieldUnder(label: string): HTMLInputElement | HTMLSelectElement {
+    const dialog = document.querySelector('[role="dialog"]')!
+    const found = [...dialog.querySelectorAll('label')].find((l) => l.textContent === label)
+    expect(found, `no field labelled ${label}`).toBeDefined()
+    return found!.parentElement!.querySelector('input, select') as HTMLInputElement | HTMLSelectElement
+  }
+
+  it('offers the black/white cut-off', async () => {
+    await openForm()
+    expect((fieldUnder('黑白分界') as HTMLInputElement).value).toBe('128')
+  })
+
+  it('offers the image tone modes', async () => {
+    await openForm()
+    const select = fieldUnder('图片色调') as HTMLSelectElement
+    expect([...select.options].map((o) => o.value)).toEqual(['none', 'floyd-steinberg', 'ordered'])
+  })
+
+  it('keeps the cut-off inside the range the renderer accepts', async () => {
+    await openForm()
+    const field = fieldUnder('黑白分界') as HTMLInputElement
+    fireEvent.change(field, { target: { value: '900' } })
+    expect(Number(field.value)).toBeLessThanOrEqual(255)
+    fireEvent.change(field, { target: { value: '0' } })
+    expect(Number(field.value)).toBeGreaterThanOrEqual(1)
+  })
+
+  it('says what the cut-off costs, not just what it does', async () => {
+    // Raising it rescues pale artwork and fattens every stroke on the label;
+    // a control that mentions only the first invites people to raise it.
+    await openForm()
+    expect(screen.getByText(/笔画都会变粗/)).toBeDefined()
+  })
+})
+
+/**
  * Choosing what paper the calibration page is for.
  *
  * It is measured against the edges of the label, so it has to be the size of

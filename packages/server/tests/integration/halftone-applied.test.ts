@@ -35,12 +35,17 @@ function labelWithImage(): LabelIR {
   })
 }
 
-function render(ir: LabelIR, halftone?: 'none' | 'floyd-steinberg' | 'ordered'): BinaryBitmap {
+function render(
+  ir: LabelIR,
+  halftone?: 'none' | 'floyd-steinberg' | 'ordered',
+  threshold?: number,
+): BinaryBitmap {
   return renderLabel({
     ir,
     fonts,
     svgOptions: { resolveImage: () => greyImage() },
     ...(halftone === undefined ? {} : { halftone }),
+    ...(threshold === undefined ? {} : { threshold }),
   }).bitmap
 }
 
@@ -135,5 +140,51 @@ describe('determinism', () => {
     const fs = render(labelWithImage(), 'floyd-steinberg')
     const ordered = render(labelWithImage(), 'ordered')
     expect([...fs.data]).not.toEqual([...ordered.data])
+  })
+})
+
+
+describe('the black/white cut-off', () => {
+  /**
+   * A pale shape sits above the midpoint and prints as nothing at all — the
+   * failure the setting exists for. Raising the cut-off brings it back.
+   */
+  it('rescues a tone the midpoint discards', () => {
+    const ir = labelWithImage()
+    expect(countSetDots(render(ir, 'none', 128))).toBe(0)
+    expect(countSetDots(render(ir, 'none', 200))).toBeGreaterThan(0)
+  })
+
+  it('discards more as it is lowered', () => {
+    const ir = labelIrSchema.parse({
+      widthMm: 40,
+      heightMm: 20,
+      dpi: 203,
+      elements: [
+        {
+          id: 't', type: 'text', xMm: 2, yMm: 2, widthMm: 34, heightMm: 8,
+          content: 'THRESHOLD', fontFamily: 'Noto Sans CJK SC', fontSizeMm: 6,
+          bold: false, align: 'left',
+        },
+      ],
+    })
+    // Anti-aliased edges are grey, so a higher cut-off keeps more of them and
+    // every stroke on the label comes out fatter.
+    expect(countSetDots(render(ir, 'none', 200))).toBeGreaterThan(countSetDots(render(ir, 'none', 60)))
+  })
+
+  it('defaults to the midpoint, so nothing changes for a label that never asked', () => {
+    const ir = labelWithImage()
+    expect([...render(ir).data]).toEqual([...render(ir, 'none', 128).data])
+  })
+
+  it('does not reach inside a halftoned image', () => {
+    // Error diffusion decides against its own midpoint. Letting the profile's
+    // cut-off in as well would flood a photograph the moment somebody raised it
+    // to rescue a pale logo elsewhere on the label.
+    const ir = labelWithImage()
+    expect([...render(ir, 'floyd-steinberg', 128).data]).toEqual(
+      [...render(ir, 'floyd-steinberg', 200).data],
+    )
   })
 })

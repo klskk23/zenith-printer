@@ -71,6 +71,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
               density: capabilities?.densityDefault ?? 3,
               labelType: capabilities?.paperTypes[0] ?? 1,
               halftone: 'none',
+              threshold: 128,
               labelWidthMm: 50,
               labelHeightMm: 30,
               marginTopMm: 0,
@@ -133,6 +134,29 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                 </p>
               )}
             </div>
+          </div>
+
+          {/*
+            The binarisation cut-off. Adjustable at last: it was reachable only
+            through the preview endpoint, so a value could be found for a pale
+            logo and then had nowhere to go — the print path used 128 whatever
+            the preview had been told.
+          */}
+          <div className="space-y-1">
+            <Label>{copy.profiles.threshold}</Label>
+            <Input
+              type="number"
+              min={1}
+              max={255}
+              value={editing.threshold ?? 128}
+              onChange={(e) =>
+                setDraft({
+                  ...editing,
+                  threshold: Math.min(255, Math.max(1, Number(e.target.value) || 128)),
+                })
+              }
+            />
+            <p className="text-[11px] text-muted-foreground">{copy.profiles.thresholdHint}</p>
           </div>
 
           {/*
@@ -249,6 +273,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                       marginLeftMm: editing.marginLeftMm ?? 0,
                       isDefault: editing.isDefault ?? false,
                       halftone: editing.halftone ?? 'none',
+                      threshold: editing.threshold ?? 128,
                     },
                   },
                   {

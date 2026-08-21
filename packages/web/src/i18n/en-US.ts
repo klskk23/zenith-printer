@@ -362,6 +362,9 @@ export const copy: Copy = {
     noProfileSelected: 'No print settings chosen, so no margins are shown.',
     density: 'Density',
     labelType: 'Media type',
+    threshold: 'Black/white cut-off',
+    thresholdHint:
+      'Pixels darker than this are printed. 128 is the midpoint and suits black-on-white artwork. Raising it rescues pale shapes and hairlines, at the cost of fattening every stroke on the label.',
     halftone: 'Image tone',
     halftoneHint:
       'Images only. Text and barcodes always use a hard threshold — dithering them frays the strokes and drops stray dots into a barcode’s quiet zones.',

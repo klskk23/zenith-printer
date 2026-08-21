@@ -360,6 +360,8 @@ export const copy = {
     noProfileSelected: '尚未选择打印参数，因此不显示边距。',
     density: '浓度',
     labelType: '介质类型',
+    threshold: '黑白分界',
+    thresholdHint: '亮度低于这个值的像素才会被打印。128 是中点，适合黑白稿。调高能救回浅灰的图形和极细的线，代价是整张标签的笔画都会变粗。',
     halftone: '图片色调',
     halftoneHint: '只作用于图片元素。文字和条码始终用硬阈值——把它们抖动会让笔画发毛，也会在条码的空白区里落下杂点。',
     halftoneModes: {
