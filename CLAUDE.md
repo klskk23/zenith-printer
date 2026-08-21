@@ -1,14 +1,18 @@
 <!-- SPECKIT START -->
-当前功能：**001-label-design-print**（标签设计与打印环境）
+当前功能：**002-web-workspace-editor**（前端工作区与标签编辑器重构）
 
 开始任何实现工作前，请阅读以下产物：
 
-- 实现计划：`specs/001-label-design-print/plan.md`
-- 功能规格：`specs/001-label-design-print/spec.md`
-- 技术决策与待实测假设：`specs/001-label-design-print/research.md`
-- 数据模型：`specs/001-label-design-print/data-model.md`
-- 接口契约：`specs/001-label-design-print/contracts/`
-- 环境搭建：`specs/001-label-design-print/quickstart.md`
+- 实现计划：`specs/002-web-workspace-editor/plan.md`
+- 功能规格：`specs/002-web-workspace-editor/spec.md`
+- 技术决策与待实测假设：`specs/002-web-workspace-editor/research.md`
+- 数据模型：`specs/002-web-workspace-editor/data-model.md`
+- 接口契约：`specs/002-web-workspace-editor/contracts/`
+- 环境搭建：`specs/002-web-workspace-editor/quickstart.md`
+- 界面设计共识：`docs/frontend-design-v2.md`
+
+上一功能 **001-label-design-print** 的产物仍然有效，其规格与契约是本功能的基线：
+`specs/001-label-design-print/`
 <!-- SPECKIT END -->
 
 ## 项目宪章

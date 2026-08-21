@@ -36,7 +36,7 @@ npm workspaces 四包结构（见 plan.md）：`packages/shared/`、`packages/se
 - [X] T005 创建 `.github/workflows/ci.yml`：typecheck → lint → test → coverage，任一失败即阻断合并（宪章「质量门槛（CI 强制）」）
 - [X] T006 [P] 将字体文件置入 `fonts/full/`（全量）与 `fonts/subset/`（GB2312 子集），并在 `packages/shared/src/fonts.ts` 中声明可选字体清单
 - [X] T007 建立 `packages/cli/src/index.ts` 骨架：commander、kebab-case 参数、`--json` 双格式、stdout/stderr 分流、稳定退出码（宪章原则 III.B）
-- [ ] T008 [HW] **硬件实测 #1（最高优先，先于任何业务代码）**：实现 `packages/cli/src/commands/set-shutdown.ts` 调用 `abstraction.setAutoShutDownTime(4)`，读回确认，放置 70 分钟后观察 B3S_P 是否关机；结果回填 `specs/001-label-design-print/research.md`
+- [ ] T008 [HW]（进行中：`setAutoShutDownTime(4)` 已写入并读回确认；截至 2026-08-21 实际使用中**未观察到设备离线**，但尚不足以断定为「永不」，转为长期观察） **硬件实测 #1（最高优先，先于任何业务代码）**：实现 `packages/cli/src/commands/set-shutdown.ts` 调用 `abstraction.setAutoShutDownTime(4)`，读回确认，放置 70 分钟后观察 B3S_P 是否关机；结果回填 `specs/001-label-design-print/research.md`
 - [X] T009 [P] [HW] 硬件实测 #2：在 `packages/cli/src/commands/probe.ts` 中测量精臣 serial 连接握手耗时，结果回填 `research.md`
 
 **⚠️ T008 的结论可能改变 UI 提示设计**：若 `ShutdownTime4` 不是「永不」，则闲置一小时后首个任务必然失败且需人到现场按电源键。这不是软件能规避的，必须在 FR-036 的提示文案中如实告知。
@@ -259,7 +259,7 @@ npm workspaces 四包结构（见 plan.md）：`packages/shared/`、`packages/se
 - [X] T121 [P] 在 `packages/web/src/features/print/field-form.tsx` 补充起始值覆盖与已消耗区间冲突的警示；在 `packages/web/src/features/print/print-dialog.tsx` 补充装纸尺寸与模板不符的提示（`RfidInfo` 不含尺寸字段，仅能提示用户自行确认）
 - [X] T122 [P] 覆盖率达 **93.05%**。补了领域助手与空跑驱动的测试；`serial-transport.ts` 与 `tcp-transport.ts` 已排除在统计外——它们是 serialport/net 之上的薄适配器，无法在脱机套件中运行，按 0% 计入只会让门槛数字失真（理由written in vitest.config.ts）
 - [X] T123 编写 `packages/server/tests/integration/performance.test.ts`：断言单张渲染 < 200ms、提交受理 < 2s（SC-005）；100 份端到端 < 5 分钟（SC-004）以 `*.hardware.test.ts` 单独验证
-- [ ] T124 [HW] 端到端验收：按 `specs/001-label-design-print/quickstart.md` 的六步流程验证 SC-001（新用户 10 分钟内完成首张标签）、SC-002（条码扫描成功率 ≥99%）、SC-003（位置偏差 ≤0.5mm）
+- [X] T124 [HW] 端到端验收：按 `specs/001-label-design-print/quickstart.md` 的六步流程验证 SC-001（新用户 10 分钟内完成首张标签）、SC-002（条码扫描成功率 ≥99%）、SC-003（位置偏差 ≤0.5mm）
 - [X] T125 编写 `deploy/zenith-printer.service`（systemd unit）并在 `specs/001-label-design-print/quickstart.md` 中补全串口权限（`dialout` 组）说明，验证单进程启动
 
 ---
