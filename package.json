@@ -1,0 +1,38 @@
+{
+  "name": "zenith-printer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -ws --if-present",
+    "typecheck": "tsc --build --force",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:hardware": "vitest run --project hardware",
+    "fetch-fonts": "bash scripts/fetch-fonts.sh",
+    "cli": "node --experimental-strip-types packages/cli/src/index.ts",
+    "subset-fonts": "python3 scripts/subset-fonts.py"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^24.10.1",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.39.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^3.2.4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "@serialport/bindings-cpp@13.0.0": true,
+    "@serialport/bindings-cpp@12.0.1": true
+  }
+}

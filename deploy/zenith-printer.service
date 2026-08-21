@@ -1,0 +1,56 @@
+# Zenith Printer — single-process label design and print service.
+#
+# Install:
+#   sudo cp deploy/zenith-printer.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now zenith-printer
+#
+# The service user must be in the dialout group to reach /dev/ttyACM0.
+
+[Unit]
+Description=Zenith Printer label service
+Documentation=file:///opt/zenith-printer/specs/001-label-design-print/quickstart.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zenith
+Group=zenith
+# Serial access. Without this the NIIMBOT link fails with EACCES, which the
+# service reports as "printer unreachable" — technically true, unhelpfully so.
+SupplementaryGroups=dialout
+
+WorkingDirectory=/opt/zenith-printer
+ExecStart=/usr/bin/node --experimental-strip-types packages/server/src/index.ts
+
+# Bind to the LAN only. There is no authentication: anyone who can reach the
+# service can submit and cancel jobs, so exposing it publicly is a mistake
+# rather than a configuration choice.
+Environment=ZENITH_HOST=0.0.0.0
+Environment=ZENITH_PORT=3000
+Environment=ZENITH_DB=/var/lib/zenith-printer/zenith.db
+Environment=ZENITH_UPLOADS=/var/lib/zenith-printer/uploads
+Environment=LOG_LEVEL=info
+# Set to 1 to run every motion except printing — useful for demos and for any
+# automated check that must not consume stock.
+# Environment=ZENITH_DRY_RUN=1
+
+Restart=on-failure
+RestartSec=5
+
+# A restart while a job is printing leaves the printed count unverifiable, so
+# the service marks such jobs failed with an unknown count on the way back up
+# (FR-053). Give it a moment to finish the current label first.
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+StateDirectory=zenith-printer
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/zenith-printer
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,40 @@
+/*
+ * Editor fonts.
+ *
+ * These must be the same faces the backend renders with, or the preview stops
+ * predicting the label. The frontend loads GB2312 subsets to keep the first
+ * paint reasonable (the full CJK faces are 19-26MB); the backend uses the full
+ * files, so a rare glyph shows as tofu here while still printing correctly.
+ * That tradeoff is recorded in the spec's assumptions.
+ *
+ * Family names are load-bearing: they must match FONT_FAMILIES in
+ * packages/server/src/render/fonts.ts exactly.
+ */
+
+@font-face {
+  font-family: 'Noto Sans CJK SC';
+  src: url('/fonts/subset/NotoSansCJKsc-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Noto Sans CJK SC';
+  src: url('/fonts/subset/NotoSansCJKsc-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Noto Serif CJK SC';
+  src: url('/fonts/subset/NotoSerifCJKsc-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DejaVu Sans Mono';
+  src: url('/fonts/subset/DejaVuSansMono.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}

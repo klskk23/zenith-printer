@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.vitest/
+
+# Runtime data
+*.db
+*.db-journal
+data/
+uploads/
+
+# Fonts (binaries fetched via scripts/fetch-fonts.sh; integrity pinned in fonts/MANIFEST.sha256)
+fonts/full/*.ttf
+fonts/full/*.otf
+fonts/full/*.ttc
+fonts/subset/*.ttf
+fonts/subset/*.otf
+fonts/subset/*.woff2
+
+# Logs / env
+*.log
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+data/
+packages/web/public/fonts/
