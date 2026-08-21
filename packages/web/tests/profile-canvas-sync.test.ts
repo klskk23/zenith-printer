@@ -14,7 +14,7 @@
 import { describe, expect, it } from 'vitest'
 import { labelIrSchema, type LabelIR } from '@zenith/shared'
 import { commit, initUndo, undo } from '../src/editor/undo.ts'
-import { inspect } from '../src/editor/guards.ts'
+import { canPrint, isOutOfBounds } from '../src/editor/guards.ts'
 
 const LIMITS = { dpi: 203, printheadPixels: 832 }
 
@@ -53,21 +53,27 @@ describe('canvas follows the profile', () => {
 })
 
 describe('what the user sees afterwards', () => {
+  /**
+   * Asserted through `isOutOfBounds`, which is what the canvas outlines an
+   * element from. Overflow is deliberately not a violation: it would be
+   * produced and cleared on every pointer move of a drag.
+   */
+  function overflowing(ir: ReturnType<typeof applyStock>): string[] {
+    return ir.elements.filter((element) => isOutOfBounds(element, ir)).map((element) => element.id)
+  }
+
   it('flags elements that no longer fit', () => {
-    const after = applyStock(design(50, 30), 40, 20)
-    const overflow = inspect(after, LIMITS).filter((v) => v.code === 'ELEMENT_OUT_OF_BOUNDS')
-    expect(overflow.map((v) => v.elementId)).toContain('b')
+    expect(overflowing(applyStock(design(50, 30), 40, 20))).toContain('b')
   })
 
-  it('flags them as warnings, so printing is still possible', () => {
-    const after = applyStock(design(50, 30), 40, 20)
-    const overflow = inspect(after, LIMITS).filter((v) => v.code === 'ELEMENT_OUT_OF_BOUNDS')
-    expect(overflow.every((v) => !v.blocking)).toBe(true)
+  it('does not refuse to print because of it', () => {
+    // The judgement is the operator's: a batch held back for one clipped label
+    // is worse than a label to reprint.
+    expect(canPrint(applyStock(design(50, 30), 40, 20), LIMITS)).toBe(true)
   })
 
   it('says nothing when everything still fits', () => {
-    const after = applyStock(design(50, 30), 60, 40)
-    expect(inspect(after, LIMITS).filter((v) => v.code === 'ELEMENT_OUT_OF_BOUNDS')).toEqual([])
+    expect(overflowing(applyStock(design(50, 30), 60, 40))).toEqual([])
   })
 })
 

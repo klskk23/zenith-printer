@@ -653,3 +653,49 @@ describe('making a QR code smaller', () => {
     expect(gcd).toBe(2)
   })
 })
+
+describe('the warning strip under the canvas', () => {
+  /**
+   * Overflow used to be listed there. Dragging an element produces and clears
+   * one on every pointer move, so the strip appeared and vanished under the
+   * hand doing the dragging, and shoved the warnings that do need reading
+   * around the screen.
+   *
+   * It is still reported twice, and both are better: the canvas outlines the
+   * element in red the moment it crosses the edge, and the print dialog lists
+   * what will be clipped before any stock is consumed.
+   */
+  it('says nothing about an element hanging off the edge', () => {
+    openDesign()
+    addElement('矩形')
+
+    const xField = [...document.querySelectorAll('label')].find((l) => l.textContent === 'X 坐标')!
+    fireEvent.change(xField.parentElement!.querySelector('input')!, { target: { value: '48' } })
+
+    expect(screen.queryByText(/超出画布/)).toBeNull()
+  })
+
+  it('still outlines it on the canvas', () => {
+    openDesign()
+    addElement('矩形')
+    const xField = [...document.querySelectorAll('label')].find((l) => l.textContent === 'X 坐标')!
+    fireEvent.change(xField.parentElement!.querySelector('input')!, { target: { value: '48' } })
+
+    // Deselected first: a selected element is outlined in the selection colour
+    // whether or not it overflows, so the overflow colour is only visible once
+    // nothing is selected.
+    fireEvent.pointerDown(document.querySelector('[data-label-canvas] svg')!)
+
+    // The silent signal stays. It costs no layout and never moves anything,
+    // which is exactly what the banner could not manage.
+    expect(elementRects()[0]!.getAttribute('stroke')).toBe('#dc2626')
+  })
+
+  it('still says something that genuinely blocks printing', () => {
+    // Removing the noise must not remove the strip: an image with no file
+    // chosen cannot print, and that has to stay visible.
+    openDesign()
+    addElement('图片')
+    expect(screen.getByText('还没有为这个图片元素选择图片')).toBeDefined()
+  })
+})

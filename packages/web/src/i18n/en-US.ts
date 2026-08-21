@@ -216,8 +216,6 @@ export const copy: Copy = {
       `The canvas is ${v.widthMm}mm wide, beyond this printer's maximum of ${v.maxWidthMm}mm`,
     STROKE_TOO_THIN: (v: Record<string, number | string>): string =>
       `A stroke thinner than one dot disappears when printed. The minimum is ${v.minWidthMm}mm (1 dot)`,
-    ELEMENT_OUT_OF_BOUNDS: (): string =>
-      'This element extends past the canvas; the part outside will not be printed',
     BARCODE_CONTENT_EMPTY: (): string => 'The barcode has no content',
     IMAGE_NOT_CHOSEN: (): string => 'No image has been chosen for this element',
   },

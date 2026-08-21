@@ -34,7 +34,6 @@ export interface Violation {
   code:
     | 'CANVAS_TOO_WIDE'
     | 'STROKE_TOO_THIN'
-    | 'ELEMENT_OUT_OF_BOUNDS'
     | 'BARCODE_CONTENT_EMPTY'
     | 'IMAGE_NOT_CHOSEN'
   elementId?: string
@@ -157,11 +156,20 @@ export function inspect(ir: LabelIR, limits: PrinterLimits | null): Violation[] 
       violations.push({ code: 'IMAGE_NOT_CHOSEN', elementId: element.id, blocking: true })
     }
 
-    if (isOutOfBounds(element, ir)) {
-      // Marked, not blocked: dragging past the edge is a normal intermediate
-      // state and interrupting it would make the editor unusable.
-      violations.push({ code: 'ELEMENT_OUT_OF_BOUNDS', elementId: element.id, blocking: false })
-    }
+    // Overflow is deliberately *not* a violation.
+    //
+    // It is reported twice already, and both are better than a line of text
+    // here: the canvas outlines the element in red the moment it crosses the
+    // edge, and the print dialog's preflight lists what will be clipped before
+    // any stock is consumed — including the cases the editor cannot know
+    // about, such as a barcode whose width follows a variable and overflows on
+    // one row in a hundred.
+    //
+    // As a violation it was noise. Dragging an element produces and clears it
+    // on every pointer move, so a banner appears and disappears under the
+    // hand doing the dragging, and the warnings that do need reading are
+    // pushed around by it. `isOutOfBounds` stays exported and is what the
+    // canvas draws from.
   }
 
   return violations.sort((a, b) => Number(b.blocking) - Number(a.blocking))

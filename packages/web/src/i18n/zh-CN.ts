@@ -213,7 +213,6 @@ export const copy = {
       `画布宽度 ${v.widthMm}mm 超出该打印机的最大打印宽度 ${v.maxWidthMm}mm`,
     STROKE_TOO_THIN: (v: Record<string, number | string>): string =>
       `线宽小于一个点，打印后不可见。最小为 ${v.minWidthMm}mm（1 dot）`,
-    ELEMENT_OUT_OF_BOUNDS: (): string => '该元素超出画布，超出部分不会被打印',
     BARCODE_CONTENT_EMPTY: (): string => '条码内容为空',
     IMAGE_NOT_CHOSEN: (): string => '还没有为这个图片元素选择图片',
   },

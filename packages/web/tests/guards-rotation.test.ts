@@ -85,11 +85,17 @@ describe('overflow detection under rotation', () => {
  * and a batch held back for one clipped label is worse than a label to reprint.
  */
 describe('overflow severity', () => {
-  it('reports a rotated overflow as a warning', () => {
+  /**
+   * The rotation has to be measured, not ignored: a 40x10 mm barcode turned a
+   * quarter turn occupies 10x40 mm, and checking it against its unrotated box
+   * passes an element that is half off the label. Asserted through
+   * `isOutOfBounds`, which is what the canvas outlines from — overflow is not
+   * reported as a violation.
+   */
+  it('sees a rotated overflow', () => {
     const ir = label({ ...WIDE_BARCODE, rotation: 90, yMm: 5 })
-    const overflow = inspect(ir, LIMITS).filter((v) => v.code === 'ELEMENT_OUT_OF_BOUNDS')
-    expect(overflow).toHaveLength(1)
-    expect(overflow[0]!.blocking).toBe(false)
+    expect(isOutOfBounds(ir.elements[0]!, ir)).toBe(true)
+    expect(inspect(ir, LIMITS)).toEqual([])
   })
 
   it('does not disable printing because of an overflow', () => {

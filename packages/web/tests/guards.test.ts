@@ -51,12 +51,17 @@ describe('canvas width', () => {
 })
 
 describe('out of bounds', () => {
-  it('marks rather than blocks', () => {
-    // Dragging briefly past the edge is normal; a modal here would be
-    // intolerable to use.
-    const violations = inspect(label([{ ...rule, x2Mm: 80 }]), LIMITS)
-    expect(violations[0]?.code).toBe('ELEMENT_OUT_OF_BOUNDS')
-    expect(violations[0]?.blocking).toBe(false)
+  /**
+   * Overflow is shown on the canvas, in red, and again by the print dialog's
+   * preflight before any stock is consumed. It is deliberately not a violation
+   * as well: dragging an element produces and clears one on every pointer
+   * move, so the banner appeared and vanished under the hand doing the
+   * dragging and shoved the warnings that do need reading around the screen.
+   */
+  it('is not reported as a violation', () => {
+    const ir = label([{ ...rule, x2Mm: 80 }])
+    expect(isOutOfBounds(ir.elements[0]!, ir)).toBe(true)
+    expect(inspect(ir, LIMITS)).toEqual([])
   })
 
   it('still allows printing when only marks remain', () => {
