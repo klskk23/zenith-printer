@@ -23,6 +23,14 @@ import { Label } from '../../components/ui/label.tsx'
 import { Select } from '../../components/ui/select.tsx'
 import { OffsetPanel } from './offset-panel.tsx'
 import { ProfilesPanel } from '../profiles/profiles-panel.tsx'
+import { EditPrinterDialog } from './edit-printer-dialog.tsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog.tsx'
 import {
   useAddPrinter,
   useDeletePrinter,
@@ -166,6 +174,8 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
   const probe = useProbePrinter()
   const queue = useSetQueueState()
   const remove = useDeletePrinter()
+  const [editing, setEditing] = useState(false)
+  const [profilesOpen, setProfilesOpen] = useState(false)
 
   return (
     <Card>
@@ -186,16 +196,22 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
 
         <OffsetPanel printer={printer} />
 
-        {/*
-          Profiles are edited here, with the machine they belong to. The editor
-          only picks one from a dropdown: which roll is loaded is a property of
-          the printer, not a decision taken while designing a label.
-        */}
-        <ProfilesPanel printerId={printer.id} capabilities={printer.capabilities} />
-
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" disabled={probe.isPending} onClick={() => probe.mutate(printer.id)}>
             {probe.isPending ? copy.printers.probing : copy.printers.probe}
+          </Button>
+          {/*
+            Profiles belong to the machine, so they are managed here — but in a
+            dialog rather than inline. A page listing several printers, each
+            with its stock settings unfolded beneath it, buries the thing the
+            page is for: seeing at a glance which machines are there and whether
+            they are running.
+          */}
+          <Button size="sm" variant="outline" onClick={() => setProfilesOpen(true)}>
+            {copy.printers.manageProfiles}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            {copy.printers.edit}
           </Button>
           <Button
             size="sm"
@@ -223,6 +239,18 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
         </div>
 
         <ErrorNotice error={probe.error ?? remove.error} />
+
+        <EditPrinterDialog printer={printer} open={editing} onOpenChange={setEditing} />
+
+        <Dialog open={profilesOpen} onOpenChange={setProfilesOpen}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{copy.printers.manageProfiles}</DialogTitle>
+              <DialogDescription>{printer.name}</DialogDescription>
+            </DialogHeader>
+            <ProfilesPanel printerId={printer.id} capabilities={printer.capabilities} />
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   )

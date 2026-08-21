@@ -83,7 +83,7 @@ export const copy: Copy = {
     add: 'Add printer',
     probe: 'Probe',
     probing: 'Probing…',
-    remove: 'Remove',
+    remove: 'Remove printer',
     confirmRemove: 'Remove this printer?',
     notProbed: 'Not probed yet',
     fields: {
@@ -93,6 +93,10 @@ export const copy: Copy = {
       address: 'Address',
       printTaskName: 'Print task',
     },
+    edit: 'Edit connection',
+    manageProfiles: 'Print profiles',
+    addressChangeClearsProbe:
+      'The address changed, so the probed device settings will be cleared — they describe whatever was at the old address. Probe again after saving.',
     hints: {
       printTaskName:
         'B3S_P uses B1. Valid values: D11_V1 / D110 / B1 / B21_V1 / B21_L2B / D110M_V4 / H1S',

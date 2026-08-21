@@ -505,3 +505,125 @@ describe('calibration page size', () => {
     expect(snapshotOf().widthMm).not.toBeCloseTo(48, 1)
   })
 })
+
+/** A printer with a driver stubbed in, so probing never touches a port. */
+async function printerId(): Promise<string> {
+  stubDriver()
+  await createPrinter()
+  return 'prn-0001'
+}
+
+function queueOneJob(printerId: string): void {
+  app.ctx.db
+    .prepare(
+      `INSERT INTO print_jobs (id, idempotency_key, printer_id, requested_copies, status, snapshot, created_at)
+       VALUES ('j-move', 'k-move', ?, 5, 'queued', '{}', '2026-08-21T00:00:00Z')`,
+    )
+    .run(printerId)
+}
+
+describe('changing how a printer is reached', () => {
+  it('updates the address', async () => {
+    const id = await printerId()
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/printers/${id}`,
+      payload: { address: '/dev/ttyACM7' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().address).toBe('/dev/ttyACM7')
+  })
+
+  it('keeps the profiles, the offset and the job history', async () => {
+    // The whole point: correcting an address used to mean deleting the printer
+    // and adding it again, which discards all three.
+    const id = await printerId()
+    await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/profiles`,
+      payload: { name: '50x30', density: 3, labelType: 1, labelWidthMm: 50, labelHeightMm: 30 },
+    })
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/printers/${id}/offset`,
+      payload: { offsetXDots: 5, offsetYDots: -2 },
+    })
+
+    await app.inject({ method: 'PATCH', url: `/api/printers/${id}`, payload: { address: '/dev/ttyACM7' } })
+
+    const printer = (await app.inject({ method: 'GET', url: `/api/printers/${id}` })).json()
+    expect(printer.offsetXDots).toBe(5)
+    expect(printer.offsetYDots).toBe(-2)
+    const profiles = (await app.inject({ method: 'GET', url: `/api/printers/${id}/profiles` })).json()
+    expect(profiles.profiles).toHaveLength(1)
+  })
+
+  /**
+   * The probed numbers describe whatever answered at the *old* address. Head
+   * width, dpi and density range belonging to another machine produce labels
+   * that are wrong in ways nobody checks, so they go and the printer reads as
+   * unprobed until somebody probes it.
+   */
+  it('clears the probed capabilities when the address moves', async () => {
+    const id = await printerId()
+    await app.inject({ method: 'POST', url: `/api/printers/${id}/probe` })
+    expect((await app.inject({ method: 'GET', url: `/api/printers/${id}` })).json().capabilities).not.toBeNull()
+
+    await app.inject({ method: 'PATCH', url: `/api/printers/${id}`, payload: { address: '/dev/ttyACM7' } })
+    expect((await app.inject({ method: 'GET', url: `/api/printers/${id}` })).json().capabilities).toBeNull()
+  })
+
+  it('keeps the capabilities when only the name changes', async () => {
+    const id = await printerId()
+    await app.inject({ method: 'POST', url: `/api/printers/${id}/probe` })
+
+    await app.inject({ method: 'PATCH', url: `/api/printers/${id}`, payload: { name: '前台标签机' } })
+    const printer = (await app.inject({ method: 'GET', url: `/api/printers/${id}` })).json()
+    expect(printer.name).toBe('前台标签机')
+    expect(printer.capabilities).not.toBeNull()
+  })
+
+  it('refuses to move a printer with work queued', async () => {
+    // Mid-flight jobs hold this address; moving it under them sends the rest of
+    // a batch to another machine, or to nowhere.
+    const id = await printerId()
+    await app.inject({ method: 'PATCH', url: `/api/printers/${id}/queue`, payload: { queueState: 'paused' } })
+    await app.inject({ method: 'POST', url: `/api/printers/${id}/probe` })
+    queueOneJob(id)
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/printers/${id}`,
+      payload: { address: '/dev/ttyACM7' },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().code).toBe('PRINTER_HAS_QUEUED_JOBS')
+  })
+
+  it('allows a rename while work is queued', async () => {
+    // A name is not a route to anything.
+    const id = await printerId()
+    await app.inject({ method: 'PATCH', url: `/api/printers/${id}/queue`, payload: { queueState: 'paused' } })
+    await app.inject({ method: 'POST', url: `/api/printers/${id}/probe` })
+    queueOneJob(id)
+
+    const res = await app.inject({ method: 'PATCH', url: `/api/printers/${id}`, payload: { name: '前台' } })
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('rejects an empty change', async () => {
+    const id = await printerId()
+    const res = await app.inject({ method: 'PATCH', url: `/api/printers/${id}`, payload: {} })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('reports an unknown printer rather than creating one', async () => {
+    await createPrinter()
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/printers/nope',
+      payload: { address: '/dev/ttyACM7' },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+})

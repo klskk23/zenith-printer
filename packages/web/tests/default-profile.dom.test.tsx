@@ -150,22 +150,27 @@ describe('the calibration page', () => {
 })
 
 describe('the profile form', () => {
-  it('offers a control for making a profile the default', async () => {
+  /**
+   * Profiles live behind a button on the printers page rather than unfolded
+   * under each printer, so the form is two clicks in: open the dialog, then
+   * pick the profile.
+   */
+  async function openProfileForm(): Promise<void> {
     render(wrap(<App />))
     fireEvent.click(screen.getAllByText('打印机')[0]!)
-    await screen.findAllByText('原厂 50×30')
+    fireEvent.click(await screen.findByText('打印参数'))
+    fireEvent.click((await screen.findAllByText('原厂 50×30'))[0]!)
+  }
 
-    fireEvent.click(screen.getAllByText('原厂 50×30')[0]!)
+  it('offers a control for making a profile the default', async () => {
+    await openProfileForm()
     // Without this the flag could never be set, so the default was a concept
     // the system referred to and nobody could create.
     expect(await screen.findAllByText('设为默认')).not.toHaveLength(0)
   })
 
   it('explains what being the default does', async () => {
-    render(wrap(<App />))
-    fireEvent.click(screen.getAllByText('打印机')[0]!)
-    await screen.findAllByText('原厂 50×30')
-    fireEvent.click(screen.getAllByText('原厂 50×30')[0]!)
+    await openProfileForm()
     expect(await screen.findAllByText(/自动选中/)).not.toHaveLength(0)
   })
 })

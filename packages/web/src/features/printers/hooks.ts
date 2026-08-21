@@ -21,6 +21,22 @@ export function useAddPrinter() {
   })
 }
 
+/**
+ * Change a printer's name, address or print task.
+ *
+ * `kind` and `transport` are deliberately not here: they decide which driver
+ * speaks to the device, so changing them would make the record a different
+ * machine keeping the old one's job history and position correction.
+ */
+export function useUpdatePrinter() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; changes: Record<string, string> }) =>
+      request<Printer>(`/printers/${input.id}`, { method: 'PATCH', body: input.changes }),
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
 export function useProbePrinter() {
   const client = useQueryClient()
   return useMutation({

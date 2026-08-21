@@ -56,7 +56,7 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
   },
   PRINTER_HAS_QUEUED_JOBS: {
     what: 'This printer still has queued jobs',
-    why: 'Removing it now would strand work that has already been accepted',
+    why: 'Removing it would strand work already accepted; moving its address would send the rest of a batch to another machine, or to nowhere',
     next: 'Wait for the queue to drain, or cancel the remaining jobs first',
   },
   JOB_ALREADY_PRINTING: {

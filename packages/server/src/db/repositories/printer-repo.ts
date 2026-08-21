@@ -152,6 +152,58 @@ export class PrinterRepo {
     return this.find(id)
   }
 
+  /**
+   * Change how the printer is reached, and what it is called.
+   *
+   * `kind` and `transport` are not editable: they decide which driver speaks to
+   * the device, and a record that swapped them would be a different machine
+   * wearing the same id — along with its job history and its offset. Deleting
+   * and adding says that plainly.
+   *
+   * A changed address clears the probed capabilities. They describe whatever
+   * answered at the *old* address, and printing against a head width or a dpi
+   * belonging to another machine produces labels that are wrong in ways nobody
+   * checks. The rest of the system already handles an unprobed printer — the
+   * job endpoint refuses with `needsProbe` rather than guessing.
+   */
+  updateConnection(
+    id: string,
+    changes: { name?: string; address?: string; printTaskName?: string },
+  ): Printer | undefined {
+    const current = this.find(id)
+    if (current === undefined) {
+      return undefined
+    }
+
+    const name = changes.name ?? current.name
+    const address = changes.address ?? current.address
+    const printTaskName = changes.printTaskName ?? current.printTaskName
+    const moved = address !== current.address
+
+    this.#db
+      .prepare(
+        `UPDATE printers
+            SET name = ?, address = ?, print_task_name = ?
+          WHERE id = ?`,
+      )
+      .run(name, address, printTaskName ?? null, id)
+
+    if (moved) {
+      this.#db
+        .prepare(
+          `UPDATE printers
+              SET dpi = NULL, printhead_pixels = NULL, density_min = NULL, density_max = NULL,
+                  density_default = NULL, paper_types = NULL, print_direction = NULL,
+                  supports_consumable_level = NULL, model = NULL, serial = NULL,
+                  firmware_version = NULL, last_probed_at = NULL
+            WHERE id = ?`,
+        )
+        .run(id)
+    }
+
+    return this.find(id)
+  }
+
   queuedJobCount(id: string): number {
     const row = this.#db
       .prepare("SELECT COUNT(*) AS n FROM print_jobs WHERE printer_id = ? AND status IN ('queued','printing')")

@@ -94,9 +94,18 @@ beforeEach(() => {
   )
 })
 
+/**
+ * Open the printers page and the profile dialog for the first printer.
+ *
+ * Profiles used to sit unfolded under each printer. A page listing several
+ * machines, each with its stock settings expanded beneath it, buries what the
+ * page is for — which printers are there and whether they are running — so
+ * they moved behind a button.
+ */
 async function openPrinters(): Promise<void> {
   render(wrap(<App />))
   fireEvent.click(screen.getAllByText('打印机')[0]!)
+  fireEvent.click(await screen.findByText('打印参数'))
   await screen.findAllByText('原厂 50×30')
 }
 
@@ -152,7 +161,13 @@ describe('deleting a profile', () => {
     await openPrinters()
     fireEvent.click(screen.getAllByText('原厂 50×30')[0]!)
     await screen.findAllByText('纸张宽度')
-    fireEvent.click(screen.getAllByText('删除')[0]!)
+    // Scoped to the profile dialog. The printer card carries a delete button
+    // of its own, and an unscoped search finds that one first — so this used to
+    // open the confirmation for deleting the whole printer and then report
+    // that no profile had been deleted.
+    const panel = document.querySelector('[role="dialog"]')!
+    const profileDelete = [...panel.querySelectorAll('button')].find((b) => b.textContent === '删除')!
+    fireEvent.click(profileDelete)
     await screen.findAllByText('确认这项操作？')
 
     // The confirm button in the dialog, not the one that opened it.

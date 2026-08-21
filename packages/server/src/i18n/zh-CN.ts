@@ -65,9 +65,9 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     next: '请到设备旁确认电源已开启、连线正常，然后重新提交任务',
   },
   PRINTER_HAS_QUEUED_JOBS: {
-    what: '该打印机仍有排队中的任务，无法删除',
-    why: '删除后这些任务将失去归属，无法继续执行',
-    next: '先取消或等待队列中的任务完成，然后再删除打印机',
+    what: '该打印机仍有排队中的任务',
+    why: '删除会让这些任务失去归属；改地址则会把剩下的标签送到另一台机器上，或者送不出去',
+    next: '先取消或等待队列中的任务完成，再进行此操作',
   },
   JOB_ALREADY_PRINTING: {
     what: '任务已经在打印中，无法取消',

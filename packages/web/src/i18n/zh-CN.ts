@@ -80,7 +80,7 @@ export const copy = {
     add: '添加打印机',
     probe: '探测',
     probing: '正在探测…',
-    remove: '删除',
+    remove: '删除打印机',
     confirmRemove: '确定删除这台打印机吗？',
     notProbed: '尚未探测',
     fields: {
@@ -90,6 +90,9 @@ export const copy = {
       address: '地址',
       printTaskName: '打印任务',
     },
+    edit: '编辑连接',
+    manageProfiles: '打印参数',
+    addressChangeClearsProbe: '地址变了，已探测的设备参数会被清空——它们描述的是旧地址上的那台机器。保存后请重新探测。',
     hints: {
       // The single most consequential piece of guidance in the whole app.
       printTaskName: 'B3S_P 请填 B1。可选值：D11_V1 / D110 / B1 / B21_V1 / B21_L2B / D110M_V4 / H1S',

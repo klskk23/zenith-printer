@@ -74,6 +74,54 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
    * offset looks like the correction was accepted and simply did nothing,
    * which sends the operator back to measuring the paper again.
    */
+  /**
+   * Change how a printer is reached.
+   *
+   * An address is not permanent: a networked printer is given a new IP, a USB
+   * device node is renumbered when something else is plugged in, a serial port
+   * moves. Without this the only way to correct one was to delete the printer
+   * and add it again — which throws away its profiles, its position
+   * correction and the link from every job it has ever run.
+   */
+  typed.patch(
+    '/api/printers/:id',
+    {
+      schema: {
+        params: idParams,
+        body: z
+          .object({
+            name: z.string().min(1).max(80).optional(),
+            address: z.string().min(1).optional(),
+            printTaskName: z.string().min(1).optional(),
+          })
+          .refine((body) => Object.keys(body).length > 0, {
+            message: 'at least one field must be given',
+          }),
+      },
+    },
+    async (request) => {
+      const store = repo()
+      const current = store.find(request.params.id)
+      if (current === undefined) {
+        throw ApiError.notFound({ printerId: request.params.id })
+      }
+
+      // Mid-flight jobs hold this printer's address; moving it under them would
+      // send the rest of a batch somewhere else, or nowhere.
+      if (request.body.address !== undefined && request.body.address !== current.address) {
+        const queued = store.queuedJobCount(request.params.id)
+        if (queued > 0) {
+          throw ApiError.conflict('PRINTER_HAS_QUEUED_JOBS', {
+            printerId: request.params.id,
+            queuedJobs: queued,
+          })
+        }
+      }
+
+      return store.updateConnection(request.params.id, request.body)
+    },
+  )
+
   typed.patch(
     '/api/printers/:id/offset',
     {
