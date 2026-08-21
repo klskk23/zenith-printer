@@ -26,11 +26,18 @@ ls -l /dev/ttyACM0                 # 确认设备存在且属组为 dialout
 ## 安装与运行
 
 ```bash
-npm install                # npm workspaces，一次装齐三个包
-npm run build              # shared → server → web
-npm run dev                # 开发模式：后端 watch + 前端 HMR
-npm start                  # 生产模式：单进程，后端托管前端产物
+npm install                # npm workspaces，一次装齐四个包
+npm run build              # 构建前端产物（shared/server/cli 直跑 TS，无需构建）
+npm run dev                # 开发：后端 --watch + Vite HMR，Vite 代理 /api 到后端
+npm start                  # 生产：单进程，后端同时托管前端产物
 ```
+
+`npm run dev` 起两个进程：后端在 3000，Vite 在 5173。开发时访问 **5173**——
+Vite 把 `/api` 代理到后端，所以前端代码不需要知道自己在开发还是生产模式。
+
+> 只有 `@zenith/web` 有构建步骤。`shared`、`server`、`cli` 由 Node 的
+> `--experimental-strip-types` 直接执行 TypeScript，所以 `npm run build` 在它们身上
+> 什么都不做（靠 `--if-present` 跳过）。
 
 默认监听 `0.0.0.0:3000`。**仅在局域网或 VPN 内访问——本期不做认证，
 任何能访问到的人都可以提交与取消任务。**

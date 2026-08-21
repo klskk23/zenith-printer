@@ -10,7 +10,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -ws --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "start": "node --experimental-strip-types packages/server/src/index.ts",
+    "dev": "bash scripts/dev.sh",
     "typecheck": "tsc --build --force",
     "lint": "eslint .",
     "test": "vitest run",
@@ -18,8 +20,8 @@
     "test:coverage": "vitest run --coverage",
     "test:hardware": "vitest run --project hardware",
     "fetch-fonts": "bash scripts/fetch-fonts.sh",
-    "cli": "node --experimental-strip-types packages/cli/src/index.ts",
-    "subset-fonts": "python3 scripts/subset-fonts.py"
+    "subset-fonts": "python3 scripts/subset-fonts.py",
+    "cli": "node --experimental-strip-types packages/cli/src/index.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

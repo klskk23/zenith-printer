@@ -52,7 +52,7 @@ auto_commit:
     enabled: true
     message: "[Spec Kit] Implementation progress"
   after_checklist:
-    enabled: false
+    enabled: true
     message: "[Spec Kit] Add checklist"
   after_analyze:
     enabled: false
