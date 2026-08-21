@@ -333,3 +333,104 @@ describe('snapshot immutability', () => {
     expect(job.snapshot.profile).toMatchObject({ name: 'thick', density: 5, labelType: 2 })
   })
 })
+
+/**
+ * Printing a template the operator has edited but not saved.
+ *
+ * The editor holds the design; the template is a saved copy of it. Sending the
+ * id alone meant the design on screen was never transmitted, so a batch came
+ * out of the *previous* version with nothing anywhere saying so — the surprise
+ * that made a live preview impossible to offer honestly.
+ */
+describe('printing an edited template', () => {
+  /** The stored design with one element moved, as an editor would hold it. */
+  function editedIr(): Record<string, unknown> {
+    return {
+      widthMm: TEMPLATE.widthMm,
+      heightMm: TEMPLATE.heightMm,
+      dpi: TEMPLATE.dpi,
+      elements: [
+        { ...TEMPLATE.elements[0], yMm: 9 },
+        TEMPLATE.elements[1],
+      ],
+    }
+  }
+
+  it('prints what was submitted, not what was stored', async () => {
+    const printerId = seedPrinter()
+    const template = await createTemplate()
+
+    const res = await submit({
+      printerId,
+      templateId: template.id,
+      ir: editedIr(),
+      copies: 1,
+      manualFieldValues: { partNo: 'XYZ-999' },
+    })
+    expect(res.statusCode).toBe(202)
+
+    const snapshot = JSON.parse(
+      String(app.ctx.db.prepare('SELECT snapshot FROM print_jobs').get()?.snapshot),
+    ) as { ir: { elements: Array<{ id: string; yMm: number }> } }
+    expect(snapshot.ir.elements.find((e) => e.id === 'code')?.yMm).toBe(9)
+  })
+
+  it('still files the job under the template it came from', async () => {
+    // History has to keep saying which template this batch belongs to, even
+    // though the content is the operator's edit of it.
+    const printerId = seedPrinter()
+    const template = await createTemplate()
+
+    await submit({
+      printerId,
+      templateId: template.id,
+      ir: editedIr(),
+      copies: 1,
+      manualFieldValues: { partNo: 'XYZ-999' },
+    })
+    expect(app.ctx.db.prepare('SELECT template_id FROM print_jobs').get()?.template_id).toBe(
+      template.id,
+    )
+  })
+
+  it('still claims sequence numbers from the template', async () => {
+    // The fields belong to the template, so an edited design goes on counting
+    // from where the last batch stopped rather than starting over.
+    const printerId = seedPrinter()
+    const template = await createTemplate()
+
+    await submit({ printerId, templateId: template.id, copies: 3, manualFieldValues: { partNo: 'A' } }, 'k1')
+    const second = await submit(
+      { printerId, templateId: template.id, ir: editedIr(), copies: 3, manualFieldValues: { partNo: 'A' } },
+      'k2',
+    )
+    expect(second.statusCode).toBe(202)
+
+    const ranges = app.ctx.db
+      .prepare('SELECT seq_ranges FROM print_jobs ORDER BY created_at, id')
+      .all()
+      .map((row) => JSON.parse(String(row.seq_ranges)) as Record<string, { start: number }>)
+    expect(ranges[1]?.serial?.start).toBeGreaterThan(ranges[0]?.serial?.start ?? 0)
+  })
+
+  it('still refuses when a manual field is missing', async () => {
+    // The template's fields still apply; submitting a design does not bypass
+    // the check that a part number was actually given.
+    const printerId = seedPrinter()
+    const template = await createTemplate()
+    const res = await submit({ printerId, templateId: template.id, ir: editedIr(), copies: 1 })
+    expect(res.statusCode).toBe(422)
+  })
+
+  it('prints the stored design when no IR is sent', async () => {
+    // "Print template X" without holding its contents still works.
+    const printerId = seedPrinter()
+    const template = await createTemplate()
+
+    await submit({ printerId, templateId: template.id, copies: 1, manualFieldValues: { partNo: 'A' } })
+    const snapshot = JSON.parse(
+      String(app.ctx.db.prepare('SELECT snapshot FROM print_jobs').get()?.snapshot),
+    ) as { ir: { elements: Array<{ id: string; yMm: number }> } }
+    expect(snapshot.ir.elements.find((e) => e.id === 'code')?.yMm).toBe(2)
+  })
+})

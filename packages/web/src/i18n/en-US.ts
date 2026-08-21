@@ -228,8 +228,6 @@ export const copy: Copy = {
     hint: 'This is the thresholded image as it will print — fine lines and pale tones vanish here',
     firstOfMany: (copies: number) => `${copies} labels; this is the first`,
     needsFields: 'Fill in the fields above to preview',
-    unsavedNotPrinted:
-      'The preview shows what you are editing, but this job prints the template as last saved — unsaved changes will not come out. Save the template first.',
     failed: 'Could not render a preview',
   },
 

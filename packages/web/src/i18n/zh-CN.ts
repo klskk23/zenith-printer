@@ -225,7 +225,6 @@ export const copy = {
     hint: '预览为二值化后的实际打印图像，细线与浅色会在此消失',
     firstOfMany: (copies: number) => `共 ${copies} 张，此处预览第 1 张`,
     needsFields: '填完上面的变量后才能预览',
-    unsavedNotPrinted: '预览的是当前编辑内容，但这次打印用的是模板已保存的版本——未保存的修改不会印出来。先保存模板再打印。',
     failed: '无法生成预览',
   },
 

@@ -734,7 +734,6 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           templateId={template?.id ?? null}
           profileId={profileId}
           printer={printer}
-          unsavedChanges={template !== null && isDirty}
           onClose={() => setPrintOpen(false)}
         />
       )}

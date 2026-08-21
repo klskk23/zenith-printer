@@ -13,6 +13,7 @@ import { PrintDialog } from '../src/features/print/print-dialog.tsx'
 import { labelIrSchema } from '@zenith/shared'
 
 const previews: Array<Record<string, unknown>> = []
+const submitted: Array<Record<string, unknown>> = []
 
 const CAPABILITIES = {
   dpi: 203, printheadPixels: 384, densityMin: 1, densityMax: 5, densityDefault: 3,
@@ -46,6 +47,7 @@ afterEach(() => {
 
 beforeEach(() => {
   previews.length = 0
+  submitted.length = 0
   formFields = []
   vi.stubGlobal('URL', {
     ...URL,
@@ -60,6 +62,14 @@ beforeEach(() => {
         ok: true, status: 200,
         headers: new Headers({ 'content-type': 'image/png', 'X-Clipped': 'false' }),
         blob: () => Promise.resolve(new Blob([new Uint8Array([1])], { type: 'image/png' })),
+      } as unknown as Response)
+    }
+    if (url.endsWith('/api/print-jobs') && init?.method === 'POST') {
+      submitted.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+      return Promise.resolve({
+        ok: true, status: 202,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ jobId: 'job-1', status: 'queued' }),
       } as unknown as Response)
     }
     const body = url.includes('print-form') ? { fields: formFields } : { warnings: [] }
@@ -80,7 +90,6 @@ function open(over: Partial<React.ComponentProps<typeof PrintDialog>> = {}): voi
         templateId={null}
         profileId="pro-1"
         printer={PRINTER as never}
-        unsavedChanges={false}
         onClose={() => undefined}
         {...over}
       />,
@@ -199,25 +208,37 @@ describe('the dialog itself', () => {
 
 describe('a template with unsaved edits', () => {
   /**
-   * The divergence is real and cannot be resolved in the preview: `templateId`
-   * and `ir` are mutually exclusive on a job submission, so a job for a saved
-   * template prints the stored design. Rather than resolve it silently in
-   * favour of the thing the user is not looking at, the dialog says it.
+   * The design on screen goes with the job, so what was previewed is what
+   * prints. `templateId` and `ir` used to be mutually exclusive, which meant
+   * the id went alone and the *previous* version came out — the surprise that
+   * made a live preview impossible to offer honestly.
    */
-  it('says the edits will not come out', async () => {
-    open({ templateId: 'tpl-1', unsavedChanges: true })
-    expect(await screen.findByText(/未保存的修改不会印出来/)).toBeDefined()
+  it('submits the design on screen', async () => {
+    open({ templateId: 'tpl-1' })
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: '确认打印' }))
+
+    await vi.waitFor(() => expect(submitted).toHaveLength(1))
+    expect(submitted[0]).toHaveProperty('ir')
   })
 
-  it('says nothing when the template is saved', async () => {
-    open({ templateId: 'tpl-1', unsavedChanges: false })
+  it('still says which template it came from', async () => {
+    // History has to keep the link, and the sequence fields are claimed from
+    // the template.
+    open({ templateId: 'tpl-1' })
     await vi.waitFor(() => expect(previews).toHaveLength(1))
-    expect(screen.queryByText(/未保存的修改不会印出来/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '确认打印' }))
+
+    await vi.waitFor(() => expect(submitted).toHaveLength(1))
+    expect(submitted[0]).toMatchObject({ templateId: 'tpl-1' })
   })
 
-  it('says nothing for a design that was never a template', async () => {
-    open({ templateId: null, unsavedChanges: false })
+  it('sends no template id for a design that was never one', async () => {
+    open({ templateId: null })
     await vi.waitFor(() => expect(previews).toHaveLength(1))
-    expect(screen.queryByText(/未保存的修改不会印出来/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '确认打印' }))
+
+    await vi.waitFor(() => expect(submitted).toHaveLength(1))
+    expect(submitted[0]).not.toHaveProperty('templateId')
   })
 })

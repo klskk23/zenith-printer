@@ -42,8 +42,22 @@ export const printJobInputSchema = z
     manualFieldValues: z.record(z.string(), z.string()).default({}),
     sequenceOverrides: z.record(z.string(), z.number().int().min(0)).default({}),
   })
-  .refine((input) => (input.templateId === undefined) !== (input.ir === undefined), {
-    message: 'provide exactly one of templateId or ir',
+  /**
+   * At least one, and both together are meaningful.
+   *
+   * `ir` alone prints an ad-hoc design. `templateId` alone prints a stored one
+   * — the API's way to say "print template X" without holding its contents.
+   * **Both** means "print this, and record that it came from template X":
+   * the design is what the editor has on screen, and the template supplies the
+   * variable fields and the identity the job is filed under.
+   *
+   * They used to be mutually exclusive, which sounded tidy and was wrong for
+   * the one workflow that exists. Opening a template, editing it and printing
+   * sent the id alone, so the design on screen was never transmitted and the
+   * *previous* version came out — with nothing anywhere saying so.
+   */
+  .refine((input) => input.templateId !== undefined || input.ir !== undefined, {
+    message: 'provide templateId, ir, or both',
     path: ['ir'],
   })
 export type PrintJobInput = z.infer<typeof printJobInputSchema>

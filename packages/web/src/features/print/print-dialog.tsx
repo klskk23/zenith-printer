@@ -38,15 +38,6 @@ export interface PrintDialogProps {
   templateId: string | null
   profileId: string | null
   /**
-   * True when the tab holds edits the template has not been saved with.
-   *
-   * The job prints the *stored* design — `templateId` and `ir` are mutually
-   * exclusive by contract — so those edits will not come out, and the preview
-   * above shows them. Saying so is the only honest option that does not
-   * require changing what a job submission means.
-   */
-  unsavedChanges: boolean
-  /**
    * The machine this is going to.
    *
    * Chosen on the editor's toolbar, and the print button there is disabled
@@ -62,7 +53,6 @@ export function PrintDialog({
   templateId,
   profileId,
   printer,
-  unsavedChanges,
   onClose,
 }: PrintDialogProps): React.JSX.Element {
   const [copies, setCopies] = useState(1)
@@ -86,9 +76,12 @@ export function PrintDialog({
 
   const jobBody = (): Record<string, unknown> => ({
     printerId: printer.id,
-    // A saved template prints from the stored design; an unsaved one goes as
-    // an ad-hoc IR so User Story 1 still works.
-    ...(templateId === null ? { ir } : { templateId }),
+    // The design on screen, always — that is what the operator is looking at
+    // and expects to get. The template id rides along when there is one, so
+    // history says which template this batch belongs to and the sequence
+    // fields are claimed from it.
+    ir,
+    ...(templateId === null ? {} : { templateId }),
     ...(profileId === null ? {} : { profileId }),
     copies,
     manualFieldValues: manualValues,
@@ -206,12 +199,6 @@ export function PrintDialog({
               }
               copies={copies}
             />
-
-            {unsavedChanges && (
-              <Alert variant="warning" className="text-xs">
-                {copy.preview.unsavedNotPrinted}
-              </Alert>
-            )}
 
             {blocked !== null && <Alert>{blocked}</Alert>}
 

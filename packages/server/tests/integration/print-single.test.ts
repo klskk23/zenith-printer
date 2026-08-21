@@ -100,10 +100,21 @@ describe('submission', () => {
     expect(res.json().status).toBe('queued')
   })
 
-  it('refuses both a template id and an ad-hoc IR', async () => {
+  /**
+   * They used to be mutually exclusive. That sounded tidy and was wrong for
+   * the one workflow that exists: opening a template, editing it and printing
+   * sent the id alone, so the design on screen was never transmitted and the
+   * previous version came out with nothing anywhere saying so.
+   *
+   * Together they mean "print this, and record that it came from template X".
+   * The 404 here is the template not existing, which is a different complaint
+   * and the right one.
+   */
+  it('accepts a template id alongside an ad-hoc IR', async () => {
     const printerId = await seedPrinter()
     const res = await submit({ printerId, ir: IR, templateId: 't1', copies: 1 })
-    expect(res.statusCode).toBe(400)
+    expect(res.statusCode).toBe(404)
+    expect(res.json().details).toMatchObject({ templateId: 't1' })
   })
 
   it('refuses neither', async () => {

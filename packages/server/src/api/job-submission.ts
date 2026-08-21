@@ -198,20 +198,32 @@ export function allocateSequences(options: AllocateOptions): Record<string, Sequ
   }
 }
 
-/** Parse and validate the label content, from a template or an ad-hoc IR. */
+/**
+ * The label to print, and where it came from.
+ *
+ * A submitted IR wins over the template's stored elements. The two are only
+ * both present when the editor has a template open, and in that case the
+ * design on screen is the one the operator is looking at and expects to get.
+ * The template is still returned alongside: it supplies the variable fields
+ * the sequence allocator claims from, and the identity the job is filed under,
+ * so history still says which template this batch belongs to.
+ *
+ * The stored elements are used when no IR is sent at all — "print template X",
+ * without holding its contents.
+ */
 export function resolveContent(
   template: Template | null,
   adHocIr: unknown,
   profile: Profile | null,
 ): ResolvedContent {
   const ir =
-    template === null
+    adHocIr !== undefined
       ? labelIrSchema.parse(adHocIr)
       : labelIrSchema.parse({
-          widthMm: template.widthMm,
-          heightMm: template.heightMm,
-          dpi: template.dpi,
-          elements: template.elements,
+          widthMm: template?.widthMm,
+          heightMm: template?.heightMm,
+          dpi: template?.dpi,
+          elements: template?.elements,
         })
   return { ir, template, profile }
 }
