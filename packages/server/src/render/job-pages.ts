@@ -16,6 +16,7 @@ export interface RenderOne {
   (ir: LabelIR): BinaryBitmap
 }
 
+
 /** Values for one copy: manual fields fixed, sequence fields stepped. */
 export function valuesForCopy(job: PrintJob, copyIndex: number): Record<string, string> {
   const values: Record<string, string> = { ...job.manualFieldValues }

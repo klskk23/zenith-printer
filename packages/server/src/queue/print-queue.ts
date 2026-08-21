@@ -26,8 +26,13 @@ import type { PrintJob } from '../domain/print-job.ts'
 import { pausesQueue } from '../domain/job-status.ts'
 import { deviceErrorCode } from '../i18n/error-map.ts'
 
+export interface PageOffset {
+  offsetXDots: number
+  offsetYDots: number
+}
+
 export interface RenderPage {
-  (ir: LabelIR): BinaryBitmap
+  (ir: LabelIR, offset: PageOffset): BinaryBitmap
 }
 
 export interface QueueDeps {
@@ -189,7 +194,15 @@ export class PrintQueue {
    * delegated to `buildJobPages`, which decides between one render and many.
    */
   #buildPages(job: PrintJob): BinaryBitmap[] {
-    return buildJobPages(job, (ir) => this.#deps.renderPage(ir))
+    // The correction comes from the job's snapshot rather than from the
+    // printer as it stands now: it was captured at submission, and the printer
+    // is expected to be recalibrated between then and here.
+    return buildJobPages(job, (ir) =>
+      this.#deps.renderPage(ir, {
+        offsetXDots: job.snapshot.offsetXDots,
+        offsetYDots: job.snapshot.offsetYDots,
+      }),
+    )
   }
 
   /**

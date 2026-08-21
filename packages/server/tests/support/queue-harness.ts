@@ -111,11 +111,17 @@ export interface Harness {
   queue: PrintQueue
   drivers: Map<string, FakePrinterDriver>
   seedPrinter: (name?: string) => string
-  enqueue: (printerId: string, copies: number, extra?: Partial<{ seqRanges: Record<string, SequenceRange> }>) => string
+  enqueue: (
+    printerId: string,
+    copies: number,
+    extra?: Partial<{ seqRanges: Record<string, SequenceRange>; snapshot: ContentSnapshot }>,
+  ) => string
   renderCalls: number[]
+  /** The correction each render was asked for, in call order. */
+  renderOffsets: { offsetXDots: number; offsetYDots: number }[]
 }
 
-const SNAPSHOT: ContentSnapshot = {
+export const SNAPSHOT: ContentSnapshot = {
   templateName: null,
   printerName: 'fake',
   printerModel: 'B3S_P',
@@ -137,6 +143,7 @@ export function createHarness(driverOptions: (printerId: string) => FakeDriverOp
   const printers = new PrinterRepo({ db, clock, ids })
   const drivers = new Map<string, FakePrinterDriver>()
   const renderCalls: number[] = []
+  const renderOffsets: { offsetXDots: number; offsetYDots: number }[] = []
 
   const queue = new PrintQueue({
     jobs,
@@ -148,8 +155,12 @@ export function createHarness(driverOptions: (printerId: string) => FakeDriverOp
       drivers.set(printerId, driver)
       return driver
     },
-    renderPage: () => {
+    renderPage: (_ir, offset) => {
       renderCalls.push(renderCalls.length)
+      // Recorded rather than ignored: a stub that swallows its arguments
+      // cannot notice one going missing, which is how the position correction
+      // came to be applied on the preview path and nowhere else.
+      renderOffsets.push(offset)
       return BLANK_PAGE
     },
   })
@@ -163,6 +174,7 @@ export function createHarness(driverOptions: (printerId: string) => FakeDriverOp
     queue,
     drivers,
     renderCalls,
+    renderOffsets,
     seedPrinter: (name = 'fake') => {
       const printer = printers.create({
         name,
@@ -194,7 +206,7 @@ export function createHarness(driverOptions: (printerId: string) => FakeDriverOp
         requestedCopies: copies,
         manualFieldValues: {},
         seqRanges: extra.seqRanges ?? {},
-        snapshot: SNAPSHOT,
+        snapshot: extra.snapshot ?? SNAPSHOT,
       })
       return job.id
     },

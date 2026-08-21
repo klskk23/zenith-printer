@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { formatSequence, resolveVariables, type LabelIR } from '@zenith/shared'
 import type { FastifyInstance } from 'fastify'
-import { PrintQueue } from './print-queue.ts'
+import { PrintQueue, type PageOffset } from './print-queue.ts'
 import { JobRepo } from '../db/repositories/job-repo.ts'
 import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { ImageRepo } from '../db/repositories/image-repo.ts'
@@ -57,14 +57,21 @@ export function createQueue(app: FastifyInstance): PrintQueue {
       }
       return createDriver(printer, { logger, jobId })
     },
-    renderPage: (ir: LabelIR): BinaryBitmap => {
+    renderPage: (ir: LabelIR, offset: PageOffset): BinaryBitmap => {
       // Assets must be inlined: resvg has no HTTP client, and an unresolved
       // href is skipped silently — the logo would vanish from the label with
       // nothing anywhere reporting a problem.
+      //
+      // The position correction is applied here, on the print path. It used to
+      // be passed only on the preview path, so a saved offset moved the preview
+      // and left the printed label exactly where it was — the one combination
+      // that gives no sign anything is wrong.
       const result = renderLabel({
         ir,
         fonts,
         svgOptions: { resolveImage: createImageResolver(images) },
+        offsetXDots: offset.offsetXDots,
+        offsetYDots: offset.offsetYDots,
       })
       return result.bitmap
     },
