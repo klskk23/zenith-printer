@@ -764,6 +764,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           templateId={template?.id ?? null}
           profileId={profileId}
           printer={printer}
+          fields={fields}
           onClose={() => setPrintOpen(false)}
         />
       )}

@@ -27,7 +27,8 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog.tsx'
 import { OverflowNotice, type OverflowWarning } from './overflow-notice.tsx'
-import { usePrintForm } from '../templates/hooks.ts'
+import { usePrintForm, type VariableField } from '../templates/hooks.ts'
+import { needsSavingForSequences, printFormFields } from './print-form-fields.ts'
 import { FieldForm } from './field-form.tsx'
 import { Preview } from './preview.tsx'
 import { firstCopyValues } from './first-copy.ts'
@@ -37,6 +38,14 @@ export interface PrintDialogProps {
   /** When set, the job prints from the saved template rather than this IR. */
   templateId: string | null
   profileId: string | null
+  /**
+   * The variable fields this design has.
+   *
+   * From the editor, not from the saved template: an unsaved design has no
+   * template to ask, and a saved one may have fields added since — and edits
+   * do print now, because the design goes with the job.
+   */
+  fields: readonly VariableField[]
   /**
    * The machine this is going to.
    *
@@ -53,6 +62,7 @@ export function PrintDialog({
   templateId,
   profileId,
   printer,
+  fields,
   onClose,
 }: PrintDialogProps): React.JSX.Element {
   const [copies, setCopies] = useState(1)
@@ -69,10 +79,24 @@ export function PrintDialog({
   // same job back rather than a second stack of labels.
   const idempotencyKey = useMemo(() => crypto.randomUUID(), [])
 
+  // What the dialog asks about: the design's fields, with the server filling in
+  // where each sequence has got to.
+  const formFields = useMemo(
+    () => printFormFields(fields, form.data?.fields ?? []),
+    [fields, form.data],
+  )
+
   // A printer that has never been probed has no head width or dpi, so nothing
-  // downstream can decide what fits. That is still reachable from here; a
-  // missing printer is not.
-  const blocked = printer.capabilities === null ? copy.print.needsProbe : null
+  // downstream can decide what fits. And a sequence has nowhere to carry on
+  // from until the design is a template — submitting one produces a job that
+  // fails in the queue, which is a wasted trip and a poor place to learn about
+  // it.
+  const blocked =
+    printer.capabilities === null
+      ? copy.print.needsProbe
+      : needsSavingForSequences(fields, templateId)
+        ? copy.preview.needsTemplateForSequence
+        : null
 
   const jobBody = (): Record<string, unknown> => ({
     printerId: printer.id,
@@ -165,7 +189,7 @@ export function PrintDialog({
             </div>
 
             <FieldForm
-              fields={form.data?.fields ?? []}
+              fields={formFields}
               copies={copies}
               manualValues={manualValues}
               sequenceOverrides={sequenceOverrides}
@@ -192,7 +216,7 @@ export function PrintDialog({
                 templateId !== null && form.isPending
                   ? null
                   : firstCopyValues({
-                      fields: form.data?.fields ?? [],
+                      fields: formFields,
                       manualValues,
                       sequenceOverrides,
                     })

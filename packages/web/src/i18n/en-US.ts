@@ -228,6 +228,8 @@ export const copy: Copy = {
     hint: 'This is the thresholded image as it will print — fine lines and pale tones vanish here',
     firstOfMany: (copies: number) => `${copies} labels; this is the first`,
     needsFields: 'Fill in the fields above to preview',
+    needsTemplateForSequence:
+      'Sequence fields need the design saved as a template first: a sequence carries on across print runs, and an unsaved design has nothing to carry on from.',
     failed: 'Could not render a preview',
   },
 

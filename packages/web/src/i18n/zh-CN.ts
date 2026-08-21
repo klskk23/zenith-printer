@@ -225,6 +225,7 @@ export const copy = {
     hint: '预览为二值化后的实际打印图像，细线与浅色会在此消失',
     firstOfMany: (copies: number) => `共 ${copies} 张，此处预览第 1 张`,
     needsFields: '填完上面的变量后才能预览',
+    needsTemplateForSequence: '序号字段需要先保存为模板：序号要跨批次接着往下走，而未保存的设计没有可以接续的东西。',
     failed: '无法生成预览',
   },
 
