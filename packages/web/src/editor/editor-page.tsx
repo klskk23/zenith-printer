@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LabelElement, LabelIR } from '@zenith/shared'
-import { renderBarcodeSvg, isVariableRef } from '@zenith/shared'
+
 import { Printer, Redo2, Undo2 } from 'lucide-react'
 import { copy } from '../i18n/index.ts'
 import { usePreferences } from '../features/preferences/context.tsx'
@@ -36,7 +36,10 @@ import type { Profile } from '../features/profiles/hooks.ts'
 import { CanvasViewport } from './canvas-viewport.tsx'
 import { LayersPanel } from './layers-panel.tsx'
 import { ElementContextMenu } from './context-menu.tsx'
-import { snapWidth } from './barcode-width.ts'
+import { symbolFitMm } from './barcode-width.ts'
+import { copyElement, duplicateElement, pasteElement } from './clipboard.ts'
+import { imageBoxMm, refit } from './autofit.ts'
+import { imageFileFrom, naturalSizeOf, useUploadImage } from '../features/images/hooks.ts'
 import { canRedo, canUndo, commit, initUndo, redo, undo } from './undo.ts'
 import { Inspector } from './inspector.tsx'
 import { VariableFieldPanel } from './variable-field-panel.tsx'
@@ -78,6 +81,18 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
     setHistory((current) => commit(current, next, coalescing.current))
   }, [])
 
+  /**
+   * Edit the design from whatever it is now, rather than from what it was when
+   * the callback was created.
+   *
+   * Needed by anything that finishes after an await: an upload that resolves
+   * two seconds later would otherwise commit a label built from the `ir` of two
+   * seconds ago, silently discarding everything typed in between.
+   */
+  const updateIr = useCallback((change: (current: LabelIR) => LabelIR) => {
+    setHistory((current) => commit(current, change(current.present), coalescing.current))
+  }, [])
+
   /** Replace the design outright — loading a template is not an undo step. */
   const resetIr = useCallback((next: LabelIR) => setHistory(initUndo(next)), [])
 
@@ -91,6 +106,18 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
   const [fields, setFields] = useState<VariableField[]>([])
   const [template, setTemplate] = useState<Template | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  /**
+   * State rather than a ref, because the context menu asks whether there is
+   * anything to paste. A ref read during render does not schedule one, so the
+   * Paste item stayed greyed out after a copy until some unrelated change
+   * happened to re-render the editor.
+   *
+   * Per tab. Copying in one design and pasting into another would have to
+   * reconcile two different dot grids, and the element would land somewhere
+   * other than where it was cut from.
+   */
+  const [clipboard, setClipboard] = useState<LabelElement | null>(null)
+  const uploadImage = useUploadImage()
   const [panel, setPanel] = useState<SidePanel>('element')
 
   // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z, and Delete for the selection. Bound on the
@@ -111,12 +138,37 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
         }
         return
       }
+      if (event.ctrlKey || event.metaKey) {
+        const key = event.key.toLowerCase()
+        if (key === 'c') {
+          event.preventDefault()
+          copySelection()
+          return
+        }
+        if (key === 'v') {
+          // Only the editor's own clipboard. An image pasted from the system
+          // clipboard arrives as a `paste` event with files on it, handled
+          // separately, and that event is not cancelled here.
+          if (clipboard !== null) {
+            event.preventDefault()
+            pasteClipboard()
+          }
+          return
+        }
+        if (key === 'd') {
+          event.preventDefault()
+          duplicateSelection()
+          return
+        }
+      }
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId !== null) {
         event.preventDefault()
         deleteElement(selectedId)
       }
     },
-    [doRedo, doUndo, selectedId],
+    // The copy/paste handlers are plain functions redefined each render; `ir`
+    // is what they actually read, so it is `ir` that has to be listed.
+    [doRedo, doUndo, selectedId, ir, clipboard],
   )
   const [printOpen, setPrintOpen] = useState(false)
 
@@ -147,24 +199,145 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
     [ir, setIr],
   )
 
-  const violations = useMemo(() => (limits === null ? [] : inspect(ir, limits)), [ir, limits])
+  const violations = useMemo(() => inspect(ir, limits), [ir, limits])
   const blocking = blockingViolations(violations)
   const selected = ir.elements.find((element) => element.id === selectedId) ?? null
 
   const addElement = (type: ElementType): void => {
-    const element = createElement(type, ir)
+    // Fitted on the way in: a new text element is 30x5 mm holding about 6x3 mm
+    // of glyphs, and a new QR code is a 15 mm square holding about 6 mm of
+    // symbol.
+    const element = refit(null, createElement(type, ir), ir.dpi)
     setIr({ ...ir, elements: [...ir.elements, element] })
     setSelectedId(element.id)
     setPanel('element')
   }
 
+  /**
+   * Apply an edit, refitting the box when the edit changed what fills it.
+   *
+   * A text element's box is not derived from its text by the renderer —
+   * `heightMm` has no effect on the drawing at all, and `widthMm` only places
+   * the anchor for centred and right-aligned text. So without this, typing a
+   * longer line leaves the selection frame, the overflow check and the layers
+   * panel all describing the box the element had when it was created.
+   *
+   * Only when the content or the font changed. Refitting on every edit would
+   * discard a width the user set by hand the next time they nudged the element
+   * a millimetre sideways.
+   */
   const updateElement = (next: LabelElement): void => {
-    setIr({ ...ir, elements: ir.elements.map((e) => (e.id === next.id ? next : e)) })
+    const previous = ir.elements.find((e) => e.id === next.id) ?? null
+    const fitted = refit(previous, next, ir.dpi)
+    setIr({ ...ir, elements: ir.elements.map((e) => (e.id === fitted.id ? fitted : e)) })
   }
 
   const deleteElement = (id: string): void => {
     setIr({ ...ir, elements: ir.elements.filter((e) => e.id !== id) })
     setSelectedId(null)
+  }
+
+  const copySelection = (): void => {
+    const copied = copyElement(ir, selectedId)
+    if (copied !== null) {
+      setClipboard(copied)
+    }
+  }
+
+  const pasteClipboard = (): void => {
+    if (clipboard === null) {
+      return
+    }
+    const { ir: next, id } = pasteElement(ir, clipboard)
+    setIr(next)
+    setSelectedId(id)
+    setPanel('element')
+  }
+
+  /**
+   * An image on the system clipboard becomes an image element.
+   *
+   * A screenshot has no filename and no place on disk, so it is uploaded like
+   * any other asset first and the element points at the result. Placed at the
+   * label's origin rather than under the pointer: a paste event carries no
+   * coordinates, and guessing from the last mouse position puts the image
+   * somewhere the user did not click.
+   */
+  const pasteImageFile = (file: File): void => {
+    // Measured alongside the upload rather than before it — a picture the
+    // browser cannot decode must still reach the label, in the default box.
+    const measuring = naturalSizeOf(file)
+    uploadImage.mutate(file, {
+      onSuccess: (asset) => {
+        const placed = { ...createElement('image', ir), assetId: asset.id } as LabelElement
+        // Appended to whatever the label is now, not to the copy captured when
+        // the upload started — anything typed while it was in flight stays.
+        updateIr((current) => ({ ...current, elements: [...current.elements, placed] }))
+        setSelectedId(placed.id)
+        setPanel('element')
+
+        void measuring.then((natural) => {
+          if (natural.width <= 0 || natural.height <= 0) {
+            return
+          }
+          // The default box is a square and the renderer letterboxes into it,
+          // so a screenshot left at that size is drawn as a strip across an
+          // element several times its height.
+          updateIr((current) => ({
+            ...current,
+            elements: current.elements.map((e) =>
+              e.id === placed.id && 'widthMm' in e ? { ...e, ...imageBoxMm(e, natural, current) } : e,
+            ),
+          }))
+        })
+      },
+    })
+  }
+
+  const handlePaste = (event: ClipboardEvent): void => {
+    const target = event.target as HTMLElement | null
+    if (
+      target !== null &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+    ) {
+      return
+    }
+    const file = imageFileFrom([...(event.clipboardData?.files ?? [])])
+    if (file === null) {
+      return
+    }
+    event.preventDefault()
+    pasteImageFile(file)
+  }
+
+  /**
+   * Listen on the document, not on the editor's own element.
+   *
+   * A paste event goes to whatever has focus, and after clicking the canvas
+   * that is usually the document body — so a handler bound to this element
+   * received nothing, and pasting a screenshot appeared to do nothing at all.
+   *
+   * Only while this tab is the active one. Inactive tabs stay mounted (they
+   * keep their undo history), so a document-level listener in each of them
+   * would paste the same image into every open design.
+   */
+  const isActiveTab = workspace.activeTab?.id === tabId
+  useEffect(() => {
+    if (!isActiveTab) {
+      return
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+  })
+
+  const duplicateSelection = (): void => {
+    const result = duplicateElement(ir, selectedId)
+    if (result === null) {
+      return
+    }
+    setIr(result.ir)
+    setSelectedId(result.id)
+    setPanel('element')
   }
 
   /** Point an element at a variable field, or back at fixed content. */
@@ -203,24 +376,14 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
   const snapBarcodeWidthMm = useCallback(
     (targetMm: number): number => {
       const element = ir.elements.find((e) => e.id === selectedId)
-      if (element === undefined || element.type !== 'barcode') {
+      if (element === undefined || (element.type !== 'barcode' && element.type !== 'qrcode')) {
         return targetMm
       }
-      try {
-        const content = isVariableRef(element.content) ? 'SAMPLE' : element.content
-        const probe = renderBarcodeSvg({
-          symbology: element.symbology,
-          content,
-          heightDots: 10,
-          moduleWidthDots: element.moduleWidthDots,
-        })
-        return snapWidth(targetMm, probe.moduleCount, ir.dpi).widthMm
-      } catch {
-        // Invalid content has no module count; the guards report that
-        // separately, and blocking the drag here would be a second complaint
-        // about the same thing.
-        return targetMm
-      }
+      // QR codes go through the same quantisation as barcodes. They used not
+      // to, so dragging one produced any side at all and the renderer then
+      // drew the largest that fitted — leaving the symbol adrift inside its
+      // own frame.
+      return symbolFitMm(element, targetMm, ir.dpi)?.widthMm ?? targetMm
     },
     [ir.dpi, ir.elements, selectedId],
   )
@@ -256,6 +419,28 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
   useEffect(() => {
     workspace.setDirty(tabId, isDirty)
   }, [tabId, isDirty])
+
+  /**
+   * Preselect the printer's default profile.
+   *
+   * A printer is chosen because a roll is loaded in it, and which roll that is
+   * is what the default records. Leaving the selector empty meant the canvas
+   * kept whatever size it had and no margins were drawn — a design laid out
+   * against nothing in particular.
+   *
+   * Only when nothing is selected: reselecting the default would undo a
+   * deliberate choice of a different roll every time the list refetched.
+   */
+  useEffect(() => {
+    if (printerId === null || profileId !== null) {
+      return
+    }
+    const fallback = profiles.data?.find((p) => p.isDefault)
+    if (fallback !== undefined) {
+      setProfileId(fallback.id)
+      applyProfileStock(fallback)
+    }
+  }, [printerId, profileId, profiles.data])
 
   const templateBody = (): Record<string, unknown> => ({
     printerKind: printer?.kind ?? 'niimbot',
@@ -333,6 +518,8 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
               value={printerId ?? ''}
               onChange={(event) => {
                 setPrinterId(event.target.value || null)
+                // Cleared here; the effect below picks this printer's default
+                // once its profiles have loaded.
                 setProfileId(null)
               }}
             >
@@ -453,6 +640,10 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
               selectedId={selectedId}
               onDelete={deleteElement}
               onChange={setIr}
+              onCopy={copySelection}
+              onPaste={pasteClipboard}
+              onDuplicate={duplicateSelection}
+              canPaste={clipboard !== null}
               className="flex min-h-0 flex-1 flex-col"
             >
               <CanvasViewport

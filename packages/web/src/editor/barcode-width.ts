@@ -13,7 +13,18 @@
  * The floor of 2 dots is a scanning limit, not a drawing one: at 203 dpi that
  * is 0.25 mm, the usual Code 128 X-dimension.
  */
-import { MIN_MODULE_WIDTH_DOTS, dotsToMm, mmToDots } from '@zenith/shared'
+import {
+  MIN_MODULE_WIDTH_DOTS,
+  dotsToMm,
+  isVariableRef,
+  mmToDots,
+  renderBarcodeSvg,
+  renderQrcodeSvg,
+  snapQrcodeModuleWidth,
+  type BarcodeElement,
+  type LabelElement,
+  type QrcodeElement,
+} from '@zenith/shared'
 
 export interface SnapResult {
   moduleWidthDots: number
@@ -56,4 +67,142 @@ export function largestModuleWidthWithin(availableMm: number, moduleCount: numbe
   }
   const available = mmToDots(availableMm, dpi)
   return Math.max(MIN_MODULE_WIDTH_DOTS, Math.floor(available / moduleCount))
+}
+
+
+/**
+ * Content to size a symbol by when the real content is not known yet.
+ *
+ * A variable-bound symbol has no content until print time, and its module
+ * count depends on how long that content turns out to be. Sizing it from a
+ * stand-in is an estimate — `copy.editor.variableWidthHint` says so next to
+ * the field — but an estimate keeps the box roughly the size of the symbol,
+ * where refusing to size it at all leaves the box wherever it was last.
+ */
+const SAMPLE_CONTENT = 'SAMPLE'
+
+/**
+ * How many modules this symbol has.
+ *
+ * Fixed by the content and the symbology; the module width does not enter into
+ * it. Returns null for content the symbology cannot encode — the guards report
+ * that separately, and resizing the box to nothing on a typo would be a second
+ * complaint about the same thing.
+ */
+export function moduleCountOf(element: BarcodeElement | QrcodeElement): number | null {
+  const content = isVariableRef(element.content) ? SAMPLE_CONTENT : element.content
+  try {
+    if (element.type === 'qrcode') {
+      return renderQrcodeSvg({
+        content,
+        moduleWidthDots: element.moduleWidthDots,
+        errorCorrectionLevel: element.errorCorrectionLevel,
+      }).moduleCount
+    }
+    return renderBarcodeSvg({
+      symbology: element.symbology,
+      content,
+      heightDots: 10,
+      moduleWidthDots: element.moduleWidthDots,
+    }).moduleCount
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The box that matches what the renderer will actually draw.
+ *
+ * A symbol's size is `moduleWidth x moduleCount` and nothing else — the
+ * declared box does not stretch it. So the box has to be kept equal to that
+ * product, or it describes a region the symbol does not fill: a QR code at the
+ * default module width is about 6 mm across inside the 15 mm square it is
+ * created with, and enlarging that square did nothing at all, because the
+ * renderer takes the *smaller* of the box and the module width.
+ *
+ * A barcode's height is free — it is a free choice, not a consequence of the
+ * content — so only its width is returned. A QR code is square by definition.
+ */
+export function symbolBoxMm(
+  element: BarcodeElement | QrcodeElement,
+  dpi: number,
+): { widthMm: number; heightMm?: number } | null {
+  const moduleCount = moduleCountOf(element)
+  if (moduleCount === null) {
+    return null
+  }
+  const moduleWidthDots = effectiveModuleWidth(element)
+  const sideMm = widthForModule(moduleWidthDots, moduleCount, dpi)
+  return element.type === 'qrcode' ? { widthMm: sideMm, heightMm: sideMm } : { widthMm: sideMm }
+}
+
+/**
+ * The module width the renderer will actually use.
+ *
+ * A QR's comes in even dots — see `QRCODE_MODULE_WIDTH_STEP` — and the
+ * renderer rounds an odd one on the way in. Computing a box from the odd value
+ * therefore describes a symbol nobody will draw: the frame came out one module
+ * per module short of the code inside it.
+ */
+function effectiveModuleWidth(element: BarcodeElement | QrcodeElement): number {
+  return element.type === 'qrcode'
+    ? snapQrcodeModuleWidth(element.moduleWidthDots)
+    : element.moduleWidthDots
+}
+
+/**
+ * The module width and box that come closest to a requested size.
+ *
+ * The inverse of `symbolBoxMm`: the user drags a handle or types a width, and
+ * this answers with the nearest size the symbology can actually produce, along
+ * with the module width that produces it.
+ */
+export function symbolFitMm(
+  element: BarcodeElement | QrcodeElement,
+  targetMm: number,
+  dpi: number,
+): { moduleWidthDots: number; widthMm: number; heightMm?: number } | null {
+  const moduleCount = moduleCountOf(element)
+  if (moduleCount === null) {
+    return null
+  }
+  const snapped = snapWidth(targetMm, moduleCount, dpi)
+  if (element.type !== 'qrcode') {
+    return { moduleWidthDots: snapped.moduleWidthDots, widthMm: snapped.widthMm }
+  }
+  // Snapped twice: once onto a whole number of modules, then onto the even
+  // module widths a QR can actually be drawn at.
+  const moduleWidthDots = snapQrcodeModuleWidth(snapped.moduleWidthDots)
+  const sideMm = widthForModule(moduleWidthDots, moduleCount, dpi)
+  return { moduleWidthDots, widthMm: sideMm, heightMm: sideMm }
+}
+
+
+/**
+ * Turn a new size into the change that actually resizes the element.
+ *
+ * For most types the size *is* the change. For a symbol it is not: the
+ * renderer draws `moduleWidth x moduleCount` and takes the smaller of that and
+ * the declared box, so writing only a width leaves the box growing around a
+ * symbol that stays exactly where it was. That is what a resize drag did — the
+ * handle moved, the frame followed, and the code did not.
+ *
+ * A barcode keeps whatever height the drag asked for; its height is a free
+ * choice rather than a consequence of its content.
+ */
+export function resizePatchFor(
+  element: LabelElement,
+  size: { widthMm: number; heightMm: number },
+  dpi: number,
+): Partial<LabelElement> {
+  if (element.type !== 'barcode' && element.type !== 'qrcode') {
+    return size as Partial<LabelElement>
+  }
+  const fitted = symbolFitMm(element, size.widthMm, dpi)
+  if (fitted === null) {
+    return size as Partial<LabelElement>
+  }
+  return (
+    element.type === 'barcode' ? { ...fitted, heightMm: size.heightMm } : fitted
+  ) as Partial<LabelElement>
 }

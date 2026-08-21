@@ -19,11 +19,15 @@ const WHEEL_SENSITIVITY = 0.0015
  * Not all of it: the rotation handle sits above the top edge, elements are
  * dragged past the sides while being positioned, and a label flush against its
  * container reads as part of the application rather than as a piece of paper.
+ *
+ * These were 0.85 and 0.7, which filled the column and left a 50x30 label
+ * looming over the workspace. Both are now 60% of that — the label reads as a
+ * piece of paper on a desk, and the zoom field is there for a closer look.
  */
-export const FIT_SHARE = 0.85
+export const FIT_SHARE = 0.51
 
 /** Never shrink below this share of the width, however tall the label is. */
-export const MIN_FIT_SHARE = 0.7
+export const MIN_FIT_SHARE = 0.42
 
 export function clampZoom(zoom: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))

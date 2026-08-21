@@ -27,6 +27,48 @@ export function nextElementId(type: ElementType): string {
   return `${type}-${counter}`
 }
 
+/**
+ * An id no element in this label already holds.
+ *
+ * The counter alone is not enough. It starts at zero on every page load, so
+ * opening a template that contains `text-1` and then adding a text element
+ * produced a second `text-1` — and two elements sharing an id means selecting
+ * one selects both, and editing one edits both.
+ */
+export function uniqueElementId(ir: LabelIR, type: ElementType): string {
+  const taken = new Set(ir.elements.map((element) => element.id))
+  let id = nextElementId(type)
+  while (taken.has(id)) {
+    id = nextElementId(type)
+  }
+  return id
+}
+
+/**
+ * Move an element by a millimetre delta.
+ *
+ * A line is defined by two points, so moving it means moving both. Leaving the
+ * far end behind stretches the line instead of moving it — the kind of rule
+ * that has to live in one place, because the second copy is the one that gets
+ * forgotten.
+ */
+export function translateElement(
+  element: LabelElement,
+  deltaXMm: number,
+  deltaYMm: number,
+): LabelElement {
+  if (element.type === 'line') {
+    return {
+      ...element,
+      xMm: element.xMm + deltaXMm,
+      yMm: element.yMm + deltaYMm,
+      x2Mm: element.x2Mm + deltaXMm,
+      y2Mm: element.y2Mm + deltaYMm,
+    }
+  }
+  return { ...element, xMm: element.xMm + deltaXMm, yMm: element.yMm + deltaYMm }
+}
+
 export interface CreateOptions {
   xMm?: number
   yMm?: number
@@ -35,7 +77,7 @@ export interface CreateOptions {
 export function createElement(type: ElementType, ir: LabelIR, options: CreateOptions = {}): LabelElement {
   const xMm = options.xMm ?? 2
   const yMm = options.yMm ?? 2
-  const id = nextElementId(type)
+  const id = uniqueElementId(ir, type)
 
   switch (type) {
     case 'text':

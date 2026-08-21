@@ -14,8 +14,10 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { dotsToMm, irToSvg, layoutGrid, type LabelElement, type LabelIR } from '@zenith/shared'
 import { boundsOf, isOutOfBounds } from './guards.ts'
 import { angleFromCentre, snapRotation } from './rotation.ts'
-import { applyResize, resizeModeFor } from './resize.ts'
-import { isSnapBypassed, snapPointMm } from './snapping.ts'
+import { resizeModeFor, resizeSnapped } from './resize.ts'
+import { SNAP_STEP_MM, isSnapBypassed, snapPointMm } from './snapping.ts'
+import { translateElement } from './elements.ts'
+import { resizePatchFor } from './barcode-width.ts'
 import { marginBands, type Margins } from './margins.ts'
 import { cn } from '../lib/utils.ts'
 
@@ -76,8 +78,15 @@ export function EditorCanvas({
 
   // The shared module owns every pixel the user sees, so what the editor shows
   // and what the printer burns cannot diverge.
+  // `skipUnrenderable` is what keeps the editor alive through the states a
+  // half-typed symbol passes through. Without it, clearing a QR code's content
+  // threw out of React's render pass and blanked the entire application.
   const markup = useMemo(
-    () => irToSvg(ir, resolveImage === undefined ? {} : { resolveImage }),
+    () =>
+      irToSvg(ir, {
+        skipUnrenderable: true,
+        ...(resolveImage === undefined ? {} : { resolveImage }),
+      }),
     [ir, resolveImage],
   )
   const inner = useMemo(() => markup.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, ''), [markup])
@@ -101,21 +110,9 @@ export function EditorCanvas({
     (id: string, deltaXMm: number, deltaYMm: number) => {
       onChange({
         ...ir,
-        elements: ir.elements.map((element) => {
-          if (element.id !== id) {
-            return element
-          }
-          if (element.type === 'line') {
-            return {
-              ...element,
-              xMm: element.xMm + deltaXMm,
-              yMm: element.yMm + deltaYMm,
-              x2Mm: element.x2Mm + deltaXMm,
-              y2Mm: element.y2Mm + deltaYMm,
-            }
-          }
-          return { ...element, xMm: element.xMm + deltaXMm, yMm: element.yMm + deltaYMm }
-        }),
+        elements: ir.elements.map((element) =>
+          element.id === id ? translateElement(element, deltaXMm, deltaYMm) : element,
+        ),
       })
     },
     [ir, onChange],
@@ -193,26 +190,29 @@ export function EditorCanvas({
         if (!('widthMm' in element)) {
           return
         }
-        const size = applyResize({
-          mode: resizeModeFor(element),
-          original: { widthMm: drag.startWidthMm, heightMm: drag.startHeightMm },
-          desired: {
-            widthMm: drag.startWidthMm + deltaXMm,
-            heightMm: drag.startHeightMm + deltaYMm,
+        // Snapped on the way in, so the type's own rule gets the last word —
+        // see `resizeSnapped`.
+        const size = resizeSnapped(
+          {
+            mode: resizeModeFor(element),
+            original: { widthMm: drag.startWidthMm, heightMm: drag.startHeightMm },
+            desired: {
+              widthMm: drag.startWidthMm + deltaXMm,
+              heightMm: drag.startHeightMm + deltaYMm,
+            },
+            lockAspect: event.shiftKey,
+            snapWidthMm: snapBarcodeWidthMm,
           },
-          lockAspect: event.shiftKey,
-          snapWidthMm: snapBarcodeWidthMm,
-        })
-        const snapped = bypass
-          ? size
-          : {
-              widthMm: snapPointMm({ xMm: size.widthMm, yMm: size.heightMm }, { grid }).xMm,
-              heightMm: snapPointMm({ xMm: size.widthMm, yMm: size.heightMm }, { grid }).yMm,
-            }
+          { grid, bypass },
+        )
+        // Not just the size: a barcode or QR code is sized by its module
+        // width, and writing the box alone grew the frame around a symbol that
+        // never moved.
+        const patch = resizePatchFor(element, size, ir.dpi)
         onChange({
           ...ir,
           elements: ir.elements.map((e) =>
-            e.id === element.id && 'widthMm' in e ? { ...e, ...snapped } : e,
+            e.id === element.id && 'widthMm' in e ? ({ ...e, ...patch } as LabelElement) : e,
           ),
         })
         return
@@ -252,9 +252,62 @@ export function EditorCanvas({
         aria-label="label canvas"
       >
         {/*
-          Margin bands, under everything else. Hatched rather than filled so it
-          reads as advice: elements can be placed here and are simply flagged as
-          close to the edge.
+          The grid the editor snaps to, drawn so that snapping is something the
+          user can see rather than a correction applied behind their back. It
+          was invisible before, which — together with a step of one dot, below
+          the width of the lines drawn over it — is why snapping was reported
+          as not implemented at all.
+
+          Under the label content and not hit-testable: it is a backdrop, not a
+          layer of the design.
+        */}
+        <defs>
+          <pattern
+            id="layout-grid"
+            width={grid.lengthToDots(SNAP_STEP_MM)}
+            height={grid.lengthToDots(SNAP_STEP_MM)}
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d={`M ${grid.lengthToDots(SNAP_STEP_MM)} 0 L 0 0 0 ${grid.lengthToDots(SNAP_STEP_MM)}`}
+              fill="none"
+              stroke="#cbd5e1"
+              strokeWidth={0.5}
+            />
+          </pattern>
+          {/* Every fifth line, so the eye can count millimetres without doing so. */}
+          <pattern
+            id="layout-grid-major"
+            width={grid.lengthToDots(SNAP_STEP_MM * 5)}
+            height={grid.lengthToDots(SNAP_STEP_MM * 5)}
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d={`M ${grid.lengthToDots(SNAP_STEP_MM * 5)} 0 L 0 0 0 ${grid.lengthToDots(SNAP_STEP_MM * 5)}`}
+              fill="none"
+              stroke="#94a3b8"
+              strokeWidth={0.75}
+            />
+          </pattern>
+        </defs>
+        <rect
+          width={grid.widthDots}
+          height={grid.heightDots}
+          fill="url(#layout-grid)"
+          pointerEvents="none"
+          data-layout-grid
+        />
+        <rect
+          width={grid.widthDots}
+          height={grid.heightDots}
+          fill="url(#layout-grid-major)"
+          pointerEvents="none"
+        />
+
+        {/*
+          Margin bands, over the grid but under everything else. Hatched rather
+          than filled so it reads as advice: elements can be placed here and are
+          simply flagged as close to the edge.
         */}
         {margins !== null && (
           <>

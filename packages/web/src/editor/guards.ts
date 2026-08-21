@@ -108,20 +108,32 @@ export function isOutOfBounds(element: LabelElement, ir: LabelIR): boolean {
 }
 
 /** Every problem with the current design, blocking ones first. */
-export function inspect(ir: LabelIR, limits: PrinterLimits): Violation[] {
+/**
+ * `limits` is null until a printer is chosen.
+ *
+ * The checks that need a printer are skipped; the ones that do not are still
+ * reported. Returning nothing at all was defensible while an unencodable
+ * symbol was drawn as a plausible-looking wrong thing — now that the editor
+ * leaves it out of the drawing rather than crashing on it, an element that has
+ * silently stopped appearing with no message anywhere is the worst of the
+ * three outcomes.
+ */
+export function inspect(ir: LabelIR, limits: PrinterLimits | null): Violation[] {
   const violations: Violation[] = []
 
-  const maxWidth = maxCanvasWidthMm(limits)
-  if (ir.widthMm > maxWidth + 1e-6) {
-    violations.push({
-      code: 'CANVAS_TOO_WIDE',
-      values: { widthMm: ir.widthMm, maxWidthMm: Number(maxWidth.toFixed(2)) },
-      blocking: true,
-    })
+  if (limits !== null) {
+    const maxWidth = maxCanvasWidthMm(limits)
+    if (ir.widthMm > maxWidth + 1e-6) {
+      violations.push({
+        code: 'CANVAS_TOO_WIDE',
+        values: { widthMm: ir.widthMm, maxWidthMm: Number(maxWidth.toFixed(2)) },
+        blocking: true,
+      })
+    }
   }
 
   for (const element of ir.elements) {
-    if ('strokeWidthDots' in element && element.strokeWidthDots < 1) {
+    if (limits !== null && 'strokeWidthDots' in element && element.strokeWidthDots < 1) {
       violations.push({
         code: 'STROKE_TOO_THIN',
         elementId: element.id,

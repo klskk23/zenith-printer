@@ -11,18 +11,25 @@
  */
 import {
   MIN_MODULE_WIDTH_DOTS,
+  QRCODE_MODULE_WIDTH_STEP,
   dotsToMm,
   isVariableRef,
   mmToDots,
+  snapQrcodeModuleWidth,
   type BarcodeElement,
   type LabelElement,
   type LabelIR,
   type QrcodeElement,
+  type Rotation,
 } from '@zenith/shared'
 import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
 import { copy } from '../i18n/index.ts'
 import { ToggleGroup, ToggleGroupItem } from '../components/ui/toggle-group.tsx'
 import { FONT_FAMILIES, type FontFamilyKey } from './elements.ts'
+import { ROTATIONS } from './rotation.ts'
+import { ImageField } from './image-field.tsx'
+import { imageBoxMm } from './autofit.ts'
+import { symbolBoxMm, symbolFitMm } from './barcode-width.ts'
 import { dotStepMm } from './guards.ts'
 import { Button } from '../components/ui/button.tsx'
 import { Checkbox } from '../components/ui/checkbox.tsx'
@@ -57,10 +64,12 @@ function MmInput({
   value,
   dpi,
   onChange,
+  disabled = false,
 }: {
   value: number
   dpi: number
   onChange: (value: number) => void
+  disabled?: boolean
 }): React.JSX.Element {
   const step = dotStepMm(dpi)
   return (
@@ -69,6 +78,7 @@ function MmInput({
         type="number"
         value={Number(value.toFixed(3))}
         step={Number(step.toFixed(3))}
+        disabled={disabled}
         onChange={(event) => {
           const parsed = Number(event.target.value)
           if (Number.isFinite(parsed)) {
@@ -142,17 +152,36 @@ function ModuleWidthField({
         <Input
           type="number"
           min={MIN_MODULE_WIDTH_DOTS}
-          step={1}
+          // A QR's module width steps in twos; a barcode's in ones. Offering
+          // the finer step for a QR offered values it cannot be drawn at, and
+          // the renderer rounded them — leaving the frame describing a symbol
+          // one module per module smaller than the one inside it.
+          step={element.type === 'qrcode' ? QRCODE_MODULE_WIDTH_STEP : 1}
           value={element.moduleWidthDots}
           onChange={(event) => {
-            const next = Math.max(MIN_MODULE_WIDTH_DOTS, Math.round(Number(event.target.value) || MIN_MODULE_WIDTH_DOTS))
-            patch({ moduleWidthDots: next } as never)
+            const raw = Math.max(MIN_MODULE_WIDTH_DOTS, Math.round(Number(event.target.value) || MIN_MODULE_WIDTH_DOTS))
+            const next = element.type === 'qrcode' ? snapQrcodeModuleWidth(raw) : raw
+            // The box follows: a symbol's size *is* moduleWidth x moduleCount,
+            // so changing the module width without moving the box leaves the
+            // box describing a region the symbol no longer fills.
+            const box = symbolBoxMm({ ...element, moduleWidthDots: next }, dpi)
+            patch({ moduleWidthDots: next, ...(box ?? {}) } as never)
           }}
         />
       </Field>
       <p className="text-[11px] text-muted-foreground">
         {copy.editor.moduleWidthHint(element.moduleWidthDots, moduleMm)}
       </p>
+      {/*
+        The floor is a scanning limit, not a drawing one, and a symbol created
+        at the default module width is already sitting on it. Without saying
+        so, dragging a new QR code inwards simply does nothing, and there is no
+        way to tell a refusal from a broken handle — which is how "it cannot be
+        made smaller" came to be reported as a bug.
+      */}
+      {element.moduleWidthDots <= MIN_MODULE_WIDTH_DOTS && (
+        <p className="text-[11px] text-muted-foreground">{copy.editor.atMinModuleWidth}</p>
+      )}
       {variable && (
         // The module count depends on the content, and the content is not known
         // until print time — so the width shown here is an estimate.
@@ -160,6 +189,33 @@ function ModuleWidthField({
       )}
     </div>
   )
+}
+
+/**
+ * Translate a typed width or height into a change the renderer will honour.
+ *
+ * For most types the number is taken as given. A barcode's width and a QR
+ * code's side are `moduleWidth x moduleCount`, so an arbitrary number is not a
+ * size the symbol has: it is rounded to the nearest one that is, and the
+ * module width that produces it is written alongside. Without this the fields
+ * accepted any value, stored it, and changed nothing on the canvas — the
+ * renderer sizes the symbol from the module width and simply capped it against
+ * the box.
+ */
+function sizeChange(
+  element: LabelElement,
+  change: { widthMm?: number; heightMm?: number },
+  dpi: number,
+): Partial<LabelElement> {
+  if (element.type !== 'barcode' && element.type !== 'qrcode') {
+    return change as Partial<LabelElement>
+  }
+  // A barcode's height is a free choice; only its width is quantised.
+  if (change.widthMm === undefined) {
+    return element.type === 'barcode' ? (change as Partial<LabelElement>) : {}
+  }
+  const fitted = symbolFitMm(element, change.widthMm, dpi)
+  return (fitted === null ? change : fitted) as Partial<LabelElement>
 }
 
 export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): React.JSX.Element {
@@ -172,7 +228,10 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
   }
 
   return (
-    <div className="space-y-3">
+    // Named so tests can tell an element's width field from the canvas width
+    // field in the left column — both are labelled the same way, and a query
+    // across the whole document silently picks the wrong one.
+    <div className="space-y-3" data-inspector>
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">{copy.editor.elements[element.type]}</h3>
         <Button variant="ghost" size="sm" onClick={() => onDelete(element.id)}>
@@ -201,13 +260,51 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
       ) : (
         <div className="grid grid-cols-2 gap-2">
           <Field label={copy.editor.fields.width}>
-            <MmInput value={element.widthMm} dpi={ir.dpi} onChange={(widthMm) => patch({ widthMm } as never)} />
+            <MmInput
+              value={element.widthMm}
+              dpi={ir.dpi}
+              onChange={(widthMm) => patch(sizeChange(element, { widthMm }, ir.dpi))}
+            />
           </Field>
           <Field label={copy.editor.fields.height}>
-            <MmInput value={element.heightMm} dpi={ir.dpi} onChange={(heightMm) => patch({ heightMm } as never)} />
+            <MmInput
+              value={element.heightMm}
+              dpi={ir.dpi}
+              // Disabled for a QR code rather than silently ignored: its side
+              // is set by the width field, and a field that accepts a number
+              // and discards it is worse than one that says it cannot be used.
+              disabled={element.type === 'qrcode'}
+              onChange={(heightMm) => patch(sizeChange(element, { heightMm }, ir.dpi))}
+            />
           </Field>
         </div>
       )}
+
+      {/*
+        Rotation, as four buttons rather than a number field.
+        `rotationSchema` admits only quarter turns — a free angle resamples a
+        barcode onto the dot grid and it stops scanning — so a field that
+        accepts 37 would be offering something the label cannot hold. The
+        canvas handle does the same thing by dragging; this is the way to set
+        it exactly, and the way to see what it currently is.
+      */}
+      <Field label={copy.editor.fields.rotation}>
+        <ToggleGroup
+          type="single"
+          value={String(element.rotation)}
+          onValueChange={(value) => value && patch({ rotation: Number(value) as Rotation })}
+        >
+          {ROTATIONS.map((degrees) => (
+            <ToggleGroupItem
+              key={degrees}
+              value={String(degrees)}
+              aria-label={copy.editor.fields.rotationDegrees(degrees)}
+            >
+              {copy.editor.fields.rotationDegrees(degrees)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </Field>
 
       {'strokeWidthDots' in element && (
         <Field label={copy.editor.fields.strokeWidth}>
@@ -222,11 +319,19 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
       {(element.type === 'text' || element.type === 'barcode' || element.type === 'qrcode') &&
         typeof element.content === 'string' && (
           <Field label={copy.editor.fields.content}>
-            {element.type === 'text' ? (
-              // Multi-line, and only where the user typed a newline. The
-              // renderer never wraps to the box width: wrapping needs glyph
-              // metrics, and the browser's are not the print renderer's, so the
-              // two would break at different words.
+            {element.type === 'text' || element.type === 'qrcode' ? (
+              // Multi-line for text, and only where the user typed a newline:
+              // the renderer never wraps to the box width, because wrapping
+              // needs glyph metrics and the browser's are not the print
+              // renderer's, so the two would break at different words.
+              //
+              // Multi-line for QR codes because a QR code holds bytes, and a
+              // newline is a byte like any other — a vCard or a Wi-Fi
+              // credential is several lines by definition. A single-line field
+              // made those impossible to enter while the encoder handled them
+              // perfectly well. A barcode keeps a single-line field: the
+              // numeric symbologies cannot carry a newline at all, and a
+              // scanner emitting one mid-field is rarely what anyone wanted.
               <Textarea
                 rows={3}
                 value={element.content}
@@ -322,6 +427,17 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
 
       {(element.type === 'barcode' || element.type === 'qrcode') && (
         <ModuleWidthField element={element} dpi={ir.dpi} patch={patch} />
+      )}
+
+      {element.type === 'image' && (
+        <Field label={copy.editor.fields.image}>
+          <ImageField
+            element={element}
+            onChange={(assetId, natural) =>
+              patch({ assetId, ...imageBoxMm(element, natural, ir) } as never)
+            }
+          />
+        </Field>
       )}
 
       {(element.type === 'rect' || element.type === 'ellipse') && (

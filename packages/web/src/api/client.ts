@@ -103,6 +103,35 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return (await response.json()) as T
 }
 
+/**
+ * Post a single file as multipart form data.
+ *
+ * Separate from `request` because that one serialises the body as JSON, and a
+ * file is not JSON. The Content-Type header is deliberately not set: the
+ * browser has to add it itself so it can include the multipart boundary, and
+ * setting it by hand produces a body the server cannot parse.
+ */
+export async function upload<T>(path: string, file: File, field = 'file'): Promise<T> {
+  const form = new FormData()
+  form.append(field, file, file.name)
+
+  let response: Response
+  try {
+    response = await fetch(`/api${path}`, {
+      method: 'POST',
+      headers: { 'Accept-Language': requestLocale },
+      body: form,
+    })
+  } catch {
+    throw new ApiRequestError(0, FALLBACK)
+  }
+
+  if (!response.ok) {
+    throw new ApiRequestError(response.status, await parseError(response))
+  }
+  return (await response.json()) as T
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

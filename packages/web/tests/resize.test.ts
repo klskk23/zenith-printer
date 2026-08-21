@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { labelIrSchema } from '@zenith/shared'
-import { applyResize, resizeModeFor, type Size } from '../src/editor/resize.ts'
+import { applyResize, resizeModeFor, resizeSnapped, type Size } from '../src/editor/resize.ts'
+import { gridFor } from '../src/editor/snapping.ts'
 
 function element(over: Record<string, unknown>) {
   return labelIrSchema.parse({
@@ -12,7 +13,7 @@ function element(over: Record<string, unknown>) {
 describe('resizeModeFor', () => {
   it.each([
     ['image', { id: 'i', type: 'image', assetId: 'a' }, 'uniform'],
-    ['qrcode', { id: 'q', type: 'qrcode', content: 'x', moduleWidthDots: 2 }, 'uniform'],
+    ['qrcode', { id: 'q', type: 'qrcode', content: 'x', moduleWidthDots: 2 }, 'square-and-steps'],
     ['text', { id: 't', type: 'text', content: 'x', fontFamily: 'f', fontSizeMm: 3 }, 'box-only'],
     ['barcode', { id: 'b', type: 'barcode', content: 'x', symbology: 'code128', moduleWidthDots: 2 }, 'height-and-steps'],
     ['rect', { id: 'r', type: 'rect', strokeWidthDots: 1 }, 'free'],
@@ -104,5 +105,119 @@ describe('minimum size', () => {
   it('honours a caller-supplied floor', () => {
     const result = applyResize({ mode: 'free', original, desired: { widthMm: 0.1, heightMm: 0.1 }, minMm: 2 })
     expect(result).toEqual({ widthMm: 2, heightMm: 2 })
+  })
+})
+
+describe('resizeSnapped', () => {
+  const grid = gridFor({ widthMm: 50, heightMm: 30, dpi: 203 })
+
+  /**
+   * The regression that arrived with a visible snap step.
+   *
+   * A barcode's width is moduleWidth x moduleCount. Snapping the *result* of
+   * the type rule rounded that to the nearest millimetre, which is a width the
+   * symbology cannot produce — the renderer then draws the modules it can and
+   * the element no longer matches its own box.
+   */
+  it('leaves a quantised barcode width exactly as the symbology set it', () => {
+    const legalWidths = [12.4, 18.6, 24.8]
+    const quantise = (target: number): number =>
+      legalWidths.reduce((best, w) => (Math.abs(w - target) < Math.abs(best - target) ? w : best))
+
+    const size = resizeSnapped(
+      {
+        mode: 'height-and-steps',
+        original: { widthMm: 12.4, heightMm: 10 },
+        desired: { widthMm: 19.1, heightMm: 10.4 },
+        snapWidthMm: quantise,
+      },
+      { grid },
+    )
+
+    expect(legalWidths).toContain(size.widthMm)
+  })
+
+  it('keeps a uniform element square when its sides start equal', () => {
+    // A QR code rounded on each axis separately stops being square, and a QR
+    // code that is not square does not scan.
+    const size = resizeSnapped(
+      {
+        mode: 'uniform',
+        original: { widthMm: 10, heightMm: 10 },
+        desired: { widthMm: 14.4, heightMm: 13.6 },
+      },
+      { grid },
+    )
+    expect(size.widthMm).toBeCloseTo(size.heightMm, 6)
+  })
+
+  it('puts a freely resized box on the visible grid', () => {
+    const size = resizeSnapped(
+      {
+        mode: 'free',
+        original: { widthMm: 10, heightMm: 10 },
+        desired: { widthMm: 14.4, heightMm: 13.6 },
+      },
+      { grid },
+    )
+    expect(size.widthMm).toBeCloseTo(14, 1)
+    expect(size.heightMm).toBeCloseTo(14, 1)
+  })
+
+  it('gives the exact size when snapping is suspended', () => {
+    const size = resizeSnapped(
+      {
+        mode: 'free',
+        original: { widthMm: 10, heightMm: 10 },
+        desired: { widthMm: 14.4, heightMm: 13.6 },
+      },
+      { grid, bypass: true },
+    )
+    expect(size.widthMm).toBeCloseTo(14.4, 6)
+    expect(size.heightMm).toBeCloseTo(13.6, 6)
+  })
+})
+
+
+describe('resizing a QR code', () => {
+  /**
+   * A QR's side is moduleWidth x moduleCount, so the sizes in between do not
+   * exist. It used to resize as merely 'uniform', which produced any side at
+   * all; the renderer then drew the largest side that fitted and the symbol
+   * sat adrift inside a frame a good deal larger than itself.
+   */
+  it('lands on a side the symbology can produce', () => {
+    const legal = [6.25, 9.375, 12.5]
+    const nearest = (target: number): number =>
+      legal.reduce((best, s) => (Math.abs(s - target) < Math.abs(best - target) ? s : best))
+
+    const size = applyResize({
+      mode: 'square-and-steps',
+      original: { widthMm: 6.25, heightMm: 6.25 },
+      desired: { widthMm: 11.9, heightMm: 6.25 },
+      snapWidthMm: nearest,
+    })
+
+    expect(legal).toContain(size.widthMm)
+  })
+
+  it('stays square whichever handle direction drives it', () => {
+    const size = applyResize({
+      mode: 'square-and-steps',
+      original: { widthMm: 10, heightMm: 10 },
+      desired: { widthMm: 10.2, heightMm: 18 },
+    })
+    expect(size.widthMm).toBe(size.heightMm)
+    // Height moved further, so height is what the side follows.
+    expect(size.heightMm).toBeCloseTo(18, 6)
+  })
+
+  it('takes the requested side when nothing quantises it', () => {
+    const size = applyResize({
+      mode: 'square-and-steps',
+      original: { widthMm: 10, heightMm: 10 },
+      desired: { widthMm: 14, heightMm: 10 },
+    })
+    expect(size).toEqual({ widthMm: 14, heightMm: 14 })
   })
 })

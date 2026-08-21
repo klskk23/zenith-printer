@@ -21,6 +21,11 @@ export interface ElementContextMenuProps {
   selectedId: string | null
   onDelete: (id: string) => void
   onChange: (ir: LabelIR) => void
+  onCopy: () => void
+  onPaste: () => void
+  onDuplicate: () => void
+  /** False when nothing has been copied yet, so Paste is offered honestly. */
+  canPaste: boolean
   children: React.ReactNode
   /** Applied to the trigger wrapper, which sits in the layout flow. */
   className?: string
@@ -31,6 +36,10 @@ export function ElementContextMenu({
   selectedId,
   onDelete,
   onChange,
+  onCopy,
+  onPaste,
+  onDuplicate,
+  canPaste,
   children,
   className,
 }: ElementContextMenuProps): React.JSX.Element {
@@ -42,6 +51,16 @@ export function ElementContextMenu({
         <div className={className}>{children}</div>
       </ContextMenuTrigger>
       <ContextMenuContent>
+        <ContextMenuItem disabled={target === null} onSelect={onCopy}>
+          {copy.editor.contextMenu.copy}
+        </ContextMenuItem>
+        <ContextMenuItem disabled={!canPaste} onSelect={onPaste}>
+          {copy.editor.contextMenu.paste}
+        </ContextMenuItem>
+        <ContextMenuItem disabled={target === null} onSelect={onDuplicate}>
+          {copy.editor.contextMenu.duplicate}
+        </ContextMenuItem>
+        <ContextMenuSeparator className="my-1 h-px bg-border" />
         <ContextMenuItem disabled={target === null} onSelect={() => target && onDelete(target.id)}>
           {copy.editor.contextMenu.delete}
         </ContextMenuItem>

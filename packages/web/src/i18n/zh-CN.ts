@@ -130,6 +130,9 @@ export const copy = {
     },
     contextMenu: {
       delete: '删除',
+      copy: '复制',
+      paste: '粘贴',
+      duplicate: '创建副本',
       toFront: '置顶',
       toBack: '置底',
     },
@@ -137,6 +140,7 @@ export const copy = {
     redo: '重做',
     moduleWidth: '模块宽度',
     moduleWidthHint: (dots: number, mm: number) => `${dots} dot = ${mm.toFixed(3)} mm`,
+    atMinModuleWidth: '已是可扫描的最小尺寸，无法再缩小',
     derivedWidth: '宽度（由模块宽度决定）',
     variableWidthHint: '内容来自可变字段，实际宽度随每张标签的内容变化',
     rotation: '旋转',
@@ -177,6 +181,16 @@ export const copy = {
       cornerRadius: '圆角',
       errorCorrection: '纠错级别',
       image: '图片',
+      rotationDegrees: (degrees: number): string => `${degrees}°`,
+    },
+    image: {
+      choose: '选择图片…',
+      replace: '更换图片…',
+      notChosen: '尚未选择图片',
+      uploading: '上传中…',
+      pasteHint: '也可以直接按 Ctrl+V 粘贴剪贴板中的图片',
+      rejectedType: '只支持 PNG 和 JPEG 图片',
+      rejectedSize: (maxMb: number): string => `图片超过 ${maxMb} MB 上限`,
     },
     align: { left: '左对齐', center: '居中', right: '右对齐' },
     fonts: { sans: '黑体', serif: '宋体', mono: '等宽' },
@@ -346,6 +360,7 @@ export const copy = {
     offsetX: '水平偏移',
     offsetY: '垂直偏移',
     isDefault: '设为默认',
+    isDefaultHint: '默认参数会在选择该打印机时自动选中，校正页也按它的纸张尺寸打印。每台打印机只有一个默认。',
     remove: '删除',
     confirmRemove: (name: string) => `确定删除打印参数「${name}」吗？使用该参数的历史记录不受影响。`,
     offsetHint: '按点调节；预览会同步显示偏移后的效果，不必试打',
@@ -366,6 +381,12 @@ export const copy = {
   jobs: {
     heading: '打印队列',
     empty: '队列为空',
+    // Stated rather than left blank: a blank where a name goes reads as
+    // missing data, not as "there was never a template".
+    adHoc: '未使用模板（一次性设计）',
+    template: '模板',
+    time: '时间',
+    copies: (n: number) => `${n} 张`,
     cancel: '取消',
     status: {
       queued: '排队中',

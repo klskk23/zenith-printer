@@ -133,6 +133,9 @@ export const copy: Copy = {
     },
     contextMenu: {
       delete: 'Delete',
+      copy: 'Copy',
+      paste: 'Paste',
+      duplicate: 'Duplicate',
       toFront: 'Bring to front',
       toBack: 'Send to back',
     },
@@ -140,6 +143,7 @@ export const copy: Copy = {
     redo: 'Redo',
     moduleWidth: 'Module width',
     moduleWidthHint: (dots: number, mm: number) => `${dots} dot = ${mm.toFixed(3)} mm`,
+    atMinModuleWidth: 'Already the smallest scannable size; it cannot go lower',
     derivedWidth: 'Width (follows the module width)',
     variableWidthHint:
       'Content comes from a variable field, so the printed width changes with each label',
@@ -181,6 +185,16 @@ export const copy: Copy = {
       cornerRadius: 'Corner radius',
       errorCorrection: 'Error correction',
       image: 'Image',
+      rotationDegrees: (degrees: number): string => `${degrees}°`,
+    },
+    image: {
+      choose: 'Choose image…',
+      replace: 'Replace image…',
+      notChosen: 'No image chosen yet',
+      uploading: 'Uploading…',
+      pasteHint: 'Or press Ctrl+V to paste an image from the clipboard',
+      rejectedType: 'Only PNG and JPEG images are supported',
+      rejectedSize: (maxMb: number): string => `Image is over the ${maxMb} MB limit`,
     },
     align: { left: 'Left', center: 'Centre', right: 'Right' },
     fonts: { sans: 'Sans', serif: 'Serif', mono: 'Monospace' },
@@ -347,6 +361,7 @@ export const copy: Copy = {
     offsetX: 'Horizontal offset',
     offsetY: 'Vertical offset',
     isDefault: 'Make default',
+    isDefaultHint: 'The default is selected automatically when this printer is chosen, and the calibration page prints at its stock size. One per printer.',
     remove: 'Delete',
     confirmRemove: (name: string) => `Delete the print settings "${name}"? Printed history is unaffected.`,
     offsetHint: 'Adjusted in dots; the preview shows the corrected result, so no test print is needed',
@@ -368,6 +383,10 @@ export const copy: Copy = {
   jobs: {
     heading: 'Print queue',
     empty: 'The queue is empty',
+    adHoc: 'No template (one-off design)',
+    template: 'Template',
+    time: 'Time',
+    copies: (n: number) => `${n} labels`,
     cancel: 'Cancel',
     status: {
       queued: 'Queued',
