@@ -11,10 +11,15 @@
  * copies genuinely differ; the first is one that will actually be printed,
  * where a composite would be a label nobody receives.
  *
- * Everything it needs to be truthful is passed in and nothing is assumed: the
- * template id, so a design with unsaved edits previews what will print rather
- * than what is on screen; the profile id, so the cut-off and the screen are
- * the ones that will be used.
+ * It renders the design on screen, edits included. It used to render the saved
+ * template instead, on the grounds that a job submitted with a `templateId`
+ * prints the stored version — true, but it made the preview useless for the
+ * thing a preview is for: seeing the change you just made. The divergence is
+ * now stated in the dialog instead of being silently resolved in favour of the
+ * thing the user is not looking at.
+ *
+ * The profile id is still sent, so the cut-off and the image tone are the ones
+ * that will be used.
  */
 import { useEffect, useState } from 'react'
 import type { LabelIR } from '@zenith/shared'
@@ -24,8 +29,6 @@ import { Alert } from '../../components/ui/alert.tsx'
 export interface PreviewProps {
   ir: LabelIR
   printerId: string | null
-  /** When set, the server renders the stored template — what the job will print. */
-  templateId: string | null
   profileId: string | null
   /** Copy one's field values, or null while the form is incomplete. */
   variableValues: Record<string, string> | null
@@ -35,7 +38,6 @@ export interface PreviewProps {
 export function Preview({
   ir,
   printerId,
-  templateId,
   profileId,
   variableValues,
   copies,
@@ -48,7 +50,6 @@ export function Preview({
   const body = JSON.stringify({
     printerId,
     ir,
-    ...(templateId === null ? {} : { templateId }),
     ...(profileId === null ? {} : { profileId }),
     ...(variableValues === null ? {} : { variableValues }),
   })

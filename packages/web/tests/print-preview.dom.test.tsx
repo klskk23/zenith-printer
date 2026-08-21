@@ -80,6 +80,7 @@ function open(over: Partial<React.ComponentProps<typeof PrintDialog>> = {}): voi
         templateId={null}
         profileId="pro-1"
         printer={PRINTER as never}
+        unsavedChanges={false}
         onClose={() => undefined}
         {...over}
       />,
@@ -105,19 +106,17 @@ describe('the print dialog', () => {
   })
 
   /**
-   * A job submitted with a template prints the *saved* design. Previewing the
-   * editor's IR instead would show one label and print another.
+   * It renders the design on screen, edits included — which is what a preview
+   * is for. It used to render the saved template, on the grounds that a job
+   * with a `templateId` prints the stored version; true, and it meant that
+   * after opening a template you had to save before you could see anything
+   * you had just changed.
    */
-  it('renders the stored template when the job will print from one', async () => {
+  it('renders what is on screen, not the stored template', async () => {
     open({ templateId: 'tpl-1' })
     await vi.waitFor(() => expect(previews).toHaveLength(1))
-    expect(previews[0]).toMatchObject({ templateId: 'tpl-1' })
-  })
-
-  it('sends no template id for an unsaved design', async () => {
-    open()
-    await vi.waitFor(() => expect(previews).toHaveLength(1))
     expect(previews[0]).not.toHaveProperty('templateId')
+    expect(previews[0]).toHaveProperty('ir')
   })
 })
 
@@ -194,5 +193,31 @@ describe('the dialog itself', () => {
     // confirmations that open on top of them.
     open()
     expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+  })
+})
+
+
+describe('a template with unsaved edits', () => {
+  /**
+   * The divergence is real and cannot be resolved in the preview: `templateId`
+   * and `ir` are mutually exclusive on a job submission, so a job for a saved
+   * template prints the stored design. Rather than resolve it silently in
+   * favour of the thing the user is not looking at, the dialog says it.
+   */
+  it('says the edits will not come out', async () => {
+    open({ templateId: 'tpl-1', unsavedChanges: true })
+    expect(await screen.findByText(/未保存的修改不会印出来/)).toBeDefined()
+  })
+
+  it('says nothing when the template is saved', async () => {
+    open({ templateId: 'tpl-1', unsavedChanges: false })
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    expect(screen.queryByText(/未保存的修改不会印出来/)).toBeNull()
+  })
+
+  it('says nothing for a design that was never a template', async () => {
+    open({ templateId: null, unsavedChanges: false })
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    expect(screen.queryByText(/未保存的修改不会印出来/)).toBeNull()
   })
 })
