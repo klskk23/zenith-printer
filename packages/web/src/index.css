@@ -1,8 +1,14 @@
 @import 'tailwindcss';
 @import './fonts.css';
 
-/* shadcn/ui design tokens. Custom components must reuse these rather than
-   introducing a second styling system (constitution: "UI component rules"). */
+/*
+ * shadcn/ui design tokens. Custom components must reuse these rather than
+ * introducing a second styling system (constitution: "UI component rules").
+ *
+ * Two palettes. The dark one is not a filter over the light one: on a dark
+ * ground the same borders read heavier and the same greys read lighter, so
+ * each value is chosen rather than derived.
+ */
 @theme {
   --color-background: oklch(1 0 0);
   --color-foreground: oklch(0.145 0 0);
@@ -15,8 +21,51 @@
   --radius: 0.5rem;
 }
 
+/*
+ * Explicit choice wins over the system setting, so `data-theme` is applied to
+ * the root element and takes precedence over the media query below it.
+ */
+:root[data-theme='dark'] {
+  --color-background: oklch(0.145 0 0);
+  --color-foreground: oklch(0.985 0 0);
+  --color-primary: oklch(0.922 0 0);
+  --color-primary-foreground: oklch(0.205 0 0);
+  --color-muted: oklch(0.269 0 0);
+  --color-muted-foreground: oklch(0.708 0 0);
+  --color-border: oklch(0.371 0 0);
+  --color-destructive: oklch(0.704 0.191 22.216);
+}
+
+/*
+ * "Follow system" is the absence of an explicit choice, so it is expressed as
+ * "no data-theme attribute" rather than as a third value to apply. Guarded
+ * against `light` so that choosing light on a dark system still gives light.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-background: oklch(0.145 0 0);
+    --color-foreground: oklch(0.985 0 0);
+    --color-primary: oklch(0.922 0 0);
+    --color-primary-foreground: oklch(0.205 0 0);
+    --color-muted: oklch(0.269 0 0);
+    --color-muted-foreground: oklch(0.708 0 0);
+    --color-border: oklch(0.371 0 0);
+    --color-destructive: oklch(0.704 0.191 22.216);
+  }
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: 'Noto Sans CJK SC', system-ui, sans-serif;
+}
+
+/*
+ * The label canvas is white regardless of theme: it is a sheet of paper, and
+ * the preview's job is to look like what comes out of the printer. Inverting
+ * it in dark mode would make the preview lie about the print.
+ */
+[data-label-canvas] {
+  background-color: #ffffff;
+  color: #000000;
 }
