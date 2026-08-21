@@ -32,7 +32,9 @@ function TabContent({ tab }: { tab: WorkspaceTab }): React.JSX.Element {
     case 'index':
       return <IndexPage />
     case 'design':
-      return <EditorPage />
+      // The tab knows which template it was opened on; the editor has to be
+      // told, or it starts blank and the template has to be picked again.
+      return <EditorPage tabId={tab.id} templateId={tab.templateId} />
     case 'templates':
       return <TemplatesPage />
     case 'printers':

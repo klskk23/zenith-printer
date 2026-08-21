@@ -1,10 +1,17 @@
 /**
  * Print profiles for one printer.
  *
- * Offsets step in dots, because that is the machine's actual resolution and
- * typing multiples of 0.125mm would be absurd (FR-029). The preview reflects
- * the offset immediately, so nobody has to burn a label to see what a nudge
- * did (FR-028).
+ * A profile describes the paper: its size, its margins, and how the machine is
+ * driven for it. Position correction is not here — it belongs to the printer,
+ * because it says where *the machine* lays ink down and changes on every roll
+ * reload.
+ *
+ * The panel owns which profile is being edited. It was written as a controlled
+ * component back when the editor hosted it and needed to know the selection;
+ * the editor now picks a profile from a dropdown instead, leaving one caller
+ * that has no interest in it. Keeping the props meant that caller passed a
+ * no-op `onSelect`, so clicking a profile did nothing at all and the edit form
+ * — which contains the only delete button — could never be opened.
  */
 import { useState } from 'react'
 import { ApiRequestError } from '../../api/client.ts'
@@ -12,6 +19,7 @@ import type { Capabilities } from '../../api/types.ts'
 import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
+import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
 import { useDeleteProfile, useProfiles, useSaveProfile, type Profile } from './hooks.ts'
@@ -19,8 +27,6 @@ import { useDeleteProfile, useProfiles, useSaveProfile, type Profile } from './h
 export interface ProfilesPanelProps {
   printerId: string
   capabilities: Capabilities | null
-  selectedProfileId: string | null
-  onSelect: (id: string | null) => void
 }
 
 
@@ -31,18 +37,18 @@ const MARGIN_KEYS = [
   { key: 'marginLeftMm', label: copy.profiles.marginLeft },
 ] as const
 
-export function ProfilesPanel({
-  printerId,
-  capabilities,
-  selectedProfileId,
-  onSelect,
-}: ProfilesPanelProps): React.JSX.Element {
+export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): React.JSX.Element {
   const profiles = useProfiles(printerId)
   const save = useSaveProfile(printerId)
   const remove = useDeleteProfile(printerId)
   const [draft, setDraft] = useState<Partial<Profile> | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const editing = draft ?? profiles.data?.find((p) => p.id === selectedProfileId) ?? null
+  const saved = profiles.data?.find((p) => p.id === selectedId) ?? null
+  const editing = draft ?? saved
+  // Nothing is written until Save; Cancel discards the draft and leaves the
+  // stored settings untouched.
+  const dirty = draft !== null
 
   return (
     <div className="space-y-3">
@@ -79,10 +85,12 @@ export function ProfilesPanel({
           <Button
             key={profile.id}
             size="sm"
-            variant={profile.id === selectedProfileId ? 'default' : 'outline'}
+            variant={profile.id === selectedId ? 'default' : 'outline'}
             onClick={() => {
               setDraft(null)
-              onSelect(profile.id === selectedProfileId ? null : profile.id)
+              // Clicking the open one closes it, so the form can be dismissed
+              // without saving.
+              setSelectedId(profile.id === selectedId ? null : profile.id)
             }}
           >
             {profile.name}
@@ -178,7 +186,7 @@ export function ProfilesPanel({
           <div className="flex gap-2">
             <Button
               size="sm"
-              disabled={save.isPending}
+              disabled={save.isPending || !dirty}
               onClick={() =>
                 save.mutate(
                   {
@@ -196,16 +204,53 @@ export function ProfilesPanel({
                       isDefault: editing.isDefault ?? false,
                     },
                   },
-                  { onSuccess: (saved) => { setDraft(null); onSelect(saved.id) } },
+                  {
+                    onSuccess: (saved) => {
+                      setDraft(null)
+                      setSelectedId(saved.id)
+                    },
+                  },
                 )
               }
             >
               {copy.common.save}
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!dirty}
+              onClick={() => {
+                setDraft(null)
+                // A brand-new profile has nothing to fall back to, so cancelling
+                // it closes the form rather than leaving an empty one open.
+                if (editing.id === undefined) {
+                  setSelectedId(null)
+                }
+              }}
+            >
+              {copy.common.cancel}
+            </Button>
             {editing.id !== undefined && (
-              <Button size="sm" variant="ghost" onClick={() => remove.mutate(editing.id!)}>
+              // Deleting stock settings is not recoverable, and the profile
+              // being removed is not named on the button — so it is confirmed.
+              <ConfirmButton
+                size="sm"
+                variant="ghost"
+                title={copy.common.confirmTitle}
+                description={copy.profiles.confirmRemove(editing.name ?? '')}
+                cancelLabel={copy.common.cancel}
+                confirmLabel={copy.profiles.remove}
+                onConfirm={() =>
+                  remove.mutate(editing.id!, {
+                    onSuccess: () => {
+                      setDraft(null)
+                      setSelectedId(null)
+                    },
+                  })
+                }
+              >
                 {copy.profiles.remove}
-              </Button>
+              </ConfirmButton>
             )}
           </div>
 

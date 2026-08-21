@@ -191,12 +191,7 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
           only picks one from a dropdown: which roll is loaded is a property of
           the printer, not a decision taken while designing a label.
         */}
-        <ProfilesPanel
-          printerId={printer.id}
-          capabilities={printer.capabilities}
-          selectedProfileId={null}
-          onSelect={() => undefined}
-        />
+        <ProfilesPanel printerId={printer.id} capabilities={printer.capabilities} />
 
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" disabled={probe.isPending} onClick={() => probe.mutate(printer.id)}>

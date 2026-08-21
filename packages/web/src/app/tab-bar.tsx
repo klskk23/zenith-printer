@@ -24,16 +24,29 @@ import {
 } from '../components/ui/alert-dialog.tsx'
 import { useWorkspace } from './workspace.tsx'
 import type { WorkspaceTab } from './workspace-state.ts'
+import { useTemplates } from '../features/templates/hooks.ts'
 
-function tabTitle(tab: WorkspaceTab): string {
+/**
+ * What a tab is called.
+ *
+ * A design tab opened on a template shows that template's name — otherwise
+ * three open designs are all labelled "标签设计" and telling them apart means
+ * clicking through them.
+ */
+function tabTitle(tab: WorkspaceTab, templateName: string | undefined): string {
   if (tab.kind !== 'design') {
     return copy.workspace.tabs[tab.kind]
   }
-  return tab.templateId === null ? copy.workspace.untitledDesign : copy.workspace.tabs.design
+  if (tab.templateId === null) {
+    return copy.workspace.untitledDesign
+  }
+  // The list may not have loaded yet; the generic name is better than a blank.
+  return templateName ?? copy.workspace.tabs.design
 }
 
 export function TabBar(): React.JSX.Element {
   const { tabs, state, activate, close } = useWorkspace()
+  const templates = useTemplates()
   const [pendingClose, setPendingClose] = useState<WorkspaceTab | null>(null)
 
   const requestClose = (tab: WorkspaceTab): void => {
@@ -47,7 +60,7 @@ export function TabBar(): React.JSX.Element {
 
   return (
     <>
-      <div className="flex items-stretch gap-px overflow-x-auto border-b border-border bg-muted/40">
+      <div data-tab-bar className="flex items-stretch gap-px overflow-x-auto border-b border-border bg-muted/40">
         {tabs.map((tab) => {
           const isActive = tab.id === state.activeId
           return (
@@ -64,7 +77,9 @@ export function TabBar(): React.JSX.Element {
                   aria-hidden
                   className={cn('h-1.5 w-1.5 rounded-full', isActive ? 'bg-primary' : 'bg-transparent')}
                 />
-                <span className="whitespace-nowrap">{tabTitle(tab)}</span>
+                <span className="whitespace-nowrap">
+                  {tabTitle(tab, templates.data?.find((t) => t.id === tab.templateId)?.name)}
+                </span>
                 {tab.isDirty && (
                   <span className="text-primary" title={copy.workspace.unsavedMark} aria-label={copy.workspace.unsavedMark}>
                     ●

@@ -32,8 +32,6 @@ export interface CanvasProps {
   /** Called once per gesture so the undo stack records a drag as one step. */
   onGestureStart?: () => void
   onGestureEnd?: () => void
-  /** Right-click on an element; the menu itself lives outside the canvas. */
-  onContextMenu?: (elementId: string, at: { x: number; y: number }) => void
   /** Margins from the chosen profile. Drawn as advice; never enforced. */
   margins?: Margins | null
 }
@@ -65,7 +63,6 @@ export function EditorCanvas({
   snapBarcodeWidthMm,
   onGestureStart,
   onGestureEnd,
-  onContextMenu,
   margins = null,
 }: CanvasProps): React.JSX.Element {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -239,7 +236,9 @@ export function EditorCanvas({
   }, [drag, onGestureEnd])
 
   return (
-    <div className="inline-block border border-border bg-white shadow-sm">
+    // Paper is white in either theme: the preview's job is to look like what
+    // comes out of the printer, and inverting it would make it lie.
+    <div data-label-canvas className="inline-block border border-border shadow-sm">
       <svg
         ref={svgRef}
         width={grid.widthDots * zoom}
@@ -307,10 +306,16 @@ export function EditorCanvas({
                 strokeDasharray={overflowing && !selected ? '4 2' : undefined}
                 className={cn('cursor-move', selected && 'cursor-grab')}
                 onPointerDown={(event) => handlePointerDown(event, element)}
-                onContextMenu={(event) => {
-                  event.preventDefault()
+                onContextMenu={() => {
+                  // Select what was right-clicked, then let the event carry on
+                  // to the ContextMenu trigger wrapping the canvas.
+                  //
+                  // Calling preventDefault() here suppressed the menu entirely:
+                  // Radix opens on the `contextmenu` default action, so
+                  // cancelling it in a child means right-clicking an element —
+                  // the only place the menu is useful — did nothing, while
+                  // right-clicking bare canvas still worked.
                   onSelect(element.id)
-                  onContextMenu?.(element.id, { x: event.clientX, y: event.clientY })
                 }}
                 data-element-id={element.id}
               />

@@ -92,6 +92,24 @@ export function closeTab(state: WorkspaceState, id: string): WorkspaceState {
   return { tabs, activeId: neighbour?.id ?? null }
 }
 
+/**
+ * Point a tab at a template.
+ *
+ * Used when an unsaved design is first saved: the tab it lives in becomes that
+ * template's tab, so its title, its address and any later save all refer to the
+ * same thing.
+ */
+export function setTabTemplate(
+  state: WorkspaceState,
+  id: string,
+  templateId: string | null,
+): WorkspaceState {
+  return {
+    ...state,
+    tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, templateId } : tab)),
+  }
+}
+
 export function markDirty(state: WorkspaceState, id: string, isDirty: boolean): WorkspaceState {
   return {
     ...state,

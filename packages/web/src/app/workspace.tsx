@@ -19,6 +19,7 @@ import {
   markDirty,
   openTab,
   restoreFromPath,
+  setTabTemplate,
   type WorkspaceState,
   type WorkspaceTab,
 } from './workspace-state.ts'
@@ -31,6 +32,8 @@ export interface WorkspaceApi {
   activate: (id: string) => void
   close: (id: string) => void
   setDirty: (id: string, isDirty: boolean) => void
+  /** Bind a tab to a template — used the first time a design is saved. */
+  setTemplate: (id: string, templateId: string | null) => void
   /** True once the tab count reaches the soft limit; advice only. */
   atSoftLimit: boolean
 }
@@ -57,6 +60,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   const close = useCallback((id: string) => setState((s) => closeTab(s, id)), [])
   const setDirty = useCallback(
     (id: string, isDirty: boolean) => setState((s) => markDirty(s, id, isDirty)),
+    [],
+  )
+  const setTemplate = useCallback(
+    (id: string, templateId: string | null) => setState((s) => setTabTemplate(s, id, templateId)),
     [],
   )
 
@@ -128,9 +135,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       activate,
       close,
       setDirty,
+      setTemplate,
       atSoftLimit: exceedsSoftLimit(state),
     }),
-    [state, activeTab, open, activate, close, setDirty],
+    [state, activeTab, open, activate, close, setDirty, setTemplate],
   )
 
   return <WorkspaceContext.Provider value={api}>{children}</WorkspaceContext.Provider>

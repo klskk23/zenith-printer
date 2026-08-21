@@ -22,6 +22,8 @@ export interface ElementContextMenuProps {
   onDelete: (id: string) => void
   onChange: (ir: LabelIR) => void
   children: React.ReactNode
+  /** Applied to the trigger wrapper, which sits in the layout flow. */
+  className?: string
 }
 
 export function ElementContextMenu({
@@ -30,13 +32,14 @@ export function ElementContextMenu({
   onDelete,
   onChange,
   children,
+  className,
 }: ElementContextMenuProps): React.JSX.Element {
   const target = ir.elements.find((element) => element.id === selectedId) ?? null
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div>{children}</div>
+        <div className={className}>{children}</div>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem disabled={target === null} onSelect={() => target && onDelete(target.id)}>
