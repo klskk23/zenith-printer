@@ -105,17 +105,36 @@ describe('rendering', () => {
     expect(samples[5]).toBeLessThan(RENDER_BUDGET_MS)
   })
 
-  it('renders a hundred copies well inside the batch budget', () => {
-    // Sequence fields make every copy a separate render, so the batch cost is
-    // a hundred renders plus transfer — the paper is the slow part, not this.
-    renderLabel({ ir: RICH_IR, fonts })
-    const total = elapsedMs(() => {
-      for (let i = 0; i < 100; i += 1) {
-        renderLabel({ ir: RICH_IR, fonts })
-      }
-    })
-    expect(total).toBeLessThan(100 * RENDER_BUDGET_MS)
-  })
+  /**
+   * The runner's own timeout has to sit above the budget being asserted.
+   *
+   * It did not: vitest defaults to five seconds and the budget here is twenty,
+   * so the assertion was unreachable — the test was killed at five seconds
+   * whatever it was about to conclude. A hundred renders take about three and
+   * a half seconds alone and four and a half alongside the rest of the suite,
+   * which left an eight percent margin against a limit that had nothing to do
+   * with the thing being measured. It went red roughly once in five full runs,
+   * always here, and always without an assertion message — because a timeout
+   * has none, which is what made it look like noise for so long.
+   *
+   * Derived from the budget rather than written out, so the two cannot drift
+   * apart again.
+   */
+  it(
+    'renders a hundred copies well inside the batch budget',
+    () => {
+      // Sequence fields make every copy a separate render, so the batch cost is
+      // a hundred renders plus transfer — the paper is the slow part, not this.
+      renderLabel({ ir: RICH_IR, fonts })
+      const total = elapsedMs(() => {
+        for (let i = 0; i < 100; i += 1) {
+          renderLabel({ ir: RICH_IR, fonts })
+        }
+      })
+      expect(total).toBeLessThan(100 * RENDER_BUDGET_MS)
+    },
+    100 * RENDER_BUDGET_MS + 10_000,
+  )
 })
 
 describe('submission', () => {
