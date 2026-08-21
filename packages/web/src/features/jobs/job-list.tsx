@@ -9,6 +9,7 @@
 import { ApiRequestError } from '../../api/client.ts'
 import type { JobStatus } from '../../api/types.ts'
 import { copy } from '../../i18n/index.ts'
+import { Progress } from '../../components/ui/progress.tsx'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Card, CardContent } from '../../components/ui/card.tsx'
@@ -24,16 +25,28 @@ const STATUS_STYLE: Record<JobStatus, string> = {
 }
 
 function ProgressLabel({ job }: { job: PrintJob }): React.JSX.Element {
-  if (job.pagesPrinted === null) {
-    // Never render this as 0: the count is genuinely unknown, and treating it
-    // as zero would lead someone to reprint the whole batch.
-    return (
-      <span className="font-medium text-amber-700">
-        {copy.jobs.progressUnknown(job.requestedCopies)}
-      </span>
-    )
-  }
-  return <span>{copy.jobs.progress(job.pagesPrinted, job.requestedCopies)}</span>
+  const unknown = job.pagesPrinted === null
+
+  return (
+    <div className="w-full space-y-1">
+      {/*
+        `value={null}` is deliberate and is not the same as zero. After a
+        service restart the printed count is genuinely unknown; a bar at zero
+        would tell someone to reprint the whole batch. Radix renders null as
+        indeterminate, and the striped fill says "unknown" rather than "none".
+      */}
+      <Progress
+        value={unknown ? null : Math.round((job.pagesPrinted! / Math.max(1, job.requestedCopies)) * 100)}
+      />
+      {unknown ? (
+        <span className="font-medium text-amber-700">
+          {copy.jobs.progressUnknown(job.requestedCopies)}
+        </span>
+      ) : (
+        <span>{copy.jobs.progress(job.pagesPrinted!, job.requestedCopies)}</span>
+      )}
+    </div>
+  )
 }
 
 function JobRow({ job }: { job: PrintJob }): React.JSX.Element {

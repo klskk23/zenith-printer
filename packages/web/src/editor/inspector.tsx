@@ -19,7 +19,9 @@ import {
   type LabelIR,
   type QrcodeElement,
 } from '@zenith/shared'
+import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
 import { copy } from '../i18n/index.ts'
+import { ToggleGroup, ToggleGroupItem } from '../components/ui/toggle-group.tsx'
 import { FONT_FAMILIES, type FontFamilyKey } from './elements.ts'
 import { dotStepMm } from './guards.ts'
 import { Button } from '../components/ui/button.tsx'
@@ -261,12 +263,27 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
                 onChange={(fontSizeMm) => patch({ fontSizeMm } as never)}
               />
             </Field>
+            {/*
+              Three mutually exclusive options worth seeing at once. A dropdown
+              hides two of the three behind a click and says nothing about what
+              the choice is.
+            */}
             <Field label={copy.editor.fields.align}>
-              <Select value={element.align} onChange={(event) => patch({ align: event.target.value } as never)}>
-                <option value="left">{copy.editor.align.left}</option>
-                <option value="center">{copy.editor.align.center}</option>
-                <option value="right">{copy.editor.align.right}</option>
-              </Select>
+              <ToggleGroup
+                type="single"
+                value={element.align}
+                onValueChange={(value) => value && patch({ align: value } as never)}
+              >
+                <ToggleGroupItem value="left" aria-label={copy.editor.align.left} title={copy.editor.align.left}>
+                  <AlignLeft className="h-3.5 w-3.5" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="center" aria-label={copy.editor.align.center} title={copy.editor.align.center}>
+                  <AlignCenter className="h-3.5 w-3.5" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="right" aria-label={copy.editor.align.right} title={copy.editor.align.right}>
+                  <AlignRight className="h-3.5 w-3.5" />
+                </ToggleGroupItem>
+              </ToggleGroup>
             </Field>
           </div>
           <Label className="flex items-center gap-2 text-sm text-foreground">

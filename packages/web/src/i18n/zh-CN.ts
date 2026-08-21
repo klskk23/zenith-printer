@@ -125,8 +125,8 @@ export const copy = {
       toBack: '置底',
     },
     zoom: {
-      fit: '适应窗口',
       label: '缩放',
+      hint: 'Ctrl + 滚轮可缩放',
     },
     contextMenu: {
       delete: '删除',
@@ -286,6 +286,7 @@ export const copy = {
     themes: { light: '浅色', dark: '深色', system: '跟随系统' },
     pollInterval: '队列刷新间隔（毫秒）',
     alwaysConfirmTabClose: '关闭标签页时总是确认',
+    unsaved: '有未保存的修改',
     localOnlyHint: '换一个浏览器会回到默认值——系统没有账号，无法记住是谁。',
   },
 
@@ -302,6 +303,8 @@ export const copy = {
     printCalibration: '打印校正页',
     confirmTitle: '打印校正页？',
     confirmBody: '这会实际打印一张标签并消耗纸张，无法撤销。',
+    confirmSize: (w: number, h: number) => `将按 ${w}×${h}mm 打印。`,
+    needsProfile: '还没有记录纸张尺寸的打印参数。校正页要贴着纸边来量，必须和纸一样大——请先新建一个打印参数并填入纸张宽高。',
     confirmCancel: '取消',
     confirmPrint: '打印',
     save: '保存偏移',
@@ -344,6 +347,7 @@ export const copy = {
     offsetY: '垂直偏移',
     isDefault: '设为默认',
     remove: '删除',
+    confirmRemove: (name: string) => `确定删除打印参数「${name}」吗？使用该参数的历史记录不受影响。`,
     offsetHint: '按点调节；预览会同步显示偏移后的效果，不必试打',
     densityHint: (min: number, max: number): string => `该机型支持 ${min} – ${max}`,
   },

@@ -128,8 +128,8 @@ export const copy: Copy = {
       toBack: 'Send to back',
     },
     zoom: {
-      fit: 'Fit to window',
       label: 'Zoom',
+      hint: 'Ctrl + scroll to zoom',
     },
     contextMenu: {
       delete: 'Delete',
@@ -289,6 +289,7 @@ export const copy: Copy = {
     themes: { light: 'Light', dark: 'Dark', system: 'Follow system' },
     pollInterval: 'Queue refresh interval (ms)',
     alwaysConfirmTabClose: 'Always confirm before closing a tab',
+    unsaved: 'Unsaved changes',
     localOnlyHint:
       'Another browser starts from the defaults — there are no accounts, so there is nobody to remember.',
   },
@@ -304,6 +305,8 @@ export const copy: Copy = {
     printCalibration: 'Print calibration page',
     confirmTitle: 'Print a calibration page?',
     confirmBody: 'This prints a real label and consumes stock. It cannot be undone.',
+    confirmSize: (w: number, h: number) => `It will print at ${w}×${h}mm.`,
+    needsProfile: 'No profile records a stock size yet. The calibration page is measured against the edges of the paper, so it has to be the same size — create a profile with the stock width and height first.',
     confirmCancel: 'Cancel',
     confirmPrint: 'Print',
     save: 'Save correction',
@@ -345,6 +348,7 @@ export const copy: Copy = {
     offsetY: 'Vertical offset',
     isDefault: 'Make default',
     remove: 'Delete',
+    confirmRemove: (name: string) => `Delete the print settings "${name}"? Printed history is unaffected.`,
     offsetHint: 'Adjusted in dots; the preview shows the corrected result, so no test print is needed',
     densityHint: (min: number, max: number): string => `This model supports ${min} – ${max}`,
   },

@@ -58,7 +58,7 @@ export function LayersPanel({ ir, selectedId, onSelect, onChange }: LayersPanelP
               </button>
               <span className="flex shrink-0 gap-0.5">
                 <Button
-                  size="icon"
+                  size="icon-sm"
                   variant="ghost"
                   title={copy.editor.layers.toFront}
                   disabled={isFrontmost(ir, element.id)}
@@ -67,7 +67,7 @@ export function LayersPanel({ ir, selectedId, onSelect, onChange }: LayersPanelP
                   ↑
                 </Button>
                 <Button
-                  size="icon"
+                  size="icon-sm"
                   variant="ghost"
                   title={copy.editor.layers.toBack}
                   disabled={isBackmost(ir, element.id)}

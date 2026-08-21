@@ -16,7 +16,11 @@ const buttonVariants = cva(
       size: {
         default: 'h-9 px-4 py-2',
         sm: 'h-8 rounded-md px-3 text-xs',
-        icon: 'h-8 w-8',
+        // Square, and the same height as `default` — an icon button sitting in
+        // a row of inputs and selects has to line up with them. It used to be
+        // h-8, which made every toolbar it appeared in look a pixel out.
+        icon: 'h-9 w-9',
+        'icon-sm': 'h-8 w-8',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },

@@ -12,6 +12,7 @@
  * Last write wins is acceptable; last write wins *unannounced* is not.
  */
 import { useState } from 'react'
+import { Save } from 'lucide-react'
 import { ApiRequestError } from '../../api/client.ts'
 import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
@@ -69,7 +70,9 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
             }
           }}
         >
-          <option value="">{copy.workspace.untitledDesign}</option>
+          {/* An em dash, like the other selects. Naming it "untitled design"
+              read as though a template by that name existed. */}
+          <option value="">—</option>
           {templates.data?.map((template) => (
             <option key={template.id} value={template.id}>
               {template.name}
@@ -78,19 +81,21 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
         </Select>
       </div>
 
+      {/* Default height, matching the selects it sits beside. */}
       <Button
-        size="sm"
         variant="outline"
+        className="gap-1.5"
         disabled={save.isPending}
         // A design with no template behind it has no name yet, so saving asks
         // for one. An existing template saves straight over itself.
         onClick={() => (current === null ? setNaming('') : commit(current.name, false))}
       >
+        <Save className="h-4 w-4" />
         {current === null ? copy.templates.save : copy.templates.update}
       </Button>
 
       {current !== null && (
-        <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => setNaming(current.name)}>
+        <Button variant="ghost" disabled={save.isPending} onClick={() => setNaming(current.name)}>
           {copy.templates.saveAs}
         </Button>
       )}
@@ -139,7 +144,9 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
         the current edits left alone until the user asks.
       */}
       {save.error instanceof ApiRequestError && (
-        <Alert variant="destructive" className="w-full text-xs">
+        // Full width on its own line: an error wedged between dropdowns is
+        // both unreadable and pushes everything beside it out of alignment.
+        <Alert variant="destructive" className="w-full basis-full text-xs">
           <p className="font-medium">{save.error.body.what}</p>
           <p className="mt-1 opacity-90">{save.error.body.why}</p>
           <p className="mt-1 font-medium">{save.error.body.next}</p>

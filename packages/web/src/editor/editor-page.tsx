@@ -6,9 +6,10 @@
  * the parts that change, save it, and print batches that differ only where
  * they should.
  */
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LabelElement, LabelIR } from '@zenith/shared'
 import { renderBarcodeSvg, isVariableRef } from '@zenith/shared'
+import { Printer, Redo2, Undo2 } from 'lucide-react'
 import { copy } from '../i18n/index.ts'
 import { usePreferences } from '../features/preferences/context.tsx'
 import { Alert } from '../components/ui/alert.tsx'
@@ -29,7 +30,8 @@ import { usePrinters } from '../features/printers/hooks.ts'
 import { PrintDialog } from '../features/print/print-dialog.tsx'
 import { TemplateBar } from '../features/templates/template-bar.tsx'
 import { useProfiles } from '../features/profiles/hooks.ts'
-import type { Template, VariableField } from '../features/templates/hooks.ts'
+import { useTemplates, type Template, type VariableField } from '../features/templates/hooks.ts'
+import { useWorkspace } from '../app/workspace.tsx'
 import type { Profile } from '../features/profiles/hooks.ts'
 import { CanvasViewport } from './canvas-viewport.tsx'
 import { LayersPanel } from './layers-panel.tsx'
@@ -43,7 +45,14 @@ import { blockingViolations, inspect } from './guards.ts'
 
 type SidePanel = 'element' | 'fields'
 
-export function EditorPage(): React.JSX.Element {
+export interface EditorPageProps {
+  /** The workspace tab this editor lives in. */
+  tabId: string
+  /** Template the tab was opened on, if any. */
+  templateId: string | null
+}
+
+export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.Element {
   const printers = usePrinters()
   const [printerId, setPrinterId] = useState<string | null>(null)
   const [profileId, setProfileId] = useState<string | null>(null)
@@ -51,6 +60,8 @@ export function EditorPage(): React.JSX.Element {
   // than per-operation inverses, so a new element type is undoable the day it
   // exists instead of the day somebody writes its inverse.
   const { preferences } = usePreferences()
+  const workspace = useWorkspace()
+  const allTemplates = useTemplates()
   // A blank label starts at whatever this browser was told to prefer (FR-071).
   const [history, setHistory] = useState(() =>
     initUndo(
@@ -214,6 +225,38 @@ export function EditorPage(): React.JSX.Element {
     [ir.dpi, ir.elements, selectedId],
   )
 
+  /**
+   * Load the template the tab was opened on.
+   *
+   * The workspace records which template a design tab is for; without this the
+   * editor never found out, so opening one from the library produced an empty
+   * "untitled design" and the template had to be picked again by hand.
+   *
+   * Keyed on the id rather than the object: re-running on every refetch would
+   * discard whatever the user had typed since.
+   */
+  useEffect(() => {
+    if (templateId === null || template?.id === templateId) {
+      return
+    }
+    const found = allTemplates.data?.find((t) => t.id === templateId)
+    if (found !== undefined) {
+      loadTemplate(found)
+    }
+  }, [templateId, allTemplates.data])
+
+  /**
+   * Report unsaved work to the workspace.
+   *
+   * This drives the tab's unsaved marker, the confirmation on closing it and
+   * the browser's leave prompt — none of which did anything before, because
+   * nothing ever set the flag.
+   */
+  const isDirty = template === null ? ir.elements.length > 0 : history.past.length > 0
+  useEffect(() => {
+    workspace.setDirty(tabId, isDirty)
+  }, [tabId, isDirty])
+
   const templateBody = (): Record<string, unknown> => ({
     printerKind: printer?.kind ?? 'niimbot',
     widthMm: ir.widthMm,
@@ -225,8 +268,18 @@ export function EditorPage(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col" onKeyDown={onKeyDown} tabIndex={-1}>
-      {/* Top bar: what this design is for, and the two irreversible actions. */}
-      <div className="flex flex-wrap items-end gap-3 border-b border-border pb-3">
+      {/*
+        Top bar, in two groups: what this design *is* on the left — which
+        template, and saving it — and everything about printing on the right.
+        They were interleaved before, so answering "where will this go" meant
+        reading across the whole bar.
+      */}
+      <div
+        role="toolbar"
+        aria-label={copy.editor.heading}
+        aria-orientation="horizontal"
+        className="flex flex-wrap items-end gap-3 border-b border-border pb-3"
+      >
         <TemplateBar
           current={template}
           buildBody={templateBody}
@@ -234,75 +287,100 @@ export function EditorPage(): React.JSX.Element {
           onSaved={(saved) => {
             setTemplate(saved)
             setFields(saved.variableFields)
+            // The tab now *is* this template's tab: its title, its address and
+            // any later save all refer to the same thing.
+            workspace.setTemplate(tabId, saved.id)
+            setHistory(initUndo({ ...ir }))
           }}
         />
 
-        <div className="space-y-1">
-          <Label>{copy.print.printer}</Label>
-          <Select
-            value={printerId ?? ''}
-            onChange={(event) => {
-              setPrinterId(event.target.value || null)
-              setProfileId(null)
-            }}
-          >
-            <option value="">—</option>
-            {printers.data?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-
         {/*
-          A profile is chosen here, not edited here: it belongs to the printer
-          and its settings live on the printer page. Choosing one resizes the
-          canvas to that stock, because designing on a canvas that is not the
-          paper produces a label nobody notices is wrong until it prints.
+          Everything about printing, grouped at the far end and fenced off from
+          the document controls on the left. The dropdowns choose what to print
+          on; the button prints. Putting them together means the whole answer to
+          "where is this going" sits in one place instead of at both ends of the
+          bar.
         */}
-        <div className="space-y-1">
-          <Label>{copy.profiles.heading}</Label>
-          <Select
-            value={profileId ?? ''}
-            disabled={printerId === null}
-            onChange={(event) => {
-              const id = event.target.value || null
-              setProfileId(id)
-              applyProfileStock(profiles.data?.find((p) => p.id === id) ?? null)
-            }}
-          >
-            <option value="">—</option>
-            {profiles.data?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
-              </option>
-            ))}
-          </Select>
-        </div>
+        <div className="ml-auto flex items-end gap-2">
+          <div className="flex items-end gap-1">
+            <Button
+              size="icon"
+              variant="outline"
+              disabled={!canUndo(history)}
+              aria-label={copy.editor.undo}
+              title={copy.editor.undo}
+              onClick={doUndo}
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              disabled={!canRedo(history)}
+              aria-label={copy.editor.redo}
+              title={copy.editor.redo}
+              onClick={doRedo}
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
+          </div>
 
-        <div className="ml-auto flex items-end gap-1">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canUndo(history)}
-            title={copy.editor.undo}
-            onClick={doUndo}
-          >
-            ↶
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canRedo(history)}
-            title={copy.editor.redo}
-            onClick={doRedo}
-          >
-            ↷
-          </Button>
+          <Separator orientation="vertical" className="h-9" />
+
+          <div className="space-y-1">
+            <Label>{copy.print.printer}</Label>
+            <Select
+              value={printerId ?? ''}
+              onChange={(event) => {
+                setPrinterId(event.target.value || null)
+                setProfileId(null)
+              }}
+            >
+              <option value="">—</option>
+              {printers.data?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          {/*
+            A profile is chosen here, not edited here: it belongs to the printer
+            and its settings live on the printer page. Choosing one resizes the
+            canvas to that stock, because designing on a canvas that is not the
+            paper produces a label nobody notices is wrong until it prints.
+          */}
+          <div className="space-y-1">
+            <Label>{copy.profiles.heading}</Label>
+            <Select
+              value={profileId ?? ''}
+              disabled={printerId === null}
+              onChange={(event) => {
+                const id = event.target.value || null
+                setProfileId(id)
+                applyProfileStock(profiles.data?.find((p) => p.id === id) ?? null)
+              }}
+            >
+              <option value="">—</option>
+              {profiles.data?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <Separator orientation="vertical" className="h-9" />
+
           {/* Overflow warns but never blocks (FR-067); only faults that make
               the job impossible disable this. */}
-          <Button disabled={blocking.length > 0 || printerId === null} onClick={() => setPrintOpen(true)}>
+          <Button
+            className="gap-1.5"
+            disabled={blocking.length > 0 || printerId === null}
+            onClick={() => setPrintOpen(true)}
+          >
+            <Printer className="h-4 w-4" />
             {copy.print.action}
           </Button>
         </div>
@@ -367,12 +445,15 @@ export function EditorPage(): React.JSX.Element {
 
         {/* Centre: rulers, canvas, zoom. */}
         <ResizablePanel id="canvas" defaultSize="60" minSize="30">
-          <div className="h-full overflow-auto px-3">
+          {/* The viewport owns its height, centring and scrolling; a second
+              scroll container here would nest two scrollbars. */}
+          <div className="flex h-full min-h-0 flex-col">
             <ElementContextMenu
               ir={ir}
               selectedId={selectedId}
               onDelete={deleteElement}
               onChange={setIr}
+              className="flex min-h-0 flex-1 flex-col"
             >
               <CanvasViewport
                 ir={ir}
@@ -383,6 +464,9 @@ export function EditorPage(): React.JSX.Element {
                 snapBarcodeWidthMm={snapBarcodeWidthMm}
                 // Advice, not a boundary: elements can still be placed here.
                 margins={profile}
+                marginNote={
+                  profile === null ? copy.profiles.noProfileSelected : copy.profiles.marginHint
+                }
                 // A drag emits a state per pointer move; without this the whole
                 // history is one drag.
                 onGestureStart={() => {
@@ -393,17 +477,6 @@ export function EditorPage(): React.JSX.Element {
                 }}
               />
             </ElementContextMenu>
-
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {profile === null ? copy.profiles.noProfileSelected : copy.profiles.marginHint}
-            </p>
-
-            {/*
-              Breathing room under the canvas. Without it the label sits flush
-              against the bottom of the scroll area, which makes the rotation
-              handle of an element near the lower edge awkward to reach.
-            */}
-            <div className="h-24" aria-hidden />
           </div>
         </ResizablePanel>
 

@@ -10,13 +10,16 @@
  * The page says so out loud, so that someone hunting for a server setting
  * learns where it lives rather than concluding it does not exist.
  */
+import { useEffect, useMemo, useState } from 'react'
 import { copy } from '../i18n/index.ts'
+import { Button } from '../components/ui/button.tsx'
 import { Alert } from '../components/ui/alert.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { Label } from '../components/ui/label.tsx'
 import { Select } from '../components/ui/select.tsx'
 import { Switch } from '../components/ui/switch.tsx'
 import { usePreferences } from '../features/preferences/context.tsx'
+import { PREFERENCE_KEYS, type Preferences } from '../features/preferences/store.ts'
 import { LOCALES } from '../features/preferences/locale.ts'
 import { FONT_FAMILIES, type FontFamilyKey } from '../editor/elements.ts'
 
@@ -32,6 +35,31 @@ function Row({ label, children }: { label: string; children: React.ReactNode }):
 export function SettingsPage(): React.JSX.Element {
   const { preferences, update } = usePreferences()
 
+  /**
+   * Edits are held until saved.
+   *
+   * Applying each keystroke immediately made the page impossible to explore:
+   * changing the language mid-thought reloaded every label around you, and
+   * there was no way back except remembering what it had been. A draft gives
+   * the change a moment where it is not yet true.
+   */
+  const [draft, setDraft] = useState<Preferences>(preferences)
+
+  // Adopt outside changes only while nothing is being edited, so a background
+  // update cannot overwrite what someone is in the middle of typing.
+  const dirty = useMemo(
+    () => PREFERENCE_KEYS.some((key) => draft[key] !== preferences[key]),
+    [draft, preferences],
+  )
+  useEffect(() => {
+    if (!dirty) {
+      setDraft(preferences)
+    }
+  }, [preferences])
+
+  const set = <K extends keyof Preferences>(key: K, value: Preferences[K]): void =>
+    setDraft((current) => ({ ...current, [key]: value }))
+
   return (
     <div className="max-w-2xl space-y-4">
       <h2 className="text-sm font-semibold">{copy.settings.heading}</h2>
@@ -41,8 +69,8 @@ export function SettingsPage(): React.JSX.Element {
       <section className="divide-y divide-border rounded-md border border-border px-3">
         <Row label={copy.settings.language}>
           <Select
-            value={preferences.language}
-            onChange={(event) => update({ language: event.target.value as (typeof LOCALES)[number] })}
+            value={draft.language}
+            onChange={(event) => set('language', event.target.value as (typeof LOCALES)[number])}
           >
             {LOCALES.map((locale) => (
               <option key={locale} value={locale}>
@@ -58,16 +86,16 @@ export function SettingsPage(): React.JSX.Element {
               type="number"
               step={0.5}
               min={1}
-              value={preferences.defaultLabelWidthMm}
-              onChange={(e) => update({ defaultLabelWidthMm: Number(e.target.value) || 1 })}
+              value={draft.defaultLabelWidthMm}
+              onChange={(e) => set('defaultLabelWidthMm', Number(e.target.value) || 1)}
             />
             <span className="text-xs text-muted-foreground">×</span>
             <Input
               type="number"
               step={0.5}
               min={1}
-              value={preferences.defaultLabelHeightMm}
-              onChange={(e) => update({ defaultLabelHeightMm: Number(e.target.value) || 1 })}
+              value={draft.defaultLabelHeightMm}
+              onChange={(e) => set('defaultLabelHeightMm', Number(e.target.value) || 1)}
             />
           </div>
         </Row>
@@ -77,15 +105,15 @@ export function SettingsPage(): React.JSX.Element {
             type="number"
             step={1}
             min={1}
-            value={preferences.defaultDpi}
-            onChange={(e) => update({ defaultDpi: Number(e.target.value) || 203 })}
+            value={draft.defaultDpi}
+            onChange={(e) => set('defaultDpi', Number(e.target.value) || 203)}
           />
         </Row>
 
         <Row label={copy.settings.defaultFont}>
           <Select
-            value={preferences.defaultFontFamily}
-            onChange={(e) => update({ defaultFontFamily: e.target.value })}
+            value={draft.defaultFontFamily}
+            onChange={(e) => set('defaultFontFamily', e.target.value)}
           >
             {(Object.keys(FONT_FAMILIES) as FontFamilyKey[]).map((key) => (
               <option key={key} value={FONT_FAMILIES[key]}>
@@ -97,8 +125,8 @@ export function SettingsPage(): React.JSX.Element {
 
         <Row label={copy.settings.displayUnit}>
           <Select
-            value={preferences.displayUnit}
-            onChange={(e) => update({ displayUnit: e.target.value as 'mm' | 'dot' })}
+            value={draft.displayUnit}
+            onChange={(e) => set('displayUnit', e.target.value as 'mm' | 'dot')}
           >
             <option value="mm">{copy.settings.displayUnits.mm}</option>
             <option value="dot">{copy.settings.displayUnits.dot}</option>
@@ -107,8 +135,8 @@ export function SettingsPage(): React.JSX.Element {
 
         <Row label={copy.settings.theme}>
           <Select
-            value={preferences.theme}
-            onChange={(e) => update({ theme: e.target.value as 'light' | 'dark' | 'system' })}
+            value={draft.theme}
+            onChange={(e) => set('theme', e.target.value as 'light' | 'dark' | 'system')}
           >
             <option value="system">{copy.settings.themes.system}</option>
             <option value="light">{copy.settings.themes.light}</option>
@@ -121,18 +149,28 @@ export function SettingsPage(): React.JSX.Element {
             type="number"
             step={500}
             min={500}
-            value={preferences.queuePollIntervalMs}
-            onChange={(e) => update({ queuePollIntervalMs: Number(e.target.value) || 2000 })}
+            value={draft.queuePollIntervalMs}
+            onChange={(e) => set('queuePollIntervalMs', Number(e.target.value) || 2000)}
           />
         </Row>
 
         <Row label={copy.settings.alwaysConfirmTabClose}>
           <Switch
-            checked={preferences.alwaysConfirmTabClose}
-            onCheckedChange={(checked) => update({ alwaysConfirmTabClose: checked })}
+            checked={draft.alwaysConfirmTabClose}
+            onCheckedChange={(checked) => set('alwaysConfirmTabClose', checked === true)}
           />
         </Row>
       </section>
+
+      <div className="flex items-center gap-2">
+        <Button disabled={!dirty} onClick={() => update(draft)}>
+          {copy.common.save}
+        </Button>
+        <Button variant="outline" disabled={!dirty} onClick={() => setDraft(preferences)}>
+          {copy.common.cancel}
+        </Button>
+        {dirty && <span className="text-[11px] text-muted-foreground">{copy.settings.unsaved}</span>}
+      </div>
 
       <p className="text-[11px] text-muted-foreground">{copy.settings.localOnlyHint}</p>
     </div>

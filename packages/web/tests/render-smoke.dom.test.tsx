@@ -185,3 +185,90 @@ describe('the design tab top bar', () => {
     expect(screen.getAllByText('模板名称').length).toBeGreaterThan(0)
   })
 })
+
+/**
+ * Top bar grouping.
+ *
+ * Two groups: the design on the left, printing on the right. They were
+ * interleaved, so answering "where will this go" meant reading across the whole
+ * bar. Order is asserted through the DOM rather than by eye.
+ */
+describe('the top bar groups printing together', () => {
+  function topBar(): HTMLElement {
+    render(wrap(<App />))
+    fireEvent.click(screen.getAllByText('标签设计')[0]!)
+    // By role, not by class: the constitution forbids asserting on styling,
+    // and a toolbar is what this row actually is.
+    return screen.getByRole('toolbar', { name: '标签设计' })
+  }
+
+  it('separates the two groups', () => {
+    const bar = topBar()
+    // One between undo/redo and the printer selects, one before Print.
+    expect(bar.querySelectorAll('[role="separator"]').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('puts the printer and profile selects after the template one', () => {
+    const bar = topBar()
+    const labels = [...bar.querySelectorAll('label')].map((l) => l.textContent)
+    expect(labels.indexOf('模板')).toBeLessThan(labels.indexOf('打印机'))
+    expect(labels.indexOf('打印机')).toBeLessThan(labels.indexOf('打印参数'))
+  })
+
+  it('ends with the print button', () => {
+    const bar = topBar()
+    const buttons = [...bar.querySelectorAll('button')].map((b) => b.textContent?.trim() ?? '')
+    expect(buttons[buttons.length - 1]).toBe('打印')
+  })
+})
+
+/**
+ * The zoom control.
+ *
+ * A field at the foot of the canvas column, not a button bar above it. There is
+ * no "fit to window": fitting is the default state, and a button for the thing
+ * that should already have happened mostly reports a failure to do it.
+ */
+describe('zoom', () => {
+  function openDesign(): void {
+    render(wrap(<App />))
+    fireEvent.click(screen.getAllByText('标签设计')[0]!)
+  }
+
+  it('is a field, not a stepper', () => {
+    openDesign()
+    const zoom = document.querySelector('#canvas-zoom') as HTMLInputElement
+    expect(zoom).not.toBeNull()
+    expect(zoom.type).toBe('number')
+  })
+
+  it('has no fit-to-window button', () => {
+    openDesign()
+    expect(screen.queryByText('适应窗口')).toBeNull()
+  })
+
+  it('accepts a typed percentage', () => {
+    openDesign()
+    const zoom = document.querySelector('#canvas-zoom') as HTMLInputElement
+    fireEvent.change(zoom, { target: { value: '200' } })
+    expect(Number(zoom.value)).toBe(200)
+  })
+
+  it('clamps a percentage beyond the usable range', () => {
+    openDesign()
+    const zoom = document.querySelector('#canvas-zoom') as HTMLInputElement
+    fireEvent.change(zoom, { target: { value: '5000' } })
+    expect(Number(zoom.value)).toBeLessThanOrEqual(800)
+  })
+
+  it('says how to zoom with the wheel', () => {
+    openDesign()
+    expect(screen.getAllByText(/Ctrl/).length).toBeGreaterThan(0)
+  })
+
+  it('keeps the margin note in the status strip', () => {
+    openDesign()
+    // No profile is selected in this suite, so the note explains the absence.
+    expect(screen.getAllByText(/尚未选择打印参数/).length).toBeGreaterThan(0)
+  })
+})
