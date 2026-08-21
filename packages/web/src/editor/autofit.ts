@@ -26,6 +26,7 @@
  */
 import {
   TEXT_LINE_HEIGHT,
+  isVariableRef,
   textLines,
   type LabelElement,
   type LabelIR,
@@ -59,8 +60,21 @@ const MIN_EXTENT_MM = 0.5
  * `TEXT_LINE_HEIGHT` ems below the last, so the extent follows from the font
  * size and the line count and agrees with the print exactly.
  */
-export function textBoxMm(element: TextElement, measure: LineWidthMeasurer): Box {
-  const lines = textLines(typeof element.content === 'string' ? element.content : '')
+export function textBoxMm(
+  element: TextElement,
+  measure: LineWidthMeasurer,
+  /**
+   * What the element will actually say, for an element bound to a variable.
+   *
+   * Without it a bound element measures the empty string and its box collapses
+   * to the minimum — so binding a field made the text on the canvas shrink to
+   * a speck, which reads as having broken the element rather than having
+   * connected it to something.
+   */
+  text?: string,
+): Box {
+  const literal = text ?? (typeof element.content === 'string' ? element.content : '')
+  const lines = textLines(literal)
   const perMm = Math.max(...lines.map((line) => measure(line, element)), 0)
 
   return {
@@ -194,12 +208,19 @@ function affectsSymbolBox(previous: LabelElement, next: LabelElement): boolean {
  * Types whose box genuinely is a free choice — rectangles, lines, images after
  * their proportions are set — are returned untouched.
  */
-export function refit(previous: LabelElement | null, next: LabelElement, dpi: number): LabelElement {
+export function refit(
+  previous: LabelElement | null,
+  next: LabelElement,
+  dpi: number,
+  /** Stand-in content, so a bound element is measured by what it will say. */
+  values: Readonly<Record<string, string>> = {},
+): LabelElement {
   if (next.type === 'text') {
     if (previous !== null && (previous.type !== 'text' || !affectsTextBox(previous, next))) {
       return next
     }
-    return { ...next, ...textBoxMm(next, canvasLineWidth) }
+    const text = isVariableRef(next.content) ? (values[next.content.$var] ?? '') : next.content
+    return { ...next, ...textBoxMm(next, canvasLineWidth, text) }
   }
 
   if (next.type === 'qrcode' || next.type === 'barcode') {

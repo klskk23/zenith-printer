@@ -768,3 +768,62 @@ describe('the rulers', () => {
     expect(highlights()[0]!.getAttribute('pointer-events')).toBe('none')
   })
 })
+
+describe('binding an element to a variable field', () => {
+  /**
+   * Radix activates a tab on focus, not on click, so a bare click leaves the
+   * panel where it was — and every assertion after it passes against the wrong
+   * panel.
+   */
+  function openFieldsTab(): void {
+    const tab = screen.getByRole('tab', { name: '可变字段' })
+    fireEvent.focus(tab)
+    fireEvent.click(tab)
+    expect(document.querySelector('[data-inspector]'), 'the fields tab did not open').toBeNull()
+  }
+
+  /**
+   * The crash: `irToSvg` refuses a `$var` it has no value for — correct when
+   * printing, since a label with a hole where a part number belongs is worse
+   * than one that does not print. But the editor is where bindings are *made*,
+   * and it draws inside React's render pass, so the throw escaped and blanked
+   * the application the moment a field was added.
+   */
+  it.each(['手工填入', '递增序号'])('survives adding a %s field', (kind) => {
+    openDesign()
+    addElement('文字')
+
+    openFieldsTab()
+    fireEvent.click(screen.getByText(kind))
+
+    expect(screen.getByRole('toolbar', { name: '标签设计' })).toBeDefined()
+    expect(document.querySelector('[data-label-canvas]')).not.toBeNull()
+  })
+
+  it('draws the sample value rather than nothing', () => {
+    openDesign()
+    addElement('文字')
+    openFieldsTab()
+    fireEvent.click(screen.getByText('手工填入'))
+
+    // Something is still drawn where the text was: a bound element shows what
+    // it will say, so the layout can be judged before the values exist.
+    expect(document.querySelector('[data-label-canvas] text')).not.toBeNull()
+  })
+
+  it('keeps the binding in the design, not the sample', () => {
+    // The stored element has to keep pointing at the field; drawing a sample
+    // must not write the sample back.
+    openDesign()
+    addElement('文字')
+    openFieldsTab()
+    fireEvent.click(screen.getByText('递增序号'))
+
+    const propertiesTab = screen.getByRole('tab', { name: '元素属性' })
+    fireEvent.focus(propertiesTab)
+    fireEvent.click(propertiesTab)
+    // A bound element has no free-text content field to type into.
+    const inspector = document.querySelector('[data-inspector]')!
+    expect(inspector.querySelector('textarea')).toBeNull()
+  })
+})

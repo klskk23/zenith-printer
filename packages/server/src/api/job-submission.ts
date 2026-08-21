@@ -15,6 +15,7 @@ import {
   labelIrSchema,
   renderBarcodeSvg,
   resolveVariables,
+  sampleValues,
   type LabelIR,
 } from '@zenith/shared'
 import type { Database } from '../db/index.ts'
@@ -37,14 +38,10 @@ export interface ResolvedContent {
  * Sequence fields contribute their starting value; manual fields their sample.
  */
 export function previewValues(template: Template | null): Record<string, string> {
-  const values: Record<string, string> = {}
-  for (const field of template?.variableFields ?? []) {
-    values[field.name] =
-      field.source === 'manual'
-        ? (field.sampleValue ?? '')
-        : String(field.seqStart ?? 1).padStart(field.seqDigits ?? 1, '0')
-  }
-  return values
+  // The rule lives in @zenith/shared: the editor draws with these values and
+  // this check measures with them, and the two disagreeing would be invisible
+  // until a barcode reported as fitting turned out not to.
+  return sampleValues(template?.variableFields ?? [])
 }
 
 /** Every manual field must have a value before anything is printed (FR-038). */

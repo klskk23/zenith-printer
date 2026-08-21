@@ -36,6 +36,14 @@ export interface CanvasProps {
   onGestureEnd?: () => void
   /** Margins from the chosen profile. Drawn as advice; never enforced. */
   margins?: Margins | null
+  /**
+   * The same design with its variable bindings filled in, for drawing only.
+   *
+   * Interaction still works from `ir`, so an edit made while looking at a
+   * sample writes the binding back rather than the sample. Defaults to `ir`
+   * for a design that has no bindings.
+   */
+  drawnIr?: LabelIR
 }
 
 type Gesture = 'move' | 'resize' | 'rotate'
@@ -66,6 +74,7 @@ export function EditorCanvas({
   onGestureStart,
   onGestureEnd,
   margins = null,
+  drawnIr,
 }: CanvasProps): React.JSX.Element {
   const svgRef = useRef<SVGSVGElement>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -78,16 +87,29 @@ export function EditorCanvas({
 
   // The shared module owns every pixel the user sees, so what the editor shows
   // and what the printer burns cannot diverge.
-  // `skipUnrenderable` is what keeps the editor alive through the states a
-  // half-typed symbol passes through. Without it, clearing a QR code's content
-  // threw out of React's render pass and blanked the entire application.
+  /**
+   * The drawing, with variable bindings filled in.
+   *
+   * `irToSvg` refuses to render a `$var` it was not given a value for, and
+   * rightly: printing a label with a hole where a part number belongs is worse
+   * than refusing. But the editor is where bindings are *made*, so the moment
+   * an element was bound the canvas threw out of React's render pass and
+   * blanked the application. Standing values are what the designer needs to
+   * see anyway — a box the width of "ABC-12345" rather than of nothing.
+   *
+   * Resolved into a copy. The stored IR keeps the binding, so an edit made
+   * while looking at a sample writes back the binding.
+   *
+   * `skipUnrenderable` covers the other states a half-typed symbol passes
+   * through — an empty QR code, an EAN-13 three digits in.
+   */
   const markup = useMemo(
     () =>
-      irToSvg(ir, {
+      irToSvg(drawnIr ?? ir, {
         skipUnrenderable: true,
         ...(resolveImage === undefined ? {} : { resolveImage }),
       }),
-    [ir, resolveImage],
+    [ir, drawnIr, resolveImage],
   )
   const inner = useMemo(() => markup.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, ''), [markup])
 

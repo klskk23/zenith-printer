@@ -70,3 +70,40 @@ export function formatSequence(fieldName: string, value: number, digits: number)
   }
   return String(value).padStart(digits, '0')
 }
+
+
+/**
+ * The shape needed to produce a stand-in value; both sides' field types fit.
+ */
+export interface SampleableField {
+  name: string
+  source: 'manual' | 'sequence'
+  sampleValue?: string
+  seqStart?: number
+  seqDigits?: number
+}
+
+/**
+ * Stand-in values for fields whose real content is not known yet.
+ *
+ * Shared because two places need the same answer and a disagreement between
+ * them is invisible until it is expensive: the editor draws the design with
+ * these, and the pre-print check measures overflow with them. If the editor
+ * showed `1` where the check assumed `0001`, a barcode could be reported as
+ * fitting on a canvas it does not fit on.
+ *
+ * A manual field has whatever sample the author gave it, and an empty string
+ * if none — an empty box is honest about a field nobody described. A sequence
+ * shows its starting number, padded, because that is the value the first label
+ * of the next batch will actually carry.
+ */
+export function sampleValues(fields: readonly SampleableField[]): Record<string, string> {
+  const values: Record<string, string> = {}
+  for (const field of fields) {
+    values[field.name] =
+      field.source === 'manual'
+        ? (field.sampleValue ?? '')
+        : String(field.seqStart ?? 1).padStart(field.seqDigits ?? 1, '0')
+  }
+  return values
+}

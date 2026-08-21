@@ -39,6 +39,8 @@ import { ElementContextMenu } from './context-menu.tsx'
 import { symbolFitMm } from './barcode-width.ts'
 import { copyElement, duplicateElement, pasteElement } from './clipboard.ts'
 import { imageBoxMm, refit } from './autofit.ts'
+import { previewIr } from './preview-values.ts'
+import { sampleValues } from '@zenith/shared'
 import { imageFileFrom, naturalSizeOf, useUploadImage } from '../features/images/hooks.ts'
 import { canRedo, canUndo, commit, initUndo, redo, undo } from './undo.ts'
 import { Inspector } from './inspector.tsx'
@@ -210,6 +212,15 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
   )
 
   const violations = useMemo(() => inspect(ir, limits), [ir, limits])
+
+  /**
+   * The design as the canvas should draw it.
+   *
+   * `irToSvg` refuses a `$var` it has no value for — correct when printing,
+   * fatal in the editor, which is where bindings are made. Binding an element
+   * threw out of React's render pass and blanked the application.
+   */
+  const drawn = useMemo(() => previewIr(ir, fields), [ir, fields])
   const blocking = blockingViolations(violations)
   const selected = ir.elements.find((element) => element.id === selectedId) ?? null
 
@@ -217,7 +228,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
     // Fitted on the way in: a new text element is 30x5 mm holding about 6x3 mm
     // of glyphs, and a new QR code is a 15 mm square holding about 6 mm of
     // symbol.
-    const element = refit(null, createElement(type, ir), ir.dpi)
+    const element = refit(null, createElement(type, ir), ir.dpi, sampleValues(fields))
     setIr({ ...ir, elements: [...ir.elements, element] })
     setSelectedId(element.id)
     setPanel('element')
@@ -238,7 +249,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
    */
   const updateElement = (next: LabelElement, mergeKey: string | null = null): void => {
     const previous = ir.elements.find((e) => e.id === next.id) ?? null
-    const fitted = refit(previous, next, ir.dpi)
+    const fitted = refit(previous, next, ir.dpi, sampleValues(fields))
     setIr({ ...ir, elements: ir.elements.map((e) => (e.id === fitted.id ? fitted : e)) }, mergeKey)
   }
 
@@ -658,6 +669,10 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
             >
               <CanvasViewport
                 ir={ir}
+                // The drawing gets bindings filled in; interaction keeps the
+                // stored design, so editing while looking at a sample writes
+                // back the binding.
+                drawnIr={drawn}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
                 onChange={setIr}
