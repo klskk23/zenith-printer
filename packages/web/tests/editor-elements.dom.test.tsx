@@ -827,3 +827,91 @@ describe('binding an element to a variable field', () => {
     expect(inspector.querySelector('textarea')).toBeNull()
   })
 })
+
+describe('renaming a variable field', () => {
+  function openFields(): void {
+    const tab = screen.getByRole('tab', { name: '可变字段' })
+    fireEvent.focus(tab)
+    fireEvent.click(tab)
+  }
+
+  /** The bind selector, not the printer one on the toolbar. */
+  function bindSelect(): HTMLSelectElement {
+    const label = [...document.querySelectorAll('label')].find(
+      (l) => l.textContent === '绑定到选中元素',
+    )
+    expect(label, 'no bind selector').toBeDefined()
+    return label!.parentElement!.querySelector('select') as HTMLSelectElement
+  }
+
+  function nameInput(): HTMLInputElement {
+    const label = [...document.querySelectorAll('label')].find((l) => l.textContent === '字段名')
+    expect(label, 'no field name input').toBeDefined()
+    return label!.parentElement!.querySelector('input') as HTMLInputElement
+  }
+
+  function addManualField(): void {
+    openDesign()
+    addElement('文字')
+    openFields()
+    fireEvent.click(screen.getByText('手工填入'))
+  }
+
+  /**
+   * The row was keyed by the field's name, and the name box edits that name —
+   * so after every keystroke React saw a different row, threw the old one away
+   * and built a new one. The caret went with it, and a name could only ever be
+   * one character long.
+   */
+  it('keeps the input alive across keystrokes', () => {
+    addManualField()
+    const input = nameInput()
+    input.focus()
+
+    for (const value of ['p', 'pa', 'par', 'part']) {
+      fireEvent.change(nameInput(), { target: { value } })
+    }
+
+    expect(nameInput().value).toBe('part')
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('keeps it the same element, not a replacement that happens to look alike', () => {
+    addManualField()
+    const before = nameInput()
+    fireEvent.change(before, { target: { value: 'x' } })
+    expect(nameInput()).toBe(before)
+  })
+
+  /**
+   * A binding is by name. Renaming the field without rewriting them leaves
+   * every bound element pointing at something that no longer exists — it draws
+   * as nothing, and nothing on screen says why.
+   */
+  it('takes the elements bound to it along', () => {
+    addManualField()
+    // The new field binds to the selected element automatically or by hand;
+    // either way the element ends up pointing at the field's name.
+    fireEvent.change(bindSelect(), { target: { value: 'field1' } })
+    expect(bindSelect().value, 'the element did not bind').toBe('field1')
+
+    fireEvent.change(nameInput(), { target: { value: 'partNo' } })
+
+    // Still bound: the selector shows the new name rather than falling back to
+    // "not bound".
+    expect(bindSelect().value).toBe('partNo')
+  })
+
+  it('warns when two fields end up with the same name', () => {
+    addManualField()
+    fireEvent.click(screen.getByText('手工填入'))
+
+    const inputs = [...document.querySelectorAll('label')]
+      .filter((l) => l.textContent === '字段名')
+      .map((l) => l.parentElement!.querySelector('input') as HTMLInputElement)
+    expect(inputs.length).toBe(2)
+
+    fireEvent.change(inputs[1]!, { target: { value: inputs[0]!.value } })
+    expect(screen.getAllByText(/字段名重复/).length).toBeGreaterThan(0)
+  })
+})

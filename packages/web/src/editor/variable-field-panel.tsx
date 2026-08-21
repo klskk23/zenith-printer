@@ -26,6 +26,11 @@ export interface VariableFieldPanelProps {
   fields: VariableField[]
   onChangeFields: (fields: VariableField[]) => void
   onBindElement: (elementId: string, fieldName: string | null) => void
+  /**
+   * Renaming is the editor's job, not this panel's: every element bound to the
+   * field has to follow, and only the editor holds the design.
+   */
+  onRenameField: (index: number, name: string) => void
 }
 
 function canHoldField(element: LabelElement | null): boolean {
@@ -44,12 +49,24 @@ export function VariableFieldPanel({
   fields,
   onChangeFields,
   onBindElement,
+  onRenameField,
 }: VariableFieldPanelProps): React.JSX.Element {
   const bound = boundFieldName(element)
 
-  const patch = (name: string, changes: Partial<VariableField>): void => {
-    onChangeFields(fields.map((field) => (field.name === name ? { ...field, ...changes } : field)))
+  /**
+   * By position, not by name.
+   *
+   * The name is one of the things being edited, so identifying a row by it
+   * means a row stops being itself the moment somebody types in it.
+   */
+  const patch = (index: number, changes: Partial<VariableField>): void => {
+    onChangeFields(fields.map((field, at) => (at === index ? { ...field, ...changes } : field)))
   }
+
+  /** Two fields sharing a name make every binding to it ambiguous. */
+  const duplicated = new Set(
+    fields.map((field) => field.name).filter((name, at, all) => all.indexOf(name) !== at),
+  )
 
   const addField = (source: VariableField['source']): void => {
     const name = `field${fields.length + 1}`
@@ -98,8 +115,14 @@ export function VariableFieldPanel({
 
       {fields.length === 0 && <p className="text-xs text-muted-foreground">{copy.fields.empty}</p>}
 
-      {fields.map((field) => (
-        <div key={field.name} className="space-y-2 rounded-md border border-border p-2">
+      {/*
+        Keyed by position. Keyed by name — which it was — the row was a
+        different row after every keystroke in the name box, so React threw it
+        away and built a new one, and the caret went with it: typing a name
+        one character at a time was impossible.
+      */}
+      {fields.map((field, index) => (
+        <div key={index} className="space-y-2 rounded-md border border-border p-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium">
               {field.source === 'manual' ? copy.fields.manual : copy.fields.sequence}
@@ -116,11 +139,14 @@ export function VariableFieldPanel({
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label>{copy.fields.name}</Label>
-              <Input value={field.name} onChange={(e) => patch(field.name, { name: e.target.value })} />
+              <Input value={field.name} onChange={(e) => onRenameField(index, e.target.value)} />
+              {duplicated.has(field.name) && (
+                <p className="text-[11px] text-destructive">{copy.fields.duplicateName}</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>{copy.fields.label}</Label>
-              <Input value={field.label} onChange={(e) => patch(field.name, { label: e.target.value })} />
+              <Input value={field.label} onChange={(e) => patch(index, { label: e.target.value })} />
             </div>
           </div>
 
@@ -129,7 +155,7 @@ export function VariableFieldPanel({
               <Label>{copy.fields.sampleValue}</Label>
               <Input
                 value={field.sampleValue ?? ''}
-                onChange={(e) => patch(field.name, { sampleValue: e.target.value })}
+                onChange={(e) => patch(index, { sampleValue: e.target.value })}
               />
               <p className="text-[11px] text-muted-foreground">{copy.fields.sampleHint}</p>
             </div>
@@ -142,7 +168,7 @@ export function VariableFieldPanel({
                     type="number"
                     min={0}
                     value={field.seqStart ?? 1}
-                    onChange={(e) => patch(field.name, { seqStart: Number(e.target.value) || 0 })}
+                    onChange={(e) => patch(index, { seqStart: Number(e.target.value) || 0 })}
                   />
                 </div>
                 <div className="space-y-1">
@@ -152,7 +178,7 @@ export function VariableFieldPanel({
                     min={1}
                     max={12}
                     value={field.seqDigits ?? 3}
-                    onChange={(e) => patch(field.name, { seqDigits: Number(e.target.value) || 1 })}
+                    onChange={(e) => patch(index, { seqDigits: Number(e.target.value) || 1 })}
                   />
                 </div>
                 <div className="space-y-1">
@@ -161,7 +187,7 @@ export function VariableFieldPanel({
                     type="number"
                     min={1}
                     value={field.seqStep ?? 1}
-                    onChange={(e) => patch(field.name, { seqStep: Number(e.target.value) || 1 })}
+                    onChange={(e) => patch(index, { seqStep: Number(e.target.value) || 1 })}
                   />
                 </div>
               </div>

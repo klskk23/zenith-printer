@@ -251,6 +251,7 @@ export const copy: Copy = {
     heading: 'Variable fields',
     empty:
       'No variable fields yet. Add one and a single template can cover a batch of labels that differ',
+    duplicateName: 'Duplicate name — elements bound to it cannot be told apart',
     addManual: 'Entered by hand',
     addSequence: 'Running number',
     manual: 'Entered by hand (one value shared by every copy in this run)',

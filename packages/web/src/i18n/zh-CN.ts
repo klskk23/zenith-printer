@@ -247,6 +247,7 @@ export const copy = {
   fields: {
     heading: '可变字段',
     empty: '还没有可变字段。加一个之后，同一个模板就能覆盖内容不同的一批标签',
+    duplicateName: '字段名重复，绑定到它的元素将无法区分',
     addManual: '手工填入',
     addSequence: '递增序号',
     manual: '手工填入（本次打印全部份数共用一个值）',

@@ -40,7 +40,7 @@ import { symbolFitMm } from './barcode-width.ts'
 import { copyElement, duplicateElement, pasteElement } from './clipboard.ts'
 import { imageBoxMm, refit } from './autofit.ts'
 import { previewIr } from './preview-values.ts'
-import { sampleValues } from '@zenith/shared'
+import { isVariableRef, sampleValues } from '@zenith/shared'
 import { imageFileFrom, naturalSizeOf, useUploadImage } from '../features/images/hooks.ts'
 import { canRedo, canUndo, commit, initUndo, redo, undo } from './undo.ts'
 import { Inspector } from './inspector.tsx'
@@ -359,6 +359,37 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
     setIr(result.ir)
     setSelectedId(result.id)
     setPanel('element')
+  }
+
+  /**
+   * Rename a field, and take every element bound to it along.
+   *
+   * A binding is by name, so renaming the field without rewriting them leaves
+   * each one pointing at something that no longer exists — the element draws
+   * as nothing, and nothing on screen says why. The two halves belong in one
+   * step for undo as well: reversing a rename has to reverse the rebinding.
+   *
+   * Identified by position, because the name is the thing being edited. Every
+   * keystroke is a rename; the shared merge key folds them into one entry.
+   */
+  const renameField = (index: number, name: string): void => {
+    const previous = fields[index]?.name
+    if (previous === undefined || previous === name) {
+      return
+    }
+
+    setFields(fields.map((field, at) => (at === index ? { ...field, name } : field)))
+    setIr(
+      {
+        ...ir,
+        elements: ir.elements.map((element) =>
+          'content' in element && isVariableRef(element.content) && element.content.$var === previous
+            ? ({ ...element, content: { $var: name } } as LabelElement)
+            : element,
+        ),
+      },
+      `rename-field-${index}`,
+    )
   }
 
   /** Point an element at a variable field, or back at fixed content. */
@@ -730,6 +761,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                       fields={fields}
                       onChangeFields={setFields}
                       onBindElement={bindElement}
+                      onRenameField={renameField}
                     />
                   </TabsContent>
                 </CardContent>
