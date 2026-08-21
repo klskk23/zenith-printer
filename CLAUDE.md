@@ -1,18 +1,24 @@
 <!-- SPECKIT START -->
-当前功能：**002-web-workspace-editor**（前端工作区与标签编辑器重构）
+当前功能：**003-variables-data-sources**（变量与表格数据源）
 
 开始任何实现工作前，请阅读以下产物：
 
-- 实现计划：`specs/002-web-workspace-editor/plan.md`
-- 功能规格：`specs/002-web-workspace-editor/spec.md`
-- 技术决策与待实测假设：`specs/002-web-workspace-editor/research.md`
-- 数据模型：`specs/002-web-workspace-editor/data-model.md`
-- 接口契约：`specs/002-web-workspace-editor/contracts/`
-- 环境搭建：`specs/002-web-workspace-editor/quickstart.md`
-- 界面设计共识：`docs/frontend-design-v2.md`
+- 实现计划：`specs/003-variables-data-sources/plan.md`
+- 功能规格：`specs/003-variables-data-sources/spec.md`
+- 技术决策与否决项：`specs/003-variables-data-sources/research.md`
+- 数据模型：`specs/003-variables-data-sources/data-model.md`
+- 接口契约：`specs/003-variables-data-sources/contracts/`
+  - `variable-grammar.md` —— `${}` 文法，**已冻结**，改动会静默改变既有标签的含义
+  - `driver-port.md` —— 驱动端口的流式变更，影响四个驱动
+  - `rest-api.md` —— 新增与变更的端点
+- 环境搭建与手工验收：`specs/003-variables-data-sources/quickstart.md`
+- 设计共识（含否决项及其理由）：`docs/variables-and-data-sources.md`
 
-上一功能 **001-label-design-print** 的产物仍然有效，其规格与契约是本功能的基线：
-`specs/001-label-design-print/`
+本功能**废弃**「可变字段」（`variableFields` + `{ $var: name }`），改为三种变量与
+内联 `${}` 引用。IR 中元素的 `content` 收窄为普通字符串。
+
+前两个功能的产物仍然有效，其规格与契约是本功能的基线：
+`specs/001-label-design-print/`、`specs/002-web-workspace-editor/`
 <!-- SPECKIT END -->
 
 ## 项目宪章
