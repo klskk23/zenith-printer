@@ -22,6 +22,8 @@ import { OverflowNotice, type OverflowWarning } from './overflow-notice.tsx'
 import { Select } from '../../components/ui/select.tsx'
 import { usePrintForm } from '../templates/hooks.ts'
 import { FieldForm } from './field-form.tsx'
+import { Preview } from './preview.tsx'
+import { firstCopyValues } from './first-copy.ts'
 
 export interface PrintDialogProps {
   ir: LabelIR
@@ -124,7 +126,7 @@ export function PrintDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-background p-5 shadow-lg">
+      <div className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-lg">
         <h2 className="text-base font-semibold">{copy.print.heading}</h2>
 
         {result === null ? (
@@ -169,6 +171,32 @@ export function PrintDialog({
               onChangeOverride={(name, value) =>
                 setSequenceOverrides((prev) => ({ ...prev, [name]: value }))
               }
+            />
+
+            {/*
+              Below the fields, because it depends on them: a preview drawn
+              before the variables are filled in is a preview of a label that
+              will never print.
+            */}
+            <Preview
+              ir={ir}
+              printerId={selectedPrinterId}
+              templateId={templateId}
+              profileId={profileId}
+              variableValues={
+                // Held back until the field list has arrived. An empty list
+                // looks like "no variables" for the first render, which would
+                // preview a label with its `$var` refs unresolved and then
+                // replace it a moment later.
+                templateId !== null && form.isPending
+                  ? null
+                  : firstCopyValues({
+                      fields: form.data?.fields ?? [],
+                      manualValues,
+                      sequenceOverrides,
+                    })
+              }
+              copies={copies}
             />
 
             {blocked !== null && <Alert>{blocked}</Alert>}

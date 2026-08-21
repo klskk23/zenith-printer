@@ -1,0 +1,175 @@
+/**
+ * The preview, in the dialog that decides whether to burn a hundred labels.
+ *
+ * The component existed and nothing referenced it — so the one place that
+ * shows what the printer will actually put down was unreachable, while the
+ * settings that decide it (the cut-off, the image tone) grew controls of their
+ * own. A setting you cannot see the effect of is a setting you tune blind.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { PrintDialog } from '../src/features/print/print-dialog.tsx'
+import { labelIrSchema } from '@zenith/shared'
+
+const previews: Array<Record<string, unknown>> = []
+
+const CAPABILITIES = {
+  dpi: 203, printheadPixels: 384, densityMin: 1, densityMax: 5, densityDefault: 3,
+  paperTypes: [1], printDirection: 'top', supportsConsumableLevel: true,
+  model: 'B3S_P', serial: null, firmwareVersion: null,
+}
+
+const PRINTER = {
+  id: 'prn-1', name: 'B3S_P', kind: 'niimbot', transport: 'serial', address: '/dev/ttyACM0',
+  capabilities: CAPABILITIES, queueState: 'running', queuePausedReason: null,
+  lastProbedAt: '2026-08-22T00:00:00.000Z', createdAt: '2026-08-22T00:00:00.000Z',
+  offsetXDots: 0, offsetYDots: 0,
+}
+
+const IR = labelIrSchema.parse({
+  widthMm: 50, heightMm: 30, dpi: 203,
+  elements: [{ id: 'r', type: 'rect', xMm: 2, yMm: 2, widthMm: 10, heightMm: 10, strokeWidthDots: 2 }],
+})
+
+let formFields: unknown[] = []
+
+function wrap(ui: React.ReactNode): React.JSX.Element {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false } } })
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>
+}
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+beforeEach(() => {
+  previews.length = 0
+  formFields = []
+  vi.stubGlobal('URL', {
+    ...URL,
+    createObjectURL: () => 'blob:preview',
+    revokeObjectURL: () => undefined,
+  })
+  vi.stubGlobal('fetch', vi.fn((input: string, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/api/preview')) {
+      previews.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+      return Promise.resolve({
+        ok: true, status: 200,
+        headers: new Headers({ 'content-type': 'image/png', 'X-Clipped': 'false' }),
+        blob: () => Promise.resolve(new Blob([new Uint8Array([1])], { type: 'image/png' })),
+      } as unknown as Response)
+    }
+    const body = url.includes('print-form') ? { fields: formFields } : { warnings: [] }
+    return Promise.resolve({
+      ok: true, status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: () => Promise.resolve(body),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    } as unknown as Response)
+  }))
+})
+
+function open(over: Partial<React.ComponentProps<typeof PrintDialog>> = {}): void {
+  render(
+    wrap(
+      <PrintDialog
+        ir={IR}
+        templateId={null}
+        profileId="pro-1"
+        printers={[PRINTER as never]}
+        selectedPrinterId="prn-1"
+        onSelectPrinter={() => undefined}
+        onClose={() => undefined}
+        {...over}
+      />,
+    ),
+  )
+}
+
+describe('the print dialog', () => {
+  it('shows a preview', async () => {
+    open()
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    expect(await screen.findByAltText('打印预览')).toBeDefined()
+  })
+
+  /**
+   * Without the profile the preview would use the defaults, and show a label
+   * the cut-off and the image tone were never applied to.
+   */
+  it('renders through the chosen profile', async () => {
+    open()
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    expect(previews[0]).toMatchObject({ printerId: 'prn-1', profileId: 'pro-1' })
+  })
+
+  /**
+   * A job submitted with a template prints the *saved* design. Previewing the
+   * editor's IR instead would show one label and print another.
+   */
+  it('renders the stored template when the job will print from one', async () => {
+    open({ templateId: 'tpl-1' })
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    expect(previews[0]).toMatchObject({ templateId: 'tpl-1' })
+  })
+
+  it('sends no template id for an unsaved design', async () => {
+    open()
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    expect(previews[0]).not.toHaveProperty('templateId')
+  })
+})
+
+describe('a batch of more than one', () => {
+  it('says which label is being shown', async () => {
+    open()
+    const copies = document.querySelector('input[type="number"]') as HTMLInputElement
+    fireEvent.change(copies, { target: { value: '20' } })
+    expect(await screen.findByText(/共 20 张，此处预览第 1 张/)).toBeDefined()
+  })
+
+  it('says nothing about it for a single label', async () => {
+    open()
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    expect(screen.queryByText(/此处预览第 1 张/)).toBeNull()
+  })
+})
+
+describe('a design with variables', () => {
+  it('waits for the fields rather than previewing a label with holes in it', async () => {
+    formFields = [{ name: 'sku', label: 'SKU', source: 'manual' }]
+    open({ templateId: 'tpl-1' })
+
+    expect(await screen.findByText('填完上面的变量后才能预览')).toBeDefined()
+    expect(previews).toHaveLength(0)
+  })
+
+  it('previews once they are filled in', async () => {
+    formFields = [{ name: 'sku', label: 'SKU', source: 'manual' }]
+    open({ templateId: 'tpl-1' })
+    await screen.findByText('填完上面的变量后才能预览')
+
+    const field = [...document.querySelectorAll('input')].find(
+      (i) => i.type !== 'number',
+    ) as HTMLInputElement
+    fireEvent.change(field, { target: { value: 'A-1' } })
+
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    expect(previews[0]).toMatchObject({ variableValues: { sku: 'A-1' } })
+  })
+
+  it('previews the first copy of a sequence, not the first number', async () => {
+    // The suggestion continues from what has already been printed; showing
+    // 0001 would be a label nobody is about to produce.
+    formFields = [
+      { name: 'serial', label: '流水号', source: 'sequence', suggestedStart: 41, seqDigits: 4, seqStep: 1 },
+    ]
+    open({ templateId: 'tpl-1' })
+
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+    expect(previews[0]).toMatchObject({ variableValues: { serial: '0041' } })
+  })
+})

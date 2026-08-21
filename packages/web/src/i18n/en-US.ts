@@ -228,6 +228,9 @@ export const copy: Copy = {
     loading: 'Rendering…',
     clipped: 'The red region falls outside the canvas and will not be printed',
     hint: 'This is the thresholded image as it will print — fine lines and pale tones vanish here',
+    firstOfMany: (copies: number) => `${copies} labels; this is the first`,
+    needsFields: 'Fill in the fields above to preview',
+    failed: 'Could not render a preview',
   },
 
   print: {

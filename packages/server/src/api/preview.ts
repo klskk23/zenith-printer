@@ -8,7 +8,12 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { labelIrSchema } from '@zenith/shared'
+import {
+  MissingVariableError,
+  labelIrSchema,
+  resolveVariables,
+  type LabelIR,
+} from '@zenith/shared'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { maxLabelWidthMm } from '../domain/printer.ts'
@@ -22,12 +27,25 @@ import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { ImageRepo } from '../db/repositories/image-repo.ts'
 import { encodeMonochromePng } from '../render/png.ts'
 import { ApiError } from './errors.ts'
+import { resolveContent } from './job-submission.ts'
+import { TemplateRepo } from '../db/repositories/template-repo.ts'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
 const previewBody = z.object({
   printerId: z.string().min(1),
   ir: labelIrSchema,
+  /**
+   * Preview the stored template rather than the IR sent alongside it.
+   *
+   * A job submitted with a `templateId` prints the *saved* design, so an editor
+   * with unsaved changes would otherwise preview one label and print another —
+   * and a preview that shows something other than what prints is worse than no
+   * preview at all.
+   */
+  templateId: z.string().min(1).optional(),
+  /** Values for this copy's variable fields, so the preview is a real label. */
+  variableValues: z.record(z.string(), z.string()).optional(),
   profileId: z.string().min(1).optional(),
   /**
    * Position correction in dots.
@@ -63,7 +81,7 @@ export async function registerPreviewRoutes(app: FastifyInstance): Promise<void>
       throw ApiError.unprocessable('VALIDATION_FAILED', { printerId: printer.id })
     }
 
-    const ir = request.body.ir
+    const ir = previewIr(app, request.body)
     const maxWidth = maxLabelWidthMm(capabilities)
     if (ir.widthMm > maxWidth + 1e-6) {
       throw ApiError.unprocessable('FIELD_VALIDATION_FAILED', {
@@ -142,4 +160,41 @@ function thresholdFor(
   }
   const profiles = new ProfileRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
   return profiles.find(body.profileId)?.threshold ?? DEFAULT_THRESHOLD
+}
+
+
+/**
+ * The label this preview should show.
+ *
+ * The same content the job endpoint would build — from the stored template
+ * when one is named, from the ad-hoc IR otherwise — with this copy's variable
+ * values filled in. Anything less and the preview is of a different label.
+ */
+function previewIr(
+  app: FastifyInstance,
+  body: { ir: LabelIR; templateId?: string; variableValues?: Record<string, string> },
+): LabelIR {
+  let ir = body.ir
+  if (body.templateId !== undefined) {
+    const templates = new TemplateRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+    const template = templates.find(body.templateId)
+    if (template === undefined) {
+      throw ApiError.notFound({ templateId: body.templateId })
+    }
+    ir = resolveContent(template, null, null).ir
+  }
+
+  if (body.variableValues === undefined) {
+    return ir
+  }
+  try {
+    return resolveVariables(ir, body.variableValues)
+  } catch (err) {
+    if (err instanceof MissingVariableError) {
+      // The caller has not filled the form in yet. Saying which field is
+      // missing beats rendering a label with a hole in it.
+      throw ApiError.unprocessable('FIELD_VALIDATION_FAILED', { fieldName: err.fieldName })
+    }
+    throw err
+  }
 }
