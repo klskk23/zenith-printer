@@ -19,6 +19,7 @@ import type { Capabilities } from '../../api/types.ts'
 import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
+import { Checkbox } from '../../components/ui/checkbox.tsx'
 import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
@@ -100,6 +101,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             }}
           >
             {profile.name}
+            {profile.isDefault && <span className="ml-1 opacity-70">★</span>}
           </Button>
         ))}
       </div>
@@ -188,6 +190,22 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             {/* Said explicitly, because a shaded region normally means "no". */}
             <p className="text-[11px] text-muted-foreground">{copy.profiles.marginHint}</p>
           </div>
+
+          {/*
+            The default is what everything else falls back to: the profile the
+            editor preselects when a printer is chosen, and the stock the
+            calibration page is printed at. Without a control for it the flag
+            could never be set, so "default profile" was a concept the system
+            referred to and nobody could create.
+          */}
+          <Label className="flex items-center gap-2 text-sm text-foreground">
+            <Checkbox
+              checked={editing.isDefault === true}
+              onCheckedChange={(checked) => setDraft({ ...editing, isDefault: checked === true })}
+            />
+            {copy.profiles.isDefault}
+          </Label>
+          <p className="text-[11px] text-muted-foreground">{copy.profiles.isDefaultHint}</p>
 
           <div className="flex gap-2">
             <Button

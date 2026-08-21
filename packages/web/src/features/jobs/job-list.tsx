@@ -10,6 +10,9 @@ import { ApiRequestError } from '../../api/client.ts'
 import type { JobStatus } from '../../api/types.ts'
 import { useState } from 'react'
 import { copy } from '../../i18n/index.ts'
+import { usePreferences } from '../preferences/context.tsx'
+import { usePrinters } from '../printers/hooks.ts'
+import { belongsInQueue, formatInstant, hasTemplate, jobInstant } from './job-summary.ts'
 import { ReprintDialog } from './reprint-dialog.tsx'
 import { Progress } from '../../components/ui/progress.tsx'
 import { Alert } from '../../components/ui/alert.tsx'
@@ -52,6 +55,8 @@ function ProgressLabel({ job }: { job: PrintJob }): React.JSX.Element {
 }
 
 function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
+  const { preferences } = usePreferences()
+  const locale = preferences.language
   const cancel = useCancelJob()
   const [reprinting, setReprinting] = useState(false)
   const cancellable = job.status === 'queued'
@@ -59,9 +64,23 @@ function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
   return (
     <Card>
       <CardContent className="space-y-2 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className={cn('text-sm', STATUS_STYLE[job.status])}>{copy.jobs.status[job.status]}</span>
-          <span className="font-mono text-[11px] text-muted-foreground">{job.id.slice(0, 8)}</span>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            {/*
+              What was printed, not which row this is. An id fragment identifies
+              a job to someone reading logs; it tells the person holding the
+              labels nothing.
+            */}
+            <p className="truncate text-sm font-medium">
+              {hasTemplate(job) ? job.snapshot.templateName : copy.jobs.adHoc}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {formatInstant(jobInstant(job), locale)} · {copy.jobs.copies(job.requestedCopies)}
+            </p>
+          </div>
+          <span className={cn('shrink-0 text-sm', STATUS_STYLE[job.status])}>
+            {copy.jobs.status[job.status]}
+          </span>
         </div>
 
         <div className="flex items-center justify-between gap-3 text-xs">
@@ -106,12 +125,23 @@ function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
 export function JobList({ printerId }: { printerId: string | null }): React.JSX.Element {
   const jobs = useJobs(printerId)
 
+  const printers = usePrinters()
+  const pausedPrinterIds = new Set(
+    (printers.data ?? []).filter((p) => p.queueState === 'paused').map((p) => p.id),
+  )
+
+  // What is in flight, plus what is blocking it. Finished jobs used to pile up
+  // here as well as in history, so the queue never emptied and the two pages
+  // showed the same rows.
+  const active = (jobs.data ?? []).filter((job) => belongsInQueue(job, pausedPrinterIds))
+
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold">{copy.jobs.heading}</h3>
-      {jobs.data?.length === 0 && <p className="text-xs text-muted-foreground">{copy.jobs.empty}</p>}
+      {active.length === 0 && <p className="text-xs text-muted-foreground">{copy.jobs.empty}</p>}
       <div className="space-y-2">
-        {jobs.data?.map((job) => <JobRow key={job.id} job={job} />)}
+        {active.map((job) => (
+          <JobRow key={job.id} job={job} />
+        ))}
       </div>
     </div>
   )

@@ -10,29 +10,27 @@
  */
 import { useState } from 'react'
 import { copy } from '../../i18n/index.ts'
+import { usePreferences } from '../preferences/context.tsx'
+import { formatInstant, hasTemplate, isFinished, jobInstant } from './job-summary.ts'
 import { Button } from '../../components/ui/button.tsx'
 import { ReprintDialog } from './reprint-dialog.tsx'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Card, CardContent } from '../../components/ui/card.tsx'
 import { useJobs, type PrintJob } from './hooks.ts'
 
-const FINISHED = new Set(['completed', 'failed', 'cancelled'])
-
-function formatWhen(iso: string | null): string {
-  if (iso === null) {
-    return '—'
-  }
-  return new Date(iso).toLocaleString('zh-CN', { hour12: false })
-}
-
 function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
+  const { preferences } = usePreferences()
   const unknown = job.pagesPrinted === null
 
   return (
     <Card>
       <CardContent className="space-y-1 p-3 text-xs">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-medium">{job.snapshot.templateName ?? copy.history.adHoc}</span>
+          {/* Stated, not blank: "no template" is a fact about this job, and a
+              blank where a name goes reads as missing data instead. */}
+          <span className={hasTemplate(job) ? 'font-medium' : 'font-medium text-muted-foreground'}>
+            {hasTemplate(job) ? job.snapshot.templateName : copy.jobs.adHoc}
+          </span>
           <span className="flex items-center gap-2">
             <span className="text-muted-foreground">{copy.jobs.status[job.status]}</span>
             {job.status === 'failed' && (
@@ -44,7 +42,9 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
         </div>
 
         <div className="flex items-center justify-between gap-2 text-muted-foreground">
-          <span>{formatWhen(job.finishedAt ?? job.createdAt)}</span>
+          {/* Follows the interface language; this used to be hardcoded zh-CN,
+              so an English interface still showed Chinese timestamps. */}
+          <span>{formatInstant(jobInstant(job), preferences.language)}</span>
           <span className={unknown ? 'font-medium text-amber-700' : ''}>
             {unknown
               ? copy.jobs.progressUnknown(job.requestedCopies)
@@ -72,19 +72,20 @@ export function JobHistory({ printerId }: { printerId: string | null }): React.J
   const jobs = useJobs(printerId)
   const [expanded, setExpanded] = useState(false)
 
-  const finished = (jobs.data ?? []).filter((job) => FINISHED.has(job.status)).reverse()
+  // Newest first: history is read backwards from what just happened.
+  const finished = (jobs.data ?? []).filter(isFinished).reverse()
   const shown = expanded ? finished : finished.slice(0, 5)
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{copy.history.heading}</h3>
-        {finished.length > 5 && (
+      {/* The page supplies the heading; a second one here read as a repeat. */}
+      {finished.length > 5 && (
+        <div className="flex justify-end">
           <Button size="sm" variant="ghost" onClick={() => setExpanded(!expanded)}>
             {expanded ? copy.history.collapse : copy.history.expand(finished.length)}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {finished.length === 0 && <p className="text-xs text-muted-foreground">{copy.history.empty}</p>}
 
