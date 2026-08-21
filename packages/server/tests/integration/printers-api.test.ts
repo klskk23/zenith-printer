@@ -284,6 +284,17 @@ describe('calibration page', () => {
          WHERE id = ?`,
       )
       .run(printer.id)
+
+    // The calibration page must be the size of the paper, so a profile
+    // recording that size is a precondition rather than a nicety.
+    await app.inject({
+      method: 'POST',
+      url: `/api/printers/${printer.id}/profiles`,
+      payload: {
+        name: 'stock', density: 3, labelType: 1,
+        labelWidthMm: 50, labelHeightMm: 30, isDefault: true,
+      },
+    })
     return printer.id
   }
 
@@ -372,5 +383,125 @@ describe('calibration page', () => {
       payload: { confirmed: true },
     })
     expect(res.statusCode).toBe(404)
+  })
+})
+
+/**
+ * The calibration page has to be the size of the paper.
+ *
+ * It is measured against the edges of the label, so a page that is not the
+ * size of the label cannot be measured at all. This used to fall back to the
+ * printhead's full width when no profile said otherwise, which on a 50 mm roll
+ * means printing 104 mm: a wasted label, and most of it missing.
+ */
+describe('calibration page size', () => {
+  async function readyPrinter(): Promise<string> {
+    const printer = (await createPrinter()).json()
+    app.ctx.db
+      .prepare(
+        `UPDATE printers SET dpi = 203, printhead_pixels = 384, density_min = 1, density_max = 5,
+           density_default = 3, paper_types = '[1]', print_direction = 'top',
+           supports_consumable_level = 1, model = 'B3S_P', last_probed_at = '2026-08-21T00:00:00Z'
+         WHERE id = ?`,
+      )
+      .run(printer.id)
+    return printer.id
+  }
+
+  async function addProfile(
+    printerId: string,
+    over: Record<string, unknown> = {},
+  ): Promise<{ id: string }> {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/printers/${printerId}/profiles`,
+      payload: {
+        name: 'stock',
+        density: 3,
+        labelType: 1,
+        labelWidthMm: 50,
+        labelHeightMm: 30,
+        isDefault: true,
+        ...over,
+      },
+    })
+    return res.json()
+  }
+
+  const snapshotOf = (): { widthMm: number; heightMm: number } => {
+    const row = app.ctx.db.prepare('SELECT snapshot FROM print_jobs').get() as { snapshot: string }
+    return JSON.parse(row.snapshot).ir
+  }
+
+  it('refuses when nothing records a stock size', async () => {
+    const id = await readyPrinter()
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true },
+    })
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json().code).toBe('CALIBRATION_STOCK_UNKNOWN')
+  })
+
+  it('burns no label when it refuses', async () => {
+    const id = await readyPrinter()
+    await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true },
+    })
+    const count = app.ctx.db.prepare('SELECT COUNT(*) AS n FROM print_jobs').get() as { n: number }
+    expect(Number(count.n)).toBe(0)
+  })
+
+  it('says what to do about it', async () => {
+    const id = await readyPrinter()
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true },
+    })
+    expect(res.json().next.length).toBeGreaterThan(0)
+  })
+
+  it('uses the default profile stock', async () => {
+    const id = await readyPrinter()
+    await addProfile(id, { labelWidthMm: 50, labelHeightMm: 30 })
+    await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true },
+    })
+    expect(snapshotOf()).toMatchObject({ widthMm: 50, heightMm: 30 })
+  })
+
+  it('uses the profile it was asked for, not the default', async () => {
+    const id = await readyPrinter()
+    await addProfile(id, { name: 'wide', labelWidthMm: 50, labelHeightMm: 30 })
+    const narrow = await addProfile(id, {
+      name: 'narrow', labelWidthMm: 40, labelHeightMm: 20, isDefault: false,
+    })
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true, profileId: narrow.id },
+    })
+
+    expect(snapshotOf()).toMatchObject({ widthMm: 40, heightMm: 20 })
+  })
+
+  it('never falls back to the printhead width', async () => {
+    // 384 dots at 203 dpi is 48 mm — the value the old fallback produced.
+    const id = await readyPrinter()
+    await addProfile(id, { labelWidthMm: 50, labelHeightMm: 30 })
+    await app.inject({
+      method: 'POST',
+      url: `/api/printers/${id}/calibration-page`,
+      payload: { confirmed: true },
+    })
+    expect(snapshotOf().widthMm).not.toBeCloseTo(48, 1)
   })
 })

@@ -7,15 +7,13 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { isOffsetWithinHead, maxLabelWidthMm, printerInputSchema, queueStateSchema } from '../domain/printer.ts'
+import { isOffsetWithinHead, printerInputSchema, queueStateSchema } from '../domain/printer.ts'
 import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { JobRepo } from '../db/repositories/job-repo.ts'
 import { buildSnapshot, resolveContent } from './job-submission.ts'
 import { calibrationPageIr } from '../render/calibration-page.ts'
 import { randomUUID } from 'node:crypto'
 
-/** Used only when no profile says how tall the stock is. */
-const DEFAULT_CALIBRATION_HEIGHT_MM = 30
 import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { ApiError, HttpStatus } from './errors.ts'
 import { createDriver } from '../drivers/factory.ts'
@@ -169,10 +167,26 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
           ? (profiles.listFor(printer.id).find((p) => p.isDefault) ?? null)
           : (profiles.find(request.body.profileId) ?? null)
 
+      /*
+       * The page is measured against the edges of the paper, so it has to be
+       * the size of the paper.
+       *
+       * Refused rather than guessed. This used to fall back to the printhead's
+       * full width, which on a 50 mm roll means printing a 104 mm page: a
+       * wasted label, and one that cannot be measured because most of it is
+       * not there. Being told to pick the stock costs a click; guessing costs
+       * a label and produces nothing.
+       */
+      if (profile === null) {
+        throw ApiError.unprocessable('CALIBRATION_STOCK_UNKNOWN', {
+          printerId: printer.id,
+          profileCount: profiles.listFor(printer.id).length,
+        })
+      }
+
       const ir = calibrationPageIr({
-        // The page has to match the stock to be measurable against its edges.
-        widthMm: profile?.labelWidthMm ?? maxLabelWidthMm(capabilities),
-        heightMm: profile?.labelHeightMm ?? DEFAULT_CALIBRATION_HEIGHT_MM,
+        widthMm: profile.labelWidthMm,
+        heightMm: profile.labelHeightMm,
         dpi: capabilities.dpi,
       })
 

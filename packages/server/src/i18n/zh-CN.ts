@@ -124,6 +124,11 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '打印会消耗纸张且无法撤销',
     next: '确认后继续，届时将实际消耗标签',
   },
+  CALIBRATION_STOCK_UNKNOWN: {
+    what: '不知道该按多大的纸打印校正页',
+    why: '校正页要贴着纸的边缘来量，因此必须和纸一样大；这台打印机还没有记录纸张尺寸的打印参数',
+    next: '先在打印机页面新建一个打印参数并填入纸张宽高，再打印校正页',
+  },
   VALIDATION_FAILED: {
     what: '请求内容不合法',
     why: '提交的数据未通过校验',

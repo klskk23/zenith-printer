@@ -114,6 +114,11 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'Printing consumes stock and cannot be undone',
     next: 'Confirm once you are ready to spend the labels',
   },
+  CALIBRATION_STOCK_UNKNOWN: {
+    what: 'The size of the calibration page is unknown',
+    why: 'It is measured against the edges of the paper, so it has to be the size of the paper — and this printer has no profile recording a stock size',
+    next: 'Create a profile with the stock width and height on the printer page, then print the calibration page',
+  },
   VALIDATION_FAILED: {
     what: 'The request is not valid',
     why: 'The submitted data failed validation',
