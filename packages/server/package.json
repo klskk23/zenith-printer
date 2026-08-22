@@ -12,6 +12,7 @@
     "@zenith/shared": "*",
     "fastify": "^5.12.1",
     "fastify-type-provider-zod": "^7.0.0",
+    "google-auth-library": "^11.0.2",
     "serialport": "^13.0.0",
     "sharp": "^0.35.3",
     "zod": "^4.4.3"

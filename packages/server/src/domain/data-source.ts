@@ -29,12 +29,33 @@ export const dataSourceColumnsSchema = z
     message: 'column names must be unique',
   })
 
+/**
+ * Where a data source's rows come from, when they come from elsewhere.
+ *
+ * `worksheetId` is the stable handle — a worksheet can be renamed in Google and
+ * keeps its id — while `worksheetTitle` is what the read endpoint addresses it
+ * by. Both are kept, and the title is refreshed from the id on every read;
+ * storing only the title would break on a rename that broke nothing.
+ */
+export interface DataSourceLink {
+  spreadsheetId: string
+  spreadsheetTitle: string
+  worksheetId: number
+  worksheetTitle: string
+  lastRefreshedAt: string
+}
+
+export type DataSourceKind = 'local' | 'google-sheets'
+
 export interface DataSource {
   id: string
   name: string
   columns: string[]
   /** Denormalised so the list page does not COUNT(*) over ten thousand rows. */
   rowCount: number
+  sourceKind: DataSourceKind
+  /** Non-null exactly when `sourceKind` is not `local`. */
+  link: DataSourceLink | null
   createdAt: string
   updatedAt: string
 }

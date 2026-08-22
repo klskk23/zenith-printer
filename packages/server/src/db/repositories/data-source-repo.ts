@@ -8,7 +8,12 @@
  */
 import type { Database } from '../index.ts'
 import type { Clock, IdGenerator } from '../../clock.ts'
-import { MAX_ROWS, type DataSource, type DataSourceRow } from '../../domain/data-source.ts'
+import {
+  MAX_ROWS,
+  type DataSource,
+  type DataSourceLink,
+  type DataSourceRow,
+} from '../../domain/data-source.ts'
 
 type Row = Record<string, unknown>
 
@@ -16,6 +21,17 @@ export interface CreateDataSourceInput {
   name: string
   columns: string[]
   rows: Array<Record<string, string>>
+}
+
+export interface CreateLinkedInput extends CreateDataSourceInput {
+  link: Omit<DataSourceLink, 'lastRefreshedAt'>
+}
+
+export interface ReplaceLinkedInput {
+  columns: string[]
+  rows: Array<Record<string, string>>
+  /** Re-read from the worksheet id, so a rename in Google does not strand us. */
+  worksheetTitle: string
 }
 
 export class DataSourceRepo {
@@ -35,9 +51,89 @@ export class DataSourceRepo {
       name: String(row.name),
       columns: JSON.parse(String(row.columns)) as string[],
       rowCount: Number(row.row_count),
+      sourceKind: String(row.source_kind) as DataSource['sourceKind'],
+      link:
+        row.spreadsheet_id === null || row.spreadsheet_id === undefined
+          ? null
+          : {
+              spreadsheetId: String(row.spreadsheet_id),
+              spreadsheetTitle: String(row.spreadsheet_title),
+              worksheetId: Number(row.worksheet_id),
+              worksheetTitle: String(row.worksheet_title),
+              lastRefreshedAt: String(row.last_refreshed_at),
+            },
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     }
+  }
+
+  /** The stored row, for tests that need to see the columns themselves. */
+  rawRow(id: string): Record<string, unknown> {
+    return this.#db.prepare('SELECT * FROM data_sources WHERE id = ?').get(id) as Record<
+      string,
+      unknown
+    >
+  }
+
+  /**
+   * Create a data source backed by a spreadsheet.
+   *
+   * `lastRefreshedAt` is set now rather than left null: the rows being written
+   * *are* the result of a read, and calling that "never refreshed" would be a
+   * lie the list page would then display.
+   */
+  createLinked(input: CreateLinkedInput): DataSource {
+    const created = this.create({ name: input.name, columns: input.columns, rows: input.rows })
+    this.#db
+      .prepare(
+        `UPDATE data_sources
+            SET source_kind = 'google-sheets', spreadsheet_id = ?, spreadsheet_title = ?,
+                worksheet_id = ?, worksheet_title = ?, last_refreshed_at = ?
+          WHERE id = ?`,
+      )
+      .run(
+        input.link.spreadsheetId,
+        input.link.spreadsheetTitle,
+        input.link.worksheetId,
+        input.link.worksheetTitle,
+        this.#clock.now().toISOString(),
+        created.id,
+      )
+    return this.find(created.id)!
+  }
+
+  /** Replace a linked source's columns and rows wholesale, as a refresh does. */
+  replaceLinked(id: string, input: ReplaceLinkedInput): void {
+    this.#db.exec('BEGIN')
+    try {
+      this.#db
+        .prepare('UPDATE data_sources SET columns = ?, worksheet_title = ?, last_refreshed_at = ? WHERE id = ?')
+        .run(JSON.stringify(input.columns), input.worksheetTitle, this.#clock.now().toISOString(), id)
+      this.#writeRows(id, input.rows)
+      this.#db.exec('COMMIT')
+    } catch (err) {
+      this.#db.exec('ROLLBACK')
+      throw err
+    }
+  }
+
+  /**
+   * Sever the link, keeping every row.
+   *
+   * The origin is cleared rather than hidden: nothing afterwards can decide the
+   * source is "sort of" still linked. What remains is exactly what uploading a
+   * CSV would have produced.
+   */
+  unlink(id: string): void {
+    this.#db
+      .prepare(
+        `UPDATE data_sources
+            SET source_kind = 'local', spreadsheet_id = NULL, spreadsheet_title = NULL,
+                worksheet_id = NULL, worksheet_title = NULL, last_refreshed_at = NULL,
+                updated_at = ?
+          WHERE id = ?`,
+      )
+      .run(this.#clock.now().toISOString(), id)
   }
 
   list(): DataSource[] {

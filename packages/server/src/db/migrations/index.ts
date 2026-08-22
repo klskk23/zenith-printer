@@ -322,6 +322,30 @@ const templateThumbnail = `
   ALTER TABLE templates ADD COLUMN thumbnail BLOB;
 `
 
+/**
+ * Where a data source's rows come from.
+ *
+ * Six nullable columns on the row rather than a side table: a data source has
+ * at most one origin, and that origin lives exactly as long as the row does —
+ * deleting the source deletes it, unlinking clears it. A join table would only
+ * add a way for the two to disagree.
+ *
+ * No backfill. `local` is not a placeholder for the right answer; for every
+ * data source that already exists, it *is* the right answer.
+ *
+ * `source_kind` is a CHECK rather than a boolean so that a second kind of
+ * origin later costs a value, not another column.
+ */
+const dataSourceLink = `
+  ALTER TABLE data_sources ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'local'
+    CHECK (source_kind IN ('local', 'google-sheets'));
+  ALTER TABLE data_sources ADD COLUMN spreadsheet_id    TEXT;
+  ALTER TABLE data_sources ADD COLUMN spreadsheet_title TEXT;
+  ALTER TABLE data_sources ADD COLUMN worksheet_id      INTEGER;
+  ALTER TABLE data_sources ADD COLUMN worksheet_title   TEXT;
+  ALTER TABLE data_sources ADD COLUMN last_refreshed_at TEXT;
+`
+
 export const migrations: Migration[] = [
   { id: 1, name: 'initial_schema', up: initialSchema },
   { id: 2, name: 'template_version', up: templateVersion },
@@ -337,4 +361,5 @@ export const migrations: Migration[] = [
   { id: 9, name: 'claims_from_seq_ranges', up: '', apply: claimsFromSeqRanges },
   { id: 10, name: 'drop_variable_fields', up: dropVariableFields, apply: rewriteElementContent },
   { id: 11, name: 'template_thumbnail', up: templateThumbnail, apply: backfillThumbnails },
+  { id: 12, name: 'data_source_link', up: dataSourceLink },
 ]

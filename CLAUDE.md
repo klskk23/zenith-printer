@@ -1,24 +1,32 @@
 <!-- SPECKIT START -->
-当前功能：**003-variables-data-sources**（变量与表格数据源）
+当前功能：**004-google-sheets-source**（Google Sheets 数据源）
 
 开始任何实现工作前，请阅读以下产物：
 
-- 实现计划：`specs/003-variables-data-sources/plan.md`
-- 功能规格：`specs/003-variables-data-sources/spec.md`
-- 技术决策与否决项：`specs/003-variables-data-sources/research.md`
-- 数据模型：`specs/003-variables-data-sources/data-model.md`
-- 接口契约：`specs/003-variables-data-sources/contracts/`
-  - `variable-grammar.md` —— `${}` 文法，**已冻结**，改动会静默改变既有标签的含义
-  - `driver-port.md` —— 驱动端口的流式变更，影响四个驱动
-  - `rest-api.md` —— 新增与变更的端点
-- 环境搭建与手工验收：`specs/003-variables-data-sources/quickstart.md`
-- 设计共识（含否决项及其理由）：`docs/variables-and-data-sources.md`
+- 实现计划：`specs/004-google-sheets-source/plan.md`
+- 功能规格：`specs/004-google-sheets-source/spec.md`
+- 技术决策与否决项：`specs/004-google-sheets-source/research.md`（外部事实已核实，附出处）
+- 数据模型：`specs/004-google-sheets-source/data-model.md`
+- 接口契约：`specs/004-google-sheets-source/contracts/`
+  - `sheets-port.md` —— 与 Google 唯一的接触面；**私钥只在真实实现里出现这一处**
+  - `rest-api.md` —— 新增与变更的端点、错误码、CLI
+- 环境搭建与手工验收：`specs/004-google-sheets-source/quickstart.md`
+- 设计共识（含否决项及其理由）：`docs/google-sheets-data-source.md`
 
-本功能**废弃**「可变字段」（`variableFields` + `{ $var: name }`），改为三种变量与
-内联 `${}` 引用。IR 中元素的 `content` 收窄为普通字符串。
+三条支配性决定，改动前先读它们的理由：
 
-前两个功能的产物仍然有效，其规格与契约是本功能的基线：
-`specs/001-label-design-print/`、`specs/002-web-workspace-editor/`
+1. **服务账号，不是 OAuth2**。局域网 HTTP 地址无法注册为重定向 URI；服务账号另免去
+   刷新令牌有效期与应用验证，且只能看见被显式分享的表。
+2. **行留在本地，刷新是手动的**。渲染、`PageSource`、提交时快照一行不改，打印不依赖外网。
+3. **失败不是拒绝**。表不在、列对不上、超行数、超时——保留旧行、说清原因、不阻止打印。
+   唯一会拦住人的是「有列消失或改名」。
+
+**默认测试套件必须脱网可跑**：Google 侧一律走 `SheetsPort` 的假实现。只有两点必须联网
+实测（见 `quickstart.md` 第五节），它们在 `hardware` 项目里。
+
+前三个功能的产物仍然有效，其规格与契约是本功能的基线：
+`specs/001-label-design-print/`、`specs/002-web-workspace-editor/`、
+`specs/003-variables-data-sources/`
 <!-- SPECKIT END -->
 
 ## 项目宪章
