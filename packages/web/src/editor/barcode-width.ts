@@ -136,8 +136,18 @@ export function moduleCountOf(
 export function symbolBoxMm(
   element: BarcodeElement | QrcodeElement,
   dpi: number,
+  /**
+   * Values for `${}` references, so the box matches what will be encoded.
+   *
+   * Without them a symbol bound to a column was measured against the stand-in,
+   * and the frame on the canvas described a symbol nobody was going to print.
+   * Text has been measured against its resolved content since boxes were made
+   * to follow content; these two were left behind because the values never
+   * reached them.
+   */
+  values: Readonly<Record<string, string>> = {},
 ): { widthMm: number; heightMm?: number } | null {
-  const moduleCount = moduleCountOf(element)
+  const moduleCount = moduleCountOf(element, values)
   if (moduleCount === null) {
     return null
   }
@@ -171,8 +181,11 @@ export function symbolFitMm(
   element: BarcodeElement | QrcodeElement,
   targetMm: number,
   dpi: number,
+  /** Values for `${}` references: the achievable widths are multiples of the
+   *  module count, and that count comes from what will actually be encoded. */
+  values: Readonly<Record<string, string>> = {},
 ): { moduleWidthDots: number; widthMm: number; heightMm?: number } | null {
-  const moduleCount = moduleCountOf(element)
+  const moduleCount = moduleCountOf(element, values)
   if (moduleCount === null) {
     return null
   }
@@ -204,11 +217,12 @@ export function resizePatchFor(
   element: LabelElement,
   size: { widthMm: number; heightMm: number },
   dpi: number,
+  values: Readonly<Record<string, string>> = {},
 ): Partial<LabelElement> {
   if (element.type !== 'barcode' && element.type !== 'qrcode') {
     return size as Partial<LabelElement>
   }
-  const fitted = symbolFitMm(element, size.widthMm, dpi)
+  const fitted = symbolFitMm(element, size.widthMm, dpi, values)
   if (fitted === null) {
     return size as Partial<LabelElement>
   }

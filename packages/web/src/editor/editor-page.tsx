@@ -38,7 +38,7 @@ import { LayersPanel } from './layers-panel.tsx'
 import { ElementContextMenu } from './context-menu.tsx'
 import { symbolFitMm } from './barcode-width.ts'
 import { copyElement, duplicateElement, pasteElement } from './clipboard.ts'
-import { imageBoxMm, refit } from './autofit.ts'
+import { imageBoxMm, refit, refitReferences } from './autofit.ts'
 import { designValues, previewIr } from './preview-values.ts'
 import type { VariableDefinition } from '@zenith/shared'
 import { imageFileFrom, naturalSizeOf, useUploadImage } from '../features/images/hooks.ts'
@@ -240,6 +240,26 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
     () => ({ ...firstRow, ...designValues(variables) }),
     [variables, JSON.stringify(firstRow)],
   )
+  /**
+   * Keep reference-bearing boxes in step with the values behind them.
+   *
+   * `refit` covers an edit to an element. This covers the other way the
+   * content changes: binding a column, or editing the constant a barcode
+   * points at. Without it the symbol redraws at its new size and its frame —
+   * the thing that says whether it fits the label — stays where it was.
+   *
+   * Folded into one undo entry via a fixed merge key, so typing into a
+   * constant's value field does not leave one entry per keystroke. Commits
+   * only when something actually moved; `refitReferences` returns the same
+   * object otherwise, which is what stops this from looping.
+   */
+  useEffect(() => {
+    setHistory((current) => {
+      const next = refitReferences(current.present, values)
+      return next === current.present ? current : commit(current, next, 'values')
+    })
+  }, [values])
+
   const preview = useMemo(() => previewIr(ir, values), [ir, values])
   const drawn = preview.ir
   const blocking = blockingViolations(violations)
@@ -425,7 +445,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
       // to, so dragging one produced any side at all and the renderer then
       // drew the largest that fitted — leaving the symbol adrift inside its
       // own frame.
-      return symbolFitMm(element, targetMm, ir.dpi)?.widthMm ?? targetMm
+      return symbolFitMm(element, targetMm, ir.dpi, values)?.widthMm ?? targetMm
     },
     [ir.dpi, ir.elements, selectedId],
   )
@@ -708,6 +728,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                 // stored design, so editing while looking at a sample writes
                 // back the binding.
                 drawnIr={drawn}
+                values={values}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
                 onChange={setIr}
@@ -758,7 +779,13 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                 </CardHeader>
                 <CardContent>
                   <TabsContent value="element" className="mt-0">
-                    <Inspector ir={ir} element={selected} onChange={updateElement} onDelete={deleteElement} />
+                    <Inspector
+                      ir={ir}
+                      element={selected}
+                      values={values}
+                      onChange={updateElement}
+                      onDelete={deleteElement}
+                    />
                   </TabsContent>
                   <TabsContent value="variables" className="mt-0 space-y-3">
                     <DataSourceBinding

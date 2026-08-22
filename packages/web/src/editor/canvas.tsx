@@ -44,6 +44,15 @@ export interface CanvasProps {
    * for a design that has no bindings.
    */
   drawnIr?: LabelIR
+  /**
+   * Values for `${}` references, used when a resize has to be quantised.
+   *
+   * A symbol's achievable widths are multiples of its module count, and that
+   * count comes from what it will actually encode — so dragging a barcode
+   * bound to a column has to snap against that column's value, not against
+   * the placeholder.
+   */
+  values?: Readonly<Record<string, string>>
 }
 
 type Gesture = 'move' | 'resize' | 'rotate'
@@ -75,6 +84,7 @@ export function EditorCanvas({
   onGestureEnd,
   margins = null,
   drawnIr,
+  values = {},
 }: CanvasProps): React.JSX.Element {
   const svgRef = useRef<SVGSVGElement>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -230,7 +240,7 @@ export function EditorCanvas({
         // Not just the size: a barcode or QR code is sized by its module
         // width, and writing the box alone grew the frame around a symbol that
         // never moved.
-        const patch = resizePatchFor(element, size, ir.dpi)
+        const patch = resizePatchFor(element, size, ir.dpi, values)
         onChange({
           ...ir,
           elements: ir.elements.map((e) =>

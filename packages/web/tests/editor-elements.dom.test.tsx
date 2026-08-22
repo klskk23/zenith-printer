@@ -937,3 +937,46 @@ describe('the inverted switch', () => {
     expect(screen.queryByLabelText('反相（白字）')).toBeNull()
   })
 })
+
+describe('a symbol bound to a variable', () => {
+  /** The barcode's own frame on the canvas, in millimetres of label. */
+  const frameWidth = (): number => {
+    const frame = document.querySelector('rect[data-element-id]')
+    expect(frame, 'no element frame on the canvas').not.toBeNull()
+    return Number(frame!.getAttribute('width'))
+  }
+
+  /**
+   * Switch the right-hand column.
+   *
+   * Radix unmounts the inactive panel, so the inspector and the variables
+   * panel are never on screen together — and in happy-dom a tab activates on
+   * focus rather than on click.
+   */
+  const openPanel = (name: string): void => {
+    fireEvent.focus(screen.getByRole('tab', { name }))
+  }
+
+  it('sizes its frame from the value, not from the reference text', () => {
+    // The frame is what tells you whether the symbol fits. Measured against
+    // the literal `${sku}` — or against the six-character stand-in used while
+    // a reference has no value — it describes a barcode nobody is going to
+    // print, and a long order number silently overruns the label.
+    openDesign()
+    addElement('条码')
+    fireEvent.change(screen.getByLabelText('内容'), { target: { value: '${sku}' } })
+
+    openPanel('变量')
+    fireEvent.click(screen.getByText('加常量'))
+    fireEvent.change(screen.getByLabelText('变量名'), { target: { value: 'sku' } })
+    fireEvent.blur(screen.getByLabelText('变量名'))
+    fireEvent.change(screen.getByLabelText('固定值'), { target: { value: 'A1' } })
+    const short = frameWidth()
+
+    // Same design, longer value: more modules, so a wider symbol.
+    fireEvent.change(screen.getByLabelText('固定值'), {
+      target: { value: 'A1234567890123456789' },
+    })
+    expect(frameWidth()).toBeGreaterThan(short)
+  })
+})

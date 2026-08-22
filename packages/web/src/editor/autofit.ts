@@ -26,6 +26,7 @@
  */
 import {
   evaluate,
+  parse,
   TEXT_LINE_HEIGHT,
   textLines,
   type LabelElement,
@@ -227,11 +228,67 @@ export function refit(
     if (previous !== null && !affectsSymbolBox(previous, next)) {
       return next
     }
-    const box = symbolBoxMm(next, dpi)
+    const box = symbolBoxMm(next, dpi, values)
     // Null means the content cannot be encoded. The guards report that; the
     // box is left where it was rather than collapsing mid-keystroke.
     return box === null ? next : { ...next, ...box }
   }
 
   return next
+}
+
+
+/** Compares the two size fields, for the types that have them. */
+function sameBox(a: LabelElement, b: LabelElement): boolean {
+  if (!('widthMm' in a) || !('widthMm' in b)) {
+    // A line has no box to refit; its endpoints are the geometry.
+    return true
+  }
+  return a.widthMm === b.widthMm && a.heightMm === b.heightMm
+}
+
+/** Whether this element's size depends on a value supplied at print time. */
+function hasReference(element: LabelElement): boolean {
+  return (
+    'content' in element &&
+    parse(element.content).some((segment) => segment.kind === 'ref')
+  )
+}
+
+/**
+ * Re-fit every element whose content is a `${}` reference.
+ *
+ * `refit` runs when an *element* is edited, which covers typing a barcode's
+ * content by hand. It does not cover the other way the content changes: the
+ * value behind the reference. Bind a barcode to a column, or edit the constant
+ * it points at, and the symbol on the canvas redraws at its new size while its
+ * frame — the thing that says whether it fits the label — stays where it was.
+ *
+ * Only reference-bearing elements are touched. A literal element cannot have
+ * changed, and refitting it would discard a width somebody set by hand for a
+ * reason that has nothing to do with them.
+ *
+ * Returns the **same object** when nothing moved, so a caller can use identity
+ * to decide whether anything happened.
+ */
+export function refitReferences(
+  ir: LabelIR,
+  values: Readonly<Record<string, string>>,
+): LabelIR {
+  let moved = false
+  const elements = ir.elements.map((element) => {
+    if (!hasReference(element)) {
+      return element
+    }
+    const fitted = refit(null, element, ir.dpi, values)
+    // Compared by value, not by identity: `refit` builds a new object every
+    // time, so an identity test would report a change on every render and the
+    // caller's effect would commit an undo entry each time round — or loop.
+    if (sameBox(element, fitted)) {
+      return element
+    }
+    moved = true
+    return fitted
+  })
+  return moved ? { ...ir, elements } : ir
 }

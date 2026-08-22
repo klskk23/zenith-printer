@@ -42,6 +42,14 @@ export interface InspectorProps {
   ir: LabelIR
   element: LabelElement | null
   /**
+   * Values for `${}` references.
+   *
+   * A symbol's size is `moduleWidth x moduleCount`, and the count comes from
+   * what it will actually encode — so a barcode bound to a column has to be
+   * measured against that column's value, exactly as text already is.
+   */
+  values: Readonly<Record<string, string>>
+  /**
    * `mergeKey` names the action, so consecutive edits of one field fold into a
    * single undo entry instead of one per keystroke.
    */
@@ -141,10 +149,12 @@ function DotsInput({
 function ModuleWidthField({
   element,
   dpi,
+  values,
   patch,
 }: {
   element: BarcodeElement | QrcodeElement
   dpi: number
+  values: Readonly<Record<string, string>>
   patch: (changes: Partial<LabelElement>) => void
 }): React.JSX.Element {
   const moduleMm = dotsToMm(element.moduleWidthDots, dpi)
@@ -168,7 +178,7 @@ function ModuleWidthField({
             // The box follows: a symbol's size *is* moduleWidth x moduleCount,
             // so changing the module width without moving the box leaves the
             // box describing a region the symbol no longer fills.
-            const box = symbolBoxMm({ ...element, moduleWidthDots: next }, dpi)
+            const box = symbolBoxMm({ ...element, moduleWidthDots: next }, dpi, values)
             patch({ moduleWidthDots: next, ...(box ?? {}) } as never)
           }}
         />
@@ -210,6 +220,7 @@ function sizeChange(
   element: LabelElement,
   change: { widthMm?: number; heightMm?: number },
   dpi: number,
+  values: Readonly<Record<string, string>>,
 ): Partial<LabelElement> {
   if (element.type !== 'barcode' && element.type !== 'qrcode') {
     return change as Partial<LabelElement>
@@ -218,11 +229,11 @@ function sizeChange(
   if (change.widthMm === undefined) {
     return element.type === 'barcode' ? (change as Partial<LabelElement>) : {}
   }
-  const fitted = symbolFitMm(element, change.widthMm, dpi)
+  const fitted = symbolFitMm(element, change.widthMm, dpi, values)
   return (fitted === null ? change : fitted) as Partial<LabelElement>
 }
 
-export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): React.JSX.Element {
+export function Inspector({ ir, element, values, onChange, onDelete }: InspectorProps): React.JSX.Element {
   if (element === null) {
     return <p className="text-sm text-muted-foreground">{copy.editor.noSelection}</p>
   }
@@ -280,7 +291,7 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
             <MmInput
               value={element.widthMm}
               dpi={ir.dpi}
-              onChange={(widthMm) => patch(sizeChange(element, { widthMm }, ir.dpi))}
+              onChange={(widthMm) => patch(sizeChange(element, { widthMm }, ir.dpi, values))}
             />
           </Field>
           <Field label={copy.editor.fields.height}>
@@ -291,7 +302,7 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
               // is set by the width field, and a field that accepts a number
               // and discards it is worse than one that says it cannot be used.
               disabled={element.type === 'qrcode'}
-              onChange={(heightMm) => patch(sizeChange(element, { heightMm }, ir.dpi))}
+              onChange={(heightMm) => patch(sizeChange(element, { heightMm }, ir.dpi, values))}
             />
           </Field>
         </div>
@@ -370,12 +381,17 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
               // numeric symbologies cannot carry a newline at all, and a
               // scanner emitting one mid-field is rarely what anyone wanted.
               <Textarea
+                // `Field` draws its label as a sibling, so without this the
+                // control has no accessible name — nothing to announce it by,
+                // and nothing to find it by either.
+                aria-label={copy.editor.fields.content}
                 rows={3}
                 value={element.content}
                 onChange={(event) => patch({ content: event.target.value } as never)}
               />
             ) : (
               <Input
+                aria-label={copy.editor.fields.content}
                 value={element.content}
                 onChange={(event) => patch({ content: event.target.value } as never)}
               />
@@ -473,7 +489,7 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
       )}
 
       {(element.type === 'barcode' || element.type === 'qrcode') && (
-        <ModuleWidthField element={element} dpi={ir.dpi} patch={patch} />
+        <ModuleWidthField element={element} dpi={ir.dpi} values={values} patch={patch} />
       )}
 
       {element.type === 'image' && (
