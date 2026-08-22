@@ -1,0 +1,198 @@
+# Zenith Printer — release pipeline.
+#
+# Runs only when a vX.Y.Z tag is pushed. Nothing else starts a pipeline: day to
+# day checking is the GitHub workflow's job, and this one exists to turn a tag
+# into an installable .deb sitting in /opt/www/zenith-printer.
+#
+# The runner must be a **shell** executor tagged `nkg-debian`. A docker executor
+# cannot write to the host's /opt/www, which is the whole point of the last
+# stage. What that runner needs, once:
+#
+#   sudo apt-get install -y fonts-noto-cjk fonts-dejavu-core dpkg-dev binutils
+#   sudo install -d -o gitlab-runner -g gitlab-runner -m 0755 /opt/www/zenith-printer
+#   # Node 26 — Debian ships 20/22, so the NodeSource repository is required:
+#   curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash - && sudo apt-get install -y nodejs
+#   # Optional, for the install test; without it set INSTALL_TEST=0:
+#   sudo apt-get install -y docker.io && sudo adduser gitlab-runner docker
+#
+# The preflight stage checks every one of those and says which is missing, so a
+# runner that is not ready fails in seconds rather than four minutes in.
+
+stages:
+  - preflight
+  - verify
+  - package
+  - publish
+
+workflow:
+  rules:
+    # vX.Y.Z exactly. v1.2 and v1.2.3-rc1 do not release; the version has to be
+    # the one in package.json, and that file holds three numbers.
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+
+default:
+  tags:
+    - nkg-debian
+  # A release is not worth resuming half-way through, and killing a job that is
+  # mid-publish would leave a partly-written file under /opt/www.
+  interruptible: false
+
+variables:
+  PUBLISH_DIR: "/opt/www/zenith-printer"
+  # Set to "0" in the project's CI/CD variables if the runner has no docker.
+  # That skips the strongest check this pipeline has — see the install-test job.
+  INSTALL_TEST: "1"
+  # Set to "1" for one run to republish a tag that is already on disk.
+  FORCE_PUBLISH: "0"
+  GIT_SUBMODULE_STRATEGY: none
+
+# No node_modules cache on purpose. It is 350MB, GitLab would upload and
+# download it once per job, and `npm ci` deletes the directory before it starts
+# anyway. What actually makes the install fast is npm's own HTTP cache in
+# ~/.npm, and on a shell runner that persists between jobs for free.
+
+# ---------------------------------------------------------------------------
+
+preflight:
+  stage: preflight
+  script:
+    - |
+      fail() { printf '\n\033[1;31m[preflight]\033[0m %s\n      why:  %s\n      next: %s\n\n' "$1" "$2" "$3" >&2; exit 1; }
+
+      # The tag is the release name; package.json is where the version actually
+      # lives (the Makefile and the .deb both read it). If the two disagree,
+      # somebody tagged without bumping, and publishing would put 0.1.0 on disk
+      # under a v0.2.0 release.
+      PKG_VERSION="$(node -p "require('./package.json').version")"
+      if [ "$CI_COMMIT_TAG" != "v$PKG_VERSION" ]; then
+        fail "tag $CI_COMMIT_TAG does not match package.json ($PKG_VERSION)" \
+             "the .deb takes its version from package.json, not from the tag" \
+             "npm version ${CI_COMMIT_TAG#v} --no-git-tag-version, commit, then re-tag"
+      fi
+      echo "version $PKG_VERSION matches tag $CI_COMMIT_TAG"
+
+      command -v node >/dev/null || fail "node not installed" \
+        "the service runs TypeScript sources directly" \
+        "curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash - && sudo apt-get install -y nodejs"
+      MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+      [ "$MAJOR" -ge 26 ] || fail "node $MAJOR is too old" \
+        "type stripping and node:sqlite need 26+" \
+        "install nodejs 26 from the NodeSource repository"
+
+      command -v dpkg-deb >/dev/null || fail "dpkg-deb not installed" \
+        "it assembles the package" "sudo apt-get install -y dpkg-dev"
+
+      # scripts/fetch-fonts.sh copies from these exact paths, and the renderer
+      # runs with system font loading disabled — so a missing font package is a
+      # release that cannot render text, not a cosmetic problem.
+      for f in /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc \
+               /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf; do
+        [ -f "$f" ] || fail "missing system font: $f" \
+          "the bundled fonts are copied from these and checksum-verified" \
+          "sudo apt-get install -y fonts-noto-cjk fonts-dejavu-core"
+      done
+
+      # Checked here rather than in the publish stage: finding out that the
+      # runner cannot write to /opt/www after a four-minute build is a waste of
+      # everybody's afternoon.
+      [ -d "$PUBLISH_DIR" ] || fail "$PUBLISH_DIR does not exist" \
+        "the pipeline publishes into it" \
+        "sudo install -d -o gitlab-runner -g gitlab-runner -m 0755 $PUBLISH_DIR"
+      [ -w "$PUBLISH_DIR" ] || fail "$PUBLISH_DIR is not writable by $(id -un)" \
+        "the publish stage copies the .deb there" \
+        "sudo chown -R $(id -un) $PUBLISH_DIR"
+
+      if [ "$INSTALL_TEST" = "1" ] && ! docker info >/dev/null 2>&1; then
+        fail "docker is not usable by $(id -un)" \
+          "the install test installs the package in a throwaway container — the only check that covers the vendored dependency tree" \
+          "sudo apt-get install -y docker.io && sudo adduser $(id -un) docker (then restart the runner), or set INSTALL_TEST=0"
+      fi
+
+      echo "preflight ok"
+
+verify:
+  stage: verify
+  script:
+    - make deps
+    - make fonts
+    - make check
+    - make coverage
+
+package:
+  stage: package
+  script:
+    - make deps
+    - make fonts
+    - make deb
+    # The filename carries the architecture, which only the runner knows. Pass
+    # it forward rather than reconstructing it in the next job and getting it
+    # subtly wrong on the day somebody builds on arm64.
+    - echo "DEB_PATH=$(ls dist/*.deb)" > build.env
+    - cat build.env
+  artifacts:
+    name: "zenith-printer-$CI_COMMIT_TAG"
+    paths:
+      - dist/*.deb
+    reports:
+      dotenv: build.env
+    expire_in: 30 days
+
+install-test:
+  stage: package
+  needs:
+    - job: package
+      artifacts: true
+  rules:
+    - if: '$INSTALL_TEST == "1"'
+  script:
+    # Installs the package in a disposable Debian container, boots it as the
+    # service user and calls the API. A vendored dependency tree has exactly
+    # one interesting failure mode — a package that resolved on the build
+    # machine and is not in the .deb — and this is what covers it.
+    - make deb-install-test
+
+publish:
+  stage: publish
+  needs:
+    - job: package
+      artifacts: true
+    - job: install-test
+      optional: true
+  script:
+    - |
+      set -eu
+      DEB_NAME="$(basename "$DEB_PATH")"
+      TARGET="$PUBLISH_DIR/$DEB_NAME"
+
+      # A tag is meant to name one build forever. Overwriting a published file
+      # silently would leave two different binaries answering to one version,
+      # and nothing on disk to say which one anybody installed.
+      if [ -e "$TARGET" ] && [ "$FORCE_PUBLISH" != "1" ]; then
+        printf '\n\033[1;31m[publish]\033[0m %s already exists\n' "$TARGET" >&2
+        printf '      why:  a released version should name exactly one build\n' >&2
+        printf '      next: bump the version and re-tag, or re-run this job with FORCE_PUBLISH=1\n\n' >&2
+        exit 1
+      fi
+
+      # 0644 and 0755: this directory is served over HTTP, so the web server
+      # has to be able to read what lands in it.
+      install -m 0644 "$DEB_PATH" "$TARGET"
+
+      cd "$PUBLISH_DIR"
+
+      # A stable URL for "give me the current one", next to the versioned files
+      # that stay put. Relative, so it survives the directory being moved.
+      ln -sfn "$DEB_NAME" zenith-printer_latest.deb
+
+      # Real files only: the symlink above also matches *.deb, and hashing it
+      # would list one build twice under two names. Regenerated rather than
+      # appended to, so a forced republish does not leave two lines claiming
+      # different checksums for the same file.
+      find . -maxdepth 1 -type f -name '*.deb' -printf '%P\n' \
+        | sort | xargs -r sha256sum > SHA256SUMS
+      chmod 0644 SHA256SUMS
+
+      printf '\n\033[32m[publish]\033[0m %s\n' "$TARGET"
+      printf '            %s\n' "$(sha256sum "$DEB_NAME")"
+      printf '            latest -> %s\n\n' "$DEB_NAME"
+      ls -lh "$PUBLISH_DIR"

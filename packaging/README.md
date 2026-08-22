@@ -109,3 +109,66 @@ make deb DEB_REVISION=2
 ```
 
 维护者字段默认取 `git config user.name/user.email`，也可以用 `DEB_MAINTAINER` 指定。
+
+---
+
+## 四、发布流水线（GitLab CI）
+
+`.gitlab-ci.yml`。**只有推送 `vX.Y.Z` 标签才会触发**，其他任何 push 和 MR 都不起流水线——
+日常检查是 GitHub workflow 的活，这条线只负责把一个标签变成 `/opt/www/zenith-printer`
+下一个能装的 `.deb`。
+
+```
+preflight  →  verify  →  package  →  publish
+             (check)     (deb +      (/opt/www)
+                          容器实装)
+```
+
+运行器必须是 **shell executor**，tag 为 `nkg-debian`。docker executor 写不到宿主机的
+`/opt/www`，而那正是最后一段的全部意义。
+
+### 运行器一次性准备
+
+```bash
+sudo apt-get install -y fonts-noto-cjk fonts-dejavu-core dpkg-dev binutils
+sudo install -d -o gitlab-runner -g gitlab-runner -m 0755 /opt/www/zenith-printer
+curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash - && sudo apt-get install -y nodejs
+# 可选，用于容器实装测试；没有就把 INSTALL_TEST 设成 0
+sudo apt-get install -y docker.io && sudo adduser gitlab-runner docker
+```
+
+上面每一项 `preflight` 都会查，缺哪个就报哪个、连命令一起给——运行器没准备好会在几秒内
+失败，而不是四分钟之后。
+
+### preflight 还查一件事：标签和 package.json 必须一致
+
+版本号只有一处：根 `package.json`。标签只是这次发布的名字。两者对不上意味着有人打标签
+时忘了改版本，而那会让 `v0.2.0` 这个发布往磁盘上放一个 `0.1.0` 的包。
+
+```bash
+npm version 0.2.0 --no-git-tag-version
+git commit -am "chore: 0.2.0"
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+### publish 做什么
+
+| 文件 | 说明 |
+|---|---|
+| `zenith-printer_<版本>_<架构>.deb` | 本次发布，0644，供 HTTP 下载 |
+| `zenith-printer_latest.deb` | 相对符号链接，永远指向最新一次 |
+| `SHA256SUMS` | 每次重新生成，只收真实文件（`latest` 是链接，不重复计入） |
+
+**同一个版本不会被悄悄覆盖。** 目标文件已存在就直接失败：一个版本号应当只对应一个二进制，
+覆盖之后磁盘上没有任何东西能说明别人装的是哪一个。确实要重发，把 `FORCE_PUBLISH` 设成
+`1` 跑一次。
+
+旧版本不会被自动清理——那是删除已发布产物，交给人做。
+
+### 变量
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `PUBLISH_DIR` | `/opt/www/zenith-printer` | 产物落点 |
+| `INSTALL_TEST` | `1` | 设 `0` 跳过容器实装测试（运行器没有 docker 时）。跳过的是这条线上最强的一道检查 |
+| `FORCE_PUBLISH` | `0` | 设 `1` 允许覆盖已发布的同名文件 |

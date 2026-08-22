@@ -6,7 +6,7 @@ Installed-Size: @INSTALLED_SIZE@
 Depends: @DEPENDS@
 Section: utils
 Priority: optional
-Homepage: https://github.com/klskk23/zenith-printer
+Homepage: https://git.mixlake.com/yanjilu/zenith-printer
 Description: LAN label design and printing service
  A single-process service that designs labels in the browser and prints them
  on NIIMBOT (serial) and Honeywell (ZPL over TCP 9100) hardware. It carries
