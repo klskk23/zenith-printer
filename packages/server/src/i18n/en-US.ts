@@ -84,6 +84,51 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'Someone saved a newer version while you were editing',
     next: 'Reload the template and reapply your changes — your current edits are still on screen',
   },
+  GOOGLE_URL_INVALID: {
+    what: 'That is not a Google Sheets link',
+    why: 'No spreadsheet id could be found in it — it may be a Docs or Slides link, or a mistyped paste',
+    next: 'Copy the full link from the spreadsheet address bar and try again',
+  },
+  GOOGLE_NOT_CONFIGURED: {
+    what: 'No Google identity is configured on this machine',
+    why: 'The server has no credentials file, so it cannot read spreadsheets as anybody',
+    next: 'Ask whoever deploys this to set ZENITH_GOOGLE_CREDENTIALS to a service-account key and restart',
+  },
+  GOOGLE_NOT_SHARED: {
+    what: 'This spreadsheet cannot be read',
+    why: 'It has not been shared with this machine\u2019s identity',
+    next: 'Open Share in the spreadsheet and give that address Viewer access, then try again',
+  },
+  GOOGLE_SPREADSHEET_NOT_FOUND: {
+    what: 'That spreadsheet could not be found',
+    why: 'It may have been deleted, or the link points at an id that does not exist — or it was never shared with this machine',
+    next: 'Check the spreadsheet still exists and has been shared with the address above',
+  },
+  GOOGLE_CREDENTIALS_INVALID: {
+    what: 'Google refused this machine\u2019s identity',
+    why: 'The credentials are invalid, expired, or the service account was disabled. This is a credentials problem, not a spreadsheet problem',
+    next: 'Ask whoever deploys this to check the credentials file and reissue the key if needed',
+  },
+  GOOGLE_RATE_LIMITED: {
+    what: 'Google turned this request away for now',
+    why: 'Too many requests in a short window',
+    next: 'Wait a moment and try again',
+  },
+  GOOGLE_UNREACHABLE: {
+    what: 'Google could not be reached',
+    why: 'The network is down, or the request timed out',
+    next: 'Check this machine\u2019s internet connection. Data already fetched is unaffected and can still be printed',
+  },
+  GOOGLE_WORKSHEET_NOT_FOUND: {
+    what: 'That worksheet could not be found',
+    why: 'It may have been deleted in Google',
+    next: 'Check the worksheet still exists, or pick another one',
+  },
+  GOOGLE_WORKSHEET_EMPTY: {
+    what: 'That worksheet is empty',
+    why: 'It has no rows at all, so there are no column names to read',
+    next: 'Put column names in the first row and at least one data row, then try again',
+  },
   TEMPLATE_FILE_INVALID: {
     what: 'This is not a template file this program can read',
     why: 'The file is not in the format this program exports, or its contents are damaged',

@@ -63,9 +63,9 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 
 ### 真实客户端
 
-- [ ] T017 在 `packages/server/src/integrations/google-sheets-client.ts` 实现 `SheetsPort`：`google-auth-library` 签发 JWT、权限范围 `spreadsheets.readonly`、`listWorksheets` 带 `fields` 裁剪、`readWorksheet` 用 `FORMATTED_VALUE`、30 秒超时
-- [ ] T018 在 T017 中把 HTTP 状态映射为 `SheetsErrorKind`（403/404/401/429/网络/超时），并加注释说明 403 与 404 的区分待 HW-2 实测确认
-- [ ] T019 在 `packages/server/src/app.ts` 按 `ZENITH_GOOGLE_CREDENTIALS` 是否配置注入真实端口或不注入，并把端口作为依赖传给路由
+- [X] T017 在 `packages/server/src/integrations/google-sheets-client.ts` 实现 `SheetsPort`：`google-auth-library` 签发 JWT、权限范围 `spreadsheets.readonly`、`listWorksheets` 带 `fields` 裁剪、`readWorksheet` 用 `FORMATTED_VALUE`、30 秒超时
+- [X] T018 在 T017 中把 HTTP 状态映射为 `SheetsErrorKind`（403/404/401/429/网络/超时），并加注释说明 403 与 404 的区分待 HW-2 实测确认
+- [X] T019 在 `packages/server/src/app.ts` 按 `ZENITH_GOOGLE_CREDENTIALS` 是否配置注入真实端口或不注入，并把端口作为依赖传给路由
 
 **检查点**：此阶段完成后，端口、纯函数与存储均已就绪且有测试；尚无任何界面或接口。
 
@@ -80,21 +80,21 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 
 ### 测试（先写，先看它们红）
 
-- [ ] T020 [P] [US1] 编写 `packages/server/tests/integration/google-status-api.test.ts`：未配置时 `configured:false`；已配置时返回 `clientEmail`；**响应中不含密钥的任何片段**（FR-004a）
-- [ ] T021 [P] [US1] 编写 `packages/server/tests/integration/google-worksheets-api.test.ts`：列出工作表；非法链接 `400`；未配置 `422`；`403/404/429/超时` 各自的状态码与错误码
-- [ ] T022 [P] [US1] 编写 `packages/server/tests/integration/google-preview-api.test.ts`：返回列名、至少 3 行、`totalRows`、`suggestedName`、`nameTaken`；空工作表 `422`；重复列名复用 `CSV_DUPLICATE_COLUMN`；超行数复用 `CSV_TOO_MANY_ROWS`
-- [ ] T023 [P] [US1] 编写 `packages/server/tests/integration/google-create-api.test.ts`：创建出的数据源带 `sourceKind:'google-sheets'` 与来源字段；重名 `409 DATA_SOURCE_NAME_TAKEN`；**预览与创建的取值走同一路径、结果逐字相同**
-- [ ] T024 [P] [US1] 编写 `packages/web/tests/link-google.dom.test.tsx`：未配置时入口不可用；粘链接 → 列出工作表 → 选一个 → 显示列名与样例行 → 名称框预填工作表名 → 确认后调用创建
-- [ ] T025 [P] [US1] 编写 `packages/server/tests/integration/linked-source-print.test.ts`：用链接的数据源提交打印任务并断言成功——设计里的 `${列名}` 解析到该表的取值、行选择按序号命中、快照抄下的是这些行。**这是 FR-011 与 US1 独立验收标准的正面**，缺了它「接进来能打印」就只是一句声明
+- [X] T020 [P] [US1] 编写 `packages/server/tests/integration/google-status-api.test.ts`：未配置时 `configured:false`；已配置时返回 `clientEmail`；**响应中不含密钥的任何片段**（FR-004a）
+- [X] T021 [P] [US1] 编写 `packages/server/tests/integration/google-worksheets-api.test.ts`：列出工作表；非法链接 `400`；未配置 `422`；`403/404/429/超时` 各自的状态码与错误码
+- [X] T022 [P] [US1] 编写 `packages/server/tests/integration/google-preview-api.test.ts`：返回列名、至少 3 行、`totalRows`、`suggestedName`、`nameTaken`；空工作表 `422`；重复列名复用 `CSV_DUPLICATE_COLUMN`；超行数复用 `CSV_TOO_MANY_ROWS`
+- [X] T023 [P] [US1] 编写 `packages/server/tests/integration/google-create-api.test.ts`：创建出的数据源带 `sourceKind:'google-sheets'` 与来源字段；重名 `409 DATA_SOURCE_NAME_TAKEN`；**预览与创建的取值走同一路径、结果逐字相同**
+- [X] T024 [P] [US1] 编写 `packages/web/tests/link-google.dom.test.tsx`：未配置时入口不可用；粘链接 → 列出工作表 → 选一个 → 显示列名与样例行 → 名称框预填工作表名 → 确认后调用创建
+- [X] T025 [P] [US1] 编写 `packages/server/tests/integration/linked-source-print.test.ts`：用链接的数据源提交打印任务并断言成功——设计里的 `${列名}` 解析到该表的取值、行选择按序号命中、快照抄下的是这些行。**这是 FR-011 与 US1 独立验收标准的正面**，缺了它「接进来能打印」就只是一句声明
 
 ### 实现
 
-- [ ] T026 [US1] 在 `packages/server/src/api/google.ts` 实现 `GET /api/google/status`，使 T020 变绿
-- [ ] T027 [US1] 在 `packages/server/src/api/google.ts` 实现 `POST /api/google/worksheets`，使 T021 变绿
-- [ ] T028 [US1] 在 `packages/server/src/api/google.ts` 实现 `POST /api/google/preview`（含 `suggestedName` 与 `nameTaken`），使 T022 变绿
-- [ ] T029 [US1] 在 `packages/server/src/api/data-sources.ts` 实现 `POST /api/data-sources/google`，使 T023 变绿
-- [ ] T030 [P] [US1] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 与 `types.ts` 加入五个新错误码的三要素文案：`GOOGLE_URL_INVALID`、`GOOGLE_NOT_CONFIGURED`、`GOOGLE_NOT_SHARED`、`GOOGLE_SPREADSHEET_NOT_FOUND`、`GOOGLE_CREDENTIALS_INVALID`
-- [ ] T031 [P] [US1] 在同上文件加入 `GOOGLE_RATE_LIMITED`、`GOOGLE_UNREACHABLE`、`GOOGLE_WORKSHEET_NOT_FOUND`、`GOOGLE_WORKSHEET_EMPTY` 的文案。`GOOGLE_NOT_SHARED` 的「下一步」须带出机器身份邮箱
+- [X] T026 [US1] 在 `packages/server/src/api/google.ts` 实现 `GET /api/google/status`，使 T020 变绿
+- [X] T027 [US1] 在 `packages/server/src/api/google.ts` 实现 `POST /api/google/worksheets`，使 T021 变绿
+- [X] T028 [US1] 在 `packages/server/src/api/google.ts` 实现 `POST /api/google/preview`（含 `suggestedName` 与 `nameTaken`），使 T022 变绿
+- [X] T029 [US1] 在 `packages/server/src/api/data-sources.ts` 实现 `POST /api/data-sources/google`，使 T023 变绿
+- [X] T030 [P] [US1] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 与 `types.ts` 加入五个新错误码的三要素文案：`GOOGLE_URL_INVALID`、`GOOGLE_NOT_CONFIGURED`、`GOOGLE_NOT_SHARED`、`GOOGLE_SPREADSHEET_NOT_FOUND`、`GOOGLE_CREDENTIALS_INVALID`
+- [X] T031 [P] [US1] 在同上文件加入 `GOOGLE_RATE_LIMITED`、`GOOGLE_UNREACHABLE`、`GOOGLE_WORKSHEET_NOT_FOUND`、`GOOGLE_WORKSHEET_EMPTY` 的文案。`GOOGLE_NOT_SHARED` 的「下一步」须带出机器身份邮箱
 - [ ] T032 [US1] 在 `packages/web/src/features/data-sources/hooks.ts` 加入 `useGoogleStatus`、`useListWorksheets`、`usePreviewWorksheet`、`useCreateLinkedSource`
 - [ ] T033 [US1] 在 `packages/web/src/features/data-sources/link-google-dialog.tsx` 实现三步对话框（粘链接 → 选工作表 → 预览+命名确认），使 T024 变绿
 - [ ] T034 [US1] 在 `packages/web/src/features/data-sources/data-sources-page.tsx` 加入「链接 Google 表格」入口，未配置时禁用并说明由部署方配置

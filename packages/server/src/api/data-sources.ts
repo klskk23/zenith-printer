@@ -15,6 +15,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import multipart from '@fastify/multipart'
 import { DataSourceRepo } from '../db/repositories/data-source-repo.ts'
+import type { DataSource } from '../domain/data-source.ts'
 import {
   MAX_ROWS,
   UnknownColumnError,
@@ -32,6 +33,7 @@ import {
 import { DecodeFailedError } from '../csv/encoding.ts'
 import { templatesBrokenByRemoving, templatesUsingDataSource } from '../domain/template-refs.ts'
 import { ApiError, HttpStatus } from './errors.ts'
+import { asApiError, readByWorksheetId, requireSheets, tableOrRefuse } from './google.ts'
 
 /** A ten-thousand-row CSV of long Chinese values still fits comfortably. */
 const MAX_UPLOAD_BYTES = 16 * 1024 * 1024
@@ -116,6 +118,20 @@ async function readUpload(request: {
   }
 }
 
+/**
+ * A data source as the wire sees it.
+ *
+ * The domain keeps the origin in a nested `link`, because it is one thing that
+ * is either wholly there or wholly absent. The wire flattens it: existing
+ * clients read `columns` and `rowCount` off the top level, and burying the new
+ * fields one layer down would make them look like a different kind of object.
+ * Local sources carry `sourceKind` and nothing else new.
+ */
+export function serialiseSource(source: DataSource): Record<string, unknown> {
+  const { link, ...rest } = source
+  return link === null ? rest : { ...rest, ...link }
+}
+
 export async function registerDataSourceRoutes(app: FastifyInstance): Promise<void> {
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } })
 
@@ -131,7 +147,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
     return source
   }
 
-  typed.get('/api/data-sources', async () => ({ dataSources: sources().list() }))
+  typed.get('/api/data-sources', async () => ({ dataSources: sources().list().map(serialiseSource) }))
 
   typed.get(
     '/api/data-sources/:id/rows',
@@ -175,6 +191,56 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
       .send({ ...created, encoding: table.encoding, delimiter: table.delimiter })
   })
 
+  /**
+   * Create a data source backed by a Google worksheet.
+   *
+   * Reads the worksheet again rather than trusting anything the preview
+   * returned: the browser is not a place to keep a table between two requests,
+   * and reading twice is what makes "what you confirmed is what got stored"
+   * true by construction rather than by hope.
+   */
+  typed.post(
+    '/api/data-sources/google',
+    {
+      schema: {
+        body: z.object({
+          spreadsheetId: z.string().min(1),
+          worksheetId: z.number().int(),
+          name: dataSourceNameSchema,
+        }),
+      },
+    },
+    async (request, reply) => {
+      const sheets = requireSheets(app.ctx)
+      const repo = sources()
+      if (repo.findByName(request.body.name) !== undefined) {
+        throw ApiError.conflict('DATA_SOURCE_NAME_TAKEN', { name: request.body.name })
+      }
+
+      let read
+      try {
+        read = await readByWorksheetId(sheets, request.body.spreadsheetId, request.body.worksheetId)
+      } catch (err) {
+        asApiError(err, sheets.clientEmail)
+      }
+      const table = tableOrRefuse(read.values)
+
+      return reply.status(HttpStatus.Created).send(
+        serialiseSource(repo.createLinked({
+          name: request.body.name,
+          columns: table.columns,
+          rows: table.rows,
+          link: {
+            spreadsheetId: request.body.spreadsheetId,
+            spreadsheetTitle: read.spreadsheetTitle,
+            worksheetId: request.body.worksheetId,
+            worksheetTitle: read.worksheetTitle,
+          },
+        })),
+      )
+    },
+  )
+
   typed.patch(
     '/api/data-sources/:id',
     { schema: { params: idParams, body: z.object({ name: dataSourceNameSchema }) } },
@@ -189,7 +255,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
         throw ApiError.conflict('DATA_SOURCE_NAME_TAKEN', { name: request.body.name })
       }
       repo.rename(request.params.id, request.body.name)
-      return require(repo, request.params.id)
+      return serialiseSource(require(repo, request.params.id))
     },
   )
 
@@ -222,7 +288,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
       repo.replace(source.id, table.columns, table.rows)
       return reply
         .status(HttpStatus.Ok)
-        .send({ ...require(repo, source.id), encoding: table.encoding, delimiter: table.delimiter })
+        .send({ ...serialiseSource(require(repo, source.id)), encoding: table.encoding, delimiter: table.delimiter })
     },
   )
 
@@ -253,7 +319,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
         throw err
       }
 
-      return require(repo, source.id)
+      return serialiseSource(require(repo, source.id))
     },
   )
 

@@ -7,6 +7,8 @@
  */
 import { join } from 'node:path'
 import { repoRoot } from './paths.ts'
+import { googleCredentialsPath } from './config.ts'
+import { createGoogleSheetsClient } from './integrations/google-sheets-client.ts'
 import { buildApp } from './app.ts'
 import { openDatabase } from './db/index.ts'
 import { registerStatic } from './static.ts'
@@ -18,13 +20,43 @@ const DB_PATH = process.env.ZENITH_DB ?? join(repoRoot, 'data', 'zenith.db')
 const WEB_ROOT = process.env.ZENITH_WEB_ROOT ?? join(repoRoot, 'packages/web/dist')
 const UPLOAD_DIR = process.env.ZENITH_UPLOADS ?? join(repoRoot, 'data', 'uploads')
 
+/**
+ * The Google client, or nothing at all.
+ *
+ * A bad key file is reported and then ignored rather than stopping the
+ * service: label printing does not depend on Google, and refusing to start
+ * because a spreadsheet integration is misconfigured would take the printer
+ * down with it.
+ */
+function sheetsFrom(log: (message: string) => void) {
+  const credentialsPath = googleCredentialsPath()
+  if (credentialsPath === undefined) {
+    return undefined
+  }
+  try {
+    const client = createGoogleSheetsClient({ credentialsPath })
+    return { port: client, clientEmail: client.clientEmail }
+  } catch (err) {
+    log(err instanceof Error ? err.message : String(err))
+    return undefined
+  }
+}
+
 async function main(): Promise<void> {
   const db = openDatabase({ location: DB_PATH })
+  const problems: string[] = []
   const app = buildApp({
     db,
     imageStorageDir: UPLOAD_DIR,
     logLevel: (process.env.LOG_LEVEL as 'info') ?? 'info',
+    ...(() => {
+      const sheets = sheetsFrom((message) => problems.push(message))
+      return sheets === undefined ? {} : { sheets }
+    })(),
   })
+  for (const problem of problems) {
+    app.log.warn({ event: 'google_credentials_unusable', problem }, 'google sheets disabled')
+  }
 
   await registerStatic(app, { root: WEB_ROOT })
 

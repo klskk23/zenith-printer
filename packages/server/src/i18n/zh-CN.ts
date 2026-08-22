@@ -89,6 +89,51 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '内容不满足所选条码码制的规则，或超出了标签可打印范围',
     next: '按提示修改字段内容后重新提交',
   },
+  GOOGLE_URL_INVALID: {
+    what: '这不是一个 Google 表格的链接',
+    why: '链接里找不到表格标识，可能粘错了，或者那是 Google 文档／幻灯片的链接',
+    next: '在表格页面地址栏复制完整链接后重试',
+  },
+  GOOGLE_NOT_CONFIGURED: {
+    what: '本机还没有配置 Google 访问身份',
+    why: '服务端未设置凭据文件，因此无法代表任何身份去读取表格',
+    next: '请部署方设置 ZENITH_GOOGLE_CREDENTIALS 指向服务账号密钥文件后重启服务',
+  },
+  GOOGLE_NOT_SHARED: {
+    what: '读不到这张表格',
+    why: '这张表格没有分享给本机的访问身份',
+    next: '在表格里点「共享」，把「查看者」权限授予该邮箱后重试',
+  },
+  GOOGLE_SPREADSHEET_NOT_FOUND: {
+    what: '找不到这张表格',
+    why: '表格可能已被删除，或者链接指向的标识不存在；也可能它从未分享给本机的访问身份',
+    next: '确认表格还在，并已分享给上面那个邮箱',
+  },
+  GOOGLE_CREDENTIALS_INVALID: {
+    what: 'Google 拒绝了本机的身份',
+    why: '凭据文件无效、已过期，或对应的服务账号已被停用。这是凭据的问题，不是表格的问题',
+    next: '请部署方检查凭据文件，必要时重新生成密钥',
+  },
+  GOOGLE_RATE_LIMITED: {
+    what: 'Google 暂时拒绝了这次请求',
+    why: '短时间内的请求次数超过了 Google 的配额',
+    next: '稍等片刻后重试',
+  },
+  GOOGLE_UNREACHABLE: {
+    what: '连不上 Google',
+    why: '网络不通，或请求超时',
+    next: '检查本机的外网连接后重试。已经取到的数据不受影响，仍可用它打印',
+  },
+  GOOGLE_WORKSHEET_NOT_FOUND: {
+    what: '找不到这个工作表',
+    why: '它可能已在 Google 那边被删除',
+    next: '回到表格确认工作表还在，或改用其他工作表',
+  },
+  GOOGLE_WORKSHEET_EMPTY: {
+    what: '这个工作表是空的',
+    why: '它一行内容都没有，无法从中得出列名',
+    next: '在表格里填好首行的列名与至少一行数据后重试',
+  },
   TEMPLATE_FILE_INVALID: {
     what: '这不是一个可以导入的模板文件',
     why: '文件不是本程序导出的格式，或者内容已损坏',

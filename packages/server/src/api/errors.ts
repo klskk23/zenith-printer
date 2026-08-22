@@ -23,7 +23,11 @@ export const HttpStatus = {
   NotFound: 404,
   Conflict: 409,
   UnprocessableEntity: 422,
+  /** Upstream turned us away for volume — ours to retry, not to report as a bug. */
+  TooManyRequests: 429,
   ServiceUnavailable: 503,
+  /** An upstream service did not answer in time. */
+  GatewayTimeout: 504,
   InternalServerError: 500,
 } as const
 

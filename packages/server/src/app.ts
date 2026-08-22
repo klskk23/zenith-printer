@@ -25,6 +25,8 @@ import { registerPrintJobRoutes } from './api/print-jobs.ts'
 import { registerPreviewRoutes } from './api/preview.ts'
 import { registerImageRoutes } from './api/images.ts'
 import { registerTemplateIoRoutes } from './api/template-io.ts'
+import type { SheetsPort } from './domain/google-sheets.ts'
+import { registerGoogleRoutes } from './api/google.ts'
 import { registerTemplateRoutes } from './api/templates.ts'
 import { registerSequencePoolRoutes } from './api/sequence-pools.ts'
 import { registerDataSourceRoutes } from './api/data-sources.ts'
@@ -40,12 +42,22 @@ export interface AppDependencies {
   clock?: Clock
   idGenerator?: IdGenerator
   logLevel?: 'error' | 'warn' | 'info' | 'debug'
+  /**
+   * How to reach Google, and who we reach it as.
+   *
+   * Absent is a normal state: no credentials configured, so the feature is
+   * simply not offered. Tests always pass a fake — the constitution forbids a
+   * test that depends on the network.
+   */
+  sheets?: { port: SheetsPort; clientEmail: string }
 }
 
 export interface AppContext {
   db: Database
   clock: Clock
   ids: IdGenerator
+  /** Null when no Google credentials are configured. */
+  sheets: { port: SheetsPort; clientEmail: string } | null
   /** Undefined when the caller opted out, e.g. focused route tests. */
   queue?: PrintQueue
 }
@@ -71,6 +83,7 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
     db: deps.db,
     clock: deps.clock ?? systemClock,
     ids: deps.idGenerator ?? uuidGenerator,
+    sheets: deps.sheets ?? null,
   })
 
   app.setErrorHandler((error, request, reply) => {
@@ -142,6 +155,7 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
   void app.register(registerSequencePoolRoutes)
   void app.register(registerDataSourceRoutes)
   void app.register(registerPreviewRoutes)
+  void app.register(registerGoogleRoutes)
   void app.register((instance) =>
     registerImageRoutes(instance, { storageDir: deps.imageStorageDir ?? 'uploads' }),
   )
