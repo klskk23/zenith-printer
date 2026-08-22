@@ -18,7 +18,7 @@ const snapshot: ContentSnapshot = {
     dpi: 203,
     elements: [
       { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, rotation: 0, content: '${serial}', symbology: 'code128', showHumanReadable: true, moduleWidthDots: 2 },
-      { id: 'part', type: 'text', xMm: 2, yMm: 16, widthMm: 40, heightMm: 5, rotation: 0, content: '${partNo}', fontFamily: 'F', fontSizeMm: 3, bold: false, align: 'left' },
+      { id: 'part', type: 'text', xMm: 2, yMm: 16, widthMm: 40, heightMm: 5, rotation: 0, content: '${partNo}', fontFamily: 'F', fontSizeMm: 3, bold: false, align: 'left', inverted: false },
     ],
   },
   profile: { name: null, density: 3, labelType: 1 }, offsetXDots: 0, offsetYDots: 0,

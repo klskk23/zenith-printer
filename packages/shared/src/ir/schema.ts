@@ -64,6 +64,23 @@ const sized = {
   heightMm: z.number().finite().positive(),
 }
 
+/**
+ * Draw in white instead of black.
+ *
+ * For putting text or a rule inside a black band — the element supplies the
+ * ink colour, the black comes from a filled rect underneath it. Nothing is
+ * composited: a white element on white paper is simply invisible, which is the
+ * honest result of asking for it.
+ *
+ * Deliberately *not* on `baseElement`. A barcode or QR code drawn light-on-dark
+ * is refused by many scanners, so offering the switch there would invite
+ * labels that look right and do not scan; and for an image "inverted" would
+ * mean inverting its pixels, which is a different operation with the same name.
+ */
+const invertible = {
+  inverted: z.boolean().default(false),
+}
+
 export const BARCODE_SYMBOLOGIES = ['code128', 'code39', 'ean13', 'ean8', 'itf14'] as const
 export const symbologySchema = z.enum(BARCODE_SYMBOLOGIES)
 export type BarcodeSymbology = z.infer<typeof symbologySchema>
@@ -75,6 +92,7 @@ export const eccSchema = z.enum(['L', 'M', 'Q', 'H'])
 export const textElementSchema = z.object({
   ...baseElement,
   ...sized,
+  ...invertible,
   type: z.literal('text'),
   content: contentSchema,
   fontFamily: z.string().min(1),
@@ -116,6 +134,7 @@ export const imageElementSchema = z.object({
 
 export const lineElementSchema = z.object({
   ...baseElement,
+  ...invertible,
   type: z.literal('line'),
   x2Mm: z.number().finite(),
   y2Mm: z.number().finite(),
@@ -125,6 +144,7 @@ export const lineElementSchema = z.object({
 export const rectElementSchema = z.object({
   ...baseElement,
   ...sized,
+  ...invertible,
   type: z.literal('rect'),
   strokeWidthDots: strokeWidthDotsSchema,
   filled: z.boolean().default(false),
@@ -139,6 +159,7 @@ export const rectElementSchema = z.object({
 export const ellipseElementSchema = z.object({
   ...baseElement,
   ...sized,
+  ...invertible,
   type: z.literal('ellipse'),
   strokeWidthDots: strokeWidthDotsSchema,
   filled: z.boolean().default(false),

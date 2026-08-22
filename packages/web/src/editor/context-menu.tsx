@@ -9,11 +9,13 @@ import { copy } from '../i18n/index.ts'
 import {
   ContextMenu,
   ContextMenuContent,
+  ContextMenuCheckboxItem,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '../components/ui/context-menu.tsx'
 import { bringToFront, isBackmost, isFrontmost, sendToBack } from './layers.ts'
+import { setInverted } from './invert.ts'
 import type { LabelIR } from '@zenith/shared'
 
 export interface ElementContextMenuProps {
@@ -60,6 +62,20 @@ export function ElementContextMenu({
         <ContextMenuItem disabled={target === null} onSelect={onDuplicate}>
           {copy.editor.contextMenu.duplicate}
         </ContextMenuItem>
+        {/* A toggle rather than two entries: the menu says what the element
+            is now, and choosing it changes that. Disabled for the types that
+            have no such field — barcodes, QR codes and images. */}
+        <ContextMenuCheckboxItem
+          disabled={target === null || !('inverted' in target)}
+          checked={target !== null && 'inverted' in target && target.inverted}
+          onSelect={() =>
+            target !== null &&
+            'inverted' in target &&
+            onChange(setInverted(ir, target.id, !target.inverted))
+          }
+        >
+          {copy.editor.contextMenu.invert}
+        </ContextMenuCheckboxItem>
         <ContextMenuSeparator className="my-1 h-px bg-border" />
         <ContextMenuItem disabled={target === null} onSelect={() => target && onDelete(target.id)}>
           {copy.editor.contextMenu.delete}

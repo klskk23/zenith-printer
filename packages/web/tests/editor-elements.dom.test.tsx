@@ -891,3 +891,49 @@ describe('the variables panel', () => {
     expect((document.querySelector('[data-inspector] textarea') as HTMLTextAreaElement).value).toBe('${sku}')
   })
 })
+
+describe('the inverted switch', () => {
+  /**
+   * White parts **inside the canvas**.
+   *
+   * Scoped: a document-wide query also counts chrome outside the label, which
+   * moves for reasons that have nothing to do with the switch.
+   */
+  const whiteParts = (): number =>
+    screen.getByLabelText('label canvas').querySelectorAll('[fill="#ffffff"], [stroke="#ffffff"]')
+      .length
+
+  it('is offered for a text element and turns its glyphs white', () => {
+    openDesign()
+    addElement('文字')
+    const before = whiteParts()
+
+    const toggle = screen.getByLabelText('反相（白字）')
+    expect((toggle as HTMLInputElement | HTMLButtonElement).getAttribute('data-state')).toBe(
+      'unchecked',
+    )
+    fireEvent.click(toggle)
+
+    expect(whiteParts()).toBeGreaterThan(before)
+  })
+
+  it('says where the black is meant to come from, since white on white is nothing', () => {
+    openDesign()
+    addElement('文字')
+    expect(screen.getByText(/黑底要自己用填充矩形铺/)).toBeDefined()
+  })
+
+  it('is offered for shapes too, not only text', () => {
+    openDesign()
+    addElement('矩形')
+    const before = whiteParts()
+    fireEvent.click(screen.getByLabelText('反相（白字）'))
+    expect(whiteParts()).toBeGreaterThan(before)
+  })
+
+  it('is not offered for a barcode, which many scanners refuse light-on-dark', () => {
+    openDesign()
+    addElement('条码')
+    expect(screen.queryByLabelText('反相（白字）')).toBeNull()
+  })
+})

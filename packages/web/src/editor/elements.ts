@@ -84,6 +84,9 @@ export function createElement(type: ElementType, ir: LabelIR, options: CreateOpt
       return {
         id,
         type: 'text',
+        // Normal ink by default; the switch is in the inspector and the
+        // right-click menu.
+        inverted: false,
         xMm,
         yMm,
         widthMm: Math.min(30, ir.widthMm - xMm),
@@ -142,6 +145,9 @@ export function createElement(type: ElementType, ir: LabelIR, options: CreateOpt
       return {
         id,
         type: 'line',
+        // Normal ink by default; the switch is in the inspector and the
+        // right-click menu.
+        inverted: false,
         xMm,
         yMm,
         x2Mm: Math.min(xMm + 30, ir.widthMm),
@@ -155,6 +161,9 @@ export function createElement(type: ElementType, ir: LabelIR, options: CreateOpt
       return {
         id,
         type: 'rect',
+        // Normal ink by default; the switch is in the inspector and the
+        // right-click menu.
+        inverted: false,
         xMm,
         yMm,
         widthMm: 20,
@@ -169,6 +178,9 @@ export function createElement(type: ElementType, ir: LabelIR, options: CreateOpt
       return {
         id,
         type: 'ellipse',
+        // Normal ink by default; the switch is in the inspector and the
+        // right-click menu.
+        inverted: false,
         xMm,
         yMm,
         widthMm: 20,

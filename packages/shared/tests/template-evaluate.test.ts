@@ -74,6 +74,7 @@ function ir(...contents: string[]): LabelIR {
       fontSizeMm: 3,
       align: 'left' as const,
       bold: false,
+      inverted: false,
     })),
   }
 }

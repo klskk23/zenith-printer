@@ -64,3 +64,47 @@ describe('right-clicking the element itself', () => {
     expect(screen.queryAllByText('删除').length).toBeGreaterThan(0)
   })
 })
+
+describe('inverting from the menu', () => {
+  /**
+   * White parts **inside the canvas**.
+   *
+   * Scoped deliberately: a document-wide query also counts the open menu's own
+   * markup, which changes as the menu opens and closes. The first version of
+   * this test did exactly that and passed identically with the toggle wired
+   * and with it stubbed out — it was measuring the menu, not the label.
+   */
+  const whiteParts = (): number =>
+    screen.getByLabelText('label canvas').querySelectorAll('[fill="#ffffff"], [stroke="#ffffff"]')
+      .length
+
+  /**
+   * The menu's own entry.
+   *
+   * By role, not by text: the inspector carries a switch with the very same
+   * label, and it renders first — a `getAllByText(...)[0]` picked *that* one,
+   * so the test drove the panel while claiming to drive the menu and passed
+   * with the menu's handler stubbed out.
+   */
+  const menuEntry = (): HTMLElement =>
+    screen.getByRole('menuitemcheckbox', { name: '反相（白字）' })
+
+  it('offers the toggle', () => {
+    openDesignWithElement()
+    fireEvent.contextMenu(screen.getByLabelText('label canvas'))
+    expect(menuEntry()).toBeDefined()
+  })
+
+  it('turns the element white and back', () => {
+    openDesignWithElement()
+    const before = whiteParts()
+
+    fireEvent.contextMenu(screen.getByLabelText('label canvas'))
+    fireEvent.click(menuEntry())
+    expect(whiteParts()).toBeGreaterThan(before)
+
+    fireEvent.contextMenu(screen.getByLabelText('label canvas'))
+    fireEvent.click(menuEntry())
+    expect(whiteParts()).toBe(before)
+  })
+})

@@ -30,7 +30,7 @@ function harness() {
       elements: [
         {
           id: 't', type: 'text', xMm: 2, yMm: 2, widthMm: 40, heightMm: 5, rotation: 0,
-          content, fontFamily: 'F', fontSizeMm: 3, bold: false, align: 'left',
+          content, fontFamily: 'F', fontSizeMm: 3, bold: false, align: 'left', inverted: false,
         },
       ],
       variables,

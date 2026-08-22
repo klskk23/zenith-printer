@@ -27,6 +27,7 @@ function ir(...contents: string[]): LabelIR {
       fontFamily: 'F',
       fontSizeMm: 3,
       bold: false,
+      inverted: false,
       align: 'left' as const,
     })),
   }
@@ -115,7 +116,7 @@ describe('previewIr', () => {
     const withLine: LabelIR = {
       ...ir('${sku}'),
       elements: [
-        { id: 'l', type: 'line', xMm: 0, yMm: 0, x2Mm: 10, y2Mm: 0, rotation: 0, strokeWidthDots: 1 },
+        { id: 'l', type: 'line', xMm: 0, yMm: 0, x2Mm: 10, y2Mm: 0, rotation: 0, strokeWidthDots: 1, inverted: false },
       ],
     }
     expect(previewIr(withLine, {}).unresolved).toEqual([])

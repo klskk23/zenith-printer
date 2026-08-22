@@ -323,6 +323,26 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
         </ToggleGroup>
       </Field>
 
+      {/*
+        Shown by testing for the field rather than listing the types, so the
+        control appears wherever the schema allows it and cannot drift out of
+        step with it. Barcodes, QR codes and images have no `inverted`: a
+        light-on-dark symbol is refused by many scanners, and for an image the
+        same word would mean inverting its pixels.
+      */}
+      {'inverted' in element && (
+        <div className="space-y-1">
+          <Label className="flex items-center gap-2 text-sm text-foreground">
+            <Checkbox
+              checked={element.inverted}
+              onCheckedChange={(checked) => patch({ inverted: checked === true } as never)}
+            />
+            {copy.editor.fields.inverted}
+          </Label>
+          <p className="text-[11px] text-muted-foreground">{copy.editor.fields.invertedHint}</p>
+        </div>
+      )}
+
       {'strokeWidthDots' in element && (
         <Field label={copy.editor.fields.strokeWidth}>
           <DotsInput

@@ -79,6 +79,17 @@ function escapeXml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
+/**
+ * The colour this element draws in.
+ *
+ * Black unless it is inverted, in which case white — for elements sitting on a
+ * black band. There is no compositing: the black comes from whatever is drawn
+ * underneath, so a white element on bare paper is invisible.
+ */
+function ink(element: { inverted?: boolean }): string {
+  return element.inverted === true ? '#ffffff' : '#000000'
+}
+
 /** Rotation about the element's own top-left corner. */
 /** Centre of the element's own, unrotated box — in absolute dots. */
 function rotationCentreDots(
@@ -180,7 +191,7 @@ function renderText(element: TextElement, grid: LayoutGrid): string {
     ` font-size="${num(fontSizeDots)}"`,
     ` font-weight="${element.bold ? 'bold' : 'normal'}"`,
     ` text-anchor="${anchor}"`,
-    ` fill="#000000"`,
+    ` fill="${ink(element)}"`,
     `>${spans}</text>`,
   ].join('')
 }
@@ -205,7 +216,7 @@ function renderLine(element: LineElement, grid: LayoutGrid): string {
   return (
     `<line x1="${num(x1 + ox)}" y1="${num(y1 + oy)}"` +
     ` x2="${num(x2 + ox)}" y2="${num(y2 + oy)}"` +
-    ` stroke="#000000" stroke-width="${num(width)}" stroke-linecap="butt"/>`
+    ` stroke="${ink(element)}" stroke-width="${num(width)}" stroke-linecap="butt"/>`
   )
 }
 
@@ -218,7 +229,7 @@ function renderRect(element: RectElement, grid: LayoutGrid): string {
     return (
       `<rect x="0" y="0" width="${num(w)}" height="${num(h)}"` +
       (radius > 0 ? ` rx="${num(radius)}" ry="${num(radius)}"` : '') +
-      ` fill="#000000"/>`
+      ` fill="${ink(element)}"/>`
     )
   }
 
@@ -230,7 +241,7 @@ function renderRect(element: RectElement, grid: LayoutGrid): string {
     ` width="${num(Math.max(0, w - element.strokeWidthDots))}"` +
     ` height="${num(Math.max(0, h - element.strokeWidthDots))}"` +
     (radius > 0 ? ` rx="${num(radius)}" ry="${num(radius)}"` : '') +
-    ` fill="none" stroke="#000000" stroke-width="${num(element.strokeWidthDots)}"/>`
+    ` fill="none" stroke="${ink(element)}" stroke-width="${num(element.strokeWidthDots)}"/>`
   )
 }
 
@@ -250,14 +261,14 @@ function renderEllipse(element: EllipseElement, grid: LayoutGrid): string {
   const cy = h / 2
 
   if (element.filled || element.strokeWidthDots * 2 >= Math.min(w, h)) {
-    return `<ellipse cx="${num(cx)}" cy="${num(cy)}" rx="${num(w / 2)}" ry="${num(h / 2)}" fill="#000000"/>`
+    return `<ellipse cx="${num(cx)}" cy="${num(cy)}" rx="${num(w / 2)}" ry="${num(h / 2)}" fill="${ink(element)}"/>`
   }
 
   const inset = element.strokeWidthDots / 2
   return (
     `<ellipse cx="${num(cx)}" cy="${num(cy)}"` +
     ` rx="${num(Math.max(0, w / 2 - inset))}" ry="${num(Math.max(0, h / 2 - inset))}"` +
-    ` fill="none" stroke="#000000" stroke-width="${num(element.strokeWidthDots)}"/>`
+    ` fill="none" stroke="${ink(element)}" stroke-width="${num(element.strokeWidthDots)}"/>`
   )
 }
 
