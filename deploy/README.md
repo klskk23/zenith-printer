@@ -65,8 +65,8 @@ grep ' /dev ' /proc/self/mountinfo   # tmpfs = 快照；devtmpfs = 真的
 | 前端产物 | 含 GB2312 子集字体 |
 | 服务端 `.ts` 源码 | Node 直接跑，后端没有编译步骤 |
 
-数据（SQLite 与上传的图片）落在具名卷 `zenith-data`，**不进镜像**。`docker compose down`
-带不走它；`docker volume rm zenith-data` 是唯一能弄丢它的命令，那得有人真心想。
+数据（SQLite 与上传的图片）落在**宿主机上的一个普通目录**，默认 `deploy/data/`（已在
+gitignore 里），**不进镜像**。见下一节。
 
 镜像里有两处容易被绕过的坑，Dockerfile 里各有一道断言：
 
@@ -74,6 +74,67 @@ grep ' /dev ' /proc/self/mountinfo   # tmpfs = 快照；devtmpfs = 真的
   照样构建成功，只是 bundle 里一个字体都没有。构建后 `test -d .../dist/fonts/subset`。
 - **npm 必须是 12**。`package.json` 里的 `allowScripts` 是 npm 12 的机制，npm 11 不认得，
   会去真编译三个本项目根本不 import 的 BLE 原生模块，然后因为镜像里没有 g++ 而失败。
+
+---
+
+## 二之二、持久化：目录，不是具名卷
+
+```yaml
+volumes:
+  - ${ZENITH_DATA:-./data}:/data
+```
+
+选目录而不是具名卷，理由只有一条但足够：**搬机器时是 `rsync -a data/`，没有第二步**。
+从具名卷里把数据弄出来要起一个一次性容器加一段 tar 管道——那种步骤人们会一直往后拖，
+拖到机器已经没了为止。
+
+顺带的好处：`docker compose down -v` 会删具名卷，而一个目录根本不在那条命令能碰到的
+范围内。
+
+路径相对 compose 文件本身，所以刚 clone 下来不用做任何准备就能跑。长期部署指到实处：
+
+```bash
+ZENITH_DATA=/srv/zenith-printer/data docker compose up -d
+```
+
+**必须放在本地文件系统上。** SQLite 需要能用的文件锁，NFS 和 SMB 上它不会拒绝，而是把
+库写坏。
+
+### 里面是什么
+
+| | |
+|---|---|
+| `zenith.db` | 打印机、模板、数据源、任务历史 |
+| `zenith.db-wal` / `-shm` | WAL 模式的伴随文件。服务正常停止时会 checkpoint 进主库 |
+| `uploads/` | 标签里用到的图片 |
+
+容器以 root 跑（privileged 是为了串口），所以这些文件在宿主机上是 root 属主，看和拷都
+要 `sudo`。这是 bind 挂载换来迁移便利的代价。
+
+### 搬到另一台机器
+
+```bash
+docker compose down                      # 让 WAL checkpoint 进主库，且没有写入者
+sudo rsync -a deploy/data/ newhost:/srv/zenith-printer/data/
+# 新机器上：
+ZENITH_DATA=/srv/zenith-printer/data docker compose up -d
+```
+
+**先停服务再拷。** 服务运行中 `zenith.db` 的一部分内容还在 `-wal` 里，只拷主库会得到一
+个少了最近改动的库。
+
+### 从旧的具名卷迁过来
+
+早先的版本用的是具名卷 `zenith-data`。一次性搬过来：
+
+```bash
+docker compose stop
+mkdir -p deploy/data
+docker run --rm -v zenith-data:/from -v "$PWD/deploy/data:/to" alpine cp -a /from/. /to/
+docker compose up -d
+```
+
+确认新库里东西都在之后，再 `docker volume rm zenith-data`——**先确认，后删**。
 
 ---
 

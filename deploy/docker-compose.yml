@@ -43,11 +43,22 @@ services:
       # the snapshot, devtmpfs means the real thing.)
       - /dev:/dev
 
-      # The database, the uploaded images, everything anybody has drawn. A
-      # named volume rather than a bind mount so that `docker compose down`
-      # cannot take it with it; `docker volume rm zenith-data` is the one way
-      # to lose it, which is a command somebody has to mean.
-      - zenith-data:/data
+      # The database, the uploaded images, everything anybody has drawn — in a
+      # plain directory on the host, not a named volume. Moving this service to
+      # another machine is then `rsync -a data/` and nothing else; getting data
+      # out of a named volume needs a throwaway container and a tar pipe, which
+      # is the sort of step people postpone until the machine is already gone.
+      #
+      # It also survives more: `docker compose down -v` removes named volumes,
+      # and a directory is simply not something that command can touch.
+      #
+      # Relative to THIS file, so a checkout works with no setup. Point it
+      # somewhere real for a permanent install:
+      #   ZENITH_DATA=/srv/zenith-printer/data docker compose up -d
+      #
+      # Keep it on a local filesystem. SQLite needs working locks, and NFS or
+      # SMB will corrupt the database rather than refuse to try.
+      - ${ZENITH_DATA:-./data}:/data
 
       # A Google service-account key, if Sheets data sources are wanted. Read
       # only, and never copied into the image — a key baked into a layer is in
@@ -84,7 +95,3 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
-
-volumes:
-  zenith-data:
-    name: zenith-data

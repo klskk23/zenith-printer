@@ -10,7 +10,9 @@ build/
 coverage/
 .vitest/
 
-# Runtime data
+# Runtime data. `data/` also covers deploy/data, which is where
+# deploy/docker-compose.yml puts the database and uploads by default — a plain
+# directory rather than a named volume, so moving the service is a copy.
 *.db
 *.db-journal
 data/
