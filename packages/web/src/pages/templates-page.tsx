@@ -19,10 +19,52 @@ import {
   type Template,
 } from '../features/templates/hooks.ts'
 import { useDataSources } from '../features/data-sources/hooks.ts'
+import { thumbnailBoxPx } from '../features/templates/thumbnail-box.ts'
 import { useWorkspace } from '../app/workspace.tsx'
 
 function matches(template: Template, query: string): boolean {
   return query === '' || template.name.toLowerCase().includes(query.toLowerCase())
+}
+
+/**
+ * The design's picture, sized to the label's own shape.
+ *
+ * Drawn when the design was saved, not on every visit: the library lists every
+ * template at once, and rendering each card on demand is a resvg pass per
+ * card, per visit, for a picture that only changes when somebody edits the
+ * design.
+ *
+ * The frame takes the label's proportions rather than being one fixed box — a
+ * 100 x 10 strip letterboxed into a square is a hairline in an empty frame,
+ * and a portrait label is a sliver. Its size is fixed before the image
+ * arrives, so a shelf of cards does not jump as they load.
+ */
+function ThumbnailFrame({ template }: { template: Template }): React.JSX.Element {
+  const box = thumbnailBoxPx(template, { maxWidthPx: 96, maxHeightPx: 56 })
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-white"
+      style={{ width: box.widthPx, height: box.heightPx }}
+      data-thumbnail-frame
+      title={template.hasThumbnail ? undefined : copy.templates.thumbnailMissing}
+    >
+      {template.hasThumbnail ? (
+        <img
+          src={thumbnailUrl(template)}
+          alt={copy.templates.thumbnailAlt(template.name)}
+          loading="lazy"
+          className="max-h-full max-w-full object-contain"
+          data-thumbnail
+        />
+      ) : (
+        // No room for a sentence at this size, so the frame carries the
+        // explanation as its tooltip and shows the shape alone.
+        <span className="text-[11px] text-muted-foreground" data-no-thumbnail aria-hidden>
+          —
+        </span>
+      )}
+    </div>
+  )
 }
 
 export function TemplatesPage(): React.JSX.Element {
@@ -69,66 +111,53 @@ export function TemplatesPage(): React.JSX.Element {
         {visible.map((template) => (
           <Card key={template.id}>
             <CardHeader className="pb-2">
-              {renamingId === template.id ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    aria-label={copy.templates.name}
-                    value={draftName}
-                    onChange={(event) => setDraftName(event.target.value)}
-                  />
-                  <Button
-                    size="sm"
-                    disabled={draftName.trim() === ''}
-                    onClick={() => {
-                      rename.mutate({ id: template.id, name: draftName.trim() })
-                      setRenamingId(null)
-                    }}
-                  >
-                    {copy.common.save}
-                  </Button>
-                </div>
-              ) : (
-                <CardTitle>{template.name}</CardTitle>
-              )}
               {/*
-                Millimetres only. The dpi and the printer kind used to be shown
-                here as though they said where this design could be printed;
-                neither does any more — the dot grid comes from whichever
-                printer it is sent to, and both drivers take a bitmap. Leaving
-                them on the card is what led people to re-save a design that
-                was never wrong.
+                Title on the left, picture on the right. Beside the name rather
+                than above the details: the name and the shape are the two
+                things a glance at a library is looking for, and putting the
+                picture in the body pushed everything that says what the design
+                *does* below the fold of the card.
               */}
-              <p className="text-[11px] text-muted-foreground" data-label-size>
-                {template.widthMm} × {template.heightMm} mm
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  {renamingId === template.id ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        aria-label={copy.templates.name}
+                        value={draftName}
+                        onChange={(event) => setDraftName(event.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        disabled={draftName.trim() === ''}
+                        onClick={() => {
+                          rename.mutate({ id: template.id, name: draftName.trim() })
+                          setRenamingId(null)
+                        }}
+                      >
+                        {copy.common.save}
+                      </Button>
+                    </div>
+                  ) : (
+                    <CardTitle className="truncate">{template.name}</CardTitle>
+                  )}
+                  {/*
+                    Millimetres only. The dpi and the printer kind used to be
+                    shown here as though they said where this design could be
+                    printed; neither does any more — the dot grid comes from
+                    whichever printer it is sent to, and both drivers take a
+                    bitmap. Leaving them on the card is what led people to
+                    re-save a design that was never wrong.
+                  */}
+                  <p className="text-[11px] text-muted-foreground" data-label-size>
+                    {template.widthMm} × {template.heightMm} mm
+                  </p>
+                </div>
+
+                <ThumbnailFrame template={template} />
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
-              {/*
-                Drawn when the design was saved, not on every visit: the
-                library lists every template at once, and rendering each card
-                on demand is a resvg pass per card, per visit, for a picture
-                that only changes when somebody edits the design.
-
-                `loading="lazy"` because a long library is mostly off-screen,
-                and a fixed aspect box so the cards do not jump as they arrive.
-              */}
-              <div className="flex h-24 items-center justify-center overflow-hidden rounded border border-border bg-white">
-                {template.hasThumbnail ? (
-                  <img
-                    src={thumbnailUrl(template)}
-                    alt={copy.templates.thumbnailAlt(template.name)}
-                    loading="lazy"
-                    className="max-h-full max-w-full object-contain"
-                    data-thumbnail
-                  />
-                ) : (
-                  // Says why there is no picture rather than leaving a blank
-                  // frame: the design is saved, it just could not be drawn.
-                  <p className="px-2 text-center text-[11px] text-muted-foreground" data-no-thumbnail>
-                    {copy.templates.thumbnailMissing}
-                  </p>
-                )}
-              </div>
               {/*
                 Which table this design prints from — the thing worth knowing at
                 a glance, now that there are no variable fields to count. Bound

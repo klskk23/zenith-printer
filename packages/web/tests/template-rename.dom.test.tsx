@@ -161,13 +161,52 @@ describe('the card thumbnail', () => {
     expect(document.querySelector('[data-thumbnail]')!.getAttribute('loading')).toBe('lazy')
   })
 
-  it('says why there is none rather than leaving an empty frame', async () => {
-    // The design saved; it just could not be drawn.
+  it('says why there is none, in the room a frame this size has', async () => {
+    // The design saved; it just could not be drawn. There is no space for a
+    // sentence beside the title, so the frame carries it as a tooltip.
     templates = [{ ...TEMPLATE, hasThumbnail: false }]
     render(wrap(<TemplatesPage />))
     await screen.findByText('面单')
     expect(document.querySelector('[data-thumbnail]')).toBeNull()
-    expect(screen.getByText('这个设计画不出预览图')).toBeDefined()
+    expect(document.querySelector('[data-thumbnail-frame]')?.getAttribute('title')).toBe(
+      '这个设计画不出预览图',
+    )
+  })
+
+  it('sits beside the title rather than above the details', async () => {
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    const frame = document.querySelector('[data-thumbnail-frame]')
+    const title = screen.getByText('面单')
+    // Same row: the frame and the title share a parent, and the frame is not
+    // inside the block that carries the name and the size.
+    expect(frame!.parentElement!.contains(title)).toBe(true)
+    expect(frame!.contains(title)).toBe(false)
+  })
+
+  it('takes the label shape, so a glance says which way round the design is', async () => {
+    templates = [
+      { ...TEMPLATE, id: 'wide', name: '横的', widthMm: 100, heightMm: 20 },
+      { ...TEMPLATE, id: 'tall', name: '竖的', widthMm: 20, heightMm: 100 },
+    ]
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('横的')
+
+    const [wide, tall] = [...document.querySelectorAll('[data-thumbnail-frame]')] as HTMLElement[]
+    const size = (el: HTMLElement): { w: number; h: number } => ({
+      w: Number.parseFloat(el.style.width),
+      h: Number.parseFloat(el.style.height),
+    })
+    expect(size(wide!).w).toBeGreaterThan(size(wide!).h)
+    expect(size(tall!).h).toBeGreaterThan(size(tall!).w)
+  })
+
+  it('fixes the frame size before the image arrives, so cards do not jump', async () => {
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    const frame = document.querySelector('[data-thumbnail-frame]') as HTMLElement
+    expect(frame.style.width).not.toBe('')
+    expect(frame.style.height).not.toBe('')
   })
 })
 
