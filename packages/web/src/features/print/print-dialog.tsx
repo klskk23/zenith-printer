@@ -39,6 +39,7 @@ import {
   type Selection,
 } from './selection.ts'
 import { useDataSources } from '../data-sources/hooks.ts'
+import { randomId } from '../../lib/random-id.ts'
 
 export interface PrintDialogProps {
   ir: LabelIR
@@ -94,7 +95,10 @@ export function PrintDialog({
   // Minted once per dialog opening. A retry — from a double click, a flaky
   // network, or the browser replaying the request — reuses it and gets the
   // same job back rather than a second stack of labels.
-  const idempotencyKey = useMemo(() => crypto.randomUUID(), [])
+  //
+  // Not `crypto.randomUUID()`: that one exists only in a secure context, and
+  // this service is plain HTTP on a LAN address. See lib/random-id.ts.
+  const idempotencyKey = useMemo(() => randomId(), [])
 
   // A printer that has never been probed has no head width or dpi, so nothing
   // downstream can decide what fits. An unresolved reference blocks for a
