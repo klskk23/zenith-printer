@@ -1,0 +1,42 @@
+#!/bin/sh
+# Zenith Printer — post-removal.
+#
+# What purge deliberately does NOT do is delete /var/lib/zenith-printer. Every
+# label template anybody has drawn lives in that database, and it is not
+# recreatable from the package. dpkg would be within its rights to remove it;
+# the trade here is a directory left behind against work destroyed by a command
+# somebody ran to free disk space. The message says where it is.
+set -e
+
+SERVICE=zenith-printer.service
+STATE_DIR=/var/lib/zenith-printer
+CONF_DIR=/etc/zenith-printer
+
+if [ "$1" = "remove" ]; then
+  if [ -x /usr/bin/deb-systemd-helper ]; then
+    deb-systemd-helper mask "$SERVICE" >/dev/null || true
+  fi
+fi
+
+if [ "$1" = "purge" ]; then
+  if [ -x /usr/bin/deb-systemd-helper ]; then
+    deb-systemd-helper purge "$SERVICE" >/dev/null || true
+    deb-systemd-helper unmask "$SERVICE" >/dev/null || true
+  fi
+
+  # rmdir, never rm -rf: an administrator may have put a Google service-account
+  # key in here, and deleting somebody's private key on the way out is not this
+  # script's call. dpkg has already removed the conffile it owns.
+  rmdir "$CONF_DIR" 2>/dev/null || true
+
+  if [ -d "$STATE_DIR" ]; then
+    echo "zenith-printer: label templates and print history are still in $STATE_DIR" >&2
+    echo "zenith-printer: remove them with: sudo rm -rf $STATE_DIR && sudo deluser --system zenith" >&2
+  fi
+fi
+
+if [ -d /run/systemd/system ]; then
+  systemctl --system daemon-reload >/dev/null || true
+fi
+
+exit 0

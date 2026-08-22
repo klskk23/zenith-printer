@@ -1,6 +1,6 @@
 # Zenith Printer — single-process label design and print service.
 #
-# Install:
+# The .deb installs this file; `make deb` builds it. For a manual install:
 #   sudo cp deploy/zenith-printer.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now zenith-printer
@@ -9,7 +9,7 @@
 
 [Unit]
 Description=Zenith Printer label service
-Documentation=file:///opt/zenith-printer/specs/001-label-design-print/quickstart.md
+Documentation=file:///usr/share/doc/zenith-printer/README.md
 After=network-online.target
 Wants=network-online.target
 
@@ -35,6 +35,12 @@ Environment=LOG_LEVEL=info
 # Set to 1 to run every motion except printing — useful for demos and for any
 # automated check that must not consume stock.
 # Environment=ZENITH_DRY_RUN=1
+
+# Read AFTER the defaults above, so anything set here wins. The leading `-`
+# makes the file optional: a unit copied by hand still starts with the values
+# above, while the packaged install edits /etc and never touches this unit —
+# which is what keeps `apt upgrade` from reverting somebody's port number.
+EnvironmentFile=-/etc/zenith-printer/zenith-printer.env
 
 Restart=on-failure
 RestartSec=5

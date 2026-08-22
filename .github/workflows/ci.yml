@@ -17,24 +17,53 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: make deps
+
+      # scripts/fetch-fonts.sh copies from these packages' install paths.
+      - name: System fonts
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk fonts-dejavu-core
 
       # Rendering determinism requires the pinned font files
-      # (Constitution: loadSystemFonts must stay false).
-      - name: Fetch fonts
-        run: npm run fetch-fonts
+      # (Constitution: loadSystemFonts must stay false). `make fonts` copies
+      # them from the system and verifies them from inside fonts/full — the
+      # manifest lists bare filenames, so checking it from the repository root
+      # reports "FAILED open or read" for every file and, before this, did.
+      - name: Fetch and verify fonts
+        run: make fonts
 
-      - name: Verify font integrity
-        run: sha256sum -c fonts/MANIFEST.sha256
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
+      - name: Typecheck, lint, test
+        run: make check
 
       - name: Coverage (>= 80% on core logic)
-        run: npm run test:coverage
+        run: make coverage
+
+  package:
+    runs-on: ubuntu-latest
+    needs: quality-gate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+
+      - name: Fonts
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk fonts-dejavu-core
+          make fonts
+
+      # Builds the frontend, vendors the production dependencies, boots the
+      # staged tree once, then assembles the .deb.
+      - name: Build the package
+        run: make deb
+
+      # Installs it in a throwaway Debian container and proves it serves.
+      - name: Install it somewhere disposable
+        run: make deb-install-test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zenith-printer-deb
+          path: dist/*.deb
+          if-no-files-found: error
