@@ -17,6 +17,7 @@ import {
   markDirty,
   openTab,
   restoreFromPath,
+  setTabTemplate,
   type WorkspaceState,
 } from '../src/app/workspace-state.ts'
 
@@ -259,6 +260,77 @@ describe('soft tab limit', () => {
 
     state = closeTab(state, state.tabs[0]!.id)
     expect(exceedsSoftLimit(state)).toBe(false)
+  })
+})
+
+describe('numbering unsaved designs', () => {
+  /** The untitled designs, in tab order, by their number. */
+  const drafts = (state: WorkspaceState): (number | undefined)[] =>
+    state.tabs.filter((t) => t.kind === 'design' && t.templateId === null).map((t) => t.draftNumber)
+
+  it('numbers them from one, so three of them are three different tabs', () => {
+    const next = ids()
+    let state = emptyWorkspace()
+    for (let i = 0; i < 3; i += 1) {
+      state = open(state, { kind: 'design', templateId: null }, next)
+    }
+    expect(drafts(state)).toEqual([1, 2, 3])
+  })
+
+  it('does not renumber the survivors when one closes', () => {
+    // The property the whole scheme exists for. Deriving the number from
+    // position instead would turn 「未命名设计 3」 into 「未命名设计 2」 under
+    // the cursor of somebody who closed a different tab — which is the exact
+    // confusion the numbers were added to end.
+    const next = ids()
+    let state = emptyWorkspace()
+    for (let i = 0; i < 3; i += 1) {
+      state = open(state, { kind: 'design', templateId: null }, next)
+    }
+    state = closeTab(state, state.tabs[0]!.id)
+    expect(drafts(state)).toEqual([2, 3])
+  })
+
+  it('reuses the lowest free number rather than counting upwards forever', () => {
+    const next = ids()
+    let state = emptyWorkspace()
+    for (let i = 0; i < 3; i += 1) {
+      state = open(state, { kind: 'design', templateId: null }, next)
+    }
+    state = closeTab(state, state.tabs[1]!.id)
+    state = open(state, { kind: 'design', templateId: null }, next)
+    expect(drafts(state)).toEqual([1, 3, 2])
+  })
+
+  it('frees the number once that design is saved', () => {
+    // A saved tab is called after its template, so it is no longer holding a
+    // number — and the next blank design should get the small one back.
+    const next = ids()
+    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
+    const first = state.tabs[0]!.id
+    state = open(state, { kind: 'design', templateId: null }, next)
+
+    state = setTabTemplate(state, first, 'tpl-1')
+    expect(state.tabs[0]!.draftNumber).toBeUndefined()
+
+    state = open(state, { kind: 'design', templateId: null }, next)
+    expect(drafts(state)).toEqual([2, 1])
+  })
+
+  it('gives no number to a design opened on a template', () => {
+    const state = open(emptyWorkspace(), { kind: 'design', templateId: 'tpl-1' })
+    expect(state.tabs[0]!.draftNumber).toBeUndefined()
+  })
+
+  it('gives no number to pages that are not designs', () => {
+    const next = ids()
+    let state = open(emptyWorkspace(), { kind: 'printers' }, next)
+    state = open(state, { kind: 'templates' }, next)
+    expect(state.tabs.map((t) => t.draftNumber)).toEqual([undefined, undefined])
+  })
+
+  it('numbers the blank design restored from an address', () => {
+    expect(restoreFromPath('/design/new', ids()).tabs[0]!.draftNumber).toBe(1)
   })
 })
 

@@ -60,7 +60,13 @@ function tabTitle(
     return copy.workspace.tabs[tab.kind]
   }
   if (tab.templateId === null) {
-    return copy.workspace.untitledDesign
+    // Numbered, because this is the one title that says nothing about its
+    // contents: three blank designs are otherwise three identical tabs. The
+    // number rides on the tab (see `nextDraftNumber`) rather than being counted
+    // off here, so closing one does not relabel the others.
+    return tab.draftNumber === undefined
+      ? copy.workspace.untitledDesign
+      : copy.workspace.untitledDesignTab(tab.draftNumber)
   }
   return templateName ?? copy.workspace.tabs.design
 }

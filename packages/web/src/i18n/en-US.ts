@@ -46,6 +46,7 @@ export const copy: Copy = {
     },
     dataSourceTab: (name: string): string => `Data source · ${name}`,
     untitledDesign: 'Untitled design',
+    untitledDesignTab: (n: number): string => `Untitled design ${n}`,
     close: 'Close',
     unsavedMark: 'Unsaved changes',
     confirmCloseTitle: 'Close this tab?',

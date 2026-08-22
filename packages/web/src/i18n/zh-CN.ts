@@ -43,6 +43,7 @@ export const copy = {
     },
     dataSourceTab: (name: string): string => `数据源-${name}`,
     untitledDesign: '未命名设计',
+    untitledDesignTab: (n: number): string => `未命名设计 ${n}`,
     close: '关闭',
     unsavedMark: '有未保存的修改',
     confirmCloseTitle: '关闭这个标签页？',

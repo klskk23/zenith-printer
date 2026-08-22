@@ -28,6 +28,13 @@ export interface WorkspaceTab {
   templateId: string | null
   /** Data source editor only. */
   dataSourceId?: string
+  /**
+   * Unsaved designs only: what separates 「未命名设计 1」 from 「未命名设计 2」.
+   *
+   * Assigned when the tab opens and never touched again, so closing one tab
+   * cannot relabel the rest. See `nextDraftNumber`.
+   */
+  draftNumber?: number
   isDirty: boolean
 }
 
@@ -40,6 +47,35 @@ export type IdFactory = () => string
 
 export function emptyWorkspace(): WorkspaceState {
   return { tabs: [], activeId: null }
+}
+
+function isUntitledDesign(tab: WorkspaceTab): boolean {
+  return tab.kind === 'design' && tab.templateId === null
+}
+
+/**
+ * The number a new blank design gets: the lowest one nobody is using.
+ *
+ * Two properties, and they pull in opposite directions:
+ *
+ *   - **Stable.** A number belongs to its tab for as long as that tab is
+ *     unsaved. Deriving it from position instead would renumber 「未命名设计 3」
+ *     to 「未命名设计 2」 the moment somebody closed a different tab — which is
+ *     the confusion the numbers were added to end.
+ *   - **Small.** Reusing the lowest free number keeps the strip readable;
+ *     a counter that only ever climbs reaches 「未命名设计 17」 on a machine
+ *     that has never had two open at once.
+ *
+ * Gaps are the price: with 1 and 3 open, the next one is 2, and closing 2
+ * leaves 1 and 3. That is the honest reading — those two tabs did not change.
+ */
+function nextDraftNumber(tabs: readonly WorkspaceTab[]): number {
+  const taken = new Set(tabs.filter(isUntitledDesign).map((tab) => tab.draftNumber))
+  let candidate = 1
+  while (taken.has(candidate)) {
+    candidate += 1
+  }
+  return candidate
 }
 
 function findSingleton(state: WorkspaceState, kind: TabKind): WorkspaceTab | undefined {
@@ -74,11 +110,13 @@ export function openTab(
     }
   }
 
+  const isBlankDesign = descriptor.kind === 'design' && (descriptor.templateId ?? null) === null
   const tab: WorkspaceTab = {
     id: nextId(),
     kind: descriptor.kind,
     templateId: descriptor.templateId ?? null,
     ...(descriptor.dataSourceId === undefined ? {} : { dataSourceId: descriptor.dataSourceId }),
+    ...(isBlankDesign ? { draftNumber: nextDraftNumber(state.tabs) } : {}),
     isDirty: false,
   }
   return { tabs: [...state.tabs, tab], activeId: tab.id }
@@ -122,7 +160,22 @@ export function setTabTemplate(
 ): WorkspaceState {
   return {
     ...state,
-    tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, templateId } : tab)),
+    tabs: state.tabs.map((tab) => {
+      if (tab.id !== id) {
+        return tab
+      }
+      // The number goes with the title. Once the tab is called after a
+      // template it is not holding one any more, so the next blank design gets
+      // it back; were the tab ever pointed at nothing again it needs a fresh
+      // one, since its old number may since have been handed out.
+      const next: WorkspaceTab = { ...tab, templateId }
+      if (templateId === null) {
+        next.draftNumber = nextDraftNumber(state.tabs.filter((other) => other.id !== id))
+      } else {
+        delete next.draftNumber
+      }
+      return next
+    }),
   }
 }
 
