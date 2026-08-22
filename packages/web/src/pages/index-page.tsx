@@ -24,6 +24,7 @@ import { ReprintDialog } from '../features/jobs/reprint-dialog.tsx'
 import { PausedQueueBanner } from '../features/jobs/paused-banner.tsx'
 import type { Printer } from '../api/types.ts'
 import { consumableDisplay } from './consumable.ts'
+import { ThumbnailFrame } from '../features/templates/thumbnail-frame.tsx'
 
 const RECENT_TEMPLATES = 6
 const RECENT_JOBS = 5
@@ -80,10 +81,13 @@ function TemplateCard({ template }: { template: Template }): React.JSX.Element {
       className="flex-col items-start gap-0.5 px-3 py-2"
       onClick={() => open({ kind: 'design', templateId: template.id })}
     >
-      <span className="block font-medium">{template.name}</span>
+      <span className="block w-full truncate font-medium">{template.name}</span>
       <span className="block text-muted-foreground">
         {template.widthMm} × {template.heightMm} mm
       </span>
+      {/* The same frame the library uses, so the two lists show a design the
+          same way rather than drifting apart at the first adjustment. */}
+      <ThumbnailFrame template={template} maxWidthPx={190} maxHeightPx={110} className="mt-1.5" />
     </Button>
   )
 }
@@ -166,10 +170,15 @@ export function IndexPage(): React.JSX.Element {
             {copy.index.allTemplates}
           </Button>
         </div>
+        {/*
+          Same rule as the library: as many cards as fit, never below the
+          floor. A lower floor here because this list sits inside a column of
+          other sections rather than filling the page.
+        */}
         {recentTemplates.length === 0 ? (
           <Alert>{copy.index.noTemplates}</Alert>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
             {recentTemplates.map((template) => (
               <TemplateCard key={template.id} template={template} />
             ))}

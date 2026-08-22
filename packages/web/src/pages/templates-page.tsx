@@ -12,61 +12,17 @@ import { ConfirmButton } from '../components/ui/confirm-button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx'
 import { Input } from '../components/ui/input.tsx'
 import {
-  thumbnailUrl,
   useDeleteTemplate,
   useRenameTemplate,
   useTemplates,
   type Template,
 } from '../features/templates/hooks.ts'
 import { useDataSources } from '../features/data-sources/hooks.ts'
-import { thumbnailBoxPx } from '../features/templates/thumbnail-box.ts'
+import { ThumbnailFrame } from '../features/templates/thumbnail-frame.tsx'
 import { useWorkspace } from '../app/workspace.tsx'
 
 function matches(template: Template, query: string): boolean {
   return query === '' || template.name.toLowerCase().includes(query.toLowerCase())
-}
-
-/**
- * The design's picture, sized to the label's own shape.
- *
- * Drawn when the design was saved, not on every visit: the library lists every
- * template at once, and rendering each card on demand is a resvg pass per
- * card, per visit, for a picture that only changes when somebody edits the
- * design.
- *
- * The frame takes the label's own proportions rather than being one fixed box.
- * That is what removes the empty bands: a frame of a different shape from the
- * label letterboxes the picture inside it, so a 100 x 10 strip in a square
- * frame is a hairline with nothing above or below it. Same shape, no bands.
- *
- * Its size is fixed before the image arrives, so a shelf of cards does not
- * jump as they load.
- */
-function ThumbnailFrame({ template }: { template: Template }): React.JSX.Element {
-  // Roughly the content width of a card at the grid's floor, and a height cap
-  // so a portrait label does not make its card twice as tall as the rest.
-  const box = thumbnailBoxPx(template, { maxWidthPx: 240, maxHeightPx: 140 })
-  return (
-    <div
-      className="mx-auto flex items-center justify-center overflow-hidden rounded border border-border bg-white"
-      style={{ width: box.widthPx, height: box.heightPx }}
-      data-thumbnail-frame
-    >
-      {template.hasThumbnail ? (
-        <img
-          src={thumbnailUrl(template)}
-          alt={copy.templates.thumbnailAlt(template.name)}
-          loading="lazy"
-          className="max-h-full max-w-full object-contain"
-          data-thumbnail
-        />
-      ) : (
-        <p className="px-2 text-center text-[11px] text-muted-foreground" data-no-thumbnail>
-          {copy.templates.thumbnailMissing}
-        </p>
-      )}
-    </div>
-  )
 }
 
 export function TemplatesPage(): React.JSX.Element {
