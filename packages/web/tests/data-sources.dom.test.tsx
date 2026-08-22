@@ -169,6 +169,40 @@ describe('the table editor', () => {
     expect(inputs.every((input) => input.tabIndex === -1)).toBe(true)
   })
 
+  it('builds its add-rows bar from the application\'s own primitives', async () => {
+    // The library ships one: an unstyled button and an English label, at the
+    // foot of the page where it is impossible to miss.
+    openEditor()
+    await screen.findByText('收件人')
+    expect(screen.getByRole('button', { name: '加行' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Add' })).toBeNull()
+    expect(document.querySelector('[data-add-rows]')).not.toBeNull()
+  })
+
+  it('adds the number of rows the bar was asked for', async () => {
+    openEditor()
+    await screen.findByText('收件人')
+    const count = screen.getByLabelText('加几行') as HTMLInputElement
+    fireEvent.change(count, { target: { value: '3' } })
+    fireEvent.click(screen.getByRole('button', { name: '加行' }))
+
+    await vi.waitFor(() => expect(patched.length).toBeGreaterThan(0))
+    const upserts = patched[0]?.upserts as Array<{ ordinal: number }>
+    expect(upserts.map((u) => u.ordinal)).toEqual([11, 12, 13])
+  })
+
+  it('keeps the count field editable while a longer number is typed', async () => {
+    // Holding it as a number would snap "1" back over the first keystroke of
+    // "10", making anything above nine impossible to enter.
+    openEditor()
+    await screen.findByText('收件人')
+    const count = screen.getByLabelText('加几行') as HTMLInputElement
+    fireEvent.change(count, { target: { value: '' } })
+    expect(count.value).toBe('')
+    fireEvent.change(count, { target: { value: '10' } })
+    expect(count.value).toBe('10')
+  })
+
   it('does not offer a per-row delete button any more', async () => {
     // Rows are removed by selecting them and pressing Delete, like a
     // spreadsheet; a button per row was the form-shaped version of this page.

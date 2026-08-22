@@ -25,6 +25,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DataSheetGrid, keyColumn, type DataSheetGridRef } from 'react-datasheet-grid'
 import 'react-datasheet-grid/dist/style.css'
 import { Alert } from '../../components/ui/alert.tsx'
+import { AddRowsBar } from './add-rows.tsx'
 import { copy } from '../../i18n/index.ts'
 import {
   emptyGridRow,
@@ -118,6 +119,10 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
         // Columns are fixed, so a duplicated row must carry every one of them —
         // an absent key would read as "leave the old value".
         duplicateRow={({ rowData }) => ({ ...emptyGridRow(columnNames), ...rowData })}
+        // The library's own bar is an unstyled button and an English label at
+        // the foot of the page; this one is built from the same primitives as
+        // everything around it.
+        addRowsComponent={AddRowsBar}
       />
     </div>
   )

@@ -104,3 +104,36 @@ body {
   color: inherit;
   font-family: inherit;
 }
+
+/*
+ * The grid scrolls itself, so it cannot be wrapped in the Radix ScrollArea the
+ * layer panel and tab bar use. This gives its native scrollbar the same shape
+ * those have — 8px, a rounded thumb in the border colour, no track — so the one
+ * place with a browser-default scrollbar stops standing out.
+ *
+ * Both syntaxes are needed: the standard properties cover Firefox and recent
+ * Chromium, the `::-webkit-` rules cover Safari and older Chromium.
+ */
+.dsg-container {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.dsg-container::-webkit-scrollbar {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+.dsg-container::-webkit-scrollbar-track,
+.dsg-container::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.dsg-container::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: var(--color-border);
+}
+
+.dsg-container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-muted-foreground);
+}
