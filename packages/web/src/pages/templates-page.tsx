@@ -11,7 +11,13 @@ import { Button } from '../components/ui/button.tsx'
 import { ConfirmButton } from '../components/ui/confirm-button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx'
 import { Input } from '../components/ui/input.tsx'
-import { useDeleteTemplate, useTemplates, type Template } from '../features/templates/hooks.ts'
+import {
+  useDeleteTemplate,
+  useRenameTemplate,
+  useTemplates,
+  type Template,
+} from '../features/templates/hooks.ts'
+import { useDataSources } from '../features/data-sources/hooks.ts'
 import { useWorkspace } from '../app/workspace.tsx'
 
 function matches(template: Template, query: string): boolean {
@@ -22,7 +28,24 @@ export function TemplatesPage(): React.JSX.Element {
   const { open } = useWorkspace()
   const templates = useTemplates()
   const remove = useDeleteTemplate()
+  const rename = useRenameTemplate()
+  const sources = useDataSources()
   const [query, setQuery] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [draftName, setDraftName] = useState('')
+
+  /**
+   * The bound source's *current* name, looked up rather than stored.
+   *
+   * A design binds by id, so the name it was bound under can already be
+   * out of date. `undefined` means the source is gone, which the binding
+   * warning below says properly — this line stays quiet about it rather than
+   * saying it a second time in weaker words.
+   */
+  const boundName = (template: Template): string | undefined =>
+    template.dataSourceId === null
+      ? undefined
+      : sources.data?.find((source) => source.id === template.dataSourceId)?.name
 
   const visible = (templates.data ?? []).filter((template) => matches(template, query))
 
@@ -45,14 +68,41 @@ export function TemplatesPage(): React.JSX.Element {
         {visible.map((template) => (
           <Card key={template.id}>
             <CardHeader className="pb-2">
-              <CardTitle>{template.name}</CardTitle>
+              {renamingId === template.id ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    aria-label={copy.templates.name}
+                    value={draftName}
+                    onChange={(event) => setDraftName(event.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={draftName.trim() === ''}
+                    onClick={() => {
+                      rename.mutate({ id: template.id, name: draftName.trim() })
+                      setRenamingId(null)
+                    }}
+                  >
+                    {copy.common.save}
+                  </Button>
+                </div>
+              ) : (
+                <CardTitle>{template.name}</CardTitle>
+              )}
               <p className="text-[11px] text-muted-foreground">
                 {template.widthMm} × {template.heightMm} mm · {template.dpi} dpi · {template.printerKind}
               </p>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p className="text-[11px] text-muted-foreground">
-                {copy.templates.fieldCount(template.variables.length)}
+              {/*
+                Which table this design prints from — the thing worth knowing at
+                a glance, now that there are no variable fields to count. Bound
+                by id, so the name is looked up fresh every render.
+              */}
+              <p className="text-[11px] text-muted-foreground" data-bound-source>
+                {template.dataSourceId === null
+                  ? copy.templates.boundSourceNone
+                  : copy.templates.boundSource(boundName(template) ?? template.dataSourceId)}
               </p>
               {/*
                 The design cannot resolve its references right now. Computed on
@@ -72,6 +122,16 @@ export function TemplatesPage(): React.JSX.Element {
                 <Button size="sm" onClick={() => open({ kind: 'design', templateId: template.id })}>
                   {copy.templates.open}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setRenamingId(template.id)
+                    setDraftName(template.name)
+                  }}
+                >
+                  {copy.templates.rename}
+                </Button>
                 <ConfirmButton
                   size="sm"
                   variant="ghost"
@@ -84,6 +144,9 @@ export function TemplatesPage(): React.JSX.Element {
                   {copy.templates.remove}
                 </ConfirmButton>
               </div>
+              {renamingId === template.id && (
+                <p className="text-[11px] text-muted-foreground">{copy.templates.renameHint}</p>
+              )}
             </CardContent>
           </Card>
         ))}

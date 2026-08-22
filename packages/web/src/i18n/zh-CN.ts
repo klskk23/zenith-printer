@@ -385,7 +385,10 @@ export const copy = {
     searchPlaceholder: '搜索模板名称',
     open: '打开',
     confirmDelete: '确定删除这个模板吗？已打印的历史记录不受影响。',
-    fieldCount: (n: number) => (n === 0 ? '无可变字段' : `${n} 个可变字段`),
+    rename: '改名',
+    renameHint: '模板名称只是给人看的，设计里不会按名称引用模板，所以改名不会影响任何东西。',
+    boundSource: (name: string): string => `数据源：${name}`,
+    boundSourceNone: '未绑定数据源',
   },
 
   settings: {

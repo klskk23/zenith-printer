@@ -11,8 +11,10 @@ import { labelElementSchema, variableDefinitionsSchema } from '@zenith/shared'
 import { isSequenceVariable, type VariableDefinition } from '@zenith/shared'
 import { printerKindSchema } from './printer.ts'
 
+export const templateNameSchema = z.string().trim().min(1).max(80)
+
 export const templateInputSchema = z.object({
-  name: z.string().min(1).max(80),
+  name: templateNameSchema,
   printerKind: printerKindSchema,
   widthMm: z.number().finite().positive(),
   heightMm: z.number().finite().positive(),

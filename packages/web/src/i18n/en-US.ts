@@ -394,7 +394,10 @@ export const copy: Copy = {
     searchPlaceholder: 'Search template names',
     open: 'Open',
     confirmDelete: 'Delete this template? Printed history is unaffected.',
-    fieldCount: (n: number) => (n === 0 ? 'No variable fields' : `${n} variable field${n === 1 ? '' : 's'}`),
+    rename: 'Rename',
+    renameHint: 'A template name is for people. Nothing references a template by name, so renaming breaks nothing.',
+    boundSource: (name: string): string => `Data source: ${name}`,
+    boundSourceNone: 'No data source bound',
   },
 
   settings: {

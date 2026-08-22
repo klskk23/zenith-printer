@@ -9,7 +9,12 @@ import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { maxLabelWidthMm } from '../domain/printer.ts'
-import { TemplateConflictError, templateInputSchema, type Template } from '../domain/template.ts'
+import {
+  TemplateConflictError,
+  templateInputSchema,
+  templateNameSchema,
+  type Template,
+} from '../domain/template.ts'
 import { profileInputSchema } from '../domain/profile.ts'
 import { TemplateRepo } from '../db/repositories/template-repo.ts'
 import { ProfileRepo } from '../db/repositories/profile-repo.ts'
@@ -97,6 +102,23 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
         }
         throw err
       }
+    },
+  )
+
+  // Rename is its own endpoint rather than a PUT of the whole design: sending
+  // the elements back just to change a word would make renaming from the
+  // library fail whenever the design had been edited elsewhere, which has
+  // nothing to do with the name. Template names need not be unique — nothing
+  // references a template by name — so there is no clash check here.
+  typed.patch(
+    '/api/templates/:id',
+    { schema: { params: idParams, body: z.object({ name: templateNameSchema }) } },
+    async (request) => {
+      const renamed = templates().rename(request.params.id, request.body.name)
+      if (renamed === undefined) {
+        throw ApiError.notFound({ templateId: request.params.id })
+      }
+      return withBindingIssue(renamed)
     },
   )
 

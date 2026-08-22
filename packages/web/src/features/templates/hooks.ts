@@ -57,6 +57,15 @@ export function useSaveTemplate() {
   })
 }
 
+export function useRenameTemplate() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; name: string }) =>
+      request<Template>(`/templates/${input.id}`, { method: 'PATCH', body: { name: input.name } }),
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
 export function useDeleteTemplate() {
   const client = useQueryClient()
   return useMutation({

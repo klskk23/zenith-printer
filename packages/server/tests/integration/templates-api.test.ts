@@ -350,3 +350,79 @@ describe('profiles', () => {
     expect(list.profiles.filter((p: { isDefault: boolean }) => p.isDefault)).toHaveLength(1)
   })
 })
+
+describe('renaming a template', () => {
+  const rename = (id: string, name: unknown) =>
+    app.inject({ method: 'PATCH', url: `/api/templates/${id}`, payload: { name } })
+
+  it('changes the name and nothing else', async () => {
+    const created = (await createTemplate()).json()
+    const res = await rename(created.id, '零件标签')
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().name).toBe('零件标签')
+    expect(res.json().elements).toHaveLength(2)
+    expect(res.json().variables).toHaveLength(2)
+    expect(res.json().widthMm).toBe(50)
+  })
+
+  it('does not need the design sent back with it', async () => {
+    // The point of a separate endpoint: renaming from the library must not
+    // depend on holding a current copy of the elements.
+    const created = (await createTemplate()).json()
+    const res = await rename(created.id, 'renamed')
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('bumps the version, so an open editor is told rather than reverting it', async () => {
+    // A design tab still holds the old name. Without the bump its next save
+    // would put that name back and nobody would be told the rename was lost.
+    const created = (await createTemplate()).json()
+    await rename(created.id, 'renamed')
+
+    const stale = await app.inject({
+      method: 'PUT',
+      url: `/api/templates/${created.id}`,
+      payload: { ...TEMPLATE, version: created.version },
+    })
+    expect(stale.statusCode).toBe(409)
+    expect(stale.json().code).toBe('TEMPLATE_VERSION_CONFLICT')
+  })
+
+  it('lets the editor save again once it has reloaded', async () => {
+    const created = (await createTemplate()).json()
+    const renamed = (await rename(created.id, 'renamed')).json()
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/templates/${created.id}`,
+      payload: { ...TEMPLATE, name: 'renamed', version: renamed.version },
+    })
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('trims surrounding space rather than storing it', async () => {
+    const created = (await createTemplate()).json()
+    expect((await rename(created.id, '  spaced  ')).json().name).toBe('spaced')
+  })
+
+  it('refuses an empty name', async () => {
+    const created = (await createTemplate()).json()
+    expect((await rename(created.id, '   ')).statusCode).toBe(400)
+  })
+
+  it('refuses a name longer than the column allows', async () => {
+    const created = (await createTemplate()).json()
+    expect((await rename(created.id, 'x'.repeat(81))).statusCode).toBe(400)
+  })
+
+  it('is a 404 for a template that does not exist', async () => {
+    expect((await rename('t-nope', 'whatever')).statusCode).toBe(404)
+  })
+
+  it('allows two templates to share a name, since nothing references one by name', async () => {
+    await createTemplate()
+    const second = (await createTemplate({ ...TEMPLATE, name: 'other' })).json()
+    expect((await rename(second.id, 'part label')).statusCode).toBe(200)
+  })
+})

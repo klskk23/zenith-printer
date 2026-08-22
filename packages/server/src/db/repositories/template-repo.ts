@@ -139,6 +139,27 @@ export class TemplateRepo {
   }
 
   /**
+   * Rename only.
+   *
+   * Bumps the version like any other write, which matters: a design tab open on
+   * this template still holds the old name, and saving it would put that name
+   * back without anybody being told. The bump turns that into the conflict
+   * prompt the editor already knows how to show.
+   *
+   * Unlike a data source, the name is not a reference — nothing points at a
+   * template by name — so a rename cannot break anything downstream.
+   */
+  rename(id: string, name: string): Template | undefined {
+    if (this.find(id) === undefined) {
+      return undefined
+    }
+    this.#db
+      .prepare('UPDATE templates SET name = ?, updated_at = ?, version = version + 1 WHERE id = ?')
+      .run(name, this.#clock.now().toISOString(), id)
+    return this.find(id)
+  }
+
+  /**
    * Templates delete freely: job history carries its own snapshot, so nothing
    * downstream breaks (FR-050, FR-051).
    */
