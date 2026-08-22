@@ -11,7 +11,6 @@
 import { copy } from '../i18n/index.ts'
 import { cn } from '../lib/utils.ts'
 import { Button } from '../components/ui/button.tsx'
-import { ScrollArea } from '../components/ui/scroll-area.tsx'
 import type { LabelElement, LabelIR } from '@zenith/shared'
 import { bringToFront, isBackmost, isFrontmost, layersTopFirst, sendToBack } from './layers.ts'
 
@@ -41,7 +40,12 @@ export function LayersPanel({ ir, selectedId, onSelect, onChange }: LayersPanelP
   }
 
   return (
-    <ScrollArea className="max-h-56">
+    // A capped list, not a fixed one: with three layers it should be three
+    // rows tall. That rules out a ScrollArea, whose viewport is sized against
+    // its parent and so needs a definite height rather than a maximum — given
+    // only `max-height` it grows to fit the content and the root clips it,
+    // which looks like a list that has silently lost its last few rows.
+    <div className="scrollbar-themed max-h-56 overflow-y-auto">
       <ul className="space-y-0.5">
         {layers.map((element) => {
           const selected = element.id === selectedId
@@ -87,6 +91,6 @@ export function LayersPanel({ ir, selectedId, onSelect, onChange }: LayersPanelP
           )
         })}
       </ul>
-    </ScrollArea>
+    </div>
   )
 }

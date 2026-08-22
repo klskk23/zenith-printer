@@ -38,7 +38,6 @@ import {
   type Selection,
 } from './selection.ts'
 import { useDataSources } from '../data-sources/hooks.ts'
-import { ScrollArea } from '../../components/ui/scroll-area.tsx'
 
 export interface PrintDialogProps {
   ir: LabelIR
@@ -186,12 +185,31 @@ export function PrintDialog({
     // trap, the Escape key and the scroll lock with it, and it stacks properly
     // with the confirmations that open on top of it.
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-hidden">
-        <ScrollArea className="max-h-[85vh] space-y-4 pr-3">
+      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>{copy.print.heading}</DialogTitle>
           <DialogDescription>{printer.name}</DialogDescription>
         </DialogHeader>
+
+        {/*
+          A native scroller, not a ScrollArea, for two reasons that both showed
+          up here at once.
+
+          Radix's viewport is the element that actually scrolls and it is sized
+          `height: 100%`, so it needs a parent with a *definite* height. Given
+          only `max-height` the percentage resolves to auto: the viewport grows
+          as tall as its content, the root clips it, and nothing scrolls at all.
+
+          And the row preview inside is a `<table>` in its own `overflow-x-auto`
+          box. Radix wraps viewport content in a `display: table` element, which
+          shrink-wraps that box to the table's full width, so it never overflows
+          and never offers a horizontal scrollbar — the table is simply cut off.
+
+          `flex-1 min-h-0` under the flex column above gives this element a
+          definite height of its own, and it is its own scroller, so the table
+          inside keeps its.
+        */}
+        <div className="scrollbar-themed min-h-0 flex-1 space-y-4 overflow-y-auto pr-3">
 
         {result === null ? (
           <>
@@ -267,7 +285,7 @@ export function PrintDialog({
             </DialogFooter>
           </>
         )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )
