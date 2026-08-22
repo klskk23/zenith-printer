@@ -8,9 +8,10 @@
  * actually present.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
+import { selectedText } from './support/select.ts'
 
 const TEMPLATE = {
   id: 'tpl-1',
@@ -95,8 +96,11 @@ describe('opening a template', () => {
     await openLibrary()
     fireEvent.click(screen.getAllByText('打开')[0]!)
     const toolbar = await screen.findByRole('toolbar', { name: '标签设计' })
-    const select = toolbar.querySelector('select')
-    expect((select as HTMLSelectElement).value).toBe('tpl-1')
+    // Asserts the *name* rather than the id: a Radix select shows the chosen
+    // item's label, and the label is what tells the operator which design is
+    // open. Reading a hidden value would pass while the bar showed "—".
+    const trigger = within(toolbar).getByRole('combobox', { name: '模板' })
+    expect(selectedText(trigger)).toContain('test')
   })
 })
 

@@ -7,9 +7,10 @@
  * of those fell back to "the first one" or "none".
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
+import { chooseOption, openedOptions, selectedText } from './support/select.ts'
 
 const PRINTER = {
   id: 'prn-1', name: 'B3S_P', kind: 'niimbot', transport: 'serial', address: '/dev/ttyACM0',
@@ -66,16 +67,15 @@ async function openDesign(): Promise<HTMLElement> {
 /**
  * Select a printer, once there is one to select.
  *
- * Firing the change before the query resolves does nothing at all: a controlled
- * `<select>` ignores a value with no matching option, and silently — which is
- * why the first version of this test reported an empty selector rather than a
- * missing one.
+ * Choosing before the query resolves does nothing at all — there is no such
+ * option yet — and it does so silently, which is why the first version of this
+ * test reported an empty selector rather than a missing one.
  */
 async function chooseFirstPrinter(toolbar: HTMLElement): Promise<void> {
   const printer = selectByLabel(toolbar, '打印机')
-  await vi.waitFor(() => expect(printer.options.length).toBeGreaterThan(1))
-  fireEvent.change(printer, { target: { value: 'prn-1' } })
-  await vi.waitFor(() => expect(printer.value).toBe('prn-1'))
+  await vi.waitFor(() => expect(openedOptions(printer).length).toBeGreaterThan(1))
+  chooseOption(printer, 'B3S_P')
+  await vi.waitFor(() => expect(selectedText(printer)).toContain('B3S_P'))
 }
 
 /** The canvas width field in the left column. */
@@ -85,13 +85,9 @@ function canvasWidth(): HTMLInputElement {
   return label!.parentElement!.querySelector('input') as HTMLInputElement
 }
 
-/** The select that sits directly under a given label. */
-function selectByLabel(toolbar: HTMLElement, label: string): HTMLSelectElement {
-  const el = [...toolbar.querySelectorAll('label')].find((l) => l.textContent === label)
-  expect(el, `no field labelled ${label}`).toBeDefined()
-  const select = el!.parentElement!.querySelector('select')
-  expect(select, `no select under ${label}`).not.toBeNull()
-  return select as HTMLSelectElement
+/** The select carrying a given accessible name. */
+function selectByLabel(toolbar: HTMLElement, label: string): HTMLElement {
+  return within(toolbar).getByRole('combobox', { name: label })
 }
 
 describe('choosing a printer in the editor', () => {
@@ -101,7 +97,7 @@ describe('choosing a printer in the editor', () => {
 
     const profile = selectByLabel(toolbar, '打印参数')
     // Not the first in the list — the one marked default.
-    await vi.waitFor(() => expect(profile.value).toBe('p-stock'))
+    await vi.waitFor(() => expect(selectedText(profile)).toContain('原厂 50×30'))
   })
 
   /**
@@ -117,9 +113,9 @@ describe('choosing a printer in the editor', () => {
     await chooseFirstPrinter(toolbar)
 
     const profile = selectByLabel(toolbar, '打印参数')
-    await vi.waitFor(() => expect(profile.value).toBe('p-stock'))
+    await vi.waitFor(() => expect(selectedText(profile)).toContain('原厂 50×30'))
 
-    fireEvent.change(profile, { target: { value: 'p-narrow' } })
+    chooseOption(profile, /^第三方 40×20/)
 
     await vi.waitFor(() => expect(Number(canvasWidth().value)).toBe(40))
   })
@@ -129,11 +125,11 @@ describe('choosing a printer in the editor', () => {
     await chooseFirstPrinter(toolbar)
 
     const profile = selectByLabel(toolbar, '打印参数')
-    await vi.waitFor(() => expect(profile.value).toBe('p-stock'))
+    await vi.waitFor(() => expect(selectedText(profile)).toContain('原厂 50×30'))
 
-    fireEvent.change(profile, { target: { value: 'p-narrow' } })
+    chooseOption(profile, /^第三方 40×20/)
     // Refetching must not reselect the default over a deliberate choice.
-    await vi.waitFor(() => expect(profile.value).toBe('p-narrow'))
+    await vi.waitFor(() => expect(selectedText(profile)).toContain('第三方 40×20'))
   })
 })
 
@@ -143,9 +139,8 @@ describe('the calibration page', () => {
     fireEvent.click(screen.getAllByText('打印机')[0]!)
     await screen.findAllByText('物理偏移校正')
 
-    const stock = [...document.querySelectorAll('select')]
-      .find((el) => el.textContent?.includes('50×30mm')) as HTMLSelectElement
-    expect(stock.value).toBe('p-stock')
+    const stock = screen.getByRole('combobox', { name: '校准用纸' })
+    expect(selectedText(stock)).toContain('原厂 50×30')
   })
 })
 

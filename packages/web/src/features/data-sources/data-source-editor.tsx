@@ -6,7 +6,7 @@
  * would silently break designs that mention it. Changing the column set means
  * uploading a replacement file, where the consequences can be shown.
  */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
@@ -21,6 +21,7 @@ import {
 } from '../../components/ui/table.tsx'
 import { copy } from '../../i18n/index.ts'
 import { PasteOverflowsColumnsError, applyPaste } from './paste.ts'
+import { editableValueColumns, ordinalColumn, useDataSourceTable } from './columns.tsx'
 import { useDataSourceRows, useDataSources, usePatchRows } from './hooks.ts'
 
 const PAGE_SIZE = 10
@@ -42,13 +43,64 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
   const total = rows.data?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
+  const setCell = (ordinal: number, column: string, value: string): void => {
+    patch.mutate({ id: dataSourceId, upserts: [{ ordinal, values: { [column]: value } }] })
+  }
+
+  /**
+   * Column definitions come from the shared file, so this table and the row
+   * selector cannot disagree about what a column is. Only the cell renderer
+   * differs — that is the editing, and it is the one thing that should differ.
+   */
+  const columns = useMemo(
+    () => [
+      ordinalColumn(),
+      ...editableValueColumns(source?.columns ?? [], {
+        onCommit: setCell,
+        onFocusCell: (ordinal, columnIndex) => setFocused({ ordinal, columnIndex }),
+        renderInput: ({ ordinal, column, columnIndex, value }) => (
+          <Input
+            aria-label={`${ordinal} ${column}`}
+            defaultValue={value}
+            onFocus={() => setFocused({ ordinal, columnIndex })}
+            onBlur={(event) => {
+              if (event.target.value !== value) {
+                setCell(ordinal, column, event.target.value)
+              }
+            }}
+          />
+        ),
+      }),
+      {
+        id: 'actions',
+        header: () => null,
+        cell: (ctx) => (
+          <ConfirmButton
+            variant="ghost"
+            size="sm"
+            title={copy.dataSources.deleteRow}
+            description={copy.dataSources.deleteWarning}
+            cancelLabel={copy.common.cancel}
+            confirmLabel={copy.dataSources.deleteConfirm}
+            onConfirm={() => patch.mutate({ id: dataSourceId, deletes: [ctx.row.original.ordinal] })}
+          >
+            {copy.dataSources.deleteRow}
+          </ConfirmButton>
+        ),
+      },
+    ],
+    [source?.columns, dataSourceId],
+  )
+
+  const table = useDataSourceTable(rows.data?.rows ?? [], columns)
+
+  // After the hooks, never before: an early return above them changes the hook
+  // count between renders, and React tears the component down rather than
+  // showing a placeholder.
   if (source === undefined) {
     return <p className="text-sm text-muted-foreground">{copy.common.loading}</p>
   }
 
-  const setCell = (ordinal: number, column: string, value: string): void => {
-    patch.mutate({ id: dataSourceId, upserts: [{ ordinal, values: { [column]: value } }] })
-  }
 
   const onPaste = (event: React.ClipboardEvent): void => {
     if (focused === null) return
@@ -86,45 +138,24 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
 
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>{copy.rowSelection.ordinal}</TableHead>
-            {source.columns.map((column) => (
-              <TableHead key={column}>{column}</TableHead>
-            ))}
-            <TableHead />
-          </TableRow>
+          {table.getHeaderGroups().map((group) => (
+            <TableRow key={group.id}>
+              {group.headers.map((header) => (
+                <TableHead key={header.id}>
+                  {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
         </TableHeader>
         <TableBody>
-          {rows.data?.rows.map((row) => (
-            <TableRow key={row.ordinal}>
-              <TableCell className="font-mono text-xs text-muted-foreground">{row.ordinal}</TableCell>
-              {source.columns.map((column, columnIndex) => (
-                <TableCell key={column}>
-                  <Input
-                    aria-label={`${row.ordinal} ${column}`}
-                    defaultValue={row.values[column] ?? ''}
-                    onFocus={() => setFocused({ ordinal: row.ordinal, columnIndex })}
-                    onBlur={(event) => {
-                      if (event.target.value !== (row.values[column] ?? '')) {
-                        setCell(row.ordinal, column, event.target.value)
-                      }
-                    }}
-                  />
+          {table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getAllCells().map((cell) => (
+                <TableCell key={cell.id}>
+                  <table.FlexRender cell={cell} />
                 </TableCell>
               ))}
-              <TableCell>
-                <ConfirmButton
-                  variant="ghost"
-                  size="sm"
-                  title={copy.dataSources.deleteRow}
-                  description={copy.dataSources.deleteWarning}
-                  cancelLabel={copy.common.cancel}
-                  confirmLabel={copy.dataSources.deleteConfirm}
-                  onConfirm={() => patch.mutate({ id: dataSourceId, deletes: [row.ordinal] })}
-                >
-                  {copy.dataSources.deleteRow}
-                </ConfirmButton>
-              </TableCell>
             </TableRow>
           ))}
         </TableBody>

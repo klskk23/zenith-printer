@@ -67,9 +67,10 @@ afterEach(() => {
 })
 
 describe('the data source list', () => {
-  it('mounts without throwing', () => {
+  it('mounts and actually renders something', async () => {
     expect(() => render(wrap(<DataSourcesPage />))).not.toThrow()
     expect(document.querySelector('[data-data-sources-page]')).not.toBeNull()
+    expect(await screen.findByText('订单表')).toBeDefined()
   })
 
   it('offers a way in when there is nothing yet', async () => {
@@ -103,8 +104,14 @@ describe('the data source list', () => {
 })
 
 describe('the table editor', () => {
-  it('mounts without throwing', () => {
+  it('mounts and actually renders something', async () => {
+    // `not.toThrow()` alone is too weak: a component that renders nothing at
+    // all passes it. That is not hypothetical — moving a hook below an early
+    // return made this page render an empty div, and only the assertions below
+    // noticed.
     expect(() => render(wrap(<DataSourceEditor dataSourceId="ds-1" />))).not.toThrow()
+    expect(await screen.findByText('订单表')).toBeDefined()
+    expect(document.querySelector('[data-data-source-editor]')).not.toBeNull()
   })
 
   it('renders the header and the first page of rows', async () => {

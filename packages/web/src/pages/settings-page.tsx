@@ -16,7 +16,7 @@ import { Button } from '../components/ui/button.tsx'
 import { Alert } from '../components/ui/alert.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { Label } from '../components/ui/label.tsx'
-import { Select } from '../components/ui/select.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 import { Switch } from '../components/ui/switch.tsx'
 import { usePreferences } from '../features/preferences/context.tsx'
 import { PREFERENCE_KEYS, type Preferences } from '../features/preferences/store.ts'
@@ -71,13 +71,18 @@ export function SettingsPage(): React.JSX.Element {
         <Row label={copy.settings.language}>
           <Select
             value={draft.language}
-            onChange={(event) => set('language', event.target.value as (typeof LOCALES)[number])}
+            onValueChange={(value) => set('language', value as (typeof LOCALES)[number])}
           >
-            {LOCALES.map((locale) => (
-              <option key={locale} value={locale}>
-                {copy.settings.languageNames[locale]}
-              </option>
-            ))}
+            <SelectTrigger aria-label={copy.settings.language}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LOCALES.map((locale) => (
+                <SelectItem key={locale} value={locale}>
+                  {copy.settings.languageNames[locale]}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </Row>
 
@@ -114,34 +119,49 @@ export function SettingsPage(): React.JSX.Element {
         <Row label={copy.settings.defaultFont}>
           <Select
             value={draft.defaultFontFamily}
-            onChange={(e) => set('defaultFontFamily', e.target.value)}
+            onValueChange={(value) => set('defaultFontFamily', value)}
           >
-            {(Object.keys(FONT_FAMILIES) as FontFamilyKey[]).map((key) => (
-              <option key={key} value={FONT_FAMILIES[key]}>
-                {copy.editor.fonts[key]}
-              </option>
-            ))}
+            <SelectTrigger aria-label={copy.settings.defaultFont}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(FONT_FAMILIES) as FontFamilyKey[]).map((key) => (
+                <SelectItem key={key} value={FONT_FAMILIES[key]}>
+                  {copy.editor.fonts[key]}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </Row>
 
         <Row label={copy.settings.displayUnit}>
           <Select
             value={draft.displayUnit}
-            onChange={(e) => set('displayUnit', e.target.value as 'mm' | 'dot')}
+            onValueChange={(value) => set('displayUnit', value as 'mm' | 'dot')}
           >
-            <option value="mm">{copy.settings.displayUnits.mm}</option>
-            <option value="dot">{copy.settings.displayUnits.dot}</option>
+            <SelectTrigger aria-label={copy.settings.displayUnit}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="mm">{copy.settings.displayUnits.mm}</SelectItem>
+              <SelectItem value="dot">{copy.settings.displayUnits.dot}</SelectItem>
+            </SelectContent>
           </Select>
         </Row>
 
         <Row label={copy.settings.theme}>
           <Select
             value={draft.theme}
-            onChange={(e) => set('theme', e.target.value as 'light' | 'dark' | 'system')}
+            onValueChange={(value) => set('theme', value as 'light' | 'dark' | 'system')}
           >
-            <option value="system">{copy.settings.themes.system}</option>
-            <option value="light">{copy.settings.themes.light}</option>
-            <option value="dark">{copy.settings.themes.dark}</option>
+            <SelectTrigger aria-label={copy.settings.theme}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="system">{copy.settings.themes.system}</SelectItem>
+              <SelectItem value="light">{copy.settings.themes.light}</SelectItem>
+              <SelectItem value="dark">{copy.settings.themes.dark}</SelectItem>
+            </SelectContent>
           </Select>
         </Row>
 

@@ -18,7 +18,7 @@ import { Alert } from '../../components/ui/alert.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
 import { Progress } from '../../components/ui/progress.tsx'
-import { Select } from '../../components/ui/select.tsx'
+import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select.tsx'
 import { copy } from '../../i18n/index.ts'
 import { useUploadDataSource, type DataSource } from './hooks.ts'
 
@@ -101,20 +101,36 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
           <div className="flex gap-2">
             <Label className="flex-1 space-y-1">
               <span className="text-[11px] text-muted-foreground">{copy.dataSources.encoding}</span>
-              <Select value={encoding} onChange={(event) => setEncoding(event.target.value)}>
-                <option value="">{copy.dataSources.encodingAuto}</option>
-                <option value="utf-8">UTF-8</option>
-                <option value="gb18030">GB18030 / GBK</option>
-                <option value="big5">Big5</option>
+              <Select
+                value={encoding === '' ? NONE : encoding}
+                onValueChange={(value) => setEncoding(value === NONE ? '' : value)}
+              >
+                <SelectTrigger aria-label={copy.dataSources.encoding}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>{copy.dataSources.encodingAuto}</SelectItem>
+                  <SelectItem value="utf-8">UTF-8</SelectItem>
+                  <SelectItem value="gb18030">GB18030 / GBK</SelectItem>
+                  <SelectItem value="big5">Big5</SelectItem>
+                </SelectContent>
               </Select>
             </Label>
             <Label className="flex-1 space-y-1">
               <span className="text-[11px] text-muted-foreground">{copy.dataSources.delimiter}</span>
-              <Select value={delimiter} onChange={(event) => setDelimiter(event.target.value)}>
-                <option value="">{copy.dataSources.delimiterAuto}</option>
-                <option value=",">,</option>
-                <option value=";">;</option>
-                <option value="&#9;">Tab</option>
+              <Select
+                value={delimiter === '' ? NONE : delimiter}
+                onValueChange={(value) => setDelimiter(value === NONE ? '' : value)}
+              >
+                <SelectTrigger aria-label={copy.dataSources.delimiter}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>{copy.dataSources.delimiterAuto}</SelectItem>
+                  <SelectItem value=",">,</SelectItem>
+                  <SelectItem value=";">;</SelectItem>
+                  <SelectItem value={'\t'}>Tab</SelectItem>
+                </SelectContent>
               </Select>
             </Label>
           </div>

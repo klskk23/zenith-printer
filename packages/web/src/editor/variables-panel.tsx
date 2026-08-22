@@ -16,7 +16,7 @@ import type { VariableDefinition } from '@zenith/shared'
 import { Button } from '../components/ui/button.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { Label } from '../components/ui/label.tsx'
-import { Select } from '../components/ui/select.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 import { copy } from '../i18n/index.ts'
 
 export interface SequencePoolOption {
@@ -122,13 +122,18 @@ export function VariablesPanel({
                 <span className="text-[11px] text-muted-foreground">{copy.variables.pool}</span>
                 <Select
                   value={variable.poolId}
-                  onChange={(event) => patch(index, { poolId: event.target.value })}
+                  onValueChange={(value) => patch(index, { poolId: value })}
                 >
-                  {pools.map((pool) => (
-                    <option key={pool.id} value={pool.id}>
-                      {copy.variables.poolOption(pool.name, pool.nextValue, pool.digits)}
-                    </option>
-                  ))}
+                  <SelectTrigger aria-label={copy.variables.pool}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pools.map((pool) => (
+                      <SelectItem key={pool.id} value={pool.id}>
+                        {copy.variables.poolOption(pool.name, pool.nextValue, pool.digits)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </Label>
             )}

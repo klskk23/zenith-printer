@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
+import { chooseOption } from './support/select.ts'
 
 const uploaded: File[] = []
 
@@ -592,10 +593,7 @@ describe('content that cannot be encoded', () => {
   it('survives a barcode part-way through a valid number', () => {
     openDesign()
     addElement('条码')
-    const symbology = document
-      .querySelector('[data-inspector]')!
-      .querySelectorAll('select')[0] as HTMLSelectElement
-    fireEvent.change(symbology, { target: { value: 'ean13' } })
+    chooseOption(screen.getByRole('combobox', { name: '码制' }), 'ean13')
     fireEvent.change(mmField('内容'), { target: { value: '49' } })
 
     expect(screen.getByRole('toolbar', { name: '标签设计' })).toBeDefined()

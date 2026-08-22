@@ -25,7 +25,7 @@ import { Separator } from '../components/ui/separator.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { Label } from '../components/ui/label.tsx'
-import { Select } from '../components/ui/select.tsx'
+import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 import { usePrinters } from '../features/printers/hooks.ts'
 import { PrintDialog } from '../features/print/print-dialog.tsx'
 import { TemplateBar } from '../features/templates/template-bar.tsx'
@@ -558,20 +558,25 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           <div className="space-y-1">
             <Label>{copy.print.printer}</Label>
             <Select
-              value={printerId ?? ''}
-              onChange={(event) => {
-                setPrinterId(event.target.value || null)
+              value={printerId ?? NONE}
+              onValueChange={(value) => {
+                setPrinterId(value === NONE ? null : value)
                 // Cleared here; the effect below picks this printer's default
                 // once its profiles have loaded.
                 setProfileId(null)
               }}
             >
-              <option value="">—</option>
-              {printers.data?.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
+              <SelectTrigger aria-label={copy.print.printer}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
+                {printers.data?.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
 
@@ -584,20 +589,25 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           <div className="space-y-1">
             <Label>{copy.profiles.heading}</Label>
             <Select
-              value={profileId ?? ''}
+              value={profileId ?? NONE}
               disabled={printerId === null}
-              onChange={(event) => {
-                const id = event.target.value || null
+              onValueChange={(value) => {
+                const id = value === NONE ? null : value
                 setProfileId(id)
                 applyProfileStock(profiles.data?.find((p) => p.id === id) ?? null)
               }}
             >
-              <option value="">—</option>
-              {profiles.data?.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
-                </option>
-              ))}
+              <SelectTrigger aria-label={copy.profiles.heading}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
+                {profiles.data?.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
 

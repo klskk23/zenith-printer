@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
+import { chooseOption, selectedText } from './support/select.ts'
 
 function wrap(ui: React.ReactNode): React.JSX.Element {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false } } })
@@ -25,11 +26,13 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('no server'))))
 })
 
-function openSettings(): HTMLSelectElement {
+function openSettings(): HTMLElement {
   render(wrap(<App />))
   fireEvent.click(screen.getAllByText('设置')[0]!)
-  const selects = [...document.querySelectorAll('select')]
-  return selects.find((el) => el.textContent?.includes('深色')) as HTMLSelectElement
+  // By its label rather than by scanning for a select that happens to contain
+  // "深色": a Radix trigger shows only the *chosen* option, so a text scan
+  // would find it only while dark was already selected.
+  return screen.getByRole('combobox', { name: '主题' })
 }
 
 /**
@@ -39,29 +42,31 @@ function openSettings(): HTMLSelectElement {
 describe('draft editing', () => {
   it('does not apply a change immediately', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'light' } })
+    chooseOption(theme, '浅色')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
   it('reports that something is unsaved', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'light' } })
+    chooseOption(theme, '浅色')
     expect(screen.getAllByText('有未保存的修改').length).toBeGreaterThan(0)
   })
 
   it('applies the change on save', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'light' } })
+    chooseOption(theme, '浅色')
     fireEvent.click(screen.getAllByText('保存')[0]!)
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
   })
 
   it('discards the change on cancel', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'light' } })
+    chooseOption(theme, '浅色')
     fireEvent.click(screen.getAllByText('取消')[0]!)
 
-    expect(theme.value).toBe('dark')
+    // Reads what the control *shows*, which is what the operator sees. The
+    // hidden value it used to read could stay right while the label went wrong.
+    expect(selectedText(theme)).toContain('深色')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
@@ -77,14 +82,14 @@ describe('draft editing', () => {
 describe('the theme actually takes effect', () => {
   it('marks the document root', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'light' } })
+    chooseOption(theme, '浅色')
     fireEvent.click(screen.getAllByText('保存')[0]!)
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
   })
 
   it('unmarks it for "follow system"', () => {
     const theme = openSettings()
-    fireEvent.change(theme, { target: { value: 'system' } })
+    chooseOption(theme, '跟随系统')
     fireEvent.click(screen.getAllByText('保存')[0]!)
     expect(document.documentElement.getAttribute('data-theme')).toBeNull()
   })
@@ -102,6 +107,6 @@ describe('the default', () => {
   })
 
   it('is what the theme selector shows', () => {
-    expect(openSettings().value).toBe('dark')
+    expect(selectedText(openSettings())).toContain('深色')
   })
 })

@@ -8,7 +8,7 @@
  */
 import { Button } from '../components/ui/button.tsx'
 import { Label } from '../components/ui/label.tsx'
-import { Select } from '../components/ui/select.tsx'
+import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 import { Alert } from '../components/ui/alert.tsx'
 import { copy } from '../i18n/index.ts'
 import { useDataSources } from '../features/data-sources/hooks.ts'
@@ -36,15 +36,20 @@ export function DataSourceBinding({
       <Label className="block space-y-1">
         <span className="text-[11px] text-muted-foreground">{copy.dataSources.heading}</span>
         <Select
-          value={dataSourceId ?? ''}
-          onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
+          value={dataSourceId ?? NONE}
+          onValueChange={(value) => onChange(value === NONE ? null : value)}
         >
-          <option value="">—</option>
-          {sources.data?.map((source) => (
-            <option key={source.id} value={source.id}>
-              {source.name}
-            </option>
-          ))}
+          <SelectTrigger aria-label={copy.dataSources.heading}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>—</SelectItem>
+            {sources.data?.map((source) => (
+              <SelectItem key={source.id} value={source.id}>
+                {source.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </Label>
 

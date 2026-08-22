@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
+import { openedOptions, selectedText } from './support/select.ts'
 
 const CAPABILITIES = {
   dpi: 203,
@@ -217,8 +218,8 @@ describe('binarisation settings', () => {
 
   it('offers the image tone modes', async () => {
     await openForm()
-    const select = fieldUnder('图片色调') as HTMLSelectElement
-    expect([...select.options].map((o) => o.value)).toEqual(['none', 'floyd-steinberg', 'ordered'])
+    const select = screen.getByRole('combobox', { name: '图片色调' })
+    expect(openedOptions(select)).toEqual(['不处理（硬阈值）', '误差扩散（照片）', '有序网点（耐热扩散）'])
   })
 
   it('keeps the cut-off inside the range the renderer accepts', async () => {
@@ -247,11 +248,23 @@ describe('binarisation settings', () => {
  * label with most of it missing.
  */
 describe('calibration stock', () => {
+  /**
+   * The printers page itself, without opening the profiles dialog.
+   *
+   * The dialog marks everything behind it `aria-hidden`, so a control on the
+   * page underneath stops being reachable by role — which is correct, and is
+   * why these tests must not open it.
+   */
+  async function openPrintersPage(): Promise<void> {
+    render(wrap(<App />))
+    fireEvent.click(screen.getAllByText('打印机')[0]!)
+    await screen.findAllByText('物理偏移校正')
+  }
+
   it('offers the printer’s profiles', async () => {
-    await openPrinters()
-    const selects = [...document.querySelectorAll('select')]
-    const stock = selects.find((el) => el.textContent?.includes('50×30mm'))
-    expect(stock).toBeDefined()
+    await openPrintersPage()
+    const stock = screen.getByRole('combobox', { name: '校准用纸' })
+    expect(openedOptions(stock).some((label) => label.includes('50×30mm'))).toBe(true)
   })
 
   it('shows the size that will be printed, before spending a label', async () => {
@@ -261,9 +274,8 @@ describe('calibration stock', () => {
   })
 
   it('defaults to the default profile', async () => {
-    await openPrinters()
-    const stock = [...document.querySelectorAll('select')]
-      .find((el) => el.textContent?.includes('50×30mm')) as HTMLSelectElement
-    expect(stock.value).toBe('prof-1')
+    await openPrintersPage()
+    const stock = screen.getByRole('combobox', { name: '校准用纸' })
+    expect(selectedText(stock)).toContain('50×30mm')
   })
 })

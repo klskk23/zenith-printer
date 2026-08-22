@@ -23,7 +23,7 @@ import { Checkbox } from '../../components/ui/checkbox.tsx'
 import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
-import { Select } from '../../components/ui/select.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select.tsx'
 import { useDeleteProfile, useProfiles, useSaveProfile, type Profile } from './hooks.ts'
 
 export interface ProfilesPanelProps {
@@ -168,13 +168,18 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             <Label>{copy.profiles.halftone}</Label>
             <Select
               value={editing.halftone ?? 'none'}
-              onChange={(e) => setDraft({ ...editing, halftone: e.target.value as Profile['halftone'] })}
+              onValueChange={(value) => setDraft({ ...editing, halftone: value as Profile['halftone'] })}
             >
-              {(['none', 'floyd-steinberg', 'ordered'] as const).map((mode) => (
-                <option key={mode} value={mode}>
-                  {copy.profiles.halftoneModes[mode]}
-                </option>
-              ))}
+              <SelectTrigger aria-label={copy.profiles.halftone}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(['none', 'floyd-steinberg', 'ordered'] as const).map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {copy.profiles.halftoneModes[mode]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground">{copy.profiles.halftoneHint}</p>
           </div>

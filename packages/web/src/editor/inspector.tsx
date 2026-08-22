@@ -36,7 +36,7 @@ import { Checkbox } from '../components/ui/checkbox.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { Textarea } from '../components/ui/textarea.tsx'
 import { Label } from '../components/ui/label.tsx'
-import { Select } from '../components/ui/select.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 
 export interface InspectorProps {
   ir: LabelIR
@@ -368,13 +368,18 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
           <Field label={copy.editor.fields.fontFamily}>
             <Select
               value={element.fontFamily}
-              onChange={(event) => patch({ fontFamily: event.target.value } as never)}
+              onValueChange={(value) => patch({ fontFamily: value } as never)}
             >
-              {(Object.keys(FONT_FAMILIES) as FontFamilyKey[]).map((key) => (
-                <option key={key} value={FONT_FAMILIES[key]}>
-                  {copy.editor.fonts[key]}
-                </option>
-              ))}
+              <SelectTrigger aria-label={copy.editor.fields.fontFamily}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(FONT_FAMILIES) as FontFamilyKey[]).map((key) => (
+                  <SelectItem key={key} value={FONT_FAMILIES[key]}>
+                    {copy.editor.fonts[key]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </Field>
           <div className="grid grid-cols-2 gap-2">
@@ -423,13 +428,18 @@ export function Inspector({ ir, element, onChange, onDelete }: InspectorProps): 
           <Field label={copy.editor.fields.symbology}>
             <Select
               value={element.symbology}
-              onChange={(event) => patch({ symbology: event.target.value } as never)}
+              onValueChange={(value) => patch({ symbology: value } as never)}
             >
-              {['code128', 'code39', 'ean13', 'ean8', 'itf14'].map((symbology) => (
-                <option key={symbology} value={symbology}>
-                  {symbology}
-                </option>
-              ))}
+              <SelectTrigger aria-label={copy.editor.fields.symbology}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {['code128', 'code39', 'ean13', 'ean8', 'itf14'].map((symbology) => (
+                  <SelectItem key={symbology} value={symbology}>
+                    {symbology}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </Field>
           <Label className="flex items-center gap-2 text-sm text-foreground">

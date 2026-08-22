@@ -27,7 +27,7 @@ import {
 } from '../../components/ui/dialog.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
-import { Select } from '../../components/ui/select.tsx'
+import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select.tsx'
 import { useSaveTemplate, useTemplates, type Template } from './hooks.ts'
 
 export interface TemplateBarProps {
@@ -62,22 +62,27 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
       <div className="space-y-1">
         <Label>{copy.templates.heading}</Label>
         <Select
-          value={current?.id ?? ''}
-          onChange={(event) => {
-            const found = templates.data?.find((t) => t.id === event.target.value)
+          value={current?.id ?? NONE}
+          onValueChange={(value) => {
+            const found = templates.data?.find((t) => t.id === value)
             if (found !== undefined) {
               onLoad(found)
             }
           }}
         >
-          {/* An em dash, like the other selects. Naming it "untitled design"
-              read as though a template by that name existed. */}
-          <option value="">—</option>
-          {templates.data?.map((template) => (
-            <option key={template.id} value={template.id}>
-              {template.name}
-            </option>
-          ))}
+          <SelectTrigger aria-label={copy.templates.heading}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {/* An em dash, like the other selects. Naming it "untitled design"
+                read as though a template by that name existed. */}
+            <SelectItem value={NONE}>—</SelectItem>
+            {templates.data?.map((template) => (
+              <SelectItem key={template.id} value={template.id}>
+                {template.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
 

@@ -395,6 +395,7 @@ export const copy: Copy = {
   },
 
   offset: {
+    stock: 'Calibration stock',
     heading: 'Position correction',
     up: 'Move up',
     right: 'Move right',

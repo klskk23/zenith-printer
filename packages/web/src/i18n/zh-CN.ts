@@ -386,6 +386,7 @@ export const copy = {
   },
 
   offset: {
+    stock: '校准用纸',
     heading: '物理偏移校正',
     up: '上移',
     right: '右移',

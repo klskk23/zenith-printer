@@ -20,7 +20,7 @@ import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
-import { Select } from '../../components/ui/select.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select.tsx'
 import { OffsetPanel } from './offset-panel.tsx'
 import { ProfilesPanel } from '../profiles/profiles-panel.tsx'
 import { EditPrinterDialog } from './edit-printer-dialog.tsx'
@@ -120,15 +120,20 @@ function AddPrinterForm(): React.JSX.Element {
             <Label>{copy.printers.fields.kind}</Label>
             <Select
               value={kind}
-              onChange={(e) => {
-                const next = e.target.value as PrinterKind
+              onValueChange={(value) => {
+                const next = value as PrinterKind
                 setKind(next)
                 setTransport(next === 'niimbot' ? 'serial' : 'tcp')
                 setAddress(next === 'niimbot' ? '/dev/ttyACM0' : '192.168.1.50:9100')
               }}
             >
-              <option value="niimbot">niimbot</option>
-              <option value="zpl">zpl</option>
+              <SelectTrigger aria-label={copy.printers.fields.kind}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="niimbot">niimbot</SelectItem>
+                <SelectItem value="zpl">zpl</SelectItem>
+              </SelectContent>
             </Select>
           </div>
         </div>

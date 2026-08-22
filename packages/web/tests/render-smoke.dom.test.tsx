@@ -204,8 +204,10 @@ describe('the top bar groups printing together', () => {
 
   it('separates the two groups', () => {
     const bar = topBar()
-    // One between undo/redo and the printer selects, one before Print.
-    expect(bar.querySelectorAll('[role="separator"]').length).toBeGreaterThanOrEqual(2)
+    // Queried by slot, not by role: a decorative separator is deliberately
+    // `aria-hidden` with `role="none"`, because a screen reader announcing
+    // "separator" between every toolbar group is noise.
+    expect(bar.querySelectorAll('[data-slot="separator"]').length).toBeGreaterThanOrEqual(2)
   })
 
   it('puts the printer and profile selects after the template one', () => {

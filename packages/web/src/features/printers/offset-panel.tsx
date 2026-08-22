@@ -35,7 +35,7 @@ import {
   setDirection,
   type OffsetDirections,
 } from './offset-directions.ts'
-import { Select } from '../../components/ui/select.tsx'
+import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select.tsx'
 import { useProfiles } from '../profiles/hooks.ts'
 import { usePrintCalibrationPage, useSetOffset } from './hooks.ts'
 
@@ -92,16 +92,20 @@ export function OffsetPanel({ printer }: { printer: Printer }): React.JSX.Elemen
             place for it to be wrong.
           */}
           <Select
-            className="h-8 w-44 text-xs"
-            value={stock?.id ?? ''}
+            value={stock?.id ?? NONE}
             disabled={(profiles.data?.length ?? 0) === 0}
-            onChange={(event) => setProfileId(event.target.value || null)}
+            onValueChange={(value) => setProfileId(value === NONE ? null : value)}
           >
-            {profiles.data?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
-              </option>
-            ))}
+            <SelectTrigger className="h-8 w-44 text-xs" aria-label={copy.offset.stock}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {profiles.data?.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
           <Button size="sm" variant="outline" disabled={stock === null} onClick={() => setConfirming(true)}>
             {copy.offset.printCalibration}
