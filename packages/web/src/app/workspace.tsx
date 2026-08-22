@@ -14,6 +14,7 @@ import {
   activateTab,
   closeTab,
   emptyWorkspace,
+  editingTabCount,
   exceedsSoftLimit,
   hasUnsavedWork,
   markDirty,
@@ -36,6 +37,8 @@ export interface WorkspaceApi {
   setTemplate: (id: string, templateId: string | null) => void
   /** True once the tab count reaches the soft limit; advice only. */
   atSoftLimit: boolean
+  /** How many editing tabs are open, for the warning to state plainly. */
+  editingTabs: number
 }
 
 const WorkspaceContext = createContext<WorkspaceApi | null>(null)
@@ -137,6 +140,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       setDirty,
       setTemplate,
       atSoftLimit: exceedsSoftLimit(state),
+      editingTabs: editingTabCount(state),
     }),
     [state, activeTab, open, activate, close, setDirty, setTemplate],
   )

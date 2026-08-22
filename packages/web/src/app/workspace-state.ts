@@ -13,9 +13,11 @@
 import { isSingletonKind, tabFromPath, type TabDescriptor, type TabKind } from './routes.ts'
 
 /**
- * Advice, not a gate. Every open tab keeps a full editing state resident, so
- * ten of them is where it is worth saying so — but refusing the eleventh would
+ * Advice, not a gate. A design tab keeps a full editing state resident, so ten
+ * of them is where it is worth saying so — but refusing the eleventh would
  * block someone whose labels are small and whose machine is fine.
+ *
+ * Counted over the editing kinds only: see `EDITING_KINDS`.
  */
 export const SOFT_TAB_LIMIT = 10
 
@@ -141,8 +143,24 @@ export function markDirty(state: WorkspaceState, id: string, isDirty: boolean): 
   }
 }
 
+/**
+ * The kinds whose tabs cost something to keep open.
+ *
+ * A design tab holds a live SVG editor and its undo history; the template
+ * library holds a list and its thumbnails. The rest — printers, the queue,
+ * history, settings — are single pages that fetch and render, and counting
+ * them towards a warning about *editing* would make the advice fire for
+ * reasons that have nothing to do with it.
+ */
+const EDITING_KINDS: ReadonlySet<TabKind> = new Set<TabKind>(['design', 'templates'])
+
+/** How many open tabs are the kind the warning is about. */
+export function editingTabCount(state: WorkspaceState): number {
+  return state.tabs.filter((tab) => EDITING_KINDS.has(tab.kind)).length
+}
+
 export function exceedsSoftLimit(state: WorkspaceState): boolean {
-  return state.tabs.length >= SOFT_TAB_LIMIT
+  return editingTabCount(state) >= SOFT_TAB_LIMIT
 }
 
 /** Whether leaving the page would discard work — the gate for the leave prompt. */

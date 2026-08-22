@@ -53,8 +53,8 @@ export const copy: Copy = {
     confirmCloseCancel: 'Cancel',
     confirmCloseConfirm: 'Close anyway',
     leavePrompt: 'There are unsaved changes. Leave anyway?',
-    softLimitWarning:
-      'Ten tabs are open. Opening more may make editing less responsive, but nothing is stopping you.',
+    softLimitWarning: (count: number): string =>
+      `${count} design and template tabs are open. Opening more may slow editing down; nothing is blocked.`,
     disconnectedBanner:
       'Disconnected from the print service. Editing continues, but saving and printing will fail.',
   },

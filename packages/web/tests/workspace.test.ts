@@ -11,6 +11,7 @@ import {
   SOFT_TAB_LIMIT,
   activateTab,
   closeTab,
+  editingTabCount,
   emptyWorkspace,
   exceedsSoftLimit,
   markDirty,
@@ -207,6 +208,56 @@ describe('soft tab limit', () => {
     for (let i = 0; i < SOFT_TAB_LIMIT - 1; i += 1) {
       state = open(state, { kind: 'design', templateId: null }, next)
     }
+    expect(exceedsSoftLimit(state)).toBe(false)
+  })
+
+  it('ignores pages that hold no editing state', () => {
+    // The warning is about editing being slow. A printers page and a queue
+    // page fetch and render; counting them makes the advice fire for reasons
+    // that have nothing to do with what it says.
+    const next = ids()
+    let state = emptyWorkspace()
+    for (const kind of ['printers', 'queue', 'history', 'settings', 'data-sources', 'index'] as const) {
+      state = open(state, { kind }, next)
+    }
+    for (let i = 0; i < SOFT_TAB_LIMIT - 1; i += 1) {
+      state = open(state, { kind: 'design', templateId: null }, next)
+    }
+
+    expect(state.tabs.length).toBeGreaterThan(SOFT_TAB_LIMIT)
+    expect(exceedsSoftLimit(state)).toBe(false)
+  })
+
+  it('counts the template library, which holds a list and its pictures', () => {
+    const next = ids()
+    let state = open(emptyWorkspace(), { kind: 'templates' }, next)
+    for (let i = 0; i < SOFT_TAB_LIMIT - 1; i += 1) {
+      state = open(state, { kind: 'design', templateId: null }, next)
+    }
+    expect(editingTabCount(state)).toBe(SOFT_TAB_LIMIT)
+    expect(exceedsSoftLimit(state)).toBe(true)
+  })
+
+  it('reports how many there actually are, not the threshold', () => {
+    // The message used to say "10" whatever the number was, so at twelve tabs
+    // it was quietly wrong about the thing it existed to report.
+    const next = ids()
+    let state = emptyWorkspace()
+    for (let i = 0; i < SOFT_TAB_LIMIT + 2; i += 1) {
+      state = open(state, { kind: 'design', templateId: null }, next)
+    }
+    expect(editingTabCount(state)).toBe(SOFT_TAB_LIMIT + 2)
+  })
+
+  it('drops back below the limit when an editing tab is closed', () => {
+    const next = ids()
+    let state = emptyWorkspace()
+    for (let i = 0; i < SOFT_TAB_LIMIT; i += 1) {
+      state = open(state, { kind: 'design', templateId: null }, next)
+    }
+    expect(exceedsSoftLimit(state)).toBe(true)
+
+    state = closeTab(state, state.tabs[0]!.id)
     expect(exceedsSoftLimit(state)).toBe(false)
   })
 })

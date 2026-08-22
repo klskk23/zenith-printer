@@ -11,7 +11,7 @@
  *     table have in common is that both are where a variable gets its value.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
 import { DataSourcesPage } from '../src/features/data-sources/data-sources-page.tsx'
@@ -98,5 +98,48 @@ describe('where sequence pools live', () => {
     )
     await screen.findByText(/只影响当前浏览器/)
     expect(document.querySelector('[data-sequence-pools]')).toBeNull()
+  })
+})
+
+describe('the too-many-tabs advice', () => {
+  /** Open a sidebar entry by its label. */
+  const openTab = (label: string): void => {
+    const nav = document.querySelector('nav')!
+    const entry = [...nav.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)
+    fireEvent.click(entry!)
+  }
+
+  it('stays quiet when the pages carry the tab count over the threshold', () => {
+    // Nine designs and six list pages is fifteen tabs — well past the
+    // threshold by raw count, and still nine of the kind the advice is about.
+    // Counting the pages would fire it here, which is the mistake this guards.
+    render(wrap(<App />))
+    for (let i = 0; i < 9; i += 1) {
+      openTab('标签设计')
+    }
+    for (const label of ['数据源', '打印机', '打印队列', '打印历史', '设置']) {
+      openTab(label)
+    }
+
+    expect(document.querySelectorAll('[data-tab-bar] > div').length).toBeGreaterThan(10)
+    expect(screen.queryByText(/可能影响编辑流畅度/)).toBeNull()
+  })
+
+  it('appears once enough design tabs are open', () => {
+    render(wrap(<App />))
+    // The design entry opens a fresh tab each time — comparing variants is a
+    // normal thing to do, which is exactly why the advice exists.
+    for (let i = 0; i < 10; i += 1) {
+      openTab('标签设计')
+    }
+    expect(screen.getByText(/可能影响编辑流畅度/)).toBeDefined()
+  })
+
+  it('says how many are open rather than repeating the threshold', () => {
+    render(wrap(<App />))
+    for (let i = 0; i < 12; i += 1) {
+      openTab('标签设计')
+    }
+    expect(screen.getByText(/12 个设计与模板标签页/)).toBeDefined()
   })
 })

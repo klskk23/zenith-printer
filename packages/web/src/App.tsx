@@ -61,7 +61,7 @@ function TabContent({ tab }: { tab: WorkspaceTab }): React.JSX.Element {
 }
 
 function Workspace({ connection }: { connection: ConnectionState }): React.JSX.Element {
-  const { tabs, state, atSoftLimit } = useWorkspace()
+  const { tabs, state, atSoftLimit, editingTabs } = useWorkspace()
   const jobs = useJobs(null)
 
   const pending = (jobs.data ?? []).filter(
@@ -83,7 +83,7 @@ function Workspace({ connection }: { connection: ConnectionState }): React.JSX.E
           {connection === 'disconnected' && <DisconnectedBanner />}
           {atSoftLimit && (
             <Alert variant="warning" className="m-4 text-xs">
-              {copy.workspace.softLimitWarning}
+              {copy.workspace.softLimitWarning(editingTabs)}
             </Alert>
           )}
 

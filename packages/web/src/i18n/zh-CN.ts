@@ -50,7 +50,8 @@ export const copy = {
     confirmCloseCancel: '取消',
     confirmCloseConfirm: '仍然关闭',
     leavePrompt: '有未保存的修改，确定要离开吗？',
-    softLimitWarning: '已打开 10 个标签页。继续开启可能影响编辑流畅度，但不会被阻止。',
+    softLimitWarning: (count: number): string =>
+      `已打开 ${count} 个设计与模板标签页。继续开启可能影响编辑流畅度，但不会被阻止。`,
     disconnectedBanner: '与打印服务的连接已断开。编辑不会中断，但保存和打印会失败。',
   },
 
