@@ -155,7 +155,7 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 - [X] T056 [US3] 在 `packages/server/src/api/data-sources.ts` 实现 `POST /api/data-sources/:id/unlink`，使 T051、T052 变绿
 - [X] T057 [P] [US3] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 与 `types.ts` 加入 `DATA_SOURCE_READ_ONLY`、`DATA_SOURCE_UNLINK_NOT_CONFIRMED` 的文案（**独立文案，不复用通用确认码**）
 - [X] T058 [US3] 在 `packages/web/src/features/data-sources/data-source-editor.tsx` 依 `sourceKind` 进入只读态并说明来自 Google，使 T053 变绿
-- [ ] T059 [US3] 在 `packages/web/src/features/data-sources/data-sources-page.tsx` 隐藏链接数据源的「替换」，加入「解除链接」及其确认框，使 T054 变绿
+- [X] T059 [US3] 在 `packages/web/src/features/data-sources/data-sources-page.tsx` 隐藏链接数据源的「替换」，加入「解除链接」及其确认框，使 T054 变绿
 
 **检查点**：链接的表不会被本地改动无声抹掉；想接管的人有一条出路。
 
@@ -169,17 +169,17 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 
 ### 测试
 
-- [ ] T060 [P] [US4] 编写 `packages/server/tests/integration/refresh-failure.test.ts`：七种 `SheetsErrorKind` 各返回 `200` + `outcome:'failed'` + 对应 `reason`；**每一种的行与列都未改动**。`timeout` 一项用**可注入的短超时**触发，测试不得真等 30 秒（研究 R6 的数值只是生产默认值）
-- [ ] T061 [P] [US4] 在同一文件补：刷新失败后用现有行提交打印任务仍成功（FR-027）
-- [ ] T062 [P] [US4] 在同一文件补：超过 10,000 行返回 `outcome:'refusedTooManyRows'` 与 `rowCount`；**旧行一行不少，且未被截断**
-- [ ] T063 [P] [US4] 编写 `packages/web/tests/refresh-failure.dom.test.tsx`：失败时显示服务端措辞的三要素；表格仍显示旧行；刷新按钮恢复可用
+- [X] T060 [P] [US4] 编写 `packages/server/tests/integration/refresh-failure.test.ts`：七种 `SheetsErrorKind` 各返回 `200` + `outcome:'failed'` + 对应 `reason`；**每一种的行与列都未改动**。`timeout` 一项用**可注入的短超时**触发，测试不得真等 30 秒（研究 R6 的数值只是生产默认值）
+- [X] T061 [P] [US4] 在同一文件补：刷新失败后用现有行提交打印任务仍成功（FR-027）
+- [X] T062 [P] [US4] 在同一文件补：超过 10,000 行返回 `outcome:'refusedTooManyRows'` 与 `rowCount`；**旧行一行不少，且未被截断**
+- [X] T063 [P] [US4] 编写 `packages/web/tests/refresh-failure.dom.test.tsx`：失败时显示服务端措辞的三要素；表格仍显示旧行；刷新按钮恢复可用
 
 ### 实现
 
-- [ ] T064 [US4] 在 `packages/server/src/api/data-sources.ts` 的刷新处理中把 `SheetsError` 映射为 `outcome:'failed'` 并保持存储不变，使 T060、T061 变绿
-- [ ] T065 [US4] 在 T042 的刷新决策中加入行数上限判定，返回 `refusedTooManyRows`，使 T062 变绿
-- [ ] T066 [P] [US4] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 为七种 `reason` 各写三要素文案；`notShared` 的「下一步」带出机器身份邮箱；404 暂时附带「或者尚未分享给 X」（待 HW-2 确认后收敛）
-- [ ] T067 [US4] 在 `packages/web/src/features/data-sources/refresh-button.tsx` 展示失败结论（服务端措辞原样显示），使 T063 变绿
+- [X] T064 [US4] 在 `packages/server/src/api/data-sources.ts` 的刷新处理中把 `SheetsError` 映射为 `outcome:'failed'` 并保持存储不变，使 T060、T061 变绿
+- [X] T065 [US4] 在 T042 的刷新决策中加入行数上限判定，返回 `refusedTooManyRows`，使 T062 变绿
+- [X] T066 [P] [US4] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 为七种 `reason` 各写三要素文案；`notShared` 的「下一步」带出机器身份邮箱；404 暂时附带「或者尚未分享给 X」（待 HW-2 确认后收敛）
+- [X] T067 [US4] 在 `packages/web/src/features/data-sources/refresh-button.tsx` 展示失败结论（服务端措辞原样显示），使 T063 变绿
 
 **检查点**：外部故障不再让打印停摆。
 
@@ -194,19 +194,19 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 
 ### 测试
 
-- [ ] T068 [P] [US5] 编写 `packages/server/tests/integration/refresh-column-change.test.ts`：只新增列 → `applied` 且 `columnsAdded` 正确，不要求确认
-- [ ] T069 [P] [US5] 在同一文件补：有列消失 → `outcome:'needsConfirmation'`，列出 `removedColumns` 与 `affectedTemplates`；**存储一字未改**
-- [ ] T070 [P] [US5] 在同一文件补：带 `confirmColumnChange:true` → 应用；应用后受影响的设计其 `bindingIssue` 报 `columnsMissing`
-- [ ] T071 [P] [US5] 在同一文件补：无设计引用消失的列时，仍要求确认（列消失本身即为 breaking），且 `affectedTemplates` 为空数组
-- [ ] T072 [P] [US5] 编写 `packages/web/tests/column-change-confirm.dom.test.tsx`：确认框列出消失的列与受影响的设计名；取消后列与行不变
+- [X] T068 [P] [US5] 编写 `packages/server/tests/integration/refresh-column-change.test.ts`：只新增列 → `applied` 且 `columnsAdded` 正确，不要求确认
+- [X] T069 [P] [US5] 在同一文件补：有列消失 → `outcome:'needsConfirmation'`，列出 `removedColumns` 与 `affectedTemplates`；**存储一字未改**
+- [X] T070 [P] [US5] 在同一文件补：带 `confirmColumnChange:true` → 应用；应用后受影响的设计其 `bindingIssue` 报 `columnsMissing`
+- [X] T071 [P] [US5] 在同一文件补：无设计引用消失的列时，仍要求确认（列消失本身即为 breaking），且 `affectedTemplates` 为空数组
+- [X] T072 [P] [US5] 编写 `packages/web/tests/column-change-confirm.dom.test.tsx`：确认框列出消失的列与受影响的设计名；取消后列与行不变
 
 ### 实现
 
-- [ ] T073 [US5] 在 T042 的刷新决策中接入 `classifyColumnChange`，`breaking` 且未确认时返回 `needsConfirmation`，使 T068、T069、T071 变绿
-- [ ] T074 [US5] 在刷新处理中复用既有的 `bindingIssue` 计算逻辑求出 `affectedTemplates`（读取时计算，不存储）
-- [ ] T075 [US5] 在 `packages/server/src/api/data-sources.ts` 支持请求体的 `confirmColumnChange`，使 T070 变绿
-- [ ] T076 [US5] 在 `packages/web/src/features/data-sources/column-change-dialog.tsx` 实现确认框，使 T072 变绿
-- [ ] T077 [US5] 在 `packages/web/src/features/data-sources/refresh-button.tsx` 接入该确认框，确认后带 `confirmColumnChange` 重发
+- [X] T073 [US5] 在 T042 的刷新决策中接入 `classifyColumnChange`，`breaking` 且未确认时返回 `needsConfirmation`，使 T068、T069、T071 变绿
+- [X] T074 [US5] 在刷新处理中复用既有的 `bindingIssue` 计算逻辑求出 `affectedTemplates`（读取时计算，不存储）
+- [X] T075 [US5] 在 `packages/server/src/api/data-sources.ts` 支持请求体的 `confirmColumnChange`，使 T070 变绿
+- [X] T076 [US5] 在 `packages/web/src/features/data-sources/column-change-dialog.tsx` 实现确认框，使 T072 变绿
+- [X] T077 [US5] 在 `packages/web/src/features/data-sources/refresh-button.tsx` 接入该确认框，确认后带 `confirmColumnChange` 重发
 - [ ] T078 [P] [US5] 在 `packages/web/src/i18n/{zh-CN,en-US}.ts` 加入确认框文案，须说明后果：引用这些列的设计将取不到值
 
 **检查点**：五个故事全部完成，Web 端功能完整。

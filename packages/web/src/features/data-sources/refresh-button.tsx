@@ -18,6 +18,7 @@ import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { useRefreshDataSource, type DataSource, type RefreshOutcome } from './hooks.ts'
+import { ColumnChangeDialog } from './column-change-dialog.tsx'
 
 export interface RefreshButtonProps {
   source: DataSource
@@ -40,6 +41,8 @@ export function RefreshButton({
 }: RefreshButtonProps): React.JSX.Element | null {
   const refresh = useRefreshDataSource()
   const [outcome, setOutcome] = useState<RefreshOutcome | null>(null)
+  const [pendingChange, setPendingChange] =
+    useState<Extract<RefreshOutcome, { outcome: 'needsConfirmation' }> | null>(null)
 
   if (source.sourceKind !== 'google-sheets') {
     return null
@@ -56,6 +59,7 @@ export function RefreshButton({
             onApplied?.(result)
           }
           if (result.outcome === 'needsConfirmation') {
+            setPendingChange(result)
             onNeedsConfirmation?.(result)
           }
         },
@@ -84,6 +88,34 @@ export function RefreshButton({
           copy.dataSources.refresh
         )}
       </Button>
+
+      {/*
+        Applying is a second request carrying the confirmation, not a stored
+        decision: the sheet could have changed again in between, and the second
+        read is the one that gets written.
+      */}
+      <ColumnChangeDialog
+        change={pendingChange}
+        applying={refresh.isPending}
+        onCancel={() => {
+          setPendingChange(null)
+          setOutcome(null)
+        }}
+        onApply={() =>
+          refresh.mutate(
+            { id: source.id, confirmColumnChange: true },
+            {
+              onSuccess: (result) => {
+                setPendingChange(null)
+                setOutcome(result)
+                if (result.outcome === 'applied') {
+                  onApplied?.(result)
+                }
+              },
+            },
+          )
+        }
+      />
 
       {outcome !== null && <RefreshNotice outcome={outcome} />}
       {refresh.error instanceof ApiRequestError && (

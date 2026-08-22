@@ -125,6 +125,40 @@ describe('the refresh control', () => {
   })
 })
 
+describe('when a refresh brings nothing back', () => {
+  it('keeps showing the rows that are already here', async () => {
+    // The promise: an external service being down means the data is not the
+    // newest, not that the feature is broken.
+    refreshReply = { outcome: 'failed', reason: 'unreachable' }
+    render(wrap(<DataSourcesPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '刷新' }))
+
+    await screen.findByText(/连不上 Google/)
+    // The row count still stands: nothing was replaced.
+    expect(screen.getByText(/2 行/)).toBeDefined()
+    expect(screen.getByText(/仍可用它打印/)).toBeDefined()
+  })
+
+  it('names the reason rather than saying it failed', async () => {
+    // "Not shared any more" and "Google is down" lead an operator to two
+    // completely different next actions.
+    refreshReply = { outcome: 'failed', reason: 'notShared' }
+    render(wrap(<DataSourcesPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '刷新' }))
+    expect(await screen.findByText(/不再分享给本机/)).toBeDefined()
+  })
+
+  it('leaves the control usable, so it can be tried again', async () => {
+    refreshReply = { outcome: 'failed', reason: 'rateLimited' }
+    render(wrap(<DataSourcesPage />))
+    const control = await screen.findByRole('button', { name: '刷新' })
+    fireEvent.click(control)
+
+    await screen.findByText(/暂时拒绝/)
+    expect((screen.getByRole('button', { name: '刷新' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+})
+
 describe('nothing refreshes on its own', () => {
   it('sends no refresh while the page simply sits there', async () => {
     // FR-014. A table that changed while somebody was looking at a list of
