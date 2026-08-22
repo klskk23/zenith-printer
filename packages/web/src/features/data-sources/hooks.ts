@@ -23,6 +23,9 @@ export interface RowPage {
   total: number
 }
 
+/** Rows one data source may hold; mirrors the server's ceiling. */
+export const MAX_ROWS = 10_000
+
 const KEY = ['data-sources']
 /**
  * Includes the page *size*.

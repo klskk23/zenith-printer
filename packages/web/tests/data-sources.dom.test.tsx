@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DataSourcesPage } from '../src/features/data-sources/data-sources-page.tsx'
 import { DataSourceEditor } from '../src/features/data-sources/data-source-editor.tsx'
 import { TabBar } from '../src/app/tab-bar.tsx'
+import { giveElementsSize } from './support/layout.ts'
+import { gridValues } from './support/grid.ts'
 import { WorkspaceProvider, useWorkspace } from '../src/app/workspace.tsx'
 import { useEffect } from 'react'
 
@@ -107,56 +109,72 @@ describe('the data source list', () => {
 })
 
 describe('the table editor', () => {
+  /**
+   * It is a spreadsheet now, not a form. The cell inputs exist but are
+   * `tabIndex=-1`: the grid owns the cursor and the clipboard, which is what
+   * makes range selection and Ctrl+V possible at all.
+   */
+  let restoreSize: () => void
+  beforeEach(() => {
+    restoreSize = giveElementsSize()
+  })
+  afterEach(() => restoreSize())
+
+  function openEditor(): void {
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
+  }
+
   it('mounts and actually renders something', async () => {
     // `not.toThrow()` alone is too weak: a component that renders nothing at
     // all passes it. That is not hypothetical — moving a hook below an early
-    // return made this page render an empty div, and only the assertions below
-    // noticed.
-    expect(() => render(wrap(<DataSourceEditor dataSourceId="ds-1" />))).not.toThrow()
+    // return made this page render an empty div, and only assertions like the
+    // ones below noticed.
+    expect(() => openEditor()).not.toThrow()
     expect(await screen.findByText('订单表')).toBeDefined()
     expect(document.querySelector('[data-data-source-editor]')).not.toBeNull()
   })
 
-  it('renders the header and the first page of rows', async () => {
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
+  it('renders the column names as headers', async () => {
+    openEditor()
     expect(await screen.findByText('收件人')).toBeDefined()
-    expect(screen.getAllByRole('row')).toHaveLength(11) // header + ten rows
+    expect(screen.getByText('订单号')).toBeDefined()
   })
 
-  it('shows the ordinals, which are what a 5-12 range refers to', async () => {
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
+  it('shows every row at once, with no paging', async () => {
+    // Paging is what made copying a block across a page boundary impossible.
+    openEditor()
     await screen.findByText('收件人')
-    expect(screen.getByLabelText('1 收件人')).toBeDefined()
-    expect(screen.getByLabelText('10 收件人')).toBeDefined()
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(10))
+    expect(screen.queryByText(/第 1 页/)).toBeNull()
+    expect(screen.queryByRole('button', { name: '下一页' })).toBeNull()
   })
 
-  it('says how to paste, since nothing on screen suggests it', async () => {
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
-    expect(await screen.findByText(/Ctrl\+V/)).toBeDefined()
+  it('asks the server for the whole table, not a page of it', async () => {
+    openEditor()
+    await screen.findByText('收件人')
+    const sizes = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('/rows'))
+      .map((url) => /pageSize=(\d+)/.exec(url)?.[1])
+    expect(sizes).toContain('10000')
   })
 
-  it('pages ten rows at a time', async () => {
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
-    expect(await screen.findByText('第 1 页 / 共 2 页')).toBeDefined()
+  it('keeps cell inputs out of the tab order, so the grid owns the keyboard', async () => {
+    // The old editor's focusable inputs are exactly why there was no cell
+    // cursor, no range and nothing for Ctrl+C to copy.
+    openEditor()
+    await screen.findByText('收件人')
+    const inputs = [...document.querySelectorAll('input.dsg-input')] as HTMLInputElement[]
+    expect(inputs.length).toBeGreaterThan(0)
+    expect(inputs.every((input) => input.tabIndex === -1)).toBe(true)
   })
 
-  it('sends only the cell that changed', async () => {
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
-    const cell = (await screen.findByLabelText('2 收件人')) as HTMLInputElement
-    fireEvent.change(cell, { target: { value: '王五' } })
-    fireEvent.blur(cell)
-
-    await vi.waitFor(() => expect(patched).toHaveLength(1))
-    expect(patched[0]).toMatchObject({ upserts: [{ ordinal: 2, values: { 收件人: '王五' } }] })
-  })
-
-  it('does not send anything when a cell is left unchanged', async () => {
-    // Otherwise tabbing across a row rewrites every cell it passes.
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
-    const cell = await screen.findByLabelText('2 收件人')
-    fireEvent.focus(cell)
-    fireEvent.blur(cell)
-    expect(patched).toHaveLength(0)
+  it('does not offer a per-row delete button any more', async () => {
+    // Rows are removed by selecting them and pressing Delete, like a
+    // spreadsheet; a button per row was the form-shaped version of this page.
+    openEditor()
+    await screen.findByText('收件人')
+    expect(screen.queryByRole('button', { name: '删除此行' })).toBeNull()
   })
 })
 

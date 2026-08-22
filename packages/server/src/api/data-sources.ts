@@ -16,6 +16,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import multipart from '@fastify/multipart'
 import { DataSourceRepo } from '../db/repositories/data-source-repo.ts'
 import {
+  MAX_ROWS,
   UnknownColumnError,
   assertKnownColumns,
   dataSourceNameSchema,
@@ -36,9 +37,21 @@ import { ApiError, HttpStatus } from './errors.ts'
 const MAX_UPLOAD_BYTES = 16 * 1024 * 1024
 
 const idParams = z.object({ id: z.string().min(1) })
+/**
+ * `pageSize` reaches the table's own ceiling on purpose.
+ *
+ * The editor is a spreadsheet: it scrolls, it does not page, so it asks for
+ * every row at once and virtualises the rendering. Ten thousand rows of a few
+ * short columns is a couple of megabytes over a LAN — cheaper than the paging
+ * state a spreadsheet would need to fake, and paging is what made copying a
+ * block across a page boundary impossible.
+ *
+ * The row *selector* in the print dialog still pages, because there the pages
+ * are how somebody reads the table.
+ */
 const pageQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(200).default(10),
+  pageSize: z.coerce.number().int().min(1).max(MAX_ROWS).default(10),
 })
 
 /** Turn an import failure into the error contract's three-part message. */

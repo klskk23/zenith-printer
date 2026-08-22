@@ -29,8 +29,10 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.548.0",
     "react": "^19.2.0",
+    "react-datasheet-grid": "^4.11.6",
     "react-dom": "^19.2.0",
     "react-resizable-panels": "^4.12.3",
+    "react-resize-detector": "^12.3.0",
     "react-router-dom": "^7.18.2",
     "tailwind-merge": "^3.3.1"
   },

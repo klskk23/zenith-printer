@@ -347,3 +347,34 @@ describe('deleting a table', () => {
     expect(res.json().details.affectedTemplates[0]).toMatchObject({ name: '面单' })
   })
 })
+
+describe('reading a whole table at once', () => {
+  /**
+   * The editor is a spreadsheet, not a paged list: it asks for every row and
+   * virtualises the rendering. Paging is what made copying a block across a
+   * page boundary impossible.
+   */
+  it('returns every row when asked for the table ceiling', async () => {
+    const csv = ['n', ...Array.from({ length: 1500 }, (_unused, i) => String(i + 1))].join('\n')
+    const id = (await uploadText(csv, { name: '长表' })).json().id
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/data-sources/${id}/rows?page=1&pageSize=10000`,
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().rows).toHaveLength(1500)
+    expect(res.json().rows[1499]).toMatchObject({ ordinal: 1500 })
+  })
+
+  it('refuses a page size above the table ceiling', async () => {
+    // Not a silent clamp: a request for more than a table may hold is a
+    // mistake somewhere, and answering it quietly hides that.
+    const id = (await uploadText('n\n1', { name: '短表' })).json().id
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/data-sources/${id}/rows?pageSize=10001`,
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})

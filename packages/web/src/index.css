@@ -69,3 +69,38 @@ body {
   background-color: #ffffff;
   color: #000000;
 }
+
+/*
+ * The data source grid, dressed in this application's tokens.
+ *
+ * react-datasheet-grid indirects every colour through a `--dsg-*` variable and
+ * scopes every rule to `.dsg-*`, so there is nothing to override and no global
+ * CSS to fight — this maps its sixteen variables onto the theme and stops.
+ *
+ * It follows light and dark automatically because the tokens on the right do;
+ * a grid with its own hard-coded palette would have been a second theme to keep
+ * in step, which is the thing the constitution rules out.
+ */
+.dsg-container {
+  --dsg-border-color: var(--color-border);
+  --dsg-cell-background-color: var(--color-background);
+  --dsg-cell-disabled-background-color: var(--color-muted);
+  --dsg-header-text-color: var(--color-muted-foreground);
+  --dsg-header-active-text-color: var(--color-foreground);
+  --dsg-selection-border-color: var(--color-primary);
+  --dsg-selection-background-color: color-mix(in oklch, var(--color-primary) 12%, transparent);
+  --dsg-selection-disabled-border-color: var(--color-muted-foreground);
+  --dsg-selection-disabled-background-color: color-mix(in oklch, var(--color-muted) 60%, transparent);
+  --dsg-scroll-shadow-color: color-mix(in oklch, var(--color-foreground) 18%, transparent);
+  --dsg-selection-border-radius: 0.25rem;
+  --dsg-transition-duration: 0.1s;
+
+  color: var(--color-foreground);
+  font-size: 0.75rem;
+}
+
+/* The cell editor is an input; without this it keeps the browser's own font. */
+.dsg-input {
+  color: inherit;
+  font-family: inherit;
+}
