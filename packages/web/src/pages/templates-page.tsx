@@ -34,19 +34,23 @@ function matches(template: Template, query: string): boolean {
  * card, per visit, for a picture that only changes when somebody edits the
  * design.
  *
- * The frame takes the label's proportions rather than being one fixed box — a
- * 100 x 10 strip letterboxed into a square is a hairline in an empty frame,
- * and a portrait label is a sliver. Its size is fixed before the image
- * arrives, so a shelf of cards does not jump as they load.
+ * The frame takes the label's own proportions rather than being one fixed box.
+ * That is what removes the empty bands: a frame of a different shape from the
+ * label letterboxes the picture inside it, so a 100 x 10 strip in a square
+ * frame is a hairline with nothing above or below it. Same shape, no bands.
+ *
+ * Its size is fixed before the image arrives, so a shelf of cards does not
+ * jump as they load.
  */
 function ThumbnailFrame({ template }: { template: Template }): React.JSX.Element {
-  const box = thumbnailBoxPx(template, { maxWidthPx: 96, maxHeightPx: 56 })
+  // Roughly the content width of a card at the grid's floor, and a height cap
+  // so a portrait label does not make its card twice as tall as the rest.
+  const box = thumbnailBoxPx(template, { maxWidthPx: 240, maxHeightPx: 140 })
   return (
     <div
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-white"
+      className="mx-auto flex items-center justify-center overflow-hidden rounded border border-border bg-white"
       style={{ width: box.widthPx, height: box.heightPx }}
       data-thumbnail-frame
-      title={template.hasThumbnail ? undefined : copy.templates.thumbnailMissing}
     >
       {template.hasThumbnail ? (
         <img
@@ -57,11 +61,9 @@ function ThumbnailFrame({ template }: { template: Template }): React.JSX.Element
           data-thumbnail
         />
       ) : (
-        // No room for a sentence at this size, so the frame carries the
-        // explanation as its tooltip and shows the shape alone.
-        <span className="text-[11px] text-muted-foreground" data-no-thumbnail aria-hidden>
-          —
-        </span>
+        <p className="px-2 text-center text-[11px] text-muted-foreground" data-no-thumbnail>
+          {copy.templates.thumbnailMissing}
+        </p>
       )}
     </div>
   )
@@ -107,57 +109,55 @@ export function TemplatesPage(): React.JSX.Element {
       {templates.isPending && <p className="text-xs text-muted-foreground">{copy.common.loading}</p>}
       {templates.data?.length === 0 && <Alert>{copy.index.noTemplates}</Alert>}
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      {/*
+        As many cards as fit, never narrower than the floor. Fixed column
+        counts gave three very wide cards on a large screen, each holding a
+        small label in a lot of nothing; `auto-fill` puts four or five across a
+        full-screen window and drops to one on a narrow one, without a
+        breakpoint per size. The floor is what stops it from squeezing the
+        cards down to where the name no longer fits on a line.
+      */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
         {visible.map((template) => (
           <Card key={template.id}>
             <CardHeader className="pb-2">
-              {/*
-                Title on the left, picture on the right. Beside the name rather
-                than above the details: the name and the shape are the two
-                things a glance at a library is looking for, and putting the
-                picture in the body pushed everything that says what the design
-                *does* below the fold of the card.
-              */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 space-y-1">
-                  {renamingId === template.id ? (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        aria-label={copy.templates.name}
-                        value={draftName}
-                        onChange={(event) => setDraftName(event.target.value)}
-                      />
-                      <Button
-                        size="sm"
-                        disabled={draftName.trim() === ''}
-                        onClick={() => {
-                          rename.mutate({ id: template.id, name: draftName.trim() })
-                          setRenamingId(null)
-                        }}
-                      >
-                        {copy.common.save}
-                      </Button>
-                    </div>
-                  ) : (
-                    <CardTitle className="truncate">{template.name}</CardTitle>
-                  )}
-                  {/*
-                    Millimetres only. The dpi and the printer kind used to be
-                    shown here as though they said where this design could be
-                    printed; neither does any more — the dot grid comes from
-                    whichever printer it is sent to, and both drivers take a
-                    bitmap. Leaving them on the card is what led people to
-                    re-save a design that was never wrong.
-                  */}
-                  <p className="text-[11px] text-muted-foreground" data-label-size>
-                    {template.widthMm} × {template.heightMm} mm
-                  </p>
-                </div>
-
-                <ThumbnailFrame template={template} />
+              <div className="min-w-0 space-y-1">
+                {renamingId === template.id ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      aria-label={copy.templates.name}
+                      value={draftName}
+                      onChange={(event) => setDraftName(event.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={draftName.trim() === ''}
+                      onClick={() => {
+                        rename.mutate({ id: template.id, name: draftName.trim() })
+                        setRenamingId(null)
+                      }}
+                    >
+                      {copy.common.save}
+                    </Button>
+                  </div>
+                ) : (
+                  <CardTitle className="truncate">{template.name}</CardTitle>
+                )}
+                {/*
+                  Millimetres only. The dpi and the printer kind used to be
+                  shown here as though they said where this design could be
+                  printed; neither does any more — the dot grid comes from
+                  whichever printer it is sent to, and both drivers take a
+                  bitmap. Leaving them on the card is what led people to
+                  re-save a design that was never wrong.
+                */}
+                <p className="text-[11px] text-muted-foreground" data-label-size>
+                  {template.widthMm} × {template.heightMm} mm
+                </p>
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
+              <ThumbnailFrame template={template} />
               {/*
                 Which table this design prints from — the thing worth knowing at
                 a glance, now that there are no variable fields to count. Bound

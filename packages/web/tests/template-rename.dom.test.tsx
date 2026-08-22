@@ -161,27 +161,36 @@ describe('the card thumbnail', () => {
     expect(document.querySelector('[data-thumbnail]')!.getAttribute('loading')).toBe('lazy')
   })
 
-  it('says why there is none, in the room a frame this size has', async () => {
-    // The design saved; it just could not be drawn. There is no space for a
-    // sentence beside the title, so the frame carries it as a tooltip.
+  it('says why there is none rather than leaving an empty frame', async () => {
+    // The design saved; it just could not be drawn.
     templates = [{ ...TEMPLATE, hasThumbnail: false }]
     render(wrap(<TemplatesPage />))
     await screen.findByText('面单')
     expect(document.querySelector('[data-thumbnail]')).toBeNull()
-    expect(document.querySelector('[data-thumbnail-frame]')?.getAttribute('title')).toBe(
-      '这个设计画不出预览图',
+    expect(screen.getByText('这个设计画不出预览图')).toBeDefined()
+  })
+
+  it('sits below the name, not beside it', async () => {
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    const card = screen.getByText('面单').closest('[class*="rounded"]')!
+    const nodes = [...card.querySelectorAll('*')]
+    // Document order within the card: the name comes first, the frame after.
+    expect(nodes.indexOf(document.querySelector('[data-thumbnail-frame]')!)).toBeGreaterThan(
+      nodes.indexOf(screen.getByText('面单')),
     )
   })
 
-  it('sits beside the title rather than above the details', async () => {
+  it('leaves no empty band beside the label, because the frame is its shape', async () => {
+    // The whole point of sizing the frame: an image letterboxed into a frame
+    // of a different shape shows bands of nothing, and a wide label in a
+    // squarish frame is mostly nothing.
+    templates = [{ ...TEMPLATE, widthMm: 100, heightMm: 20 }]
     render(wrap(<TemplatesPage />))
     await screen.findByText('面单')
-    const frame = document.querySelector('[data-thumbnail-frame]')
-    const title = screen.getByText('面单')
-    // Same row: the frame and the title share a parent, and the frame is not
-    // inside the block that carries the name and the size.
-    expect(frame!.parentElement!.contains(title)).toBe(true)
-    expect(frame!.contains(title)).toBe(false)
+    const frame = document.querySelector('[data-thumbnail-frame]') as HTMLElement
+    const ratio = Number.parseFloat(frame.style.width) / Number.parseFloat(frame.style.height)
+    expect(ratio).toBeCloseTo(5, 1)
   })
 
   it('takes the label shape, so a glance says which way round the design is', async () => {
@@ -207,6 +216,24 @@ describe('the card thumbnail', () => {
     const frame = document.querySelector('[data-thumbnail-frame]') as HTMLElement
     expect(frame.style.width).not.toBe('')
     expect(frame.style.height).not.toBe('')
+  })
+})
+
+describe('how many cards fit a row', () => {
+  it('sizes columns by available width and not by breakpoint', async () => {
+    // What this can show and what it cannot. happy-dom performs no layout, so
+    // the number of columns at any window size is not observable here — that
+    // needs a browser. What is observable is which rule is in force: fixed
+    // counts (`md:grid-cols-2 lg:grid-cols-3`) gave three very wide cards on a
+    // large screen, each holding a small label in a lot of nothing, and this
+    // guards against going back to them.
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    const grid = document.querySelector('[class*="grid-cols-"]') as HTMLElement
+    expect(grid.className).toContain('auto-fill')
+    // The floor: without it the cards squeeze until the name no longer fits.
+    expect(grid.className).toContain('18rem')
+    expect(grid.className).not.toContain('grid-cols-2')
   })
 })
 
