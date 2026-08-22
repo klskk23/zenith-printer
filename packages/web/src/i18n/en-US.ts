@@ -397,6 +397,8 @@ export const copy: Copy = {
     searchPlaceholder: 'Search template names',
     open: 'Open',
     confirmDelete: 'Delete this template? Printed history is unaffected.',
+    thumbnailAlt: (name: string): string => `Thumbnail of ${name}`,
+    thumbnailMissing: 'This design could not be drawn',
     rename: 'Rename',
     renameHint: 'A template name is for people. Nothing references a template by name, so renaming breaks nothing.',
     boundSource: (name: string): string => `Data source: ${name}`,

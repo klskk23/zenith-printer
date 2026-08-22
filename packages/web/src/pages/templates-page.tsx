@@ -12,6 +12,7 @@ import { ConfirmButton } from '../components/ui/confirm-button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx'
 import { Input } from '../components/ui/input.tsx'
 import {
+  thumbnailUrl,
   useDeleteTemplate,
   useRenameTemplate,
   useTemplates,
@@ -102,6 +103,32 @@ export function TemplatesPage(): React.JSX.Element {
               </p>
             </CardHeader>
             <CardContent className="space-y-2">
+              {/*
+                Drawn when the design was saved, not on every visit: the
+                library lists every template at once, and rendering each card
+                on demand is a resvg pass per card, per visit, for a picture
+                that only changes when somebody edits the design.
+
+                `loading="lazy"` because a long library is mostly off-screen,
+                and a fixed aspect box so the cards do not jump as they arrive.
+              */}
+              <div className="flex h-24 items-center justify-center overflow-hidden rounded border border-border bg-white">
+                {template.hasThumbnail ? (
+                  <img
+                    src={thumbnailUrl(template)}
+                    alt={copy.templates.thumbnailAlt(template.name)}
+                    loading="lazy"
+                    className="max-h-full max-w-full object-contain"
+                    data-thumbnail
+                  />
+                ) : (
+                  // Says why there is no picture rather than leaving a blank
+                  // frame: the design is saved, it just could not be drawn.
+                  <p className="px-2 text-center text-[11px] text-muted-foreground" data-no-thumbnail>
+                    {copy.templates.thumbnailMissing}
+                  </p>
+                )}
+              </div>
               {/*
                 Which table this design prints from — the thing worth knowing at
                 a glance, now that there are no variable fields to count. Bound

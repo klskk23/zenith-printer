@@ -5,6 +5,7 @@
  * ask for before a job can be submitted, including where each sequence should
  * resume (FR-048), so nobody has to remember what they printed last week.
  */
+import { join } from 'node:path'
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -21,6 +22,11 @@ import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { ApiError, HttpStatus } from './errors.ts'
 import { bindingIssueFor } from '../domain/template-refs.ts'
+import { ImageRepo } from '../db/repositories/image-repo.ts'
+import { createImageResolver } from '../render/image-resolver.ts'
+import { loadFontConfig } from '../render/fonts.ts'
+import { renderThumbnail } from '../render/thumbnail.ts'
+import { repoRoot } from '../paths.ts'
 
 const idParams = z.object({ id: z.string().min(1) })
 const printerParams = z.object({ printerId: z.string().min(1) })
@@ -72,13 +78,40 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
     bindingIssue: bindingIssueFor(app.ctx.db, template),
   })
 
+  const fonts = loadFontConfig(join(repoRoot, 'fonts'))
+
+  /**
+   * Draw the library picture and attach it, then return the template.
+   *
+   * After the save, never as part of it: a design whose barcode content cannot
+   * be encoded is still a design somebody is allowed to keep, and losing the
+   * save over its picture would be the wrong trade. `renderThumbnail` returns
+   * null in that case and the card falls back to a placeholder.
+   */
+  const withThumbnail = (template: Template): Template => {
+    const store = templates()
+    const resolveImage = createImageResolver(new ImageRepo(ctx()))
+    const png = renderThumbnail({
+      ir: {
+        widthMm: template.widthMm,
+        heightMm: template.heightMm,
+        dpi: template.dpi,
+        elements: template.elements,
+      },
+      fonts,
+      resolveImage,
+    })
+    store.saveThumbnail(template.id, png)
+    return { ...template, hasThumbnail: png !== null }
+  }
+
   typed.get('/api/templates', async () => ({
     templates: templates().list().map(withBindingIssue),
   }))
 
   typed.post('/api/templates', { schema: { body: templateInputSchema } }, async (request, reply) => {
     assertFits(request.body)
-    return reply.status(HttpStatus.Created).send(withBindingIssue(templates().create(request.body)))
+    return reply.status(HttpStatus.Created).send(withBindingIssue(withThumbnail(templates().create(request.body))))
   })
 
   typed.get('/api/templates/:id', { schema: { params: idParams } }, async (request) => {
@@ -101,7 +134,7 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
       const { version, ...input } = request.body
       assertFits(input)
       try {
-        return withBindingIssue(templates().update(request.params.id, input, version))
+        return withBindingIssue(withThumbnail(templates().update(request.params.id, input, version)))
       } catch (err) {
         if (err instanceof TemplateConflictError) {
           // Nothing is written on this path: the caller still holds their edits
@@ -115,6 +148,29 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
       }
     },
   )
+
+  /**
+   * The library picture, as PNG bytes.
+   *
+   * Its own endpoint rather than a field on the template: the list returns
+   * every design at once, and inlining a picture per row would make the common
+   * request tens of times larger for data most of it will not draw. This way
+   * the browser fetches them lazily and keeps them.
+   *
+   * Cached hard and busted by `version`, which the client appends. The bytes
+   * for a given version never change — a new save is a new version — so a long
+   * max-age is safe and a stale picture is not possible.
+   */
+  typed.get('/api/templates/:id/thumbnail', { schema: { params: idParams } }, async (request, reply) => {
+    const png = templates().thumbnail(request.params.id)
+    if (png === undefined) {
+      throw ApiError.notFound({ templateId: request.params.id })
+    }
+    return reply
+      .type('image/png')
+      .header('cache-control', 'public, max-age=31536000, immutable')
+      .send(Buffer.from(png))
+  })
 
   // Rename is its own endpoint rather than a PUT of the whole design: sending
   // the elements back just to change a word would make renaming from the

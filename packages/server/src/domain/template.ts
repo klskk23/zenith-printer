@@ -48,6 +48,18 @@ export interface Template extends TemplateInput {
    * normal case, which is also why no existing test caught it.
    */
   version: number
+  /**
+   * Whether a library thumbnail was generated for this design.
+   *
+   * A flag rather than the bytes: the list returns every template, and inlining
+   * a picture per row would make the common request tens of times larger for
+   * data most of it is not going to draw. The bytes come from
+   * `GET /api/templates/:id/thumbnail`, which the browser can cache.
+   *
+   * False when the design could not be drawn — an unencodable barcode, say.
+   * Losing the save over its picture would be the wrong trade.
+   */
+  hasThumbnail: boolean
 }
 
 export class TemplateConflictError extends Error {

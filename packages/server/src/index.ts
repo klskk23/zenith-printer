@@ -5,13 +5,12 @@
  * anyone who can reach it can submit and cancel jobs — so binding it to a
  * public interface would be a mistake, not a configuration choice.
  */
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
+import { repoRoot } from './paths.ts'
 import { buildApp } from './app.ts'
 import { openDatabase } from './db/index.ts'
 import { registerStatic } from './static.ts'
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 const HOST = process.env.ZENITH_HOST ?? '0.0.0.0'
 const PORT = Number(process.env.ZENITH_PORT ?? 3000)

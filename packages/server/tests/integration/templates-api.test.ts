@@ -426,3 +426,83 @@ describe('renaming a template', () => {
     expect((await rename(second.id, 'part label')).statusCode).toBe(200)
   })
 })
+
+describe('the library thumbnail', () => {
+  const fetchThumb = (id: string) =>
+    app.inject({ method: 'GET', url: `/api/templates/${id}/thumbnail` })
+
+  it('is generated when the design is saved', async () => {
+    const created = (await createTemplate()).json()
+    expect(created.hasThumbnail).toBe(true)
+
+    const res = await fetchThumb(created.id)
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toContain('image/png')
+    // A real PNG, not an empty body: the eight-byte signature.
+    expect(res.rawPayload.subarray(0, 8)).toEqual(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    )
+  })
+
+  it('is not inlined into the list, which returns every design at once', async () => {
+    await createTemplate()
+    const list = (await app.inject({ method: 'GET', url: '/api/templates' })).json()
+    expect(list.templates[0].hasThumbnail).toBe(true)
+    expect(list.templates[0].thumbnail).toBeUndefined()
+  })
+
+  it('is redrawn when the design is saved again', async () => {
+    const created = (await createTemplate()).json()
+    const before = (await fetchThumb(created.id)).rawPayload
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/templates/${created.id}`,
+      payload: {
+        ...TEMPLATE,
+        elements: [{ ...ELEMENTS[1], content: 'a much longer piece of text than before' }],
+        version: created.version,
+      },
+    })
+
+    expect((await fetchThumb(created.id)).rawPayload).not.toEqual(before)
+  })
+
+  it('is left alone by a rename, which does not change the picture', async () => {
+    const created = (await createTemplate()).json()
+    const before = (await fetchThumb(created.id)).rawPayload
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/templates/${created.id}`,
+      payload: { name: 'renamed' },
+    })
+
+    expect((await fetchThumb(created.id)).rawPayload).toEqual(before)
+  })
+
+  it('is cached hard, since a new save is a new version', async () => {
+    const created = (await createTemplate()).json()
+    const res = await fetchThumb(created.id)
+    expect(res.headers['cache-control']).toContain('immutable')
+  })
+
+  it('is a 404 for a template that does not exist', async () => {
+    expect((await fetchThumb('t-nope')).statusCode).toBe(404)
+  })
+
+  it('still saves a design whose picture cannot be drawn', async () => {
+    // An EAN-13 needs digits. The design is wrong and the editor says so, but
+    // it is still a design somebody is allowed to keep and come back to —
+    // losing the save over its thumbnail would be the wrong trade.
+    const res = await createTemplate({
+      ...TEMPLATE,
+      elements: [{ ...ELEMENTS[0], symbology: 'ean13', content: 'not-digits' }],
+      variables: [],
+    })
+
+    expect(res.statusCode).toBe(201)
+    expect(res.json().hasThumbnail).toBe(false)
+    expect((await fetchThumb(res.json().id)).statusCode).toBe(404)
+  })
+})

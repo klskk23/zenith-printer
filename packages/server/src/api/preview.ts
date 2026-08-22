@@ -9,8 +9,8 @@ import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { evaluateIr, labelIrSchema, type LabelIR } from '@zenith/shared'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
+import { repoRoot } from '../paths.ts'
 import { atPrinterDpi, maxLabelWidthMm } from '../domain/printer.ts'
 import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { renderLabel } from '../render/pipeline.ts'
@@ -26,7 +26,6 @@ import { resolveContent } from './job-submission.ts'
 import { DataSourceRepo } from '../db/repositories/data-source-repo.ts'
 import { TemplateRepo } from '../db/repositories/template-repo.ts'
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
 const previewBody = z.object({
   printerId: z.string().min(1),

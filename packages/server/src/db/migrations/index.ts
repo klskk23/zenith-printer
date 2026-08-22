@@ -8,6 +8,7 @@
 import type { Migration } from '../index.ts'
 import { migrateOffsets } from './offset-migration.ts'
 import { claimsFromSeqRanges, rewriteElementContent } from './variable-migration.ts'
+import { backfillThumbnails } from './thumbnail-backfill.ts'
 
 const initialSchema = `
   CREATE TABLE printers (
@@ -310,6 +311,17 @@ const dropVariableFields = `
   ALTER TABLE print_jobs DROP COLUMN seq_ranges;
 `
 
+/**
+ * The library's picture for a design, generated when it is saved.
+ *
+ * A BLOB on the row rather than a file beside the image assets: it is derived
+ * data with exactly the lifetime of the row, so storing it anywhere else just
+ * creates something to leave behind when a template is deleted.
+ */
+const templateThumbnail = `
+  ALTER TABLE templates ADD COLUMN thumbnail BLOB;
+`
+
 export const migrations: Migration[] = [
   { id: 1, name: 'initial_schema', up: initialSchema },
   { id: 2, name: 'template_version', up: templateVersion },
@@ -324,4 +336,5 @@ export const migrations: Migration[] = [
   // the move into the migration that does the dropping.
   { id: 9, name: 'claims_from_seq_ranges', up: '', apply: claimsFromSeqRanges },
   { id: 10, name: 'drop_variable_fields', up: dropVariableFields, apply: rewriteElementContent },
+  { id: 11, name: 'template_thumbnail', up: templateThumbnail, apply: backfillThumbnails },
 ]

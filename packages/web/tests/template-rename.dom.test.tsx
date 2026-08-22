@@ -29,6 +29,7 @@ const TEMPLATE = {
   createdAt: 'T',
   updatedAt: 'T',
   version: 1,
+  hasThumbnail: true,
 }
 
 const SOURCE = { id: 'ds-1', name: '订单表', columns: ['订单号'], rowCount: 3, createdAt: 'T', updatedAt: 'T' }
@@ -135,6 +136,38 @@ describe('renaming a template', () => {
     await screen.findByText('面单')
     fireEvent.click(screen.getByRole('button', { name: '改名' }))
     expect(screen.getByText(/不会影响任何东西/)).toBeDefined()
+  })
+})
+
+describe('the card thumbnail', () => {
+  it('shows the picture that was drawn when the design was saved', async () => {
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    const image = document.querySelector('[data-thumbnail]') as HTMLImageElement | null
+    expect(image).not.toBeNull()
+    expect(image!.getAttribute('src')).toBe('/api/templates/tpl-1/thumbnail?v=1')
+  })
+
+  it('keys the picture by version, so a saved change is not served from cache', async () => {
+    templates = [{ ...TEMPLATE, version: 7 }]
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    expect(document.querySelector('[data-thumbnail]')!.getAttribute('src')).toContain('v=7')
+  })
+
+  it('loads lazily, since a long library is mostly off-screen', async () => {
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    expect(document.querySelector('[data-thumbnail]')!.getAttribute('loading')).toBe('lazy')
+  })
+
+  it('says why there is none rather than leaving an empty frame', async () => {
+    // The design saved; it just could not be drawn.
+    templates = [{ ...TEMPLATE, hasThumbnail: false }]
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    expect(document.querySelector('[data-thumbnail]')).toBeNull()
+    expect(screen.getByText('这个设计画不出预览图')).toBeDefined()
   })
 })
 

@@ -51,7 +51,28 @@ export class TemplateRepo {
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
       version: Number(row.version),
+      hasThumbnail: row.thumbnail !== null && row.thumbnail !== undefined,
     }
+  }
+
+  /**
+   * Store the library picture, or clear it.
+   *
+   * Separate from `create`/`update` so a failure to draw cannot fail a save:
+   * the design is written first, and the picture is attached afterwards.
+   * Deliberately does **not** touch `version` — the thumbnail is derived from
+   * the design, so it never means somebody else's edit was overwritten.
+   */
+  saveThumbnail(id: string, png: Uint8Array | null): void {
+    this.#db.prepare('UPDATE templates SET thumbnail = ? WHERE id = ?').run(png, id)
+  }
+
+  /** The stored PNG, or undefined when there is none (or no such template). */
+  thumbnail(id: string): Uint8Array | undefined {
+    const row = this.#db.prepare('SELECT thumbnail FROM templates WHERE id = ?').get(id) as
+      | { thumbnail: Uint8Array | null }
+      | undefined
+    return row?.thumbnail === null || row?.thumbnail === undefined ? undefined : row.thumbnail
   }
 
   list(): Template[] {

@@ -116,6 +116,7 @@ describe('template field helpers', () => {
   const template: Template = {
     id: 't1',
     version: 1,
+    hasThumbnail: false,
     name: 'label',
     printerKind: 'niimbot',
     widthMm: 50,

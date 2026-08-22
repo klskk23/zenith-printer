@@ -9,9 +9,22 @@
  * So the server inlines the bytes as a data URI before rendering.
  */
 import { readFileSync } from 'node:fs'
-import type { ImageRepo } from '../db/repositories/image-repo.ts'
+
 
 export type ImageResolver = (assetId: string) => string | undefined
+
+/**
+ * The one thing a resolver needs from the asset store.
+ *
+ * Declared structurally rather than as `ImageRepo`, so callers that have no
+ * clock or id generator to hand — a migration, for one — can look assets up
+ * without inventing them.
+ */
+export interface AssetLookup {
+  /** Only the two fields a data URI is built from, so a caller can supply a
+   *  row it read itself without matching the whole repository type. */
+  find(assetId: string): { mimeType: string; storagePath: string } | undefined
+}
 
 /**
  * Build a resolver backed by the asset store.
@@ -19,7 +32,7 @@ export type ImageResolver = (assetId: string) => string | undefined
  * A missing file yields undefined and the element is skipped rather than
  * failing the whole label.
  */
-export function createImageResolver(repo: ImageRepo): ImageResolver {
+export function createImageResolver(repo: AssetLookup): ImageResolver {
   const cache = new Map<string, string | undefined>()
 
   return (assetId: string): string | undefined => {

@@ -5,8 +5,8 @@
  * it needs. Kept separate from the API so routes stay ignorant of drivers and
  * rendering; they only ask for a drain.
  */
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
+import { repoRoot } from '../paths.ts'
 import { formatSequence, type LabelIR } from '@zenith/shared'
 import type { FastifyInstance } from 'fastify'
 import { PrintQueue, type PageRenderOptions } from './print-queue.ts'
@@ -23,7 +23,6 @@ import type { BinaryBitmap } from '../drivers/port.ts'
 import type { PrintJob, SequenceClaim } from '../domain/print-job.ts'
 import { irForLabel } from '../render/job-pages.ts'
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
 /**
  * Value of a sequence variable at a given position in the batch.

@@ -26,6 +26,14 @@ export interface Template {
   updatedAt: string
   /** Optimistic concurrency token; a stale value means somebody saved first. */
   version: number
+  /**
+   * Whether the library has a picture for this design.
+   *
+   * The bytes are fetched separately — the list returns every template, and a
+   * picture per row would make it tens of times larger for data most of it is
+   * not going to draw. False when the design could not be drawn at all.
+   */
+  hasThumbnail: boolean
 }
 
 export type BindingIssue =
@@ -77,3 +85,13 @@ export function useDeleteTemplate() {
 // There is no print-form hook any more. Nothing is typed in before printing:
 // constants are fixed in the design, serials come from a pool, and column
 // values come from the rows that were selected.
+
+/**
+ * Where to fetch a design's library picture.
+ *
+ * Keyed by version so the browser may cache it forever: the bytes for one
+ * version never change, because saving produces a new version.
+ */
+export function thumbnailUrl(template: Pick<Template, 'id' | 'version'>): string {
+  return `/api/templates/${template.id}/thumbnail?v=${template.version}`
+}
