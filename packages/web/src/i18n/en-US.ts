@@ -247,6 +247,28 @@ export const copy: Copy = {
     needsProbe: 'This printer has not been probed, so its printable area is unknown',
   },
 
+  pools: {
+    heading: 'Sequence pools',
+    explain:
+      'A pool exists in its own right and can be shared between designs — a box label and a carton label running off one series of numbers. The current value is derived from what was printed, never stored separately.',
+    empty: 'No pools yet. Create one, then pick it in a design\'s variables panel',
+    name: 'Name',
+    digits: 'Digits',
+    add: 'Create',
+    reset: 'Reset',
+    delete: 'Delete',
+    nextIs: (value: string): string => `next ${value}`,
+    resetTo: (floor: string): string => `Restart at (last restarted from ${floor})`,
+    resetTitle: (name: string): string => `Restart numbering for "${name}"?`,
+    resetWarning:
+      'Restarting below a number that has already been printed will reissue it, and two boxes carrying the same serial cannot be told apart afterwards. Spans already issued stay on record. This cannot be undone.',
+    resetConfirm: 'Restart numbering',
+    deleteTitle: (name: string): string => `Delete "${name}"?`,
+    deleteWarning:
+      'Spans already issued stay on record, because those numbers are on physical labels. A pool still referenced by a design cannot be deleted.',
+    deleteConfirm: 'Delete',
+    deleteRefused: 'Designs still reference it. Point them at another pool, or make the variable a constant.',
+  },
   variables: {
     heading: 'Variables',
     empty: 'No variables yet. Once defined, reference one as ${name} inside text, barcode or QR content',

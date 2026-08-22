@@ -244,6 +244,26 @@ export const copy = {
     needsProbe: '这台打印机尚未探测，无法确定可打印范围',
   },
 
+  pools: {
+    heading: '序号池',
+    explain: '序号池独立于设计存在，可以被多个设计共用——小盒标签与外箱标签走同一条流水就靠它。当前值由已打印的任务推导，不单独存储。',
+    empty: '还没有序号池。建一个之后，在设计的变量面板里选它',
+    name: '名称',
+    digits: '位数',
+    add: '新建',
+    reset: '重置',
+    delete: '删除',
+    nextIs: (value: string): string => `下一个 ${value}`,
+    resetTo: (floor: string): string => `重置到（上次从 ${floor} 起）`,
+    resetTitle: (name: string): string => `重置「${name}」的号码？`,
+    resetWarning:
+      '如果重置到一个已经印出去的号码，接下来印的标签会与旧标签重号，而两个同号的箱子事后分不出彼此。已发放的号段仍会留在任务记录里。此操作不可撤销。',
+    resetConfirm: '确认重置',
+    deleteTitle: (name: string): string => `删除「${name}」？`,
+    deleteWarning: '已发放的号段会保留在任务记录里，因为那些号码印在实物上。仍被设计引用的序号池不能删除。',
+    deleteConfirm: '确认删除',
+    deleteRefused: '还有设计正在引用它。请先把那些设计改用其他序号池，或改为常量。',
+  },
   variables: {
     heading: '变量',
     empty: '还没有变量。定义之后，在文字、条码或二维码的内容里写 ${名称} 引用它',

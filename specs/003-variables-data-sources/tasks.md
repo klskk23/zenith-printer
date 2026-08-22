@@ -112,10 +112,10 @@ npm workspaces 四包结构，不新增包：
 
 > 先写、先看红。序号是本故事里唯一「错了就贴到实物上」的部分，测试要压住的是重号而非跳号。
 
-- [ ] T033 [P] [US1] `packages/server/tests/unit/sequence-pool.test.ts`：`current = max(floor, 已消耗最大值)`；空历史时 `current = floor`；重置只抬高 `floor` 而不动历史；`nextValue = current + step`
-- [ ] T034 [P] [US1] 重写 `packages/server/tests/unit/sequence-allocator.test.ts`：领取按**池 id** 收窄而非 `template_id`；**两个不同模板引用同一池，各领一批后号码不重叠**（AS-6）；溢出整批回滚；取消任务归还号段
-- [ ] T035 [P] [US1] `packages/server/tests/integration/sequence-pools-api.test.ts`：`GET`/`POST`/`PATCH` 契约；`PATCH` 不能改 `current`；`POST /reset` 无 `confirm` → `422 CONFIRMATION_REQUIRED`，带 `confirm` → `200` 且返回新 `current`；`DELETE` 在仍被设计引用时 → `409 SEQUENCE_POOL_IN_USE` 并列出设计，否则 `204`，且**已发放的号段留存**（FR-006a）
-- [ ] T036 [P] [US1] `packages/server/tests/integration/variables-print.test.ts`：**连续 10 批各 5 张**，逐批断言起始号紧接上批末号，全程无重号无跳号（AS-5、SC-004）；内容含未定义引用 → `422 VARIABLE_NOT_DEFINED` 且 `details.reference` 指出是哪一个；**未保存为模板的设计也能用自增变量**（FR-007）
+- [X] T033 [P] [US1] `packages/server/tests/unit/sequence-pool.test.ts`：`current = max(floor, 已消耗最大值)`；空历史时 `current = floor`；重置只抬高 `floor` 而不动历史；`nextValue = current + step`
+- [X] T034 [P] [US1] 重写 `packages/server/tests/unit/sequence-allocator.test.ts`：领取按**池 id** 收窄而非 `template_id`；**两个不同模板引用同一池，各领一批后号码不重叠**（AS-6）；溢出整批回滚；取消任务归还号段
+- [X] T035 [P] [US1] `packages/server/tests/integration/sequence-pools-api.test.ts`：`GET`/`POST`/`PATCH` 契约；`PATCH` 不能改 `current`；`POST /reset` 无 `confirm` → `422 CONFIRMATION_REQUIRED`，带 `confirm` → `200` 且返回新 `current`；`DELETE` 在仍被设计引用时 → `409 SEQUENCE_POOL_IN_USE` 并列出设计，否则 `204`，且**已发放的号段留存**（FR-006a）
+- [X] T036 [P] [US1] `packages/server/tests/integration/variables-print.test.ts`：**连续 10 批各 5 张**，逐批断言起始号紧接上批末号，全程无重号无跳号（AS-5、SC-004）；内容含未定义引用 → `422 VARIABLE_NOT_DEFINED` 且 `details.reference` 指出是哪一个；**未保存为模板的设计也能用自增变量**（FR-007）
 - [X] T037 [P] [US1] `packages/web/tests/variable-panel.dom.test.tsx`：定义常量 `sku = ABC-123` 后，内容为 `零件 ${sku} 号` 的文字元素在画布上显示 `零件 ABC-123 号`（AS-2）；`版本 ${major}.${minor}` 代入两个值且中间点号原样（AS-3）；`$${sku}` 显示字面 `${sku}`（AS-4）
 - [X] T038 [P] [US1] `packages/web/tests/variable-typing.dom.test.tsx`：在文字内容里**逐字**敲入 `$` → `${` → `${s` → `${sk` → `${sku` → `${sku}`，每一步都断言无错误提示出现、输入框保持聚焦、画布未抛异常（SC-006、FR-013、FR-016）
 - [X] T039 [P] [US1] `packages/web/tests/print-blocked-unresolved.dom.test.tsx`：内容引用了未定义的名称时，画布原样显示该引用、底部出现阻塞性提示、打印按钮 `disabled`（AS-1）
@@ -125,20 +125,20 @@ npm workspaces 四包结构，不新增包：
 - [X] T040 [P] [US1] `packages/server/src/domain/sequence-pool.ts`：`SequencePool` zod schema（`name` 唯一、`digits`、`step`、`floor`）与 `currentValue(floor, highestConsumed)` 纯函数
 - [X] T041 [P] [US1] `packages/server/src/db/repositories/sequence-pool-repo.ts`：CRUD + `highestConsumed(poolId)`（查 `job_sequence_claims`，按池 id 索引）
 - [X] T042 [US1] 重写 `packages/server/src/domain/sequence-allocator.ts`：领取写入 `job_sequence_claims`，`#highestConsumed` 改按 `pool_id` 查询；`suggest` / `allocate` / `release` / `conflictsWithHistory` 的签名由「字段」改为「池」（依赖 T040、T041）
-- [ ] T043 [US1] `packages/server/src/api/sequence-pools.ts`：实现 `contracts/rest-api.md` 的五个端点（列表、建立、修改、重置、删除），响应含 `floor`，并在 `packages/server/src/app.ts` 注册
+- [X] T043 [US1] `packages/server/src/api/sequence-pools.ts`：实现 `contracts/rest-api.md` 的五个端点（列表、建立、修改、重置、删除），响应含 `floor`，并在 `packages/server/src/app.ts` 注册
 - [X] T044 [P] [US1] `packages/server/src/db/repositories/template-repo.ts`：读写 `variables`（JSON）与 `data_source_id` 两列，用 T008 的 schema 校验
 - [X] T045 [US1] `packages/server/src/api/templates.ts`：模板的建立/更新/读取带上 `variables` 与 `dataSourceId`
 - [X] T046 [US1] `packages/server/src/api/job-submission.ts`：提交前用 `collectReferences` 校验每个引用可解析，否则 `422 VARIABLE_NOT_DEFINED`；把设计的 `variables` 解析为求值表（依赖 T042）
-- [ ] T047 [US1] `packages/server/src/render/job-pages.ts`：`valuesForCopy` 由 `job_sequence_claims` 与常量定义合成；`hasPerCopyContent` 按是否存在序号声明判定
-- [ ] T048 [US1] `packages/server/src/api/preview.ts`：移除 `variableValues`，改为用设计的变量定义求值（`rowOrdinal` 留待 US2）
-- [ ] T049 [P] [US1] `packages/web/src/api/types.ts` 与 `packages/web/src/api/client.ts`：序号池端点的类型与调用；移除 print-form 相关类型
+- [X] T047 [US1] `packages/server/src/render/job-pages.ts`：`valuesForCopy` 由 `job_sequence_claims` 与常量定义合成；`hasPerCopyContent` 按是否存在序号声明判定
+- [X] T048 [US1] `packages/server/src/api/preview.ts`：移除 `variableValues`，改为用设计的变量定义求值（`rowOrdinal` 留待 US2）
+- [X] T049 [P] [US1] `packages/web/src/api/types.ts` 与 `packages/web/src/api/client.ts`：序号池端点的类型与调用；移除 print-form 相关类型
 - [X] T050 [US1] `packages/web/src/editor/variables-panel.tsx`（新建，取代已删的 `variable-field-panel.tsx`）：常量的增删改；自增变量选择或新建序号池；名称按 FR-009a 校验；与所绑数据源的列重名时就地提示（FR-009b）
-- [ ] T051 [US1] `packages/web/src/editor/preview-values.ts`：改为调用 `@zenith/shared` 的 `evaluate`，返回代入后的 IR 与未解析引用列表；**任何输入都不抛异常**（依赖 T007）
-- [ ] T052 [US1] `packages/web/src/editor/inspector.tsx`：接入变量面板，元素内容输入框改为普通模板串输入（不再有「绑定/未绑定」的概念）
+- [X] T051 [US1] `packages/web/src/editor/preview-values.ts`：改为调用 `@zenith/shared` 的 `evaluate`，返回代入后的 IR 与未解析引用列表；**任何输入都不抛异常**（依赖 T007）
+- [X] T052 [US1] `packages/web/src/editor/inspector.tsx`：接入变量面板，元素内容输入框改为普通模板串输入（不再有「绑定/未绑定」的概念）
 - [X] T053 [P] [US1] `packages/web/src/features/sequence-pools/hooks.ts`：序号池的 react-query 读写
-- [ ] T054 [US1] `packages/web/src/features/sequence-pools/pools-panel.tsx`：列出池与当前值；重置走 `AlertDialog`，显示当前 `floor` 以便说清「从几重置到几」，文案必须写明**可能与已贴出的标签重号**（FR-006、宪章 III.0）；删除同样走确认并列出引用它的设计（FR-006a）
-- [ ] T055 [US1] `packages/web/src/pages/settings-page.tsx`：挂入序号池面板（不新增可导航页面，故不新增路由）
-- [ ] T056 [US1] `packages/web/src/features/print/print-dialog.tsx`：显示未解析引用的阻塞提示并禁用打印按钮（依赖 T051）
+- [X] T054 [US1] `packages/web/src/features/sequence-pools/pools-panel.tsx`：列出池与当前值；重置走 `AlertDialog`，显示当前 `floor` 以便说清「从几重置到几」，文案必须写明**可能与已贴出的标签重号**（FR-006、宪章 III.0）；删除同样走确认并列出引用它的设计（FR-006a）
+- [X] T055 [US1] `packages/web/src/pages/settings-page.tsx`：挂入序号池面板（不新增可导航页面，故不新增路由）
+- [X] T056 [US1] `packages/web/src/features/print/print-dialog.tsx`：显示未解析引用的阻塞提示并禁用打印按钮（依赖 T051）
 
 **Checkpoint**: US1 可独立验收 —— 不引入任何数据源，系统已比改造前更好：一处改动，多处跟随。
 
