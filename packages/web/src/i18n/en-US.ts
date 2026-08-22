@@ -260,6 +260,30 @@ export const copy: Copy = {
     explain:
       'A data source is one table. A design binds to one of them and references its columns as ${column} inside content.',
     empty: 'No data sources yet. Upload a CSV, or copy a block of cells from a spreadsheet and paste it in',
+    refreshFailed: (reason: string): string => {
+      const why: Record<string, string> = {
+        notShared: 'the spreadsheet is no longer shared with this machine',
+        notFound: 'the spreadsheet could not be found; it may have been deleted',
+        worksheetMissing: 'the worksheet could not be found; it may have been deleted',
+        credentialsInvalid: 'this machine\u2019s Google identity is invalid or expired',
+        rateLimited: 'Google turned the request away for now; try again shortly',
+        unreachable: 'Google could not be reached',
+        timeout: 'Google did not answer in time',
+      }
+      return `Nothing new was fetched: ${why[reason] ?? reason}. The table is unchanged and can still be printed`
+    },
+    refresh: 'Refresh',
+    refreshing: 'Refreshing…',
+    refreshTitle: 'Fetch this table from Google again',
+    lastRefreshed: (when: string): string => `Last refreshed: ${when}`,
+    neverRefreshed: 'Never refreshed',
+    fromGoogle: (sheet: string, worksheet: string): string => `From "${worksheet}" in the Google Sheet "${sheet}"`,
+    refreshApplied: (before: number, after: number): string =>
+      before === after ? `Refreshed; still ${after} rows` : `Refreshed: ${before} rows to ${after}`,
+    refreshAddedColumns: (columns: string[]): string => `New columns: ${columns.join(', ')}`,
+    refreshClearedSelection: 'The table changed, so the rows you had picked by number now point at different rows. The selection was cleared — please choose again',
+    refreshTooManyRows: (rows: number, limit: number): string =>
+      `That table now has ${rows} rows, over the limit of ${limit}. The refresh was cancelled and the existing rows are untouched — it does not keep the first ${limit}, because then nobody would know the rest existed`,
     linkGoogle: 'Link a Google Sheet',
     googleNotConfigured: 'Whoever deploys this must configure a Google identity first; it cannot be set from here',
     googleShareWith: (email: string): string => `Share the spreadsheet with ${email} (Viewer is enough) so this machine can read it`,

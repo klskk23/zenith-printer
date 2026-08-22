@@ -12,6 +12,7 @@ import { Input } from '../../components/ui/input.tsx'
 import { copy } from '../../i18n/index.ts'
 import { UploadDialog } from './upload-dialog.tsx'
 import { LinkGoogleDialog } from './link-google-dialog.tsx'
+import { RefreshButton } from './refresh-button.tsx'
 import { useDataSources,
   useGoogleStatus, useDeleteDataSource, useRenameDataSource, type DataSource } from './hooks.ts'
 
@@ -111,10 +112,26 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
             <p className="text-[11px] text-muted-foreground">
               {copy.dataSources.columns}: {copy.dataSources.columnList(source.columns)}
             </p>
+            {/* Where it came from and how fresh it is. Staleness is invisible
+                unless it is written down, and printing yesterday's rows is not
+                something anybody notices until the labels are in hand. */}
+            {source.sourceKind === 'google-sheets' && (
+              <p className="text-[11px] text-muted-foreground" data-source-origin>
+                {copy.dataSources.fromGoogle(
+                  source.spreadsheetTitle ?? '',
+                  source.worksheetTitle ?? '',
+                )}
+                {' · '}
+                {source.lastRefreshedAt === undefined
+                  ? copy.dataSources.neverRefreshed
+                  : copy.dataSources.lastRefreshed(new Date(source.lastRefreshedAt).toLocaleString())}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => onOpen?.(source.id)}>
                 {copy.dataSources.open}
               </Button>
+              <RefreshButton source={source} />
               <Button
                 variant="ghost"
                 size="sm"

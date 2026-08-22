@@ -213,3 +213,29 @@ export function useCreateLinkedSource() {
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })
 }
+
+export type RefreshOutcome =
+  | { outcome: 'applied'; rowsBefore: number; rowsAfter: number; columnsAdded: string[]; lastRefreshedAt: string | null }
+  | { outcome: 'needsConfirmation'; removedColumns: string[]; addedColumns: string[]; affectedTemplates: Array<{ id: string; name: string }> }
+  | { outcome: 'refusedTooManyRows'; rowCount: number; limit: number }
+  | { outcome: 'failed'; reason: string; detail?: string }
+
+export function useRefreshDataSource() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; confirmColumnChange?: boolean }) =>
+      request<RefreshOutcome>(`/data-sources/${input.id}/refresh`, {
+        method: 'POST',
+        body: input.confirmColumnChange === true ? { confirmColumnChange: true } : {},
+      }),
+    onSuccess: (result) => {
+      // Only a refresh that actually wrote something invalidates anything. The
+      // other three outcomes changed nothing, and refetching after them would
+      // suggest to the user that it had.
+      if (result.outcome === 'applied') {
+        void client.invalidateQueries({ queryKey: KEY })
+        void client.invalidateQueries({ queryKey: ['data-source-rows'] })
+      }
+    },
+  })
+}

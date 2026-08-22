@@ -29,6 +29,7 @@ import {
 import { OverflowNotice, type OverflowWarning } from './overflow-notice.tsx'
 import { Preview } from './preview.tsx'
 import { RowSelectionPanel } from './row-selection.tsx'
+import { RefreshButton } from '../data-sources/refresh-button.tsx'
 import {
   EMPTY,
   MAX_LABELS_PER_JOB,
@@ -84,6 +85,7 @@ export function PrintDialog({
 }: PrintDialogProps): React.JSX.Element {
   const [copies, setCopies] = useState(1)
   const [selection, setSelection] = useState<Selection>(EMPTY)
+  const [selectionCleared, setSelectionCleared] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [warnings, setWarnings] = useState<OverflowWarning[]>([])
   const [error, setError] = useState<ApiRequestError | null>(null)
@@ -100,8 +102,9 @@ export function PrintDialog({
   // The count comes off the data source, which already carries it. Fetching a
   // page of rows to read a number is a wasted request, and it was the request
   // that collided with the selection panel's.
-  const rowCount =
-    useDataSources().data?.find((source) => source.id === dataSourceId)?.rowCount ?? 0
+  const boundSource = useDataSources().data?.find((source) => source.id === dataSourceId)
+  const rowCount = boundSource?.rowCount ?? 0
+  const linkedSource = boundSource?.sourceKind === 'google-sheets' ? boundSource : undefined
   const chosenRows = dataSourceId === null ? 0 : selectedCount(selection, rowCount)
   const labels = dataSourceId === null ? copies : labelTotal(selection, rowCount, copies)
   const firstOrdinal =
@@ -228,6 +231,29 @@ export function PrintDialog({
                 onChange={(event) => setCopies(Math.max(1, Number(event.target.value) || 1))}
               />
             </div>
+
+            {/*
+              Above the selector, and it clears the selection when it lands.
+              A selection is a set of ordinals; after the table is replaced
+              those numbers point at different rows, so keeping them would
+              print the wrong labels while looking entirely correct.
+            */}
+            {linkedSource !== undefined && (
+              <div className="space-y-1" data-print-refresh>
+                <RefreshButton
+                  source={linkedSource}
+                  onApplied={() => {
+                    setSelection(EMPTY)
+                    setSelectionCleared(true)
+                  }}
+                />
+                {selectionCleared && (
+                  <p className="text-[11px] text-muted-foreground" data-selection-cleared>
+                    {copy.dataSources.refreshClearedSelection}
+                  </p>
+                )}
+              </div>
+            )}
 
             {dataSourceId !== null && (
               <RowSelectionPanel

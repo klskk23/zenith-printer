@@ -256,6 +256,30 @@ export const copy = {
     heading: '数据源',
     explain: '一个数据源就是一张表。设计绑定其中一张，内容里写 ${列名} 引用它的列。',
     empty: '还没有数据源。上传一份 CSV，或从表格软件里复制一片单元格粘贴进来',
+    refreshFailed: (reason: string): string => {
+      const why: Record<string, string> = {
+        notShared: '这张表已不再分享给本机',
+        notFound: '这张表格找不到了，可能已被删除',
+        worksheetMissing: '这个工作表找不到了，可能已被删除',
+        credentialsInvalid: '本机的 Google 身份无效或已过期',
+        rateLimited: 'Google 暂时拒绝了请求，稍后再试',
+        unreachable: '连不上 Google',
+        timeout: '等待 Google 响应超时',
+      }
+      return `没有取到新数据：${why[reason] ?? reason}。表格内容保持不变，仍可用它打印`
+    },
+    refresh: '刷新',
+    refreshing: '刷新中…',
+    refreshTitle: '从 Google 重新取一遍这张表的内容',
+    lastRefreshed: (when: string): string => `上次刷新：${when}`,
+    neverRefreshed: '尚未刷新',
+    fromGoogle: (sheet: string, worksheet: string): string => `来自 Google 表格「${sheet}」的「${worksheet}」`,
+    refreshApplied: (before: number, after: number): string =>
+      before === after ? `已刷新，仍是 ${after} 行` : `已刷新：${before} 行 → ${after} 行`,
+    refreshAddedColumns: (columns: string[]): string => `新增了列：${columns.join('、')}`,
+    refreshClearedSelection: '表格内容已更新，之前勾选的行按序号已经指向别的行了，所以选择被清空，请重新勾选',
+    refreshTooManyRows: (rows: number, limit: number): string =>
+      `这张表现在有 ${rows} 行，超过了上限 ${limit} 行。本次刷新已取消，原有的行没有变动——不会只取前 ${limit} 行，因为那样多出来的行存在与否就没人知道了`,
     linkGoogle: '链接 Google 表格',
     googleNotConfigured: '需要部署方先配置 Google 访问身份，界面上无法设置',
     googleShareWith: (email: string): string => `把表格分享给 ${email}（查看者即可），本机才读得到`,

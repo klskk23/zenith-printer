@@ -36,6 +36,7 @@ import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Separator } from '../../components/ui/separator.tsx'
 import { AddRowsBar } from './add-rows.tsx'
 import { GridContextMenu } from './grid-context-menu.tsx'
+import { RefreshButton } from './refresh-button.tsx'
 import {
   diffRows,
   emptyHistory,
@@ -278,6 +279,7 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
             {patch.isPending ? copy.dataSources.saving : copy.common.save}
           </Button>
 
+          <RefreshButton source={source} />
           <span className="text-xs text-muted-foreground">
             {copy.dataSources.rowCount(value.length)}
           </span>
