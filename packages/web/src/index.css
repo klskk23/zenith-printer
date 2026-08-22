@@ -173,24 +173,29 @@ body {
  * The grid's right-click menu.
  *
  * The library paints it `background: white; color: black`, which is invisible
- * as a decision until the dark theme turns it into a white slab. These are the
- * same tokens every other popover on the page uses.
+ * as a decision until the dark theme turns it into a white slab.
+ *
+ * The values are the ones `SelectContent` and `SelectItem` use, spelled as raw
+ * tokens because this element belongs to a third-party component and never
+ * passes through `cn()`. The first attempt reached for `--color-popover` and
+ * `--radius-md`, which shadcn's larger palette has and this one does not: an
+ * undefined custom property makes the whole declaration invalid, so the menu
+ * came out transparent rather than obviously wrong.
  */
 .dsg-context-menu {
-  background: var(--color-popover);
-  color: var(--color-popover-foreground);
+  background: var(--color-background);
+  color: var(--color-foreground);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius);
   box-shadow: 0 4px 12px 0 color-mix(in oklch, var(--color-foreground) 12%, transparent);
   padding: 0.25rem;
   font-size: 0.75rem;
 }
 .dsg-context-menu-item {
   padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius) - 0.25rem);
   cursor: default;
 }
 .dsg-context-menu-item:hover {
-  background: var(--color-accent);
-  color: var(--color-accent-foreground);
+  background: var(--color-muted);
 }

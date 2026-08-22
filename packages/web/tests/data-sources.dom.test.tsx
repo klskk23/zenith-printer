@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DataSourcesPage } from '../src/features/data-sources/data-sources-page.tsx'
 import { DataSourceEditor } from '../src/features/data-sources/data-source-editor.tsx'
 import { TabBar } from '../src/app/tab-bar.tsx'
 import { giveElementsSize } from './support/layout.ts'
 import { gridValues } from './support/grid.ts'
+import { copy } from '../src/i18n/index.ts'
 import { WorkspaceProvider, useWorkspace } from '../src/app/workspace.tsx'
 import { useEffect } from 'react'
 
@@ -39,6 +40,7 @@ let patched: Array<Record<string, unknown>>
  * could not tell an undo that worked from one that silently did nothing —
  * before and after would compare equal either way.
  */
+let patchFails = false
 let serverRows: Array<{ ordinal: number; values: Record<string, string> }>
 
 function applyPatch(body: {
@@ -66,6 +68,7 @@ function wrap(node: React.ReactNode): React.JSX.Element {
 beforeEach(() => {
   sources = [SOURCE]
   patched = []
+  patchFails = false
   serverRows = ROWS.map((row) => ({ ordinal: row.ordinal, values: { ...row.values } }))
   vi.stubGlobal(
     'fetch',
@@ -83,6 +86,15 @@ beforeEach(() => {
       if (url.includes('/rows') && init?.method === 'PATCH') {
         const body = JSON.parse(String(init.body)) as Record<string, unknown>
         patched.push(body)
+        if (patchFails) {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve({ what: 'x', why: 'y', next: 'z' }),
+            text: () => Promise.resolve('{}'),
+          } as unknown as Response)
+        }
         applyPatch(body as never)
         return json({ ...SOURCE, rowCount: serverRows.length })
       }
@@ -149,7 +161,25 @@ describe('the table editor', () => {
   afterEach(() => restoreSize())
 
   function openEditor(): void {
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
+    // The editor tells the workspace when it holds unsaved rows, so it needs a
+    // real provider around it rather than a stub — that is the wiring which
+    // makes the tab ask before closing.
+    render(
+      wrap(
+        <WorkspaceProvider>
+          <DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />
+        </WorkspaceProvider>,
+      ),
+    )
+  }
+
+  const button = (name: string): HTMLButtonElement =>
+    screen.getByRole('button', { name }) as HTMLButtonElement
+
+  /** Add rows and wait for the toolbar to notice there is something to save. */
+  async function addRow(): Promise<void> {
+    fireEvent.click(screen.getByRole('button', { name: '加行' }))
+    await vi.waitFor(() => expect(button('保存').disabled).toBe(false))
   }
 
   it('mounts and actually renders something', async () => {
@@ -207,16 +237,16 @@ describe('the table editor', () => {
     expect(document.querySelector('[data-add-rows]')).not.toBeNull()
   })
 
-  it('adds the number of rows the bar was asked for', async () => {
+  it('adds rows to the draft without sending anything yet', async () => {
     openEditor()
     await screen.findByText('收件人')
     const count = screen.getByLabelText('加几行') as HTMLInputElement
     fireEvent.change(count, { target: { value: '3' } })
-    fireEvent.click(screen.getByRole('button', { name: '加行' }))
+    await addRow()
 
-    await vi.waitFor(() => expect(patched.length).toBeGreaterThan(0))
-    const upserts = patched[0]?.upserts as Array<{ ordinal: number }>
-    expect(upserts.map((u) => u.ordinal)).toEqual([11, 12, 13])
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(13))
+    // The point of staging: nothing has reached the server.
+    expect(patched).toHaveLength(0)
   })
 
   it('keeps the count field editable while a longer number is typed', async () => {
@@ -231,101 +261,183 @@ describe('the table editor', () => {
     expect(count.value).toBe('10')
   })
 
+  it('offers save and discard, inert until something has changed', async () => {
+    openEditor()
+    await screen.findByText('收件人')
+    expect(button('保存').disabled).toBe(true)
+    expect(button('取消修改').disabled).toBe(true)
+    expect(screen.queryByText('有未保存的改动')).toBeNull()
+  })
+
+  it('says so while there are unsaved rows', async () => {
+    openEditor()
+    await screen.findByText('收件人')
+    await addRow()
+    expect(screen.getByText('有未保存的改动')).toBeDefined()
+  })
+
+  it('sends one patch when saved, not one per edit', async () => {
+    // Three separate edits used to be three PATCHes; a mis-paste was already
+    // the stored table before anybody could look at it.
+    openEditor()
+    await screen.findByText('收件人')
+    await addRow()
+    await addRow()
+    await addRow()
+    expect(patched).toHaveLength(0)
+
+    fireEvent.click(button('保存'))
+    await vi.waitFor(() => expect(patched).toHaveLength(1))
+    const upserts = patched[0]?.upserts as Array<{ ordinal: number }>
+    expect(upserts.map((u) => u.ordinal)).toEqual([11, 12, 13])
+  })
+
+  it('goes quiet again once the save lands', async () => {
+    openEditor()
+    await screen.findByText('收件人')
+    await addRow()
+    fireEvent.click(button('保存'))
+
+    await vi.waitFor(() => expect(button('保存').disabled).toBe(true))
+    expect(screen.queryByText('有未保存的改动')).toBeNull()
+  })
+
+  it('discards the draft and sends nothing', async () => {
+    openEditor()
+    await screen.findByText('收件人')
+    await addRow()
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(11))
+
+    // Discarding is the one thing here that cannot be undone, so it asks
+    // first. The confirm carries the same word as the button that opened it,
+    // so it has to be found inside the dialog rather than on the page.
+    fireEvent.click(button('取消修改'))
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消修改' }))
+
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(10))
+    expect(patched).toHaveLength(0)
+  })
+
   it('offers undo and redo, greyed out until there is something to undo', async () => {
     // A key combination as the only undo is no undo for anyone who does not
     // know it.
     openEditor()
     await screen.findByText('收件人')
-    expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(true)
-    expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(button('撤销').disabled).toBe(true)
+    expect(button('重做').disabled).toBe(true)
   })
 
-  it('undoes an edit by putting the server back, not just the screen', async () => {
-    // The rows live on the server, so an undo that only changed local state
-    // would be undone again by the next refetch.
+  it('undoes an edit without a round-trip', async () => {
+    // Undo used to be a second PATCH trying to put the server back. Over a
+    // draft it is local, so it costs nothing and cannot half-apply.
     openEditor()
     await screen.findByText('收件人')
+    await addRow()
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(11))
 
-    fireEvent.click(screen.getByRole('button', { name: '加行' }))
-    await vi.waitFor(() => expect(patched.length).toBe(1))
-    await vi.waitFor(() =>
-      expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(false),
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: '撤销' }))
-    await vi.waitFor(() => expect(patched.length).toBe(2))
-    // The added row is taken off again.
-    expect(patched[1]).toMatchObject({ deletes: [11] })
+    fireEvent.click(button('撤销'))
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(10))
+    expect(patched).toHaveLength(0)
   })
 
-  it('offers a redo once something has been undone', async () => {
+  it('offers a redo once something has been undone, and puts the row back', async () => {
     openEditor()
     await screen.findByText('收件人')
+    await addRow()
+    fireEvent.click(button('撤销'))
+    await vi.waitFor(() => expect(button('重做').disabled).toBe(false))
 
-    fireEvent.click(screen.getByRole('button', { name: '加行' }))
-    await vi.waitFor(() =>
-      expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(false),
-    )
-    fireEvent.click(screen.getByRole('button', { name: '撤销' }))
-
-    await vi.waitFor(() =>
-      expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(false),
-    )
+    fireEvent.click(button('重做'))
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(11))
   })
 
   it('undoes on Ctrl+Z', async () => {
     openEditor()
     await screen.findByText('收件人')
-
-    fireEvent.click(screen.getByRole('button', { name: '加行' }))
-    await vi.waitFor(() => expect(patched.length).toBe(1))
+    await addRow()
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(11))
 
     fireEvent.keyDown(document.querySelector('[data-data-source-editor]')!, {
       key: 'z',
       ctrlKey: true,
     })
-    await vi.waitFor(() => expect(patched.length).toBe(2))
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(10))
   })
 
-  it('redoing puts the row back, which is the upsert half of the diff', async () => {
-    // Undo of an added row is a delete; redo of it is an upsert. Without this
-    // the upsert half of `diffRows` is never exercised through the UI — a gap
-    // that only showed up when a deliberate break failed to turn anything red.
+  it('saves on Ctrl+S, which is what everybody presses', async () => {
     openEditor()
     await screen.findByText('收件人')
+    await addRow()
 
-    fireEvent.click(screen.getByRole('button', { name: '加行' }))
-    await vi.waitFor(() => expect(patched.length).toBe(1))
+    fireEvent.keyDown(document.querySelector('[data-data-source-editor]')!, {
+      key: 's',
+      ctrlKey: true,
+    })
+    await vi.waitFor(() => expect(patched).toHaveLength(1))
+  })
+
+  it('keeps the draft when the save fails', async () => {
+    // The one outcome worse than an error is an error that also takes the
+    // user's unsaved rows with it. The draft survives so Save can be pressed
+    // again.
+    patchFails = true
+    openEditor()
+    await screen.findByText('收件人')
+    await addRow()
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(11))
+
+    fireEvent.click(button('保存'))
+    await vi.waitFor(() => expect(patched).toHaveLength(1))
+
+    expect(await screen.findByText(copy.dataSources.patchFailed)).toBeDefined()
+    expect(gridValues(2)).toHaveLength(11)
+    expect(button('保存').disabled).toBe(false)
+    expect(screen.getByText('有未保存的改动')).toBeDefined()
+  })
+
+  it('marks the tab dirty, which is what makes closing it ask first', async () => {
+    // Without this the tab closes silently and the draft goes with it — the
+    // editor is the only thing that knows the rows are unsaved.
+    function Probe(): React.JSX.Element {
+      const { tabs } = useWorkspace()
+      return <span data-probe>{String(tabs.find((tab) => tab.id === 'tab-1')?.isDirty)}</span>
+    }
+    render(
+      wrap(
+        <WorkspaceProvider>
+          <DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />
+          <Probe />
+        </WorkspaceProvider>,
+      ),
+    )
+    await screen.findByText('收件人')
+    expect(document.querySelector('[data-probe]')?.textContent).toBe('false')
+
+    await addRow()
     await vi.waitFor(() =>
-      expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(false),
+      expect(document.querySelector('[data-probe]')?.textContent).toBe('true'),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '撤销' }))
-    await vi.waitFor(() => expect(patched.length).toBe(2))
+    fireEvent.click(button('保存'))
     await vi.waitFor(() =>
-      expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(false),
+      expect(document.querySelector('[data-probe]')?.textContent).toBe('false'),
     )
-
-    fireEvent.click(screen.getByRole('button', { name: '重做' }))
-    await vi.waitFor(() => expect(patched.length).toBe(3))
-    const upserts = patched[2]?.upserts as Array<{ ordinal: number }>
-    expect(upserts.map((u) => u.ordinal)).toEqual([11])
-    expect(patched[2]?.deletes).toEqual([])
   })
 
   it('does not undo on a bare Z, which is a cell edit', async () => {
     openEditor()
     await screen.findByText('收件人')
-    fireEvent.click(screen.getByRole('button', { name: '加行' }))
-    await vi.waitFor(() => expect(patched.length).toBe(1))
+    await addRow()
+    await vi.waitFor(() => expect(gridValues(2)).toHaveLength(11))
 
     fireEvent.keyDown(document.querySelector('[data-data-source-editor]')!, { key: 'z' })
-    expect(patched).toHaveLength(1)
+    expect(gridValues(2)).toHaveLength(11)
   })
 
   it('does not offer a per-row delete button any more', async () => {
-    // Rows are removed by selecting them and pressing Delete, like a
-    // spreadsheet; a button per row was the form-shaped version of this page.
+    // Rows are removed from the right-click menu, like a spreadsheet; a
+    // button per row was the form-shaped version of this page.
     openEditor()
     await screen.findByText('收件人')
     expect(screen.queryByRole('button', { name: '删除此行' })).toBeNull()

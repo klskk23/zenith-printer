@@ -152,6 +152,29 @@ describe('unsaved marker', () => {
     expect(state.tabs[0]!.isDirty).toBe(false)
   })
 
+  it('returns the very same state when the flag is already right', () => {
+    // Identity, not equality. A page that reports its own dirtiness from an
+    // effect sees a fresh state object come back, re-runs the effect and
+    // reports again; that loop hangs the tab, and this is what breaks it.
+    let state = open(emptyWorkspace(), { kind: 'design', templateId: null })
+    const id = state.activeId!
+    expect(markDirty(state, id, false)).toBe(state)
+
+    state = markDirty(state, id, true)
+    expect(markDirty(state, id, true)).toBe(state)
+  })
+
+  it('leaves other tabs alone when one is marked', () => {
+    const next = ids()
+    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
+    state = open(state, { kind: 'design', templateId: null }, next)
+    const first = state.tabs[0]!.id
+
+    state = markDirty(state, first, true)
+    expect(state.tabs[0]!.isDirty).toBe(true)
+    expect(state.tabs[1]!.isDirty).toBe(false)
+  })
+
   it('reports whether anything is unsaved, which is what gates the leave prompt', () => {
     const next = ids()
     let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)

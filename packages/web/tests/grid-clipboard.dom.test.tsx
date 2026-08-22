@@ -2,14 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { useRef, useState } from 'react'
 import { DataSheetGrid, keyColumn, type DataSheetGridRef } from 'react-datasheet-grid'
-import {
-  emptyGridRow,
-  patchFromOperations,
-  stringColumn,
-  type GridOperation,
-  type GridRow,
-  type RowPatch,
-} from '../src/features/data-sources/grid-operations.ts'
+import { emptyGridRow, stringColumn, type GridRow } from '../src/features/data-sources/grid-operations.ts'
+import { diffRows } from '../src/features/data-sources/table-history.ts'
 import { giveElementsSize } from './support/layout.ts'
 import { activateCell, pasteTsv } from './support/grid.ts'
 import { renderMenuItem } from '../src/features/data-sources/grid-context-menu.tsx'
@@ -25,12 +19,18 @@ import { renderMenuItem } from '../src/features/data-sources/grid-context-menu.t
  */
 const COLUMNS = ['订单号', '收件人']
 
+const START: GridRow[] = [
+  { 订单号: 'A-001', 收件人: '张三' },
+  { 订单号: 'A-002', 收件人: '李四' },
+]
+
 let restoreSize: () => void
-let patches: RowPatch[]
+/** What the grid handed back, one entry per change. */
+let states: GridRow[][]
 
 beforeEach(() => {
   restoreSize = giveElementsSize()
-  patches = []
+  states = []
 })
 
 afterEach(() => {
@@ -40,10 +40,7 @@ afterEach(() => {
 
 /** The same props the editor passes, so this tests what actually ships. */
 function Harness(): React.JSX.Element {
-  const [rows, setRows] = useState<GridRow[]>([
-    { 订单号: 'A-001', 收件人: '张三' },
-    { 订单号: 'A-002', 收件人: '李四' },
-  ])
+  const [rows, setRows] = useState<GridRow[]>(START)
   const grid = useRef<DataSheetGridRef>(null)
   ;(globalThis as Record<string, unknown>).__grid = grid
 
@@ -51,9 +48,9 @@ function Harness(): React.JSX.Element {
     <DataSheetGrid<GridRow>
       ref={grid}
       value={rows}
-      onChange={(next: GridRow[], operations: GridOperation[]) => {
+      onChange={(next: GridRow[]) => {
         setRows(next)
-        patches.push(patchFromOperations(next, operations))
+        states.push(next)
       }}
       columns={COLUMNS.map((column) => ({
         ...keyColumn<GridRow, string>(column, stringColumn),
@@ -76,10 +73,10 @@ describe('pasting a block', () => {
 
     await pasteTsv('X-1\t王五\nX-2\t赵六')
 
-    expect(patches).toHaveLength(1)
-    expect(patches[0]?.upserts).toEqual([
-      { ordinal: 1, values: { 订单号: 'X-1', 收件人: '王五' } },
-      { ordinal: 2, values: { 订单号: 'X-2', 收件人: '赵六' } },
+    expect(states).toHaveLength(1)
+    expect(states[0]).toEqual([
+      { 订单号: 'X-1', 收件人: '王五' },
+      { 订单号: 'X-2', 收件人: '赵六' },
     ])
   })
 
@@ -92,8 +89,8 @@ describe('pasting a block', () => {
 
     await pasteTsv('X-1\t王五\nX-2\t赵六\nX-3\t孙七')
 
-    expect(patches[0]?.upserts.map((u) => u.ordinal)).toEqual([1, 2, 3])
-    expect(patches[0]?.upserts[2]?.values).toEqual({ 订单号: 'X-3', 收件人: '孙七' })
+    expect(states[0]).toHaveLength(3)
+    expect(states[0]?.[2]).toEqual({ 订单号: 'X-3', 收件人: '孙七' })
   })
 
   it('keeps a leading zero, as the importer does', async () => {
@@ -103,7 +100,7 @@ describe('pasting a block', () => {
 
     await pasteTsv('007\t张三')
 
-    expect(patches[0]?.upserts[0]?.values.订单号).toBe('007')
+    expect(states[0]?.[0]?.订单号).toBe('007')
   })
 
   it('keeps a value a spreadsheet would turn into a date', async () => {
@@ -112,7 +109,7 @@ describe('pasting a block', () => {
 
     await pasteTsv('2024-01-05\t张三')
 
-    expect(patches[0]?.upserts[0]?.values.订单号).toBe('2024-01-05')
+    expect(states[0]?.[0]?.订单号).toBe('2024-01-05')
   })
 
   it('does not invent a column for a block wider than the table', async () => {
@@ -123,9 +120,7 @@ describe('pasting a block', () => {
 
     await pasteTsv('A\tB\tC\tD')
 
-    expect(Object.keys(patches[0]?.upserts[0]?.values ?? {}).sort()).toEqual(
-      [...COLUMNS].sort(),
-    )
+    expect(Object.keys(states[0]?.[0] ?? {}).sort()).toEqual([...COLUMNS].sort())
   })
 
   it('pastes into the cell that is active, not always the first', async () => {
@@ -134,7 +129,10 @@ describe('pasting a block', () => {
 
     await pasteTsv('王五')
 
-    expect(patches[0]?.upserts).toEqual([{ ordinal: 2, values: { 订单号: 'A-002', 收件人: '王五' } }])
+    expect(states[0]).toEqual([
+      { 订单号: 'A-001', 收件人: '张三' },
+      { 订单号: 'A-002', 收件人: '王五' },
+    ])
   })
 
   it('does nothing when no cell is active', async () => {
@@ -143,7 +141,21 @@ describe('pasting a block', () => {
 
     await pasteTsv('X\tY')
 
-    expect(patches).toHaveLength(0)
+    expect(states).toHaveLength(0)
+  })
+
+  it('becomes one upsert per changed row once saved', async () => {
+    // The patch is no longer built from the grid's change description; it is
+    // the difference between the table on screen and the table on the server,
+    // computed when Save is pressed. This is that step, over a real paste.
+    render(<Harness />)
+    activateCell(grid() as never, 0, 0)
+
+    await pasteTsv('X-1\t王五')
+
+    const patch = diffRows(START, states[0] ?? [])
+    expect(patch.upserts).toEqual([{ ordinal: 1, values: { 订单号: 'X-1', 收件人: '王五' } }])
+    expect(patch.deletes).toEqual([])
   })
 })
 
@@ -151,10 +163,8 @@ describe('pasting a block', () => {
  * Deleting a row.
  *
  * The right-click menu is the only way to do it in this editor, which makes it
- * the one operation whose entire path — menu label, library action, our
- * translation to a patch — had no test at all. It is driven here by calling the
- * menu item's own action, because happy-dom does no layout and the menu is
- * positioned from pointer coordinates.
+ * the one operation whose whole path — menu label, library action, the patch
+ * that reaches the server — had no test at all.
  */
 describe('the right-click menu', () => {
   it('labels its items in the interface language, not the library default', () => {
@@ -171,25 +181,13 @@ describe('the right-click menu', () => {
     )
   })
 
-  it('turns a deleted row into a patch naming the ordinal it had', () => {
-    // The row that goes is named by the position it *held*, not the position
-    // the table ends up with: the server deletes by ordinal out of the current
-    // table and only then renumbers what is left. Deleting the first of two
-    // rows is therefore `deletes: [1]`, after which the survivor becomes row 1
-    // on its own — no upsert needed to move it.
-    const patch = patchFromOperations(
-      [{ 订单号: 'A-002', 收件人: '李四' }],
-      [{ type: 'DELETE', fromRowIndex: 0, toRowIndex: 1 }],
-    )
-    expect(patch.deletes).toEqual([1])
-    expect(patch.upserts).toEqual([])
-  })
-
-  it('names every ordinal when a block of rows is deleted at once', () => {
-    const patch = patchFromOperations(
-      [{ 订单号: 'A-001', 收件人: '张三' }],
-      [{ type: 'DELETE', fromRowIndex: 1, toRowIndex: 3 }],
-    )
-    expect(patch.deletes).toEqual([2, 3])
+  it('sends the survivors forward and drops the trailing ordinal', () => {
+    // Deleting the first of two rows leaves one row, so the patch rewrites
+    // row 1 with the survivor's values and removes row 2. Naming the deleted
+    // row's own ordinal instead would delete the wrong row, because the server
+    // renumbers what is left.
+    const patch = diffRows(START, [{ 订单号: 'A-002', 收件人: '李四' }])
+    expect(patch.upserts).toEqual([{ ordinal: 1, values: { 订单号: 'A-002', 收件人: '李四' } }])
+    expect(patch.deletes).toEqual([2])
   })
 })

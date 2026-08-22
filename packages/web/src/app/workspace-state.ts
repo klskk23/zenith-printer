@@ -124,7 +124,17 @@ export function setTabTemplate(
   }
 }
 
+/**
+ * Returns the state **unchanged** when the flag already has that value.
+ *
+ * Not an optimisation. A page that reports its own dirtiness from an effect
+ * sees the new state object come back, re-runs the effect, and reports again —
+ * a render loop that hangs the tab. Identity is the only thing that stops it.
+ */
 export function markDirty(state: WorkspaceState, id: string, isDirty: boolean): WorkspaceState {
+  if (!state.tabs.some((tab) => tab.id === id && tab.isDirty !== isDirty)) {
+    return state
+  }
   return {
     ...state,
     tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, isDirty } : tab)),

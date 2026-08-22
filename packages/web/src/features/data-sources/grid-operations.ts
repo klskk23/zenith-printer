@@ -1,85 +1,18 @@
 /**
- * Turning the grid's change description into a row patch.
+ * The grid's row shape, and the column type that keeps values intact.
  *
- * react-datasheet-grid hands back the whole new value plus a list of what
- * changed — `UPDATE`, `CREATE`, `DELETE`, each over a half-open range of row
- * indices. The server speaks in *ordinals*: positions in the table, 1-based.
- *
- * The two disagree in one place that matters. A `DELETE` names indices into the
- * table **as it was**, while `UPDATE` and `CREATE` name indices into the table
- * **as it now is**. Reading a delete against the new array takes the wrong rows
- * out — and taking the wrong row out of a label table is not visible until the
- * labels are printed.
+ * This file used to also translate the grid's per-change description — its
+ * `UPDATE` / `CREATE` / `DELETE` ranges — into a patch, because every edit went
+ * straight to the server. Now that edits are staged and sent on Save, the patch
+ * is a diff of two whole tables (`table-history.ts`), and the change
+ * description is not needed: the grid's new value is the whole answer.
  */
 import { createTextColumn } from 'react-datasheet-grid'
 import type { DataSourceRow } from './hooks.ts'
 
-export interface GridOperation {
-  type: 'UPDATE' | 'CREATE' | 'DELETE'
-  /** Inclusive. */
-  fromRowIndex: number
-  /** Exclusive, as the grid defines it. */
-  toRowIndex: number
-}
-
 export interface RowPatch {
   upserts: Array<{ ordinal: number; values: Record<string, string> }>
   deletes: number[]
-}
-
-/**
- * Every value as a string, and every column present.
- *
- * An absent key would leave the old value in place on the server, so clearing
- * a cell would silently do nothing. `undefined` reaches here from a row the
- * grid created before the user typed in it.
- */
-function stringValues(row: Record<string, unknown>): Record<string, string> {
-  const values: Record<string, string> = {}
-  for (const [column, value] of Object.entries(row)) {
-    values[column] = value === undefined || value === null ? '' : String(value)
-  }
-  return values
-}
-
-/**
- * Build the patch for one change.
- *
- * `rows` is the grid's new value. Deletes are resolved against the old
- * positions, which is what the grid reports and what the server needs.
- */
-export function patchFromOperations(
-  rows: ReadonlyArray<Record<string, unknown>>,
-  operations: readonly GridOperation[],
-): RowPatch {
-  const deletes: number[] = []
-  // Keyed by ordinal so overlapping ranges — a paste reports UPDATE and CREATE
-  // over adjacent rows — do not send the same row twice.
-  const upserts = new Map<number, Record<string, string>>()
-
-  for (const operation of operations) {
-    if (operation.type === 'DELETE') {
-      for (let index = operation.fromRowIndex; index < operation.toRowIndex; index += 1) {
-        deletes.push(index + 1)
-      }
-      continue
-    }
-
-    for (let index = operation.fromRowIndex; index < operation.toRowIndex; index += 1) {
-      const row = rows[index]
-      if (row === undefined) {
-        continue
-      }
-      upserts.set(index + 1, stringValues(row))
-    }
-  }
-
-  return {
-    upserts: [...upserts.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([ordinal, values]) => ({ ordinal, values })),
-    deletes: deletes.sort((a, b) => a - b),
-  }
 }
 
 /**

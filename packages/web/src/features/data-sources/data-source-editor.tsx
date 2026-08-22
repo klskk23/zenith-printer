@@ -9,8 +9,13 @@
  *
  * react-datasheet-grid owns the cursor and the clipboard instead: its cell
  * inputs are `tabIndex=-1` and it handles selection, copy and paste at the grid
- * level. What we keep is the seam — translating its change description into a
- * row patch (`grid-operations.ts`).
+ * level.
+ *
+ * **Edits are staged.** Typing changes a local draft; nothing reaches the
+ * server until Save. Every keystroke used to be a PATCH, which meant a
+ * mis-paste was already the stored table by the time it was noticed, and undo
+ * was a second round-trip trying to put it back. Staging makes Cancel free and
+ * makes Save one patch instead of dozens.
  *
  * **No paging.** Every row is loaded and the rendering is virtualised. Paging
  * is what made copying a block across a page boundary impossible, and a
@@ -26,6 +31,7 @@ import { DataSheetGrid, keyColumn, type DataSheetGridRef } from 'react-datasheet
 import 'react-datasheet-grid/dist/style.css'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
+import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { AddRowsBar } from './add-rows.tsx'
 import { GridContextMenu } from './grid-context-menu.tsx'
 import {
@@ -39,26 +45,28 @@ import {
 import { copy } from '../../i18n/index.ts'
 import {
   emptyGridRow,
-  patchFromOperations,
   stringColumn,
   toGridRows,
-  type GridOperation,
   type GridRow,
 } from './grid-operations.ts'
 import { MAX_ROWS, useDataSourceRows, useDataSources, usePatchRows } from './hooks.ts'
+import { useWorkspace } from '../../app/workspace.tsx'
 
 /** Room for the surrounding chrome; the grid takes the rest of the window. */
 const CHROME_PX = 220
 
 export interface DataSourceEditorProps {
   dataSourceId: string
+  /** Lets the tab show a dot and ask before closing over unsaved rows. */
+  tabId: string
 }
 
-export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React.JSX.Element {
+export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps): React.JSX.Element {
   const sources = useDataSources()
   // The whole table in one request. See the note at the top about paging.
   const rows = useDataSourceRows(dataSourceId, 1, MAX_ROWS)
   const patch = usePatchRows()
+  const workspace = useWorkspace()
   const grid = useRef<DataSheetGridRef>(null)
 
   const [height, setHeight] = useState(480)
@@ -85,31 +93,37 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
     [columnNames],
   )
 
-  const value = useMemo(
+  /** What the server holds. The draft is measured against this. */
+  const saved = useMemo(
     () => toGridRows(rows.data?.rows ?? [], columnNames),
     [rows.data?.rows, columnNames],
   )
 
   /**
-   * Undo and redo.
+   * The staged table.
    *
-   * The stack holds whole tables rather than inverse operations. Going back
-   * then means diffing the table we want against the one there is and sending
-   * that — the same shape as any other edit, and it cannot drift from the thing
-   * it describes the way a hand-written inverse can.
+   * `null` means "no unsaved edits", which is a different thing from "a draft
+   * that happens to equal what is saved": after Save the draft is dropped so
+   * that a later refresh from the server is actually shown, rather than being
+   * masked by a stale copy of the same rows.
+   */
+  const [draft, setDraft] = useState<GridRow[] | null>(null)
+  const value = draft ?? saved
+  const dirty = draft !== null
+
+  /**
+   * Undo and redo, over the draft alone.
    *
-   * `value` is what the server currently holds; the stack records what it held
-   * before each edit.
+   * The stack holds whole tables rather than inverse operations — an inverse
+   * for "delete a row" has to know that the server renumbers, and one that is
+   * subtly wrong writes one row's values over another's. A snapshot cannot
+   * drift from the thing it describes.
    */
   const [history, setHistory] = useState<History<GridRow[]>>(emptyHistory)
 
-  const onChange = (next: GridRow[], operations: GridOperation[]): void => {
-    const changes = patchFromOperations(next, operations)
-    if (changes.upserts.length === 0 && changes.deletes.length === 0) {
-      return
-    }
+  const onChange = (next: GridRow[]): void => {
     setHistory((current) => pushHistory(current, value))
-    patch.mutate({ id: dataSourceId, ...changes })
+    setDraft(next)
   }
 
   const step = (direction: 'undo' | 'redo'): void => {
@@ -117,12 +131,49 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
     if (taken.state === null) {
       return
     }
-    const changes = diffRows(value, taken.state)
     setHistory(taken.history)
-    if (changes.upserts.length > 0 || changes.deletes.length > 0) {
-      patch.mutate({ id: dataSourceId, ...changes })
-    }
+    setDraft(taken.state)
   }
+
+  const save = (): void => {
+    if (draft === null) {
+      return
+    }
+    const changes = diffRows(saved, draft)
+    if (changes.upserts.length === 0 && changes.deletes.length === 0) {
+      // Edited back to where it started. Nothing to send, but the draft still
+      // has to go, or the tab stays marked as having unsaved work.
+      setDraft(null)
+      setHistory(emptyHistory)
+      return
+    }
+    patch.mutate(
+      { id: dataSourceId, ...changes },
+      {
+        // Only on success: a draft dropped after a failed save would take the
+        // user's rows with it, which is the one outcome worse than the error.
+        onSuccess: () => {
+          setDraft(null)
+          setHistory(emptyHistory)
+        },
+      },
+    )
+  }
+
+  const discard = (): void => {
+    setDraft(null)
+    setHistory(emptyHistory)
+  }
+
+  // The tab shows the dot and asks before closing; the browser asks before a
+  // reload. Neither knows about this draft unless it is told.
+  //
+  // Depends on `setDirty`, which is stable, rather than on the workspace object,
+  // whose identity changes with every state change — including this one.
+  const setDirty = workspace.setDirty
+  useEffect(() => {
+    setDirty(tabId, dirty)
+  }, [tabId, dirty, setDirty])
 
   /**
    * Bound on the container rather than on the document.
@@ -131,11 +182,21 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
    * and the two histories are not the same history.
    */
   const onKeyDown = (event: React.KeyboardEvent): void => {
-    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') {
+    if (!(event.ctrlKey || event.metaKey)) {
       return
     }
-    event.preventDefault()
-    step(event.shiftKey ? 'redo' : 'undo')
+    const key = event.key.toLowerCase()
+    if (key === 'z') {
+      event.preventDefault()
+      step(event.shiftKey ? 'redo' : 'undo')
+      return
+    }
+    if (key === 's') {
+      // Otherwise the browser offers to save the page, which is nobody's
+      // intention in a table editor.
+      event.preventDefault()
+      save()
+    }
   }
 
   if (source === undefined) {
@@ -151,8 +212,16 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
       // keydown, and the grid's own focus traps are the only focusable things.
       tabIndex={-1}
     >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{source.name}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-sm font-semibold">{source.name}</h2>
+          {dirty && (
+            <span className="text-xs text-muted-foreground" data-unsaved>
+              {copy.dataSources.unsaved}
+            </span>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
           {/* Buttons as well as the shortcut: an editor whose only undo is a
               key combination has no undo for anyone who does not know it. */}
@@ -174,8 +243,32 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
           >
             {copy.dataSources.redo}
           </Button>
+
+          {/* Discarding cannot be undone — the draft is the only copy — so it
+              asks first, and only while there is something to lose. */}
+          <ConfirmButton
+            variant="outline"
+            size="sm"
+            disabled={!dirty || patch.isPending}
+            title={copy.common.confirmTitle}
+            description={copy.dataSources.discardConfirm}
+            cancelLabel={copy.common.cancel}
+            confirmLabel={copy.dataSources.discard}
+            onConfirm={discard}
+          >
+            {copy.dataSources.discard}
+          </ConfirmButton>
+          <Button
+            size="sm"
+            disabled={!dirty || patch.isPending}
+            title={copy.dataSources.saveTitle}
+            onClick={save}
+          >
+            {patch.isPending ? copy.dataSources.saving : copy.common.save}
+          </Button>
+
           <span className="text-xs text-muted-foreground">
-            {copy.dataSources.rowCount(rows.data?.total ?? source.rowCount)}
+            {copy.dataSources.rowCount(value.length)}
           </span>
         </div>
       </div>

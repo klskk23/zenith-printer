@@ -48,7 +48,7 @@ function TabContent({ tab }: { tab: WorkspaceTab }): React.JSX.Element {
     case 'data-sources':
       return <DataSourcesPageTab />
     case 'data-source':
-      return <DataSourceEditor dataSourceId={tab.dataSourceId ?? ''} />
+      return <DataSourceEditor dataSourceId={tab.dataSourceId ?? ''} tabId={tab.id} />
     case 'printers':
       return <PrintersPage />
     case 'queue':
