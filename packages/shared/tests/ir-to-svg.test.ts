@@ -148,6 +148,18 @@ describe('content is drawn verbatim', () => {
 })
 
 describe('text', () => {
+  it('tells the renderer to keep the spaces it was given', () => {
+    // SVG collapses runs of whitespace by default and strips them from the
+    // ends, so `A  B` drew as `A B`. Every line is already its own
+    // absolutely-positioned tspan, so preserving costs nothing: there is no
+    // indentation in the markup for it to make visible.
+    const svg = irToSvg(
+      ir([{ id: 't', type: 'text', xMm: 2, yMm: 2, widthMm: 40, heightMm: 5, content: 'A  B', fontFamily: 'F', fontSizeMm: 3 }]),
+    )
+    expect(svg).toContain('xml:space="preserve"')
+    expect(svg).toContain('A  B')
+  })
+
   it('escapes markup in content', () => {
     const svg = irToSvg(
       ir([{ id: 't', type: 'text', xMm: 2, yMm: 2, widthMm: 40, heightMm: 5, content: '<&">', fontFamily: 'F', fontSizeMm: 3 }]),

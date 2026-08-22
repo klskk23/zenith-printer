@@ -168,6 +168,14 @@ function renderText(element: TextElement, grid: LayoutGrid): string {
   // editor draws and the glyphs resvg renders in the same place.
   return [
     `<text`,
+    // SVG's default is `xml:space="default"`, which collapses runs of
+    // whitespace and strips them from the ends. Two spaces between words came
+    // out as one and a space-indented line lost its indent — on the canvas and
+    // on the label alike, since both are this renderer. Nothing else here
+    // depends on the collapsing: every line is already split out into its own
+    // absolutely-positioned tspan, so there are no stray newlines or indents
+    // from the markup itself for `preserve` to make visible.
+    ` xml:space="preserve"`,
     ` font-family="${escapeXml(element.fontFamily)}"`,
     ` font-size="${num(fontSizeDots)}"`,
     ` font-weight="${element.bold ? 'bold' : 'normal'}"`,
