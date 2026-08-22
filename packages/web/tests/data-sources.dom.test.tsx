@@ -328,6 +328,21 @@ describe('the table editor', () => {
     expect(button('重做').disabled).toBe(true)
   })
 
+  it('draws undo and redo the way the designer does', async () => {
+    // Same action, two pages: a text button here and an icon button there
+    // reads as two different features. The accessible name has to survive the
+    // change to an icon, or the shortcut becomes the only way in.
+    openEditor()
+    await screen.findByText('收件人')
+
+    for (const name of ['撤销', '重做']) {
+      const control = button(name)
+      expect(control.querySelector('svg')).not.toBeNull()
+      expect(control.textContent).toBe('')
+      expect(control.getAttribute('title')).not.toBe(null)
+    }
+  })
+
   it('undoes an edit without a round-trip', async () => {
     // Undo used to be a second PATCH trying to put the server back. Over a
     // draft it is local, so it costs nothing and cannot half-apply.

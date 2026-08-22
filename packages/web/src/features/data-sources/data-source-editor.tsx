@@ -26,12 +26,14 @@
  * that mention it. Changing the column set means uploading a replacement,
  * where the consequences can be shown.
  */
+import { Redo2, Undo2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DataSheetGrid, keyColumn, type DataSheetGridRef } from 'react-datasheet-grid'
 import 'react-datasheet-grid/dist/style.css'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
+import { Separator } from '../../components/ui/separator.tsx'
 import { AddRowsBar } from './add-rows.tsx'
 import { GridContextMenu } from './grid-context-menu.tsx'
 import {
@@ -223,26 +225,35 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Buttons as well as the shortcut: an editor whose only undo is a
-              key combination has no undo for anyone who does not know it. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={!history.canUndo}
-            title={copy.dataSources.undoTitle}
-            onClick={() => step('undo')}
-          >
-            {copy.dataSources.undo}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={!history.canRedo}
-            title={copy.dataSources.redoTitle}
-            onClick={() => step('redo')}
-          >
-            {copy.dataSources.redo}
-          </Button>
+          {/* Icon buttons, the same shape as the designer's: the two pages
+              have the same undo and it should not look like two different
+              features. Buttons as well as the shortcut — an editor whose only
+              undo is a key combination has no undo for anyone who does not
+              know it. */}
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="outline"
+              disabled={!history.canUndo}
+              aria-label={copy.dataSources.undo}
+              title={copy.dataSources.undoTitle}
+              onClick={() => step('undo')}
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              disabled={!history.canRedo}
+              aria-label={copy.dataSources.redo}
+              title={copy.dataSources.redoTitle}
+              onClick={() => step('redo')}
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <Separator orientation="vertical" className="h-9" />
 
           {/* Discarding cannot be undone — the draft is the only copy — so it
               asks first, and only while there is something to lose. */}
