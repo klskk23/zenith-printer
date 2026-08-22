@@ -11,7 +11,6 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { maxLabelWidthMm } from '../domain/printer.ts'
 import { TemplateConflictError, templateInputSchema } from '../domain/template.ts'
 import { profileInputSchema } from '../domain/profile.ts'
-import { SequenceAllocator } from '../domain/sequence-allocator.ts'
 import { TemplateRepo } from '../db/repositories/template-repo.ts'
 import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { PrinterRepo } from '../db/repositories/printer-repo.ts'
@@ -98,23 +97,10 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
     return reply.status(HttpStatus.NoContent).send()
   })
 
-  /** What the client must collect before submitting a job (FR-038, FR-048). */
-  typed.get('/api/templates/:id/print-form', { schema: { params: idParams } }, async (request) => {
-    const template = templates().find(request.params.id)
-    if (template === undefined) {
-      throw ApiError.notFound({ templateId: request.params.id })
-    }
-
-    const allocator = new SequenceAllocator(app.ctx.db)
-    return {
-      templateId: template.id,
-      fields: template.variableFields.map((field) =>
-        field.source === 'manual'
-          ? { name: field.name, label: field.label, source: 'manual', sampleValue: field.sampleValue }
-          : { name: field.name, label: field.label, source: 'sequence', ...allocator.suggest(template.id, field) },
-      ),
-    }
-  })
+  // The print-form endpoint is gone with the variable-field mechanism. Its job
+  // was to say which values the operator had to type before printing, and
+  // nothing is typed any more: constants are fixed in the design, sequences
+  // come from a pool, and column values come from the selected rows.
 
   typed.get('/api/printers/:printerId/profiles', { schema: { params: printerParams } }, async (request) => ({
     profiles: profiles().listFor(request.params.printerId),

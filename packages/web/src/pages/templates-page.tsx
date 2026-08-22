@@ -52,7 +52,7 @@ export function TemplatesPage(): React.JSX.Element {
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="text-[11px] text-muted-foreground">
-                {copy.templates.fieldCount(template.variableFields.length)}
+                {copy.templates.fieldCount(template.variables.length)}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <Button size="sm" onClick={() => open({ kind: 'design', templateId: template.id })}>

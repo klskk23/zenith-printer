@@ -1,47 +1,53 @@
 /**
  * Standing content for a design that is still being written.
  *
- * The renderer refuses to draw a `$var` it has no value for, and rightly:
- * printing a label with a hole where a part number belongs is worse than
- * refusing to print. The editor is where those bindings are made, though, so
- * it needs an answer for every one of them — including the ones that have no
- * good answer, such as a binding left behind by a field that was deleted.
+ * The print path refuses to draw a reference it has no value for, and rightly:
+ * a label reading "${sku}" is waste that looks like output. The editor is where
+ * those references get written, though, so it has to have an answer for every
+ * one of them — including the ones with no good answer, such as a reference to
+ * a variable somebody just deleted.
  *
  * So this never throws. A design mid-edit is full of states that are not
- * printable yet, and the editor has to survive all of them; the guards say
- * what is wrong, and the print path refuses on its own terms.
+ * printable yet, and the editor has to survive all of them; the guards say what
+ * is wrong, and the print path refuses on its own terms.
  */
-import { isVariableRef, resolveVariables, sampleValues, type LabelIR } from '@zenith/shared'
-import type { VariableField } from '../features/templates/hooks.ts'
+import { evaluateIr, type LabelIR, type VariableDefinition } from '@zenith/shared'
 
-/** What a binding shows when nothing describes it. */
-const UNKNOWN = ''
-
-/** Every variable the design mentions, whether or not a field defines it. */
-function referencedNames(ir: LabelIR): string[] {
-  const names = new Set<string>()
-  for (const element of ir.elements) {
-    if ('content' in element && isVariableRef(element.content)) {
-      names.add(element.content.$var)
-    }
-  }
-  return [...names]
+export interface PreviewResult {
+  ir: LabelIR
+  /** Closed references with nothing behind them. Reported, never thrown. */
+  unresolved: string[]
 }
 
 /**
- * The design as it should be drawn, with bindings filled in.
+ * Values the design itself supplies.
  *
- * A copy — the stored IR keeps its bindings, so an edit made while looking at
- * a sample writes back the binding rather than the sample.
+ * A sequence variable shows the number the next label would carry — padded,
+ * because the padded form is what the label will be laid out around. `nextValue`
+ * is unknown until the pool is loaded, so it falls back to the first number.
  */
-export function previewIr(ir: LabelIR, fields: readonly VariableField[]): LabelIR {
-  const values = sampleValues(fields)
-
-  // A binding whose field was deleted still has to draw as something. Leaving
-  // it out would throw, and throwing here blanks the editor.
-  for (const name of referencedNames(ir)) {
-    values[name] ??= UNKNOWN
+export function designValues(
+  variables: readonly VariableDefinition[],
+  poolNext: Readonly<Record<string, { value: number; digits: number }>> = {},
+): Record<string, string> {
+  const values: Record<string, string> = {}
+  for (const variable of variables) {
+    if (variable.kind === 'constant') {
+      values[variable.name] = variable.value
+      continue
+    }
+    const next = poolNext[variable.poolId]
+    values[variable.name] = next === undefined ? '1' : String(next.value).padStart(next.digits, '0')
   }
+  return values
+}
 
-  return resolveVariables(ir, values)
+/**
+ * The design as it should be drawn, with references substituted.
+ *
+ * A copy: the stored IR keeps its references, so an edit made while looking at
+ * a substituted value writes back the reference rather than the value.
+ */
+export function previewIr(ir: LabelIR, values: Readonly<Record<string, string>>): PreviewResult {
+  return evaluateIr(ir, values)
 }

@@ -244,29 +244,23 @@ export const copy = {
     needsProbe: '这台打印机尚未探测，无法确定可打印范围',
   },
 
-  fields: {
-    heading: '可变字段',
-    empty: '还没有可变字段。加一个之后，同一个模板就能覆盖内容不同的一批标签',
-    duplicateName: '字段名重复，绑定到它的元素将无法区分',
-    addManual: '手工填入',
-    addSequence: '递增序号',
-    manual: '手工填入（本次打印全部份数共用一个值）',
-    sequence: '递增序号（逐份递增，每份不同）',
-    bindTo: '绑定到选中元素',
-    unbound: '不绑定（固定内容）',
-    notBindable: '只有文字、条码、二维码可以绑定可变字段',
+  variables: {
+    heading: '变量',
+    empty: '还没有变量。定义之后，在文字、条码或二维码的内容里写 ${名称} 引用它',
+    name: '变量名',
+    value: '固定值',
+    pool: '序号池',
     remove: '删除',
-    name: '字段名',
-    label: '显示名',
-    sampleValue: '示例值',
-    sampleHint: '仅用于编辑器预览版式，不会被打印',
-    seqStart: '起始值',
-    seqDigits: '位数',
-    seqStep: '步长',
-    seqPreview: (start: number, digits: number, step: number): string => {
-      const at = (i: number): string => String(start + i * step).padStart(digits, '0')
-      return `依次为 ${at(0)}、${at(1)}、${at(2)}…；位数决定补零，${digits} 位最大到 ${'9'.repeat(digits)}`
-    },
+    addConstant: '加常量',
+    addSequence: '加自增',
+    newPool: '新建序号池',
+    referenceHint: (name: string): string => `在内容里写 \${${name}} 引用它`,
+    poolOption: (name: string, next: number, digits: number): string =>
+      `${name}（下一个 ${String(next).padStart(digits, '0')}）`,
+    collides: (name: string): string =>
+      `「${name}」与所绑数据源的一列同名。同一个名称指向两处取值，无法判定用哪一个——请给其中一个改名`,
+    unresolved: (names: string): string =>
+      `内容里引用了未定义的名称：${names}。在此定义它，或改用数据源的列名`,
   },
 
   templates: {

@@ -17,7 +17,7 @@
  * What the software owes them is knowing about it beforehand, in full.
  */
 import {
-  isVariableRef,
+  evaluate,
   renderBarcodeSvg,
   rotatedBounds,
   type LabelElement,
@@ -35,16 +35,13 @@ export interface OverflowWarning {
   availableWidthMm: number
 }
 
-function literal(content: string | { $var: string }, values: Record<string, string>): string {
-  return isVariableRef(content) ? (values[content.$var] ?? '') : content
-}
 
 /** Width a barcode will actually occupy once its content is known. */
 function barcodeWidthMm(element: LabelElement, values: Record<string, string>, dpi: number): number | null {
   if (element.type !== 'barcode') {
     return null
   }
-  const content = literal(element.content, values)
+  const content = evaluate(element.content, values).text
   if (content.length === 0) {
     return null
   }

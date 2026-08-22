@@ -48,13 +48,16 @@ async function seedFailedJob(pagesPrinted: number | null): Promise<string> {
     profile: { name: 'stock', density: 3, labelType: 1 },
     offsetXDots: 0,
     offsetYDots: 0,
+    rows: [],
+    copiesPerRow: 1,
+    constants: {},
   })
 
   app.ctx.db
     .prepare(
       `INSERT INTO print_jobs (id, idempotency_key, printer_id, requested_copies, pages_printed,
-         status, failure_code, snapshot, manual_field_values, seq_ranges, created_at)
-       VALUES ('job-1','key-1','prn-1',100,?, 'failed','JOB_INTERRUPTED_BY_RESTART',?,'{}','{}','2026-08-21T00:00:00Z')`,
+         status, failure_code, snapshot, created_at)
+       VALUES ('job-1','key-1','prn-1',100,?, 'failed','JOB_INTERRUPTED_BY_RESTART',?,'2026-08-21T00:00:00Z')`,
     )
     .run(pagesPrinted, snapshot)
 

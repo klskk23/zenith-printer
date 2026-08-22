@@ -16,7 +16,7 @@
 import {
   MIN_MODULE_WIDTH_DOTS,
   dotsToMm,
-  isVariableRef,
+  evaluate,
   mmToDots,
   renderBarcodeSvg,
   renderQrcodeSvg,
@@ -89,8 +89,18 @@ const SAMPLE_CONTENT = 'SAMPLE'
  * that separately, and resizing the box to nothing on a typo would be a second
  * complaint about the same thing.
  */
-export function moduleCountOf(element: BarcodeElement | QrcodeElement): number | null {
-  const content = isVariableRef(element.content) ? SAMPLE_CONTENT : element.content
+export function moduleCountOf(
+  element: BarcodeElement | QrcodeElement,
+  /** Values for `${}` references, so the count reflects what will be encoded. */
+  values: Readonly<Record<string, string>> = {},
+): number | null {
+  // A reference with no value yet is measured against a stand-in rather than
+  // against the empty string: an unwritten variable should leave a box the
+  // right sort of size, not collapse it to nothing.
+  const evaluated = evaluate(element.content, values)
+  const content = evaluated.unresolved.length > 0 || evaluated.text.length === 0
+    ? SAMPLE_CONTENT
+    : evaluated.text
   try {
     if (element.type === 'qrcode') {
       return renderQrcodeSvg({

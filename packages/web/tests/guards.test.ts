@@ -114,7 +114,7 @@ describe('barcode content', () => {
   it('does not judge an unresolved variable reference', () => {
     // The value arrives at print time; emptiness cannot be decided here.
     const ir = label([
-      { id: 'b', type: 'barcode', xMm: 1, yMm: 1, widthMm: 20, heightMm: 10, content: { $var: 'serial' }, symbology: 'code128' },
+      { id: 'b', type: 'barcode', xMm: 1, yMm: 1, widthMm: 20, heightMm: 10, content: '${serial}', symbology: 'code128' },
     ])
     expect(inspect(ir, LIMITS)).toHaveLength(0)
   })

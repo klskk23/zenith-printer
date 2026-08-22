@@ -12,7 +12,7 @@ import { copy } from '../i18n/index.ts'
 import { cn } from '../lib/utils.ts'
 import { Button } from '../components/ui/button.tsx'
 import { ScrollArea } from '../components/ui/scroll-area.tsx'
-import { isVariableRef, type LabelElement, type LabelIR } from '@zenith/shared'
+import type { LabelElement, LabelIR } from '@zenith/shared'
 import { bringToFront, isBackmost, isFrontmost, layersTopFirst, sendToBack } from './layers.ts'
 
 /** One line of identifying text, so two barcodes are not both just "barcode". */
@@ -21,7 +21,7 @@ function describe(element: LabelElement): string {
   if (!('content' in element)) {
     return type
   }
-  const content = isVariableRef(element.content) ? `{${element.content.$var}}` : element.content
+  const content = element.content
   const firstLine = content.split('\n')[0] ?? ''
   return firstLine.length === 0 ? type : `${type} · ${firstLine.slice(0, 16)}`
 }

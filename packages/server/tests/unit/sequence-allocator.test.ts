@@ -1,242 +1,257 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { openDatabase, type Database } from '../../src/db/index.ts'
-import { SequenceAllocator, SequenceOverflowError } from '../../src/domain/sequence-allocator.ts'
-import { overlaps, rangeFor, valueAt, type VariableField } from '../../src/domain/variable-field.ts'
+import { describe, expect, it } from 'vitest'
+import { openDatabase } from '../../src/db/index.ts'
+import { SequenceAllocator, UnknownSequencePoolError } from '../../src/domain/sequence-allocator.ts'
+import { SequenceOverflowError } from '../../src/domain/sequence-pool.ts'
+import { SequencePoolRepo } from '../../src/db/repositories/sequence-pool-repo.ts'
+import type { Clock, IdGenerator } from '../../src/clock.ts'
 
-let db: Database
-let allocator: SequenceAllocator
+/**
+ * Sequence claims.
+ *
+ * One asymmetry drives everything here: a skipped serial is a gap in a ledger,
+ * a repeated serial is two boxes nobody can tell apart. The tests that matter
+ * most are the ones that would catch a repeat.
+ */
+const clock: Clock = { now: () => new Date('2026-08-22T00:00:00Z') }
 
-const serial: VariableField = {
-  name: 'serial',
-  label: 'Serial',
-  source: 'sequence',
-  seqStart: 1,
-  seqDigits: 3,
-  seqStep: 1,
+function harness() {
+  const db = openDatabase({ location: ':memory:' })
+  let n = 0
+  const ids: IdGenerator = { next: () => `id-${(n += 1)}` }
+  const pools = new SequencePoolRepo({ db, clock, ids })
+  const allocator = new SequenceAllocator(db, clock, ids)
+
+  let jobSeq = 0
+  const seedJob = (): string => {
+    jobSeq += 1
+    const id = `job-${jobSeq}`
+    db.prepare(
+      `INSERT INTO print_jobs (id, idempotency_key, requested_copies, status, snapshot, created_at)
+       VALUES (?, ?, 1, 'queued', '{}', '2026-08-22T00:00:00Z')`,
+    ).run(id, `key-${jobSeq}`)
+    return id
+  }
+
+  return { db, pools, allocator, seedJob }
 }
 
-function seedTemplate(id = 't1'): string {
-  db.prepare(
-    `INSERT INTO templates (id, name, printer_kind, width_mm, height_mm, dpi, elements, created_at, updated_at)
-     VALUES (?, 'label', 'niimbot', 50, 30, 203, '[]', '2026-08-21T00:00:00Z', '2026-08-21T00:00:00Z')`,
-  ).run(id)
-  return id
-}
-
-function seedJob(id: string, templateId: string, status = 'queued'): string {
-  db.prepare(
-    `INSERT INTO print_jobs (id, idempotency_key, template_id, requested_copies, status, snapshot, created_at)
-     VALUES (?, ?, ?, 1, ?, '{}', '2026-08-21T00:00:00Z')`,
-  ).run(id, `key-${id}`, templateId, status)
-  return id
-}
-
-beforeEach(() => {
-  db = openDatabase({ location: ':memory:' })
-  allocator = new SequenceAllocator(db)
-})
-
-describe('suggestion', () => {
-  it('starts from the configured value when nothing has been printed', () => {
-    const templateId = seedTemplate()
-    expect(allocator.suggest(templateId, serial).suggestedStart).toBe(1)
-  })
-
-  it('continues from the highest number already issued', () => {
-    // FR-048: the user should not have to remember where they left off.
-    const templateId = seedTemplate()
-    const jobId = seedJob('j1', templateId, 'completed')
-    allocator.allocate({ jobId, templateId, fields: [serial], copies: 37 })
-
-    expect(allocator.suggest(templateId, serial).suggestedStart).toBe(38)
-  })
-
-  it('counts numbers from failed jobs too', () => {
-    // A failed job still put labels on the table before it stopped, so its
-    // numbers are spent. Reusing them would be the harmful direction.
-    const templateId = seedTemplate()
-    const jobId = seedJob('j1', templateId, 'failed')
-    allocator.allocate({ jobId, templateId, fields: [serial], copies: 10 })
-
-    expect(allocator.suggest(templateId, serial).suggestedStart).toBe(11)
-  })
-
-  it('reports the limits alongside the suggestion', () => {
-    const templateId = seedTemplate()
-    expect(allocator.suggest(templateId, serial)).toMatchObject({
-      seqDigits: 3,
-      seqStep: 1,
-      maxRepresentable: 999,
+describe('claiming', () => {
+  it('starts at one when the pool has never issued a number', () => {
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 4, step: 1 })
+    const claims = h.allocator.allocate({
+      jobId: h.seedJob(),
+      bindings: [{ variableName: 'serial', poolId: pool.id }],
+      count: 5,
     })
-  })
-})
-
-describe('allocation', () => {
-  it('claims a contiguous span for the whole batch', () => {
-    const templateId = seedTemplate()
-    const jobId = seedJob('j1', templateId)
-    const ranges = allocator.allocate({ jobId, templateId, fields: [serial], copies: 80 })
-
-    expect(ranges.serial).toEqual({ start: 1, end: 80, step: 1, digits: 3 })
+    expect(claims).toEqual([
+      { poolId: pool.id, variableName: 'serial', start: 1, end: 5, step: 1, digits: 4 },
+    ])
   })
 
-  it('persists the claim at enqueue time, not at print time', () => {
-    // FR-049: two jobs submitted a second apart would otherwise both read the
-    // same high-water mark and both start from it.
-    const templateId = seedTemplate()
-    const jobId = seedJob('j1', templateId)
-    allocator.allocate({ jobId, templateId, fields: [serial], copies: 5 })
+  it('continues where the previous batch stopped', () => {
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 4, step: 1 })
+    const bindings = [{ variableName: 'serial', poolId: pool.id }]
 
-    const stored = db.prepare('SELECT seq_ranges FROM print_jobs WHERE id = ?').get(jobId)
-    expect(JSON.parse(String(stored?.seq_ranges)).serial).toEqual({ start: 1, end: 5, step: 1, digits: 3 })
+    h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 5 })
+    const second = h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 5 })
+
+    expect(second[0]).toMatchObject({ start: 6, end: 10 })
   })
 
-  it('gives consecutive jobs non-overlapping spans', () => {
-    const templateId = seedTemplate()
-    const first = allocator.allocate({
-      jobId: seedJob('j1', templateId),
-      templateId,
-      fields: [serial],
-      copies: 10,
+  it('issues no number twice across ten consecutive batches', () => {
+    // SC-004. Ten batches rather than two: an off-by-one in the continuation
+    // shows up as an overlap of exactly one number, which two batches can hide.
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 6, step: 1 })
+    const bindings = [{ variableName: 'serial', poolId: pool.id }]
+
+    const issued: number[] = []
+    for (let batch = 0; batch < 10; batch += 1) {
+      const [claim] = h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 5 })
+      if (claim === undefined) throw new Error('no claim')
+      for (let i = claim.start; i <= claim.end; i += claim.step) {
+        issued.push(i)
+      }
+    }
+
+    expect(issued).toHaveLength(50)
+    expect(new Set(issued).size).toBe(50)
+    // No gaps either: 1..50 exactly.
+    expect(issued).toEqual(Array.from({ length: 50 }, (_unused, i) => i + 1))
+  })
+
+  it('draws two designs from one run of numbers', () => {
+    // FR-005. A small-box label and a carton label sharing one serial run is
+    // the reason pools exist as standalone objects. The old derivation narrowed
+    // by template id, which made this silently issue each number twice.
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 6, step: 1 })
+
+    const boxes = h.allocator.allocate({
+      jobId: h.seedJob(),
+      bindings: [{ variableName: '流水', poolId: pool.id }],
+      count: 3,
     })
-    const second = allocator.allocate({
-      jobId: seedJob('j2', templateId),
-      templateId,
-      fields: [serial],
-      copies: 10,
+    const cartons = h.allocator.allocate({
+      jobId: h.seedJob(),
+      bindings: [{ variableName: 'serial', poolId: pool.id }],
+      count: 3,
     })
 
-    expect(first.serial).toBeDefined()
-    expect(second.serial).toBeDefined()
-    expect(overlaps(first.serial!, second.serial!)).toBe(false)
-    expect(second.serial!.start).toBe(11)
+    expect(boxes[0]).toMatchObject({ start: 1, end: 3 })
+    expect(cartons[0]).toMatchObject({ start: 4, end: 6 })
   })
 
   it('honours a step larger than one', () => {
-    const templateId = seedTemplate()
-    const stepped = { ...serial, seqStep: 5 }
-    const ranges = allocator.allocate({
-      jobId: seedJob('j1', templateId),
-      templateId,
-      fields: [stepped],
-      copies: 4,
+    const h = harness()
+    const pool = h.pools.create({ name: '偶数', digits: 4, step: 2 })
+    const claims = h.allocator.allocate({
+      jobId: h.seedJob(),
+      bindings: [{ variableName: 's', poolId: pool.id }],
+      count: 3,
     })
-    expect(ranges.serial).toEqual({ start: 1, end: 16, step: 5, digits: 3 })
+    expect(claims[0]).toMatchObject({ start: 1, end: 5, step: 2 })
   })
 
-  it('returns nothing when the template has no sequence field', () => {
-    const templateId = seedTemplate()
-    const manual: VariableField = { name: 'partNo', label: 'Part', source: 'manual', sampleValue: 'ABC' }
-    expect(allocator.allocate({ jobId: seedJob('j1', templateId), templateId, fields: [manual], copies: 5 })).toEqual({})
-  })
-})
-
-describe('user overrides', () => {
-  it('starts from the value the user chose', () => {
-    // Reprinting a spoiled batch with its original numbers is legitimate.
-    const templateId = seedTemplate()
-    const ranges = allocator.allocate({
-      jobId: seedJob('j1', templateId),
-      templateId,
-      fields: [serial],
-      copies: 5,
-      overrides: { serial: 500 },
-    })
-    expect(ranges.serial).toEqual({ start: 500, end: 504, step: 1, digits: 3 })
+  it('claims nothing when the design has no sequence variables', () => {
+    const h = harness()
+    expect(h.allocator.allocate({ jobId: h.seedJob(), bindings: [], count: 5 })).toEqual([])
   })
 
-  it('warns when an override would reissue used numbers, without refusing', () => {
-    const templateId = seedTemplate()
-    allocator.allocate({ jobId: seedJob('j1', templateId), templateId, fields: [serial], copies: 50 })
-
-    expect(allocator.conflictsWithHistory(templateId, serial, 20)).toBe(true)
-    expect(allocator.conflictsWithHistory(templateId, serial, 51)).toBe(false)
+  it('refuses a pool that does not exist rather than inventing one', () => {
+    const h = harness()
+    expect(() =>
+      h.allocator.allocate({
+        jobId: h.seedJob(),
+        bindings: [{ variableName: 's', poolId: 'gone' }],
+        count: 1,
+      }),
+    ).toThrow(UnknownSequencePoolError)
   })
 })
 
 describe('overflow', () => {
   it('refuses rather than wrapping past the configured width', () => {
-    // Wrapping 999 back to 000 silently reissues serials that already exist on
-    // physical labels — the one outcome this feature exists to prevent.
-    const templateId = seedTemplate()
+    // Wrapping 999 back to 000 reissues serials that are already on stock.
+    const h = harness()
+    const pool = h.pools.create({ name: '三位', digits: 3, step: 1 })
     expect(() =>
-      allocator.allocate({
-        jobId: seedJob('j1', templateId),
-        templateId,
-        fields: [serial],
-        copies: 5,
-        overrides: { serial: 998 },
+      h.allocator.allocate({
+        jobId: h.seedJob(),
+        bindings: [{ variableName: 's', poolId: pool.id }],
+        count: 1000,
       }),
     ).toThrow(SequenceOverflowError)
   })
 
-  it('claims nothing at all when one field overflows', () => {
-    const templateId = seedTemplate()
-    const jobId = seedJob('j1', templateId)
-    const other: VariableField = { ...serial, name: 'batch' }
+  it('rolls the whole allocation back, leaving no pool half-claimed', () => {
+    const h = harness()
+    const wide = h.pools.create({ name: '宽', digits: 6, step: 1 })
+    const narrow = h.pools.create({ name: '窄', digits: 2, step: 1 })
 
     expect(() =>
-      allocator.allocate({
-        jobId,
-        templateId,
-        fields: [other, serial],
-        copies: 5,
-        overrides: { serial: 998 },
+      h.allocator.allocate({
+        jobId: h.seedJob(),
+        bindings: [
+          { variableName: 'a', poolId: wide.id },
+          { variableName: 'b', poolId: narrow.id },
+        ],
+        count: 500,
       }),
     ).toThrow(SequenceOverflowError)
 
-    // Rolled back: no partial claim survives.
-    const stored = db.prepare('SELECT seq_ranges FROM print_jobs WHERE id = ?').get(jobId)
-    expect(JSON.parse(String(stored?.seq_ranges))).toEqual({})
-  })
-
-  it('reports the offending value and the ceiling', () => {
-    const templateId = seedTemplate()
-    try {
-      allocator.allocate({
-        jobId: seedJob('j1', templateId),
-        templateId,
-        fields: [serial],
-        copies: 5,
-        overrides: { serial: 998 },
-      })
-      expect.unreachable('should have thrown')
-    } catch (err) {
-      const overflow = err as SequenceOverflowError
-      expect(overflow.fieldName).toBe('serial')
-      expect(overflow.requestedEnd).toBe(1002)
-      expect(overflow.maxValue).toBe(999)
-    }
+    // The wide pool must not have kept its span: a claim left behind by a
+    // rejected job burns those numbers for nothing.
+    expect(h.pools.highestClaimed(wide.id)).toBeNull()
   })
 })
 
 describe('release', () => {
-  it(`frees a cancelled job's numbers for reuse`, () => {
-    // The job printed nothing, so holding its span would skip those numbers
-    // for no reason at all (FR-019).
-    const templateId = seedTemplate()
-    const jobId = seedJob('j1', templateId)
-    allocator.allocate({ jobId, templateId, fields: [serial], copies: 10 })
-    expect(allocator.suggest(templateId, serial).suggestedStart).toBe(11)
+  it('gives the numbers back when a queued job is cancelled', () => {
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 4, step: 1 })
+    const bindings = [{ variableName: 's', poolId: pool.id }]
+    const jobId = h.seedJob()
 
-    allocator.release(jobId)
+    h.allocator.allocate({ jobId, bindings, count: 5 })
+    h.allocator.release(jobId)
 
-    expect(allocator.suggest(templateId, serial).suggestedStart).toBe(1)
+    expect(h.pools.highestClaimed(pool.id)).toBeNull()
+    const next = h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 1 })
+    expect(next[0]).toMatchObject({ start: 1 })
   })
 })
 
-describe('per-copy values', () => {
-  it('pads to the configured width', () => {
-    const range = rangeFor(serial, 1, 80)
-    // The width comes from the range itself, so a three-digit field that only
-    // reaches 80 still prints 080.
-    expect(valueAt(range, 0)).toBe('001')
-    expect(valueAt(range, 79)).toBe('080')
+describe('the pool floor', () => {
+  it('starts numbering from the floor when nothing has been issued', () => {
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 6, step: 1 })
+    h.pools.setFloor(pool.id, 500)
+
+    const claims = h.allocator.allocate({
+      jobId: h.seedJob(),
+      bindings: [{ variableName: 's', poolId: pool.id }],
+      count: 2,
+    })
+    expect(claims[0]).toMatchObject({ start: 500, end: 501 })
   })
 
-  it('gives every copy a different value', () => {
-    const range = rangeFor(serial, 1, 80)
-    const values = Array.from({ length: 80 }, (_unused, i) => valueAt(range, i))
-    expect(new Set(values).size).toBe(80)
+  it('resets forward, and the next batch starts at the new floor', () => {
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 6, step: 1 })
+    const bindings = [{ variableName: 's', poolId: pool.id }]
+    const jobId = h.seedJob()
+    h.allocator.allocate({ jobId, bindings, count: 10 })
+
+    h.pools.setFloor(pool.id, 1000)
+
+    // The old claim is still on record — those numbers are on labels.
+    expect(h.allocator.claimsFor(jobId)[0]).toMatchObject({ start: 1, end: 10 })
+    const next = h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 1 })
+    expect(next[0]).toMatchObject({ start: 1000 })
+  })
+
+  it('can move numbering BACKWARDS, which is the whole point of a reset', () => {
+    // A reset that could only go forwards would be a button that silently did
+    // nothing, and the confirmation warning about duplicate serials would be
+    // a lie. It can go backwards, and that is exactly why it is confirmed.
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 6, step: 1 })
+    const bindings = [{ variableName: 's', poolId: pool.id }]
+    h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 100 })
+
+    h.pools.setFloor(pool.id, 5)
+
+    const next = h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 1 })
+    expect(next[0]).toMatchObject({ start: 5 })
+  })
+
+  it('keeps the old claims on record even after numbering restarts below them', () => {
+    // The numbers are on physical labels. Losing that record to make a counter
+    // tidy would remove the only evidence of what was printed.
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 6, step: 1 })
+    const bindings = [{ variableName: 's', poolId: pool.id }]
+    const jobId = h.seedJob()
+    h.allocator.allocate({ jobId, bindings, count: 100 })
+
+    h.pools.setFloor(pool.id, 5)
+
+    expect(h.allocator.claimsFor(jobId)).toHaveLength(1)
+    expect(h.allocator.claimsFor(jobId)[0]).toMatchObject({ start: 1, end: 100 })
+  })
+
+  it('resumes from the new run, not the old one, after a backwards reset', () => {
+    const h = harness()
+    const pool = h.pools.create({ name: '整机流水', digits: 6, step: 1 })
+    const bindings = [{ variableName: 's', poolId: pool.id }]
+    h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 100 })
+    h.pools.setFloor(pool.id, 5)
+    h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 3 })
+
+    const next = h.allocator.allocate({ jobId: h.seedJob(), bindings, count: 1 })
+    expect(next[0]).toMatchObject({ start: 8 })
   })
 })

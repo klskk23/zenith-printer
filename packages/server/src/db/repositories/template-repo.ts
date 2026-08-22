@@ -9,8 +9,7 @@
 import type { Database } from '../index.ts'
 import type { Clock, IdGenerator } from '../../clock.ts'
 import { TemplateConflictError, type Template, type TemplateInput } from '../../domain/template.ts'
-import type { VariableField } from '../../domain/variable-field.ts'
-import type { LabelElement } from '@zenith/shared'
+import { variableDefinitionsSchema, type LabelElement, type VariableDefinition } from '@zenith/shared'
 
 type Row = Record<string, unknown>
 
@@ -25,23 +24,17 @@ export class TemplateRepo {
     this.#ids = deps.ids
   }
 
-  #fields(templateId: string): VariableField[] {
-    return this.#db
-      .prepare('SELECT * FROM variable_fields WHERE template_id = ? ORDER BY name')
-      .all(templateId)
-      .map((row) => {
-        const r = row as Row
-        const field: VariableField = {
-          name: String(r.name),
-          label: String(r.label),
-          source: String(r.source) as VariableField['source'],
-        }
-        if (r.sample_value !== null) field.sampleValue = String(r.sample_value)
-        if (r.seq_start !== null) field.seqStart = Number(r.seq_start)
-        if (r.seq_digits !== null) field.seqDigits = Number(r.seq_digits)
-        if (r.seq_step !== null) field.seqStep = Number(r.seq_step)
-        return field
-      })
+  /**
+   * Variable definitions live in a JSON column rather than their own table.
+   *
+   * They are a property of the design, always read and written whole, and
+   * never queried across templates — a table would buy joins nobody performs.
+   * Parsed through the schema so a hand-edited database cannot put a shape the
+   * renderer does not understand in front of the editor.
+   */
+  #variables(raw: unknown): VariableDefinition[] {
+    const parsed = variableDefinitionsSchema.safeParse(JSON.parse(String(raw ?? '[]')))
+    return parsed.success ? parsed.data : []
   }
 
   #toTemplate(row: Row): Template {
@@ -53,7 +46,8 @@ export class TemplateRepo {
       heightMm: Number(row.height_mm),
       dpi: Number(row.dpi),
       elements: JSON.parse(String(row.elements)) as LabelElement[],
-      variableFields: this.#fields(String(row.id)),
+      variables: this.#variables(row.variables),
+      dataSourceId: row.data_source_id === null || row.data_source_id === undefined ? null : String(row.data_source_id),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
       version: Number(row.version),
@@ -72,26 +66,6 @@ export class TemplateRepo {
     return row === undefined ? undefined : this.#toTemplate(row as Row)
   }
 
-  #writeFields(templateId: string, fields: VariableField[]): void {
-    this.#db.prepare('DELETE FROM variable_fields WHERE template_id = ?').run(templateId)
-    const insert = this.#db.prepare(
-      `INSERT INTO variable_fields (template_id, name, label, source, sample_value, seq_start, seq_digits, seq_step)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    for (const field of fields) {
-      insert.run(
-        templateId,
-        field.name,
-        field.label,
-        field.source,
-        field.sampleValue ?? null,
-        field.seqStart ?? null,
-        field.seqDigits ?? null,
-        field.seqStep ?? null,
-      )
-    }
-  }
-
   create(input: TemplateInput): Template {
     const id = this.#ids.next()
     const now = this.#clock.now().toISOString()
@@ -100,11 +74,13 @@ export class TemplateRepo {
     try {
       this.#db
         .prepare(
-          `INSERT INTO templates (id, name, printer_kind, width_mm, height_mm, dpi, elements, created_at, updated_at, version)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+          `INSERT INTO templates (id, name, printer_kind, width_mm, height_mm, dpi, elements, variables, data_source_id, created_at, updated_at, version)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         )
-        .run(id, input.name, input.printerKind, input.widthMm, input.heightMm, input.dpi, JSON.stringify(input.elements), now, now)
-      this.#writeFields(id, input.variableFields)
+        .run(
+          id, input.name, input.printerKind, input.widthMm, input.heightMm, input.dpi,
+          JSON.stringify(input.elements), JSON.stringify(input.variables), input.dataSourceId, now, now,
+        )
       this.#db.exec('COMMIT')
     } catch (err) {
       this.#db.exec('ROLLBACK')
@@ -141,11 +117,14 @@ export class TemplateRepo {
     try {
       this.#db
         .prepare(
-          `UPDATE templates SET name = ?, printer_kind = ?, width_mm = ?, height_mm = ?, dpi = ?, elements = ?, updated_at = ?, version = version + 1
+          `UPDATE templates SET name = ?, printer_kind = ?, width_mm = ?, height_mm = ?, dpi = ?, elements = ?,
+             variables = ?, data_source_id = ?, updated_at = ?, version = version + 1
            WHERE id = ?`,
         )
-        .run(input.name, input.printerKind, input.widthMm, input.heightMm, input.dpi, JSON.stringify(input.elements), now, id)
-      this.#writeFields(id, input.variableFields)
+        .run(
+          input.name, input.printerKind, input.widthMm, input.heightMm, input.dpi,
+          JSON.stringify(input.elements), JSON.stringify(input.variables), input.dataSourceId, now, id,
+        )
       this.#db.exec('COMMIT')
     } catch (err) {
       this.#db.exec('ROLLBACK')

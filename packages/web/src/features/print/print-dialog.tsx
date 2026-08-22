@@ -27,11 +27,7 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog.tsx'
 import { OverflowNotice, type OverflowWarning } from './overflow-notice.tsx'
-import { usePrintForm, type VariableField } from '../templates/hooks.ts'
-import { needsSavingForSequences, printFormFields } from './print-form-fields.ts'
-import { FieldForm } from './field-form.tsx'
 import { Preview } from './preview.tsx'
-import { firstCopyValues } from './first-copy.ts'
 
 export interface PrintDialogProps {
   ir: LabelIR
@@ -39,13 +35,20 @@ export interface PrintDialogProps {
   templateId: string | null
   profileId: string | null
   /**
-   * The variable fields this design has.
+   * Values the design's own variables resolve to, from the editor.
    *
-   * From the editor, not from the saved template: an unsaved design has no
-   * template to ask, and a saved one may have fields added since — and edits
-   * do print now, because the design goes with the job.
+   * Taken from what is on screen rather than from the saved template: an
+   * unsaved design has no template to ask, and a saved one may have been
+   * edited since — and edits do print, because the design goes with the job.
    */
-  fields: readonly VariableField[]
+  variableValues: Readonly<Record<string, string>>
+  /**
+   * References the content makes that nothing resolves.
+   *
+   * Blocks submission. The label would otherwise come out reading "${sku}",
+   * which is waste that looks like output.
+   */
+  unresolved: readonly string[]
   /**
    * The machine this is going to.
    *
@@ -62,13 +65,11 @@ export function PrintDialog({
   templateId,
   profileId,
   printer,
-  fields,
+  variableValues,
+  unresolved,
   onClose,
 }: PrintDialogProps): React.JSX.Element {
   const [copies, setCopies] = useState(1)
-  const [manualValues, setManualValues] = useState<Record<string, string>>({})
-  const [sequenceOverrides, setSequenceOverrides] = useState<Record<string, number>>({})
-  const form = usePrintForm(templateId)
   const [submitting, setSubmitting] = useState(false)
   const [warnings, setWarnings] = useState<OverflowWarning[]>([])
   const [error, setError] = useState<ApiRequestError | null>(null)
@@ -79,23 +80,14 @@ export function PrintDialog({
   // same job back rather than a second stack of labels.
   const idempotencyKey = useMemo(() => crypto.randomUUID(), [])
 
-  // What the dialog asks about: the design's fields, with the server filling in
-  // where each sequence has got to.
-  const formFields = useMemo(
-    () => printFormFields(fields, form.data?.fields ?? []),
-    [fields, form.data],
-  )
-
   // A printer that has never been probed has no head width or dpi, so nothing
-  // downstream can decide what fits. And a sequence has nowhere to carry on
-  // from until the design is a template — submitting one produces a job that
-  // fails in the queue, which is a wasted trip and a poor place to learn about
-  // it.
+  // downstream can decide what fits. An unresolved reference blocks for a
+  // blunter reason: the label would come out reading "${sku}".
   const blocked =
     printer.capabilities === null
       ? copy.print.needsProbe
-      : needsSavingForSequences(fields, templateId)
-        ? copy.preview.needsTemplateForSequence
+      : unresolved.length > 0
+        ? copy.variables.unresolved(unresolved.join('、'))
         : null
 
   const jobBody = (): Record<string, unknown> => ({
@@ -108,8 +100,6 @@ export function PrintDialog({
     ...(templateId === null ? {} : { templateId }),
     ...(profileId === null ? {} : { profileId }),
     copies,
-    manualFieldValues: manualValues,
-    sequenceOverrides,
   })
 
   /**
@@ -139,7 +129,7 @@ export function PrintDialog({
     return () => {
       cancelled = true
     }
-  }, [printer.id, templateId, profileId, copies, JSON.stringify(manualValues)])
+  }, [printer.id, templateId, profileId, copies])
 
   const submit = async (): Promise<void> => {
     setSubmitting(true)
@@ -188,39 +178,15 @@ export function PrintDialog({
               />
             </div>
 
-            <FieldForm
-              fields={formFields}
-              copies={copies}
-              manualValues={manualValues}
-              sequenceOverrides={sequenceOverrides}
-              onChangeManual={(name, value) => setManualValues((prev) => ({ ...prev, [name]: value }))}
-              onChangeOverride={(name, value) =>
-                setSequenceOverrides((prev) => ({ ...prev, [name]: value }))
-              }
-            />
-
             {/*
-              Below the fields, because it depends on them: a preview drawn
-              before the variables are filled in is a preview of a label that
-              will never print.
+              The first label of the batch, not a composite of none of them:
+              a sequence counts up, so copy 40 is not copy 1 (FR-041).
             */}
             <Preview
               ir={ir}
               printerId={printer.id}
               profileId={profileId}
-              variableValues={
-                // Held back until the field list has arrived. An empty list
-                // looks like "no variables" for the first render, which would
-                // preview a label with its `$var` refs unresolved and then
-                // replace it a moment later.
-                templateId !== null && form.isPending
-                  ? null
-                  : firstCopyValues({
-                      fields: formFields,
-                      manualValues,
-                      sequenceOverrides,
-                    })
-              }
+              variableValues={unresolved.length > 0 ? null : variableValues}
               copies={copies}
             />
 

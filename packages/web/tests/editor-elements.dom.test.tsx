@@ -769,149 +769,127 @@ describe('the rulers', () => {
   })
 })
 
-describe('binding an element to a variable field', () => {
+describe('the variables panel', () => {
   /**
    * Radix activates a tab on focus, not on click, so a bare click leaves the
    * panel where it was — and every assertion after it passes against the wrong
    * panel.
    */
-  function openFieldsTab(): void {
-    const tab = screen.getByRole('tab', { name: '可变字段' })
+  function openVariablesTab(): void {
+    const tab = screen.getByRole('tab', { name: '变量' })
     fireEvent.focus(tab)
     fireEvent.click(tab)
-    expect(document.querySelector('[data-inspector]'), 'the fields tab did not open').toBeNull()
+    expect(document.querySelector('[data-inspector]'), 'the variables tab did not open').toBeNull()
+  }
+
+  function nameInputs(): HTMLInputElement[] {
+    return [...document.querySelectorAll('input[aria-label="变量名"]')] as HTMLInputElement[]
   }
 
   /**
-   * The crash: `irToSvg` refuses a `$var` it has no value for — correct when
-   * printing, since a label with a hole where a part number belongs is worse
-   * than one that does not print. But the editor is where bindings are *made*,
+   * The crash this replaces: `irToSvg` refused a `$var` it had no value for —
+   * correct when printing, but the editor is where references are *written*,
    * and it draws inside React's render pass, so the throw escaped and blanked
-   * the application the moment a field was added.
+   * the application. Evaluation cannot throw any more; this asserts the editor
+   * survives, not merely that a value appears.
    */
-  it.each(['手工填入', '递增序号'])('survives adding a %s field', (kind) => {
+  it('survives adding a constant', () => {
     openDesign()
-    addElement('文字')
-
-    openFieldsTab()
-    fireEvent.click(screen.getByText(kind))
-
-    expect(screen.getByRole('toolbar', { name: '标签设计' })).toBeDefined()
-    expect(document.querySelector('[data-label-canvas]')).not.toBeNull()
+    openVariablesTab()
+    fireEvent.click(screen.getByText('加常量'))
+    expect(document.querySelector('[data-variables-panel]')).not.toBeNull()
+    expect(document.querySelector('svg')).not.toBeNull()
   })
 
-  it('draws the sample value rather than nothing', () => {
+  it('draws the substituted value on the canvas', () => {
     openDesign()
     addElement('文字')
-    openFieldsTab()
-    fireEvent.click(screen.getByText('手工填入'))
+    const content = document.querySelector('[data-inspector] textarea') as HTMLTextAreaElement
+    fireEvent.change(content, { target: { value: '零件 ${sku} 号' } })
 
-    // Something is still drawn where the text was: a bound element shows what
-    // it will say, so the layout can be judged before the values exist.
-    expect(document.querySelector('[data-label-canvas] text')).not.toBeNull()
+    openVariablesTab()
+    fireEvent.click(screen.getByText('加常量'))
+    const name = nameInputs()[0]!
+    fireEvent.change(name, { target: { value: 'sku' } })
+    fireEvent.blur(name)
+    const value = document.querySelector('[data-variables-panel] input:not([aria-label])') as HTMLInputElement
+    fireEvent.change(value, { target: { value: 'ABC-123' } })
+
+    expect(document.body.textContent).toContain('零件 ABC-123 号')
   })
 
-  it('keeps the binding in the design, not the sample', () => {
-    // The stored element has to keep pointing at the field; drawing a sample
-    // must not write the sample back.
+  it('keeps the reference in the design, not the substituted value', () => {
+    // Otherwise an edit made while looking at a value writes the value back
+    // and the reference is gone.
     openDesign()
     addElement('文字')
-    openFieldsTab()
-    fireEvent.click(screen.getByText('递增序号'))
-
-    const propertiesTab = screen.getByRole('tab', { name: '元素属性' })
-    fireEvent.focus(propertiesTab)
-    fireEvent.click(propertiesTab)
-    // A bound element has no free-text content field to type into.
-    const inspector = document.querySelector('[data-inspector]')!
-    expect(inspector.querySelector('textarea')).toBeNull()
+    const content = document.querySelector('[data-inspector] textarea') as HTMLTextAreaElement
+    fireEvent.change(content, { target: { value: '${sku}' } })
+    expect(content.value).toBe('${sku}')
   })
-})
 
-describe('renaming a variable field', () => {
-  function openFields(): void {
-    const tab = screen.getByRole('tab', { name: '可变字段' })
+  it('reports a reference that nothing defines', () => {
+    openDesign()
+    addElement('文字')
+    fireEvent.change(document.querySelector('[data-inspector] textarea') as HTMLTextAreaElement, {
+      target: { value: '${nope}' },
+    })
+    openVariablesTab()
+    expect(document.querySelector('[data-unresolved]')?.textContent).toContain('nope')
+  })
+
+  it('says nothing while the reference is still being typed', () => {
+    // An error that flashes on the way to a valid reference is noise, and
+    // noise on every keystroke gets ignored.
+    openDesign()
+    addElement('文字')
+    const content = document.querySelector('[data-inspector] textarea') as HTMLTextAreaElement
+    openVariablesTab()
+
+    for (const partial of ['$', '${', '${s', '${sk', '${sku']) {
+      fireEvent.change(content, { target: { value: partial } })
+      expect(document.querySelector('[data-unresolved]'), `reported at "${partial}"`).toBeNull()
+    }
+  })
+
+  it('keeps the name input alive across keystrokes', () => {
+    // Keying the row by the name it edits remounted the input on every
+    // keystroke and took the focus with it — one character per click.
+    openDesign()
+    openVariablesTab()
+    fireEvent.click(screen.getByText('加常量'))
+
+    const before = nameInputs()[0]!
+    before.focus()
+    fireEvent.change(before, { target: { value: 's' } })
+    fireEvent.change(nameInputs()[0]!, { target: { value: 'sk' } })
+    fireEvent.change(nameInputs()[0]!, { target: { value: 'sku' } })
+
+    expect(nameInputs()[0]).toBe(before)
+    expect(document.activeElement).toBe(before)
+    expect(nameInputs()[0]!.value).toBe('sku')
+  })
+
+  it('does not rewrite element content when a variable is renamed', () => {
+    // References are written by hand inside the content; the editor has no
+    // business rewriting somebody's text. The unresolved warning says what
+    // broke instead.
+    openDesign()
+    addElement('文字')
+    fireEvent.change(document.querySelector('[data-inspector] textarea') as HTMLTextAreaElement, {
+      target: { value: '${sku}' },
+    })
+    openVariablesTab()
+    fireEvent.click(screen.getByText('加常量'))
+    const name = nameInputs()[0]!
+    fireEvent.change(name, { target: { value: 'sku' } })
+    fireEvent.blur(name)
+    fireEvent.change(nameInputs()[0]!, { target: { value: 'partNo' } })
+    fireEvent.blur(nameInputs()[0]!)
+
+    const tab = screen.getByRole('tab', { name: '元素属性' })
     fireEvent.focus(tab)
     fireEvent.click(tab)
-  }
-
-  /** The bind selector, not the printer one on the toolbar. */
-  function bindSelect(): HTMLSelectElement {
-    const label = [...document.querySelectorAll('label')].find(
-      (l) => l.textContent === '绑定到选中元素',
-    )
-    expect(label, 'no bind selector').toBeDefined()
-    return label!.parentElement!.querySelector('select') as HTMLSelectElement
-  }
-
-  function nameInput(): HTMLInputElement {
-    const label = [...document.querySelectorAll('label')].find((l) => l.textContent === '字段名')
-    expect(label, 'no field name input').toBeDefined()
-    return label!.parentElement!.querySelector('input') as HTMLInputElement
-  }
-
-  function addManualField(): void {
-    openDesign()
-    addElement('文字')
-    openFields()
-    fireEvent.click(screen.getByText('手工填入'))
-  }
-
-  /**
-   * The row was keyed by the field's name, and the name box edits that name —
-   * so after every keystroke React saw a different row, threw the old one away
-   * and built a new one. The caret went with it, and a name could only ever be
-   * one character long.
-   */
-  it('keeps the input alive across keystrokes', () => {
-    addManualField()
-    const input = nameInput()
-    input.focus()
-
-    for (const value of ['p', 'pa', 'par', 'part']) {
-      fireEvent.change(nameInput(), { target: { value } })
-    }
-
-    expect(nameInput().value).toBe('part')
-    expect(document.activeElement).toBe(input)
-  })
-
-  it('keeps it the same element, not a replacement that happens to look alike', () => {
-    addManualField()
-    const before = nameInput()
-    fireEvent.change(before, { target: { value: 'x' } })
-    expect(nameInput()).toBe(before)
-  })
-
-  /**
-   * A binding is by name. Renaming the field without rewriting them leaves
-   * every bound element pointing at something that no longer exists — it draws
-   * as nothing, and nothing on screen says why.
-   */
-  it('takes the elements bound to it along', () => {
-    addManualField()
-    // The new field binds to the selected element automatically or by hand;
-    // either way the element ends up pointing at the field's name.
-    fireEvent.change(bindSelect(), { target: { value: 'field1' } })
-    expect(bindSelect().value, 'the element did not bind').toBe('field1')
-
-    fireEvent.change(nameInput(), { target: { value: 'partNo' } })
-
-    // Still bound: the selector shows the new name rather than falling back to
-    // "not bound".
-    expect(bindSelect().value).toBe('partNo')
-  })
-
-  it('warns when two fields end up with the same name', () => {
-    addManualField()
-    fireEvent.click(screen.getByText('手工填入'))
-
-    const inputs = [...document.querySelectorAll('label')]
-      .filter((l) => l.textContent === '字段名')
-      .map((l) => l.parentElement!.querySelector('input') as HTMLInputElement)
-    expect(inputs.length).toBe(2)
-
-    fireEvent.change(inputs[1]!, { target: { value: inputs[0]!.value } })
-    expect(screen.getAllByText(/字段名重复/).length).toBeGreaterThan(0)
+    expect((document.querySelector('[data-inspector] textarea') as HTMLTextAreaElement).value).toBe('${sku}')
   })
 })

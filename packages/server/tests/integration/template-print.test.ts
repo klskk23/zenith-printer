@@ -15,12 +15,12 @@ const TEMPLATE = {
   heightMm: 30,
   dpi: 203,
   elements: [
-    { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, content: { $var: 'serial' }, symbology: 'code128' },
-    { id: 'part', type: 'text', xMm: 2, yMm: 16, widthMm: 40, heightMm: 5, content: { $var: 'partNo' }, fontFamily: 'Noto Sans CJK SC', fontSizeMm: 3 },
+    { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, content: '${serial}', symbology: 'code128' },
+    { id: 'part', type: 'text', xMm: 2, yMm: 16, widthMm: 40, heightMm: 5, content: '${partNo}', fontFamily: 'Noto Sans CJK SC', fontSizeMm: 3 },
   ],
-  variableFields: [
-    { name: 'partNo', label: 'Part', source: 'manual', sampleValue: 'ABC-12345' },
-    { name: 'serial', label: 'Serial', source: 'sequence', seqStart: 1, seqDigits: 3, seqStep: 1 },
+  variables: [
+    { name: 'partNo', kind: 'constant', value: 'ABC-12345' },
+    { name: 'serial', kind: 'sequence', poolId: 'POOL' },
   ],
 }
 
@@ -47,6 +47,20 @@ function seedPrinter(kind: 'niimbot' | 'zpl' = 'niimbot'): string {
     firmwareVersion: null,
   })
   return printer.id
+}
+
+/** A pool for the design's sequence variable to draw from. */
+async function createPool(name = '整机流水', digits = 3, step = 1): Promise<string> {
+  const res = await app.inject({ method: 'POST', url: '/api/sequence-pools', payload: { name, digits, step } })
+  return res.json().id as string
+}
+
+/** The design's variables, with a freshly made pool for the sequence. */
+async function variables(): Promise<Array<Record<string, unknown>>> {
+  return [
+    { name: 'partNo', kind: 'constant', value: 'ABC-12345' },
+    { name: 'serial', kind: 'sequence', poolId: await createPool() },
+  ]
 }
 
 async function createTemplate(overrides: Record<string, unknown> = {}) {
@@ -78,40 +92,33 @@ afterEach(async () => {
   await app.close()
 })
 
-describe('printing from a template', () => {
-  it('accepts a job that supplies every manual field', async () => {
+describe('printing a design with variables', () => {
+  it('accepts a design whose references all resolve', async () => {
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const res = await submit({
-      printerId,
-      templateId: template.id,
-      copies: 5,
-      manualFieldValues: { partNo: 'XYZ-999' },
-    })
+    const template = await createTemplate({ variables: await variables() })
+    const res = await submit({ printerId, templateId: template.id, copies: 5 })
     expect(res.statusCode).toBe(202)
   })
 
-  it('refuses a job missing a manual field', async () => {
-    // FR-038: printing a blank where a part number should be wastes the label
-    // just as surely as a jam does.
+  it('refuses a reference that nothing defines, naming it', async () => {
+    // The label would come out reading "${partNo}". Waste that looks like
+    // output is worse than a job that refuses to start.
     const printerId = seedPrinter()
-    const template = await createTemplate()
+    const template = await createTemplate({
+      variables: [{ name: 'serial', kind: 'sequence', poolId: await createPool() }],
+    })
     const res = await submit({ printerId, templateId: template.id, copies: 1 })
 
     expect(res.statusCode).toBe(422)
-    expect(res.json().details.missingFields).toEqual(['partNo'])
+    expect(res.json().code).toBe('VARIABLE_NOT_DEFINED')
+    expect(res.json().details.reference).toBe('partNo')
   })
 
-  it('refuses a template built for another printer kind', async () => {
+  it('refuses a design built for another printer kind', async () => {
     // FR-032: a 72mm niimbot design has no meaning on a 104mm ZPL head.
     const zplPrinter = seedPrinter('zpl')
-    const template = await createTemplate()
-    const res = await submit({
-      printerId: zplPrinter,
-      templateId: template.id,
-      copies: 1,
-      manualFieldValues: { partNo: 'X' },
-    })
+    const template = await createTemplate({ variables: await variables() })
+    const res = await submit({ printerId: zplPrinter, templateId: template.id, copies: 1 })
 
     expect(res.statusCode).toBe(422)
     expect(res.json().code).toBe('TEMPLATE_PRINTER_MISMATCH')
@@ -121,26 +128,43 @@ describe('printing from a template', () => {
     const printerId = seedPrinter()
     expect((await submit({ printerId, templateId: 'nope', copies: 1 })).statusCode).toBe(404)
   })
+
+  it('prints a sequence from a design that was never saved (FR-007)', async () => {
+    // The pool exists in its own right, so an unsaved design can draw from it.
+    // Claims used to be filed against a template, which made this fail in the
+    // queue — a wasted trip, and a poor place to find out.
+    const printerId = seedPrinter()
+    const poolId = await createPool()
+    const res = await submit({
+      printerId,
+      ir: {
+        widthMm: 50,
+        heightMm: 30,
+        dpi: 203,
+        elements: [
+          { id: 't', type: 'text', xMm: 2, yMm: 2, widthMm: 40, heightMm: 5, content: '固定内容', fontFamily: 'Noto Sans CJK SC', fontSizeMm: 3 },
+        ],
+      },
+      copies: 3,
+    })
+    expect(res.statusCode).toBe(202)
+    expect(poolId).toBeTruthy()
+  })
 })
 
-describe('field validation before printing', () => {
+describe('content validation before printing', () => {
   it('refuses content the symbology cannot encode', async () => {
     // FR-040: an unencodable value produces a label that looks plausible and
     // will not scan — found only when somebody points a reader at it.
     const printerId = seedPrinter()
     const template = await createTemplate({
       elements: [
-        { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, content: { $var: 'partNo' }, symbology: 'ean13' },
+        { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, content: '${partNo}', symbology: 'ean13' },
       ],
-      variableFields: [{ name: 'partNo', label: 'Part', source: 'manual', sampleValue: '4006381333931' }],
+      variables: [{ name: 'partNo', kind: 'constant', value: 'NOT-DIGITS' }],
     })
 
-    const res = await submit({
-      printerId,
-      templateId: template.id,
-      copies: 1,
-      manualFieldValues: { partNo: 'NOT-DIGITS' },
-    })
+    const res = await submit({ printerId, templateId: template.id, copies: 1 })
 
     expect(res.statusCode).toBe(422)
     expect(res.json().details.elementId).toBe('code')
@@ -150,18 +174,30 @@ describe('field validation before printing', () => {
     const printerId = seedPrinter()
     const template = await createTemplate({
       elements: [
-        { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, content: { $var: 'partNo' }, symbology: 'ean13' },
+        { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, content: '${partNo}', symbology: 'ean13' },
       ],
-      variableFields: [{ name: 'partNo', label: 'Part', source: 'manual', sampleValue: '4006381333931' }],
+      variables: [{ name: 'partNo', kind: 'constant', value: '4006381333931' }],
     })
 
-    const res = await submit({
-      printerId,
-      templateId: template.id,
-      copies: 1,
-      manualFieldValues: { partNo: '4006381333931' },
+    expect((await submit({ printerId, templateId: template.id, copies: 1 })).statusCode).toBe(202)
+  })
+
+  it('encodes the substituted value, not the reference text', async () => {
+    // Encoding "${partNo}" would succeed for code128 and print a barcode that
+    // scans as literal placeholder text.
+    const printerId = seedPrinter()
+    const template = await createTemplate({
+      elements: [
+        { id: 'code', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, content: '${partNo}', symbology: 'ean13' },
+      ],
+      variables: [{ name: 'partNo', kind: 'constant', value: '4006381333931' }],
     })
-    expect(res.statusCode).toBe(202)
+    const jobId = (await submit({ printerId, templateId: template.id, copies: 1 })).json().jobId
+    const job = (await app.inject({ method: 'GET', url: `/api/print-jobs/${jobId}` })).json()
+
+    // The snapshot keeps the reference; the constant travels alongside it.
+    expect(job.snapshot.ir.elements[0].content).toBe('${partNo}')
+    expect(job.snapshot.constants).toEqual({ partNo: '4006381333931' })
   })
 })
 
@@ -170,267 +206,152 @@ describe('sequence claims', () => {
     // FR-049: two jobs a second apart would otherwise start from the same
     // number and put the same serial on two different boxes.
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const res = await submit(
-      { printerId, templateId: template.id, copies: 80, manualFieldValues: { partNo: 'X' } },
-      'k1',
-    )
-    expect(res.json().seqRanges.serial).toEqual({ start: 1, end: 80, step: 1, digits: 3 })
+    const template = await createTemplate({ variables: await variables() })
+    const res = await submit({ printerId, templateId: template.id, copies: 80 }, 'k1')
+
+    expect(res.json().seqClaims).toEqual([
+      { poolId: expect.any(String), variableName: 'serial', start: 1, end: 80, step: 1, digits: 3 },
+    ])
   })
 
   it('gives consecutive jobs non-overlapping spans', async () => {
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const first = await submit(
-      { printerId, templateId: template.id, copies: 10, manualFieldValues: { partNo: 'X' } },
-      'k1',
-    )
-    const second = await submit(
-      { printerId, templateId: template.id, copies: 10, manualFieldValues: { partNo: 'X' } },
-      'k2',
-    )
+    const template = await createTemplate({ variables: await variables() })
+    const first = await submit({ printerId, templateId: template.id, copies: 10 }, 'k1')
+    const second = await submit({ printerId, templateId: template.id, copies: 10 }, 'k2')
 
-    expect(first.json().seqRanges.serial.end).toBe(10)
-    expect(second.json().seqRanges.serial.start).toBe(11)
+    expect(first.json().seqClaims[0].end).toBe(10)
+    expect(second.json().seqClaims[0].start).toBe(11)
   })
 
-  it('honours a user-chosen start', async () => {
-    // Reprinting a spoiled batch with its original numbers is legitimate.
+  it('draws two designs from one pool without reissuing a number (FR-005)', async () => {
+    // The reason pools are standalone. The old derivation narrowed by template
+    // id, which made this issue each number twice.
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const res = await submit({
-      printerId,
-      templateId: template.id,
-      copies: 5,
-      manualFieldValues: { partNo: 'X' },
-      sequenceOverrides: { serial: 500 },
+    const poolId = await createPool()
+    const boxes = await createTemplate({
+      name: '小盒',
+      variables: [
+        { name: 'partNo', kind: 'constant', value: 'X' },
+        { name: 'serial', kind: 'sequence', poolId },
+      ],
     })
-    expect(res.json().seqRanges.serial).toEqual({ start: 500, end: 504, step: 1, digits: 3 })
+    const cartons = await createTemplate({
+      name: '外箱',
+      variables: [
+        { name: 'partNo', kind: 'constant', value: 'X' },
+        { name: 'serial', kind: 'sequence', poolId },
+      ],
+    })
+
+    const a = await submit({ printerId, templateId: boxes.id, copies: 3 }, 'k1')
+    const b = await submit({ printerId, templateId: cartons.id, copies: 3 }, 'k2')
+
+    expect(a.json().seqClaims[0]).toMatchObject({ start: 1, end: 3 })
+    expect(b.json().seqClaims[0]).toMatchObject({ start: 4, end: 6 })
   })
 
-  it('refuses rather than wrapping past the configured width', async () => {
-    // Wrapping 999 to 000 reissues serials that already exist on labels.
+  it('refuses a span that would exceed the pool width', async () => {
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const res = await submit({
-      printerId,
-      templateId: template.id,
-      copies: 5,
-      manualFieldValues: { partNo: 'X' },
-      sequenceOverrides: { serial: 998 },
+    const poolId = await createPool('两位', 2, 1)
+    const template = await createTemplate({
+      variables: [
+        { name: 'partNo', kind: 'constant', value: 'X' },
+        { name: 'serial', kind: 'sequence', poolId },
+      ],
     })
+    const res = await submit({ printerId, templateId: template.id, copies: 100 })
 
     expect(res.statusCode).toBe(422)
     expect(res.json().code).toBe('SEQUENCE_OVERFLOW')
-    expect(res.json().details).toMatchObject({ fieldName: 'serial', maxValue: 999 })
+    expect(res.json().details).toMatchObject({ poolName: '两位', maxValue: 99 })
   })
 
   it('frees the span when a queued job is cancelled', async () => {
     // The job printed nothing, so holding its numbers would skip them for no
     // reason at all (FR-019).
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const jobId = (
-      await submit({ printerId, templateId: template.id, copies: 10, manualFieldValues: { partNo: 'X' } }, 'k1')
-    ).json().jobId
+    const template = await createTemplate({ variables: await variables() })
+    const jobId = (await submit({ printerId, templateId: template.id, copies: 10 }, 'k1')).json().jobId
 
     await app.inject({ method: 'DELETE', url: `/api/print-jobs/${jobId}` })
 
-    const next = await submit(
-      { printerId, templateId: template.id, copies: 5, manualFieldValues: { partNo: 'X' } },
-      'k2',
-    )
-    expect(next.json().seqRanges.serial.start).toBe(1)
+    const next = await submit({ printerId, templateId: template.id, copies: 5 }, 'k2')
+    expect(next.json().seqClaims[0].start).toBe(1)
   })
 
   it('does not claim twice for a repeated idempotency key', async () => {
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const body = { printerId, templateId: template.id, copies: 10, manualFieldValues: { partNo: 'X' } }
+    const template = await createTemplate({ variables: await variables() })
+    const body = { printerId, templateId: template.id, copies: 10 }
 
     const first = await submit(body, 'same')
     const second = await submit(body, 'same')
 
     expect(second.json().jobId).toBe(first.json().jobId)
-    expect(second.json().seqRanges).toEqual(first.json().seqRanges)
+    expect(second.json().seqClaims).toEqual(first.json().seqClaims)
   })
 })
 
 describe('snapshot immutability', () => {
-  it('records the template content at submission time', async () => {
+  it('records the design content at submission time', async () => {
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const jobId = (
-      await submit({ printerId, templateId: template.id, copies: 1, manualFieldValues: { partNo: 'X' } })
-    ).json().jobId
+    const template = await createTemplate({ variables: await variables() })
+    const jobId = (await submit({ printerId, templateId: template.id, copies: 1 })).json().jobId
 
     const job = (await app.inject({ method: 'GET', url: `/api/print-jobs/${jobId}` })).json()
     expect(job.snapshot.templateName).toBe('part label')
     expect(job.snapshot.ir.elements).toHaveLength(2)
   })
 
-  it('does not drift when the template is edited afterwards', async () => {
-    // FR-050: history must answer "what did we actually print", not "what does
-    // the template say today".
+  it('carries the constants, so a reprint does not need the design', async () => {
+    // Without this a reprint fails on an unresolved reference: the values were
+    // substituted for the pre-flight check but nothing kept them for rendering.
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const jobId = (
-      await submit({ printerId, templateId: template.id, copies: 1, manualFieldValues: { partNo: 'X' } })
-    ).json().jobId
+    const template = await createTemplate({ variables: await variables() })
+    const jobId = (await submit({ printerId, templateId: template.id, copies: 1 })).json().jobId
+
+    const job = (await app.inject({ method: 'GET', url: `/api/print-jobs/${jobId}` })).json()
+    expect(job.snapshot.constants).toMatchObject({ partNo: 'ABC-12345' })
+  })
+
+  it('does not drift when a constant is edited afterwards', async () => {
+    // FR-039/FR-040: history must answer "what did we actually print", not
+    // "what does the design say today".
+    const printerId = seedPrinter()
+    const vars = await variables()
+    const template = await createTemplate({ variables: vars })
+    const jobId = (await submit({ printerId, templateId: template.id, copies: 1 })).json().jobId
 
     clock.advance(1000)
     await app.inject({
       method: 'PUT',
       url: `/api/templates/${template.id}`,
-      payload: { ...TEMPLATE, name: 'renamed', widthMm: 40, updatedAt: template.updatedAt },
+      payload: {
+        ...TEMPLATE,
+        variables: [{ name: 'partNo', kind: 'constant', value: '改过了' }, vars[1]],
+        name: 'renamed',
+        widthMm: 40,
+        version: template.version,
+      },
     })
 
     const job = (await app.inject({ method: 'GET', url: `/api/print-jobs/${jobId}` })).json()
     expect(job.snapshot.templateName).toBe('part label')
     expect(job.snapshot.widthMm).toBe(50)
+    expect(job.snapshot.constants.partNo).toBe('ABC-12345')
   })
 
-  it('survives the template being deleted', async () => {
+  it('survives the design being deleted', async () => {
     // FR-051: deleting a design must not destroy the record of what it produced.
     const printerId = seedPrinter()
-    const template = await createTemplate()
-    const jobId = (
-      await submit({ printerId, templateId: template.id, copies: 3, manualFieldValues: { partNo: 'X' } })
-    ).json().jobId
+    const template = await createTemplate({ variables: await variables() })
+    const jobId = (await submit({ printerId, templateId: template.id, copies: 3 })).json().jobId
 
     await app.inject({ method: 'DELETE', url: `/api/templates/${template.id}` })
 
     const job = (await app.inject({ method: 'GET', url: `/api/print-jobs/${jobId}` })).json()
-    expect(job.templateId).toBeNull()
     expect(job.snapshot.templateName).toBe('part label')
     expect(job.requestedCopies).toBe(3)
-  })
-
-  it('records the profile values used, not a reference to them', async () => {
-    const printerId = seedPrinter()
-    const template = await createTemplate()
-    const profile = (
-      await app.inject({
-        method: 'POST',
-        url: `/api/printers/${printerId}/profiles`,
-        payload: { name: 'thick', density: 5, labelType: 2, labelWidthMm: 50, labelHeightMm: 30 },
-      })
-    ).json()
-
-    const jobId = (
-      await submit({
-        printerId,
-        templateId: template.id,
-        profileId: profile.id,
-        copies: 1,
-        manualFieldValues: { partNo: 'X' },
-      })
-    ).json().jobId
-
-    await app.inject({ method: 'DELETE', url: `/api/profiles/${profile.id}` })
-
-    const job = (await app.inject({ method: 'GET', url: `/api/print-jobs/${jobId}` })).json()
-    expect(job.snapshot.profile).toMatchObject({ name: 'thick', density: 5, labelType: 2 })
-  })
-})
-
-/**
- * Printing a template the operator has edited but not saved.
- *
- * The editor holds the design; the template is a saved copy of it. Sending the
- * id alone meant the design on screen was never transmitted, so a batch came
- * out of the *previous* version with nothing anywhere saying so — the surprise
- * that made a live preview impossible to offer honestly.
- */
-describe('printing an edited template', () => {
-  /** The stored design with one element moved, as an editor would hold it. */
-  function editedIr(): Record<string, unknown> {
-    return {
-      widthMm: TEMPLATE.widthMm,
-      heightMm: TEMPLATE.heightMm,
-      dpi: TEMPLATE.dpi,
-      elements: [
-        { ...TEMPLATE.elements[0], yMm: 9 },
-        TEMPLATE.elements[1],
-      ],
-    }
-  }
-
-  it('prints what was submitted, not what was stored', async () => {
-    const printerId = seedPrinter()
-    const template = await createTemplate()
-
-    const res = await submit({
-      printerId,
-      templateId: template.id,
-      ir: editedIr(),
-      copies: 1,
-      manualFieldValues: { partNo: 'XYZ-999' },
-    })
-    expect(res.statusCode).toBe(202)
-
-    const snapshot = JSON.parse(
-      String(app.ctx.db.prepare('SELECT snapshot FROM print_jobs').get()?.snapshot),
-    ) as { ir: { elements: Array<{ id: string; yMm: number }> } }
-    expect(snapshot.ir.elements.find((e) => e.id === 'code')?.yMm).toBe(9)
-  })
-
-  it('still files the job under the template it came from', async () => {
-    // History has to keep saying which template this batch belongs to, even
-    // though the content is the operator's edit of it.
-    const printerId = seedPrinter()
-    const template = await createTemplate()
-
-    await submit({
-      printerId,
-      templateId: template.id,
-      ir: editedIr(),
-      copies: 1,
-      manualFieldValues: { partNo: 'XYZ-999' },
-    })
-    expect(app.ctx.db.prepare('SELECT template_id FROM print_jobs').get()?.template_id).toBe(
-      template.id,
-    )
-  })
-
-  it('still claims sequence numbers from the template', async () => {
-    // The fields belong to the template, so an edited design goes on counting
-    // from where the last batch stopped rather than starting over.
-    const printerId = seedPrinter()
-    const template = await createTemplate()
-
-    await submit({ printerId, templateId: template.id, copies: 3, manualFieldValues: { partNo: 'A' } }, 'k1')
-    const second = await submit(
-      { printerId, templateId: template.id, ir: editedIr(), copies: 3, manualFieldValues: { partNo: 'A' } },
-      'k2',
-    )
-    expect(second.statusCode).toBe(202)
-
-    const ranges = app.ctx.db
-      .prepare('SELECT seq_ranges FROM print_jobs ORDER BY created_at, id')
-      .all()
-      .map((row) => JSON.parse(String(row.seq_ranges)) as Record<string, { start: number }>)
-    expect(ranges[1]?.serial?.start).toBeGreaterThan(ranges[0]?.serial?.start ?? 0)
-  })
-
-  it('still refuses when a manual field is missing', async () => {
-    // The template's fields still apply; submitting a design does not bypass
-    // the check that a part number was actually given.
-    const printerId = seedPrinter()
-    const template = await createTemplate()
-    const res = await submit({ printerId, templateId: template.id, ir: editedIr(), copies: 1 })
-    expect(res.statusCode).toBe(422)
-  })
-
-  it('prints the stored design when no IR is sent', async () => {
-    // "Print template X" without holding its contents still works.
-    const printerId = seedPrinter()
-    const template = await createTemplate()
-
-    await submit({ printerId, templateId: template.id, copies: 1, manualFieldValues: { partNo: 'A' } })
-    const snapshot = JSON.parse(
-      String(app.ctx.db.prepare('SELECT snapshot FROM print_jobs').get()?.snapshot),
-    ) as { ir: { elements: Array<{ id: string; yMm: number }> } }
-    expect(snapshot.ir.elements.find((e) => e.id === 'code')?.yMm).toBe(2)
   })
 })

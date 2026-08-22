@@ -25,8 +25,8 @@
  * millimetre off produces the same printed label.
  */
 import {
+  evaluate,
   TEXT_LINE_HEIGHT,
-  isVariableRef,
   textLines,
   type LabelElement,
   type LabelIR,
@@ -212,14 +212,14 @@ export function refit(
   previous: LabelElement | null,
   next: LabelElement,
   dpi: number,
-  /** Stand-in content, so a bound element is measured by what it will say. */
+  /** Values for `${}` references, so an element is measured by what it will say. */
   values: Readonly<Record<string, string>> = {},
 ): LabelElement {
   if (next.type === 'text') {
     if (previous !== null && (previous.type !== 'text' || !affectsTextBox(previous, next))) {
       return next
     }
-    const text = isVariableRef(next.content) ? (values[next.content.$var] ?? '') : next.content
+    const text = evaluate(next.content, values).text
     return { ...next, ...textBoxMm(next, canvasLineWidth, text) }
   }
 

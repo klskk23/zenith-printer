@@ -20,7 +20,7 @@ const fixedBarcode = {
 
 const variableBarcode = {
   ...fixedBarcode,
-  content: { $var: 'serial' },
+  content: '${serial}',
 }
 
 describe('a label that fits', () => {

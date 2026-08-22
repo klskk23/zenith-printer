@@ -8,7 +8,7 @@ import {
   type ContentSnapshot,
   type PrintJob,
 } from '../../src/domain/print-job.ts'
-import { requiredManualFields, sequenceFields, templateInputSchema, type Template } from '../../src/domain/template.ts'
+import { sequenceVariables, templateInputSchema, type Template } from '../../src/domain/template.ts'
 
 const snapshot: ContentSnapshot = {
   templateName: null,
@@ -20,6 +20,7 @@ const snapshot: ContentSnapshot = {
   dpi: 203,
   ir: { widthMm: 50, heightMm: 30, dpi: 203, elements: [] },
   profile: { name: null, density: 3, labelType: 1 }, offsetXDots: 0, offsetYDots: 0,
+  rows: [], copiesPerRow: 1, constants: {},
 }
 
 function job(overrides: Partial<PrintJob> = {}): PrintJob {
@@ -31,8 +32,7 @@ function job(overrides: Partial<PrintJob> = {}): PrintJob {
     profileId: null,
     requestedCopies: 80,
     pagesPrinted: 0,
-    manualFieldValues: {},
-    seqRanges: {},
+    seqClaims: [],
     status: 'queued',
     failureCode: null,
     failureMessage: null,
@@ -97,10 +97,18 @@ describe('submission schema', () => {
     expect(() => printJobInputSchema.parse({ ...base, copies: 2.5 })).toThrow()
   })
 
-  it('defaults the value maps to empty', () => {
-    const parsed = printJobInputSchema.parse(base)
-    expect(parsed.manualFieldValues).toEqual({})
-    expect(parsed.sequenceOverrides).toEqual({})
+  it('leaves rowSelection absent when the design uses no data source', () => {
+    expect(printJobInputSchema.parse(base).rowSelection).toBeUndefined()
+  })
+
+  it('accepts the three ways of naming rows', () => {
+    expect(printJobInputSchema.parse({ ...base, rowSelection: { all: true } }).rowSelection).toEqual({ all: true })
+    const explicit = printJobInputSchema.parse({ ...base, rowSelection: { ranges: [[5, 12]], ids: [3] } })
+    expect(explicit.rowSelection).toEqual({ ranges: [[5, 12]], ids: [3] })
+  })
+
+  it('rejects a row ordinal below one, since ordinals start at one', () => {
+    expect(() => printJobInputSchema.parse({ ...base, rowSelection: { ids: [0] } })).toThrow()
   })
 })
 
@@ -114,29 +122,26 @@ describe('template field helpers', () => {
     heightMm: 30,
     dpi: 203,
     elements: [],
-    variableFields: [
-      { name: 'partNo', label: 'Part', source: 'manual', sampleValue: 'ABC' },
-      { name: 'serial', label: 'Serial', source: 'sequence', seqStart: 1, seqDigits: 3, seqStep: 1 },
-      { name: 'batch', label: 'Batch', source: 'manual', sampleValue: 'B1' },
+    variables: [
+      { name: 'partNo', kind: 'constant', value: 'ABC' },
+      { name: 'serial', kind: 'sequence', poolId: 'pool-1' },
+      { name: 'batch', kind: 'constant', value: 'B1' },
     ],
+    dataSourceId: null,
     createdAt: '2026-08-21T00:00:00Z',
     updatedAt: '2026-08-21T00:00:00Z',
   }
 
-  it('lists what the print form must collect', () => {
-    // FR-038: a blank where a part number belongs wastes the label as surely
-    // as a jam does.
-    expect(requiredManualFields(template).map((f) => f.name)).toEqual(['partNo', 'batch'])
+  it('lists the sequences that need a span claimed', () => {
+    expect(sequenceVariables(template).map((v) => v.name)).toEqual(['serial'])
   })
 
-  it('lists the sequences that need a range claimed', () => {
-    expect(sequenceFields(template).map((f) => f.name)).toEqual(['serial'])
+  it('carries the pool id, which is what the claim is made against', () => {
+    expect(sequenceVariables(template)[0]?.poolId).toBe('pool-1')
   })
 
-  it('returns nothing for a template with fixed content only', () => {
-    const fixed = { ...template, variableFields: [] }
-    expect(requiredManualFields(fixed)).toEqual([])
-    expect(sequenceFields(fixed)).toEqual([])
+  it('returns nothing for a design with fixed content only', () => {
+    expect(sequenceVariables({ ...template, variables: [] })).toEqual([])
   })
 })
 
@@ -150,20 +155,47 @@ describe('template schema', () => {
     elements: [],
   }
 
-  it('defaults to no variable fields', () => {
-    expect(templateInputSchema.parse(base).variableFields).toEqual([])
+  it('defaults to no variables and no data source', () => {
+    const parsed = templateInputSchema.parse(base)
+    expect(parsed.variables).toEqual([])
+    expect(parsed.dataSourceId).toBeNull()
   })
 
-  it('rejects duplicate field names', () => {
+  it('rejects duplicate variable names', () => {
     expect(() =>
       templateInputSchema.parse({
         ...base,
-        variableFields: [
-          { name: 'a', label: 'A', source: 'manual', sampleValue: 'x' },
-          { name: 'a', label: 'B', source: 'manual', sampleValue: 'y' },
+        variables: [
+          { name: 'a', kind: 'constant', value: 'x' },
+          { name: 'a', kind: 'constant', value: 'y' },
         ],
       }),
     ).toThrow(/unique/i)
+  })
+
+  it('accepts a Chinese variable name containing a dot', () => {
+    // Column names come from somebody's spreadsheet; the grammar reserves only
+    // the closing brace.
+    const parsed = templateInputSchema.parse({
+      ...base,
+      variables: [{ name: '单价.含税', kind: 'constant', value: '19.90' }],
+    })
+    expect(parsed.variables[0]?.name).toBe('单价.含税')
+  })
+
+  it('rejects a variable name containing the closing brace', () => {
+    expect(() =>
+      templateInputSchema.parse({ ...base, variables: [{ name: 'a}b', kind: 'constant', value: 'x' }] }),
+    ).toThrow()
+  })
+
+  it('trims surrounding whitespace from a variable name', () => {
+    // `${ sku }` resolves to `sku`; a definition named " sku " would never match.
+    const parsed = templateInputSchema.parse({
+      ...base,
+      variables: [{ name: '  sku  ', kind: 'constant', value: 'x' }],
+    })
+    expect(parsed.variables[0]?.name).toBe('sku')
   })
 
   it('rejects a non-positive canvas', () => {

@@ -20,7 +20,7 @@ import {
   type PrintOptions,
 } from '../../src/drivers/port.ts'
 import type { Logger } from '../../src/drivers/frame-logger.ts'
-import type { ContentSnapshot, SequenceRange } from '../../src/domain/print-job.ts'
+import type { ContentSnapshot, SequenceClaim } from '../../src/domain/print-job.ts'
 
 export const silentLogger: Logger = {
   level: 'error',
@@ -114,7 +114,7 @@ export interface Harness {
   enqueue: (
     printerId: string,
     copies: number,
-    extra?: Partial<{ seqRanges: Record<string, SequenceRange>; snapshot: ContentSnapshot }>,
+    extra?: Partial<{ seqClaims: SequenceClaim[]; snapshot: ContentSnapshot }>,
   ) => string
   renderCalls: number[]
   /** The correction each render was asked for, in call order. */
@@ -139,6 +139,7 @@ export const SNAPSHOT: ContentSnapshot = {
   dpi: 203,
   ir: { widthMm: 50, heightMm: 30, dpi: 203, elements: [] },
   profile: { name: null, density: 3, labelType: 1 }, offsetXDots: 0, offsetYDots: 0,
+  rows: [], copiesPerRow: 1, constants: {},
 }
 
 const BLANK_PAGE: BinaryBitmap = { widthDots: 8, heightDots: 1, data: new Uint8Array(1) }
@@ -215,10 +216,21 @@ export function createHarness(driverOptions: (printerId: string) => FakeDriverOp
         idempotencyKey: `key-${seq}`,
         printerId,
         requestedCopies: copies,
-        manualFieldValues: {},
-        seqRanges: extra.seqRanges ?? {},
         snapshot: extra.snapshot ?? SNAPSHOT,
       })
+      // Claims live in their own table now, so a seeded job needs them written
+      // there rather than handed over as part of the job row. The pool has to
+      // exist first: the claim references it.
+      for (const claim of extra.seqClaims ?? []) {
+        db.prepare(
+          `INSERT OR IGNORE INTO sequence_pools (id, name, digits, step, floor, created_at)
+           VALUES (?, ?, ?, ?, 0, '1970-01-01T00:00:00.000Z')`,
+        ).run(claim.poolId, claim.poolId, claim.digits, claim.step)
+        db.prepare(
+          `INSERT INTO job_sequence_claims (job_id, pool_id, variable_name, start_value, end_value, step, digits)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ).run(job.id, claim.poolId, claim.variableName, claim.start, claim.end, claim.step, claim.digits)
+      }
       return job.id
     },
   }

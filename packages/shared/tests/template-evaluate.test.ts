@@ -58,7 +58,6 @@ describe('evaluate', () => {
 
 function ir(...contents: string[]): LabelIR {
   return {
-    version: 1,
     widthMm: 50,
     heightMm: 30,
     dpi: 203,

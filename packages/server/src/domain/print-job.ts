@@ -24,8 +24,34 @@ export function isTerminal(status: JobStatus): boolean {
   return TERMINAL_STATUSES.includes(status)
 }
 
-/** Copies per job. The spec bounds this at 100 (Assumptions). */
+/** Copies per selected row. */
 export const MAX_COPIES = 100
+
+/**
+ * Labels one job may produce, counting rows x copies.
+ *
+ * Refused before anything is rendered or any serial is claimed, and never
+ * split into several jobs behind the operator's back: a batch that quietly
+ * became three is three things to reconcile against one intention (FR-043).
+ */
+export const MAX_LABELS_PER_JOB = 1000
+
+/**
+ * Which rows of the bound data source to print.
+ *
+ * Kept compact rather than expanded client-side: `all` has to mean "the table
+ * as it stands when this is submitted", and an expanded list cannot say that.
+ * Ordinals are positions in the table, 1-based — the same numbers a "5-12"
+ * range refers to.
+ */
+export const rowSelectionSchema = z.union([
+  z.object({ all: z.literal(true) }),
+  z.object({
+    ranges: z.array(z.tuple([z.number().int().min(1), z.number().int().min(1)])).default([]),
+    ids: z.array(z.number().int().min(1)).default([]),
+  }),
+])
+export type RowSelection = z.infer<typeof rowSelectionSchema>
 
 /**
  * Submission body. Content comes from a saved template OR an ad-hoc IR, never
@@ -39,8 +65,8 @@ export const printJobInputSchema = z
     ir: labelIrSchema.optional(),
     profileId: z.string().min(1).optional(),
     copies: z.number().int().min(1).max(MAX_COPIES).default(1),
-    manualFieldValues: z.record(z.string(), z.string()).default({}),
-    sequenceOverrides: z.record(z.string(), z.number().int().min(0)).default({}),
+    /** Required when the design is bound to a data source; ignored otherwise. */
+    rowSelection: rowSelectionSchema.optional(),
   })
   /**
    * At least one, and both together are meaningful.
@@ -66,10 +92,13 @@ export type PrintJobInput = z.infer<typeof printJobInputSchema>
  * Sequence span consumed by one job, locked at enqueue time (FR-049).
  *
  * `digits` is stored rather than inferred. Deriving it from `end` looks
- * tempting and is wrong: a field configured for three digits that only reaches
+ * tempting and is wrong: a pool configured for three digits that only reaches
  * 80 would print "80" instead of "080", and the labels would not sort.
  */
-export interface SequenceRange {
+export interface SequenceClaim {
+  poolId: string
+  /** The design's name for it — what `${name}` in the content resolves to. */
+  variableName: string
   start: number
   end: number
   step: number
@@ -113,6 +142,27 @@ export interface ContentSnapshot {
   offsetXDots: number
   offsetYDots: number
   /**
+   * Row values copied out of the data source at submit time, in print order.
+   *
+   * Copied rather than referenced so history and reprints cannot drift when
+   * somebody edits the table afterwards (FR-039, FR-040). Empty when the design
+   * uses no data source, in which case the job is `copiesPerRow` identical
+   * labels — the behaviour that existed before data sources did.
+   */
+  rows: Array<Record<string, string>>
+  /** Copies of each row. Same row, same serial, for every copy (FR-036). */
+  copiesPerRow: number
+  /**
+   * The design's constants, resolved at submit time.
+   *
+   * Copied here for the same reason as `rows`: a constant edited after the fact
+   * must not change what a reprint produces. Leaving them out looked harmless
+   * because the values were already substituted for the *check* — but nothing
+   * substituted them for the *render*, so a reprint would have failed on an
+   * unresolved reference (FR-039, FR-040).
+   */
+  constants: Record<string, string>
+  /**
    * What was clipped on this run.
    *
    * Recorded here rather than recomputed on read: the design can be edited or
@@ -128,11 +178,11 @@ export interface PrintJob {
   printerId: string | null
   templateId: string | null
   profileId: string | null
+  /** Total labels: rows x copiesPerRow. Kept as the driver's page count. */
   requestedCopies: number
   /** null means unknown, which is not the same as zero (FR-053). */
   pagesPrinted: number | null
-  manualFieldValues: Record<string, string>
-  seqRanges: Record<string, SequenceRange>
+  seqClaims: SequenceClaim[]
   status: JobStatus
   failureCode: string | null
   failureMessage: string | null

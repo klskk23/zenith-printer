@@ -13,7 +13,7 @@ import {
   MIN_MODULE_WIDTH_DOTS,
   QRCODE_MODULE_WIDTH_STEP,
   dotsToMm,
-  isVariableRef,
+  parse,
   mmToDots,
   snapQrcodeModuleWidth,
   type BarcodeElement,
@@ -148,7 +148,7 @@ function ModuleWidthField({
   patch: (changes: Partial<LabelElement>) => void
 }): React.JSX.Element {
   const moduleMm = dotsToMm(element.moduleWidthDots, dpi)
-  const variable = isVariableRef(element.content)
+  const variable = parse(element.content).some((segment) => segment.kind === 'ref')
 
   return (
     <div className="space-y-1">

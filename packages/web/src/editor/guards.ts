@@ -16,7 +16,6 @@
  * intolerable.
  */
 import {
-  isVariableRef,
   layoutGrid,
   mmToDots,
   rotatedBounds,
@@ -141,11 +140,7 @@ export function inspect(ir: LabelIR, limits: PrinterLimits | null): Violation[] 
       })
     }
 
-    if (
-      (element.type === 'barcode' || element.type === 'qrcode') &&
-      !isVariableRef(element.content) &&
-      element.content.length === 0
-    ) {
+    if ((element.type === 'barcode' || element.type === 'qrcode') && element.content.length === 0) {
       violations.push({ code: 'BARCODE_CONTENT_EMPTY', elementId: element.id, blocking: true })
     }
 

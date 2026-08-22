@@ -1,14 +1,11 @@
 /**
  * Turn one job into the pages the driver will print.
  *
- * The reason this is not simply "render once, repeat N times": a sequence field
- * makes every copy different. Eighty labels then need eighty renders, each with
- * its own serial substituted.
- *
- * When nothing varies, one render is reused by reference — a hundred pointers
- * to one bitmap rather than a hundred bitmaps.
+ * Not simply "render once, repeat N times": a data source row or a sequence
+ * makes labels differ from one another. What varies and what does not is the
+ * whole content of this module.
  */
-import { resolveVariables, type LabelIR } from '@zenith/shared'
+import { evaluateIrStrict, formatSequence, type LabelIR } from '@zenith/shared'
 import type { BinaryBitmap } from '../drivers/port.ts'
 import type { PrintJob } from '../domain/print-job.ts'
 
@@ -16,32 +13,70 @@ export interface RenderOne {
   (ir: LabelIR): BinaryBitmap
 }
 
+/**
+ * Index of the *distinct content* a given label carries.
+ *
+ * With a data source it is the row: every copy of a row is identical, serial
+ * included (FR-036). Without one there are no rows, and each copy is its own
+ * unit so a sequence still steps once per label — which is what printing five
+ * numbered labels meant before data sources existed.
+ */
+export function contentIndex(job: PrintJob, labelIndex: number): number {
+  const { rows, copiesPerRow } = job.snapshot
+  if (rows.length === 0) {
+    return labelIndex
+  }
+  return Math.floor(labelIndex / Math.max(1, copiesPerRow))
+}
 
-/** Values for one copy: manual fields fixed, sequence fields stepped. */
-export function valuesForCopy(job: PrintJob, copyIndex: number): Record<string, string> {
-  const values: Record<string, string> = { ...job.manualFieldValues }
+/**
+ * Values substituted into one label: the design's constants, its row, and this
+ * job's serials.
+ *
+ * All three come off the snapshot, so a design edited after submission cannot
+ * change what a reprint produces (FR-039, FR-040).
+ */
+export function valuesForLabel(job: PrintJob, labelIndex: number): Record<string, string> {
+  const index = contentIndex(job, labelIndex)
+  const { rows, constants } = job.snapshot
 
-  for (const [name, range] of Object.entries(job.seqRanges)) {
-    const value = range.start + copyIndex * range.step
-    values[name] = String(value).padStart(range.digits, '0')
+  if (rows.length > 0 && rows[index] === undefined) {
+    // The job's page count and its row count disagree. Refusing beats printing
+    // a label with blanks where the row values belong.
+    throw new Error(
+      `job ${job.id} asks for label ${labelIndex}, which needs row ${index} of ${rows.length}`,
+    )
+  }
+
+  const values: Record<string, string> = { ...constants, ...(rows[index] ?? {}) }
+
+  for (const claim of job.seqClaims) {
+    values[claim.variableName] = formatSequence(
+      claim.variableName,
+      claim.start + index * claim.step,
+      claim.digits,
+    )
   }
 
   return values
 }
 
-export function hasPerCopyContent(job: PrintJob): boolean {
-  return Object.keys(job.seqRanges).length > 0
+/** Whether any two labels in this job differ. */
+export function hasPerLabelContent(job: PrintJob): boolean {
+  return job.seqClaims.length > 0 || job.snapshot.rows.length > 1
+}
+
+export function irForLabel(job: PrintJob, labelIndex: number): LabelIR {
+  return evaluateIrStrict(job.snapshot.ir, valuesForLabel(job, labelIndex))
 }
 
 /** Build every page for a job. */
 export function buildJobPages(job: PrintJob, render: RenderOne): BinaryBitmap[] {
-  if (!hasPerCopyContent(job)) {
+  if (!hasPerLabelContent(job)) {
     // Identical copies: render once and hand back the same object repeatedly.
-    const single = render(resolveVariables(job.snapshot.ir, job.manualFieldValues))
+    const single = render(irForLabel(job, 0))
     return Array.from({ length: job.requestedCopies }, () => single)
   }
 
-  return Array.from({ length: job.requestedCopies }, (_unused, index) =>
-    render(resolveVariables(job.snapshot.ir, valuesForCopy(job, index))),
-  )
+  return Array.from({ length: job.requestedCopies }, (_unused, index) => render(irForLabel(job, index)))
 }

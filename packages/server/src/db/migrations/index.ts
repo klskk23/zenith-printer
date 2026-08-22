@@ -251,10 +251,16 @@ const dataSourcesAndPools = `
     name       TEXT NOT NULL UNIQUE,
     digits     INTEGER NOT NULL CHECK (digits BETWEEN 1 AND 12),
     step       INTEGER NOT NULL DEFAULT 1 CHECK (step >= 1),
-    -- Reset floor. The current value is max(floor, highest claimed) — history
-    -- stays the only evidence of what was printed; this is just a declaration
-    -- that numbering starts again here.
+    -- Reset floor: numbering starts again here.
     floor      INTEGER NOT NULL DEFAULT 0 CHECK (floor >= 0),
+    -- Claims at or below this rowid predate the last reset and no longer count
+    -- towards the current value. Without it a reset could never lower the
+    -- number, since the derivation takes a maximum over history — and a reset
+    -- button that silently does nothing is worse than no reset button. The
+    -- claims themselves are kept: they are the evidence of what went onto
+    -- labels, which is exactly why resetting backwards has to be confirmed as
+    -- capable of producing duplicates (FR-006).
+    floor_watermark INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
   );
 

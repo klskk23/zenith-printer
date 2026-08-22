@@ -253,9 +253,7 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
         templateId: null,
         profileId: profile?.id ?? null,
         requestedCopies: 1,
-        manualFieldValues: {},
-        seqRanges: {},
-        snapshot: buildSnapshot(printer, content),
+        snapshot: buildSnapshot(printer, { ...content, rows: [], copiesPerRow: 1 }),
       })
 
       void app.ctx.queue?.drain(printer.id).catch((err: unknown) => {

@@ -247,30 +247,23 @@ export const copy: Copy = {
     needsProbe: 'This printer has not been probed, so its printable area is unknown',
   },
 
-  fields: {
-    heading: 'Variable fields',
-    empty:
-      'No variable fields yet. Add one and a single template can cover a batch of labels that differ',
-    duplicateName: 'Duplicate name — elements bound to it cannot be told apart',
-    addManual: 'Entered by hand',
-    addSequence: 'Running number',
-    manual: 'Entered by hand (one value shared by every copy in this run)',
-    sequence: 'Running number (increments per copy, so every label differs)',
-    bindTo: 'Bind to the selected element',
-    unbound: 'Not bound (fixed content)',
-    notBindable: 'Only text, barcodes and QR codes can be bound to a variable field',
+  variables: {
+    heading: 'Variables',
+    empty: 'No variables yet. Once defined, reference one as ${name} inside text, barcode or QR content',
+    name: 'Variable name',
+    value: 'Fixed value',
+    pool: 'Sequence pool',
     remove: 'Remove',
-    name: 'Field name',
-    label: 'Display name',
-    sampleValue: 'Sample value',
-    sampleHint: 'Used only to preview the layout; never printed',
-    seqStart: 'Start',
-    seqDigits: 'Digits',
-    seqStep: 'Step',
-    seqPreview: (start: number, digits: number, step: number): string => {
-      const at = (i: number): string => String(start + i * step).padStart(digits, '0')
-      return `${at(0)}, ${at(1)}, ${at(2)}… — digits control zero padding; ${digits} digits reach ${'9'.repeat(digits)}`
-    },
+    addConstant: 'Add constant',
+    addSequence: 'Add sequence',
+    newPool: 'New pool',
+    referenceHint: (name: string): string => `Reference it as \${${name}} in content`,
+    poolOption: (name: string, next: number, digits: number): string =>
+      `${name} (next ${String(next).padStart(digits, '0')})`,
+    collides: (name: string): string =>
+      `"${name}" is also a column of the bound data source. One name pointing at two values leaves no way to say which is meant — rename one of them`,
+    unresolved: (names: string): string =>
+      `Content references names that nothing defines: ${names}. Define them here, or use a column name from the data source`,
   },
 
   templates: {

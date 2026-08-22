@@ -33,8 +33,8 @@ const IR = labelIrSchema.parse({
   elements: [{ id: 'r', type: 'rect', xMm: 2, yMm: 2, widthMm: 10, heightMm: 10, strokeWidthDots: 2 }],
 })
 
-let formFields: unknown[] = []
-let designFields: never[] = []
+let variableValues: Record<string, string> = {}
+let unresolved: string[] = []
 
 function wrap(ui: React.ReactNode): React.JSX.Element {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false } } })
@@ -49,8 +49,8 @@ afterEach(() => {
 beforeEach(() => {
   previews.length = 0
   submitted.length = 0
-  formFields = []
-  designFields = []
+  variableValues = {}
+  unresolved = []
   vi.stubGlobal('URL', {
     ...URL,
     createObjectURL: () => 'blob:preview',
@@ -74,7 +74,7 @@ beforeEach(() => {
         json: () => Promise.resolve({ jobId: 'job-1', status: 'queued' }),
       } as unknown as Response)
     }
-    const body = url.includes('print-form') ? { fields: formFields } : { warnings: [] }
+    const body = { warnings: [] }
     return Promise.resolve({
       ok: true, status: 200,
       headers: new Headers({ 'content-type': 'application/json' }),
@@ -92,7 +92,8 @@ function open(over: Partial<React.ComponentProps<typeof PrintDialog>> = {}): voi
         templateId={null}
         profileId="pro-1"
         printer={PRINTER as never}
-        fields={designFields}
+        variableValues={variableValues}
+        unresolved={unresolved}
         onClose={() => undefined}
         {...over}
       />,
@@ -148,48 +149,67 @@ describe('a batch of more than one', () => {
 })
 
 describe('a design with variables', () => {
-  it('waits for the fields rather than previewing a label with holes in it', async () => {
-    // The design decides which fields exist; the server only fills in where a
-    // sequence has got to.
-    designFields = [{ name: 'sku', label: 'SKU', source: 'manual' }] as never[]
-    formFields = [{ name: 'sku', label: 'SKU', source: 'manual' }]
+  it('previews with the values the design resolves to', async () => {
+    // The values come from the editor, not from a form: nothing is typed in
+    // before printing any more.
+    variableValues = { sku: 'A-1' }
     open({ templateId: 'tpl-1' })
-
-    expect(await screen.findByText('填完上面的变量后才能预览')).toBeDefined()
-    expect(previews).toHaveLength(0)
-  })
-
-  it('previews once they are filled in', async () => {
-    designFields = [{ name: 'sku', label: 'SKU', source: 'manual' }] as never[]
-    formFields = [{ name: 'sku', label: 'SKU', source: 'manual' }]
-    open({ templateId: 'tpl-1' })
-    await screen.findByText('填完上面的变量后才能预览')
-
-    const field = [...document.querySelectorAll('input')].find(
-      (i) => i.type !== 'number',
-    ) as HTMLInputElement
-    fireEvent.change(field, { target: { value: 'A-1' } })
 
     await vi.waitFor(() => expect(previews).toHaveLength(1))
     expect(previews[0]).toMatchObject({ variableValues: { sku: 'A-1' } })
   })
 
-  it('previews the first copy of a sequence, not the first number', async () => {
-    // The suggestion continues from what has already been printed; showing
-    // 0001 would be a label nobody is about to produce.
-    designFields = [
-      { name: 'serial', label: '流水号', source: 'sequence', seqStart: 1, seqDigits: 4 },
-    ] as never[]
-    formFields = [
-      { name: 'serial', label: '流水号', source: 'sequence', suggestedStart: 41, seqDigits: 4, seqStep: 1 },
-    ]
+  it('previews the number the next label will carry, not the first one', async () => {
+    // Showing 0001 would be a label nobody is about to produce.
+    variableValues = { serial: '0041' }
     open({ templateId: 'tpl-1' })
 
     await vi.waitFor(() => expect(previews).toHaveLength(1))
     expect(previews[0]).toMatchObject({ variableValues: { serial: '0041' } })
   })
+
+  it('refuses to print, and to preview, while a reference resolves to nothing', async () => {
+    // The label would come out reading "${sku}", which is waste that looks
+    // like output.
+    unresolved = ['sku']
+    open({ templateId: 'tpl-1' })
+
+    expect(await screen.findByText(/引用了未定义的名称/)).toBeDefined()
+    expect((screen.getByRole('button', { name: '确认打印' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(previews).toHaveLength(0)
+  })
 })
 
+describe('the retired print form', () => {
+  /**
+   * The dialog used to collect values before printing. Nothing is typed in any
+   * more — constants are fixed in the design, serials come from a pool, column
+   * values come from the selected rows — so the form must not reappear.
+   *
+   * A negative assertion, because the failure mode is a *return*: the form is
+   * easy to reintroduce by accident while adding the row-selection panel.
+   */
+  it('does not render a value form', async () => {
+    variableValues = { sku: 'A-1' }
+    open({ templateId: 'tpl-1' })
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+
+    expect(screen.queryByText('填完上面的变量后才能预览')).toBeNull()
+    expect(screen.queryByText(/序号字段需要先保存为模板/)).toBeNull()
+    // The only number input left is the copy count.
+    const numbers = [...document.querySelectorAll('input')].filter((i) => i.type === 'number')
+    expect(numbers).toHaveLength(1)
+  })
+
+  it('never calls the print-form endpoint, which no longer exists', async () => {
+    variableValues = {}
+    open({ templateId: 'tpl-1' })
+    await vi.waitFor(() => expect(previews).toHaveLength(1))
+
+    const calls = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls
+    expect(calls.map((call) => String(call[0])).some((url) => url.includes('print-form'))).toBe(false)
+  })
+})
 
 describe('the dialog itself', () => {
   /**
@@ -256,69 +276,27 @@ describe('a template with unsaved edits', () => {
 
 describe('a design that was never saved', () => {
   /**
-   * The reported failure. An unsaved design has no template, so the print form
-   * endpoint is never called — the dialog offered nothing to fill in, the
-   * preview asked the server to resolve a `$var` it had no value for, and it
-   * came back as "could not render" with no way to act on it.
-   *
-   * The fields live in the editor, and now they travel with the dialog.
+   * The reported failure, and why sequences no longer need a template: a pool
+   * exists in its own right, so an unsaved design can draw from one. The old
+   * model recorded claims against a template, which made this fail in the
+   * queue — a wasted trip, and a poor place to find out (FR-007).
    */
-  it('still asks about its variable fields', async () => {
-    designFields = [{ name: 'sku', label: 'SKU', source: 'manual' }] as never[]
+  it('prints a sequence without being saved first', async () => {
+    variableValues = { serial: '0041' }
     open({ templateId: null })
-
-    expect(await screen.findByText('填完上面的变量后才能预览')).toBeDefined()
-    expect([...document.querySelectorAll('label')].map((l) => l.textContent)).toContain('SKU')
-  })
-
-  it('previews once they are filled in', async () => {
-    designFields = [{ name: 'sku', label: 'SKU', source: 'manual' }] as never[]
-    open({ templateId: null })
-    await screen.findByText('填完上面的变量后才能预览')
-
-    const field = [...document.querySelectorAll('input')].find((i) => i.type !== 'number')!
-    fireEvent.change(field, { target: { value: 'A-1' } })
 
     await vi.waitFor(() => expect(previews).toHaveLength(1))
-    expect(previews[0]).toMatchObject({ variableValues: { sku: 'A-1' } })
+    expect((screen.getByRole('button', { name: '确认打印' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
-  /**
-   * A sequence claim is recorded against a template, because its purpose is to
-   * carry on across print runs. Submitting one from an unsaved design produces
-   * a job that fails in the queue — a wasted trip, and a poor place to find
-   * out.
-   */
-  it('refuses to print a sequence until the template is saved', async () => {
-    designFields = [
-      { name: 'serial', label: '流水号', source: 'sequence', seqStart: 1, seqDigits: 4 },
-    ] as never[]
+  it('sends the design itself, since there is no template to name', async () => {
+    variableValues = {}
     open({ templateId: null })
-
-    expect(await screen.findByText(/序号字段需要先保存为模板/)).toBeDefined()
-    expect((screen.getByRole('button', { name: '确认打印' }) as HTMLButtonElement).disabled).toBe(true)
-  })
-
-  it('allows a manual field without saving', async () => {
-    designFields = [{ name: 'sku', label: 'SKU', source: 'manual' }] as never[]
-    open({ templateId: null })
-    expect(screen.queryByText(/序号字段需要先保存为模板/)).toBeNull()
-  })
-})
-
-describe('a saved template', () => {
-  it('takes the server’s sequence continuation, not the design’s start', async () => {
-    // Where a sequence has got to lives in the claims. Starting over would
-    // reprint numbers already on labels.
-    designFields = [
-      { name: 'serial', label: '流水号', source: 'sequence', seqStart: 1, seqDigits: 4 },
-    ] as never[]
-    formFields = [
-      { name: 'serial', label: '流水号', source: 'sequence', suggestedStart: 741, seqDigits: 4, seqStep: 1 },
-    ]
-    open({ templateId: 'tpl-1' })
-
     await vi.waitFor(() => expect(previews).toHaveLength(1))
-    expect(previews[0]).toMatchObject({ variableValues: { serial: '0741' } })
+    fireEvent.click(screen.getByRole('button', { name: '确认打印' }))
+
+    await vi.waitFor(() => expect(submitted).toHaveLength(1))
+    expect(submitted[0]).toHaveProperty('ir')
+    expect(submitted[0]).not.toHaveProperty('templateId')
   })
 })

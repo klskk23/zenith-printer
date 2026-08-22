@@ -11,12 +11,48 @@ import type {
   ContentSnapshot,
   JobStatus,
   PrintJob,
-  SequenceRange,
+  SequenceClaim,
 } from '../../domain/print-job.ts'
 
 type Row = Record<string, unknown>
 
-function toJob(row: Row): PrintJob {
+/**
+ * Sequence claims for a set of jobs, keyed by job id.
+ *
+ * Loaded alongside rather than lazily: `irForLabel` needs them to substitute a
+ * serial, and a job read without them would render every label with the same
+ * number — visibly wrong only after the labels are out.
+ */
+function claimsByJob(db: Database, jobIds: readonly string[]): Map<string, SequenceClaim[]> {
+  const byJob = new Map<string, SequenceClaim[]>()
+  if (jobIds.length === 0) {
+    return byJob
+  }
+  const placeholders = jobIds.map(() => '?').join(',')
+  const rows = db
+    .prepare(
+      `SELECT job_id, pool_id, variable_name, start_value, end_value, step, digits
+       FROM job_sequence_claims WHERE job_id IN (${placeholders}) ORDER BY variable_name`,
+    )
+    .all(...jobIds)
+
+  for (const row of rows) {
+    const jobId = String(row.job_id)
+    const list = byJob.get(jobId) ?? []
+    list.push({
+      poolId: String(row.pool_id),
+      variableName: String(row.variable_name),
+      start: Number(row.start_value),
+      end: Number(row.end_value),
+      step: Number(row.step),
+      digits: Number(row.digits),
+    })
+    byJob.set(jobId, list)
+  }
+  return byJob
+}
+
+function toJob(row: Row, claims: SequenceClaim[] = []): PrintJob {
   return {
     id: String(row.id),
     idempotencyKey: String(row.idempotency_key),
@@ -26,8 +62,7 @@ function toJob(row: Row): PrintJob {
     requestedCopies: Number(row.requested_copies),
     // NULL survives as null: it means "unknown", not "none" (FR-053).
     pagesPrinted: row.pages_printed === null ? null : Number(row.pages_printed),
-    manualFieldValues: JSON.parse(String(row.manual_field_values)) as Record<string, string>,
-    seqRanges: JSON.parse(String(row.seq_ranges)) as Record<string, SequenceRange>,
+    seqClaims: claims,
     status: String(row.status) as JobStatus,
     failureCode: row.failure_code === null ? null : String(row.failure_code),
     failureMessage: row.failure_message === null ? null : String(row.failure_message),
@@ -44,8 +79,6 @@ export interface CreateJobInput {
   templateId?: string | null
   profileId?: string | null
   requestedCopies: number
-  manualFieldValues: Record<string, string>
-  seqRanges: Record<string, SequenceRange>
   snapshot: ContentSnapshot
 }
 
@@ -66,14 +99,19 @@ export class JobRepo {
     this.#ids = deps.ids
   }
 
+  #withClaims(row: Row): PrintJob {
+    const id = String(row.id)
+    return toJob(row, claimsByJob(this.#db, [id]).get(id) ?? [])
+  }
+
   find(id: string): PrintJob | undefined {
     const row = this.#db.prepare('SELECT * FROM print_jobs WHERE id = ?').get(id)
-    return row === undefined ? undefined : toJob(row as Row)
+    return row === undefined ? undefined : this.#withClaims(row as Row)
   }
 
   findByIdempotencyKey(key: string): PrintJob | undefined {
     const row = this.#db.prepare('SELECT * FROM print_jobs WHERE idempotency_key = ?').get(key)
-    return row === undefined ? undefined : toJob(row as Row)
+    return row === undefined ? undefined : this.#withClaims(row as Row)
   }
 
   list(filter: { printerId?: string; status?: JobStatus } = {}): PrintJob[] {
@@ -91,7 +129,7 @@ export class JobRepo {
     return this.#db
       .prepare(`SELECT * FROM print_jobs ${where} ORDER BY created_at, id`)
       .all(...(params as never[]))
-      .map((row) => toJob(row as Row))
+      .map((row) => this.#withClaims(row as Row))
   }
 
   /**
@@ -110,8 +148,8 @@ export class JobRepo {
       .prepare(
         `INSERT INTO print_jobs
            (id, idempotency_key, printer_id, template_id, profile_id, requested_copies,
-            pages_printed, manual_field_values, seq_ranges, status, snapshot, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'queued', ?, ?)`,
+            pages_printed, status, snapshot, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 'queued', ?, ?)`,
       )
       .run(
         id,
@@ -120,8 +158,6 @@ export class JobRepo {
         input.templateId ?? null,
         input.profileId ?? null,
         input.requestedCopies,
-        JSON.stringify(input.manualFieldValues),
-        JSON.stringify(input.seqRanges),
         JSON.stringify(input.snapshot),
         this.#clock.now().toISOString(),
       )
@@ -171,6 +207,6 @@ export class JobRepo {
     return this.#db
       .prepare("SELECT * FROM print_jobs WHERE status = 'printing'")
       .all()
-      .map((row) => toJob(row as Row))
+      .map((row) => this.#withClaims(row as Row))
   }
 }

@@ -11,18 +11,19 @@
  * claimed range behind.
  */
 import {
-  isVariableRef,
+  collectReferences,
+  detectNameCollisions,
+  evaluateIr,
   labelIrSchema,
   renderBarcodeSvg,
-  resolveVariables,
-  sampleValues,
   type LabelIR,
 } from '@zenith/shared'
 import type { Database } from '../db/index.ts'
+import type { Clock, IdGenerator } from '../clock.ts'
 import { maxLabelWidthMm, type Printer } from '../domain/printer.ts'
 import type { Profile } from '../domain/profile.ts'
 import type { Template } from '../domain/template.ts'
-import type { ContentSnapshot, SequenceRange } from '../domain/print-job.ts'
+import type { ContentSnapshot, SequenceClaim } from '../domain/print-job.ts'
 import { SequenceAllocator, SequenceOverflowError } from '../domain/sequence-allocator.ts'
 import { ApiError } from './errors.ts'
 import { DEFAULT_THRESHOLD } from '../render/binarize.ts'
@@ -34,28 +35,64 @@ export interface ResolvedContent {
 }
 
 /**
- * Values used to render the editor preview and to validate the design.
- * Sequence fields contribute their starting value; manual fields their sample.
+ * Values the design's own variables contribute — constants directly, sequences
+ * as a placeholder of the right width.
+ *
+ * The editor draws with these and this module measures with them. Two
+ * different answers would be invisible until a barcode reported as fitting
+ * turned out not to.
  */
-export function previewValues(template: Template | null): Record<string, string> {
-  // The rule lives in @zenith/shared: the editor draws with these values and
-  // this check measures with them, and the two disagreeing would be invisible
-  // until a barcode reported as fitting turned out not to.
-  return sampleValues(template?.variableFields ?? [])
+export function constantValues(template: Template | null): Record<string, string> {
+  const values: Record<string, string> = {}
+  for (const variable of template?.variables ?? []) {
+    if (variable.kind === 'constant') {
+      values[variable.name] = variable.value
+    }
+  }
+  return values
 }
 
-/** Every manual field must have a value before anything is printed (FR-038). */
-export function assertManualFieldsProvided(
+export function designValues(
   template: Template | null,
-  provided: Record<string, string>,
-): void {
-  const missing = (template?.variableFields ?? [])
-    .filter((field) => field.source === 'manual')
-    .filter((field) => provided[field.name] === undefined || provided[field.name] === '')
-    .map((field) => field.name)
+  sequenceStarts: Record<string, { value: number; digits: number }> = {},
+): Record<string, string> {
+  const values = constantValues(template)
+  for (const variable of template?.variables ?? []) {
+    if (variable.kind !== 'sequence') continue
+    const start = sequenceStarts[variable.name]
+    values[variable.name] =
+      start === undefined ? '0' : String(start.value).padStart(start.digits, '0')
+  }
+  return values
+}
 
-  if (missing.length > 0) {
-    throw ApiError.unprocessable('FIELD_VALIDATION_FAILED', { missingFields: missing })
+/**
+ * Every closed reference must resolve before anything is printed.
+ *
+ * Unresolvable content is not a rendering problem to be discovered later: the
+ * label would come out reading "${sku}", which is waste that looks like output.
+ */
+export function assertReferencesResolvable(ir: LabelIR, values: Record<string, string>): void {
+  const unresolved = collectReferences(ir).filter((name) => values[name] === undefined)
+  if (unresolved.length > 0) {
+    throw ApiError.unprocessable('VARIABLE_NOT_DEFINED', {
+      reference: unresolved[0],
+      references: unresolved,
+    })
+  }
+}
+
+/**
+ * A design variable and a column of the bound source must not share a name.
+ *
+ * Refused rather than resolved by precedence: a precedence rule would let
+ * somebody change what an existing label prints by adding a column, without
+ * any way for them to know what they shadowed (FR-009b).
+ */
+export function assertNoNameCollisions(template: Template | null, columns: readonly string[]): void {
+  const collisions = detectNameCollisions(template?.variables ?? [], columns)
+  if (collisions.length > 0) {
+    throw ApiError.unprocessable('VARIABLE_NAME_COLLIDES', { name: collisions[0], names: collisions })
   }
 }
 
@@ -67,13 +104,10 @@ export function assertManualFieldsProvided(
  * at it (FR-040).
  */
 export function assertBarcodesEncodable(ir: LabelIR, values: Record<string, string>): void {
-  const resolved = resolveVariables(ir, values)
+  const resolved = evaluateIr(ir, values).ir
 
   for (const element of resolved.elements) {
     if (element.type !== 'barcode' && element.type !== 'qrcode') {
-      continue
-    }
-    if (isVariableRef(element.content)) {
       continue
     }
     try {
@@ -124,7 +158,7 @@ export function assertTemplateMatchesPrinter(template: Template, printer: Printe
  */
 export function buildSnapshot(
   printer: Printer,
-  content: ResolvedContent,
+  content: ResolvedContent & { rows: Array<Record<string, string>>; copiesPerRow: number },
 ): ContentSnapshot {
   const capabilities = printer.capabilities
   if (capabilities === null) {
@@ -153,15 +187,20 @@ export function buildSnapshot(
     // here because it will have changed by the time anyone reads this record.
     offsetXDots: printer.offsetXDots,
     offsetYDots: printer.offsetYDots,
+    rows: content.rows,
+    copiesPerRow: content.copiesPerRow,
+    constants: constantValues(template),
   }
 }
 
 export interface AllocateOptions {
   db: Database
+  clock: Clock
+  ids: IdGenerator
   jobId: string
   template: Template | null
-  copies: number
-  overrides: Record<string, number>
+  /** Distinct serials needed: rows when there is a data source, else copies. */
+  count: number
 }
 
 /**
@@ -169,24 +208,25 @@ export interface AllocateOptions {
  * Last step in submission: an earlier rejection must not leave a claim behind,
  * because a claimed-then-abandoned range skips numbers for nothing.
  */
-export function allocateSequences(options: AllocateOptions): Record<string, SequenceRange> {
-  const { template } = options
-  if (template === null || template.variableFields.every((f) => f.source !== 'sequence')) {
-    return {}
+export function allocateSequences(options: AllocateOptions): SequenceClaim[] {
+  const bindings = (options.template?.variables ?? [])
+    .filter((variable) => variable.kind === 'sequence')
+    .map((variable) => ({ variableName: variable.name, poolId: variable.poolId }))
+
+  if (bindings.length === 0) {
+    return []
   }
 
   try {
-    return new SequenceAllocator(options.db).allocate({
+    return new SequenceAllocator(options.db, options.clock, options.ids).allocate({
       jobId: options.jobId,
-      templateId: template.id,
-      fields: template.variableFields,
-      copies: options.copies,
-      overrides: options.overrides,
+      bindings,
+      count: options.count,
     })
   } catch (err) {
     if (err instanceof SequenceOverflowError) {
       throw ApiError.unprocessable('SEQUENCE_OVERFLOW', {
-        fieldName: err.fieldName,
+        poolName: err.poolName,
         requestedEnd: err.requestedEnd,
         maxValue: err.maxValue,
       })

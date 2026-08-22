@@ -40,7 +40,7 @@ describe('the queue passes the correction to the renderer', () => {
     const printerId = h.seedPrinter()
     h.enqueue(printerId, 3, {
       snapshot: { ...SNAPSHOT, offsetXDots: 2, offsetYDots: 2 },
-      seqRanges: { serial: { start: 1, end: 3, step: 1, digits: 3 } },
+      seqClaims: [{ poolId: 'pool-1', variableName: 'serial', start: 1, end: 3, step: 1, digits: 3 }],
     })
 
     await h.queue.drain(printerId)

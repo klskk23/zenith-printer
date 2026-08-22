@@ -1,17 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { LabelElement } from '@zenith/shared'
+import type { LabelElement, VariableDefinition } from '@zenith/shared'
 import { request } from '../../api/client.ts'
 import type { PrinterKind } from '../../api/types.ts'
-
-export interface VariableField {
-  name: string
-  label: string
-  source: 'manual' | 'sequence'
-  sampleValue?: string
-  seqStart?: number
-  seqDigits?: number
-  seqStep?: number
-}
 
 export interface Template {
   id: string
@@ -21,7 +11,16 @@ export interface Template {
   heightMm: number
   dpi: number
   elements: LabelElement[]
-  variableFields: VariableField[]
+  variables: VariableDefinition[]
+  /** The one data source this design draws rows from, or null. */
+  dataSourceId: string | null
+  /**
+   * Why this design cannot resolve its references right now, computed on read.
+   *
+   * Never stored: a stored copy drifts from the data source, and it drifts in
+   * the direction of "looks fine, is actually broken" (FR-028a).
+   */
+  bindingIssue: BindingIssue | null
   createdAt: string
   /** Optimistic concurrency token; a save carries the value it loaded with. */
   updatedAt: string
@@ -29,16 +28,9 @@ export interface Template {
   version: number
 }
 
-export interface PrintFormField {
-  name: string
-  label: string
-  source: 'manual' | 'sequence'
-  sampleValue?: string
-  suggestedStart?: number
-  seqDigits?: number
-  seqStep?: number
-  maxRepresentable?: number
-}
+export type BindingIssue =
+  | { kind: 'sourceMissing' }
+  | { kind: 'columnsMissing'; columns: string[] }
 
 const KEY = ['templates']
 
@@ -73,12 +65,6 @@ export function useDeleteTemplate() {
   })
 }
 
-/** What must be collected before a job can be submitted (FR-038, FR-048). */
-export function usePrintForm(templateId: string | null) {
-  return useQuery({
-    queryKey: ['print-form', templateId],
-    queryFn: () => request<{ fields: PrintFormField[] }>(`/templates/${templateId}/print-form`),
-    enabled: templateId !== null,
-    refetchInterval: false,
-  })
-}
+// There is no print-form hook any more. Nothing is typed in before printing:
+// constants are fixed in the design, serials come from a pool, and column
+// values come from the rows that were selected.

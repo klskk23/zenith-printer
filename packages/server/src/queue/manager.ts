@@ -7,7 +7,7 @@
  */
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { formatSequence, resolveVariables, type LabelIR } from '@zenith/shared'
+import { formatSequence, type LabelIR } from '@zenith/shared'
 import type { FastifyInstance } from 'fastify'
 import { PrintQueue, type PageRenderOptions } from './print-queue.ts'
 import { JobRepo } from '../db/repositories/job-repo.ts'
@@ -20,17 +20,18 @@ import { loadFontConfig } from '../render/fonts.ts'
 import { createImageResolver } from '../render/image-resolver.ts'
 import { mmToDots } from '@zenith/shared'
 import type { BinaryBitmap } from '../drivers/port.ts'
-import type { PrintJob, SequenceRange } from '../domain/print-job.ts'
+import type { PrintJob, SequenceClaim } from '../domain/print-job.ts'
+import { irForLabel } from '../render/job-pages.ts'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
 /**
- * Value of a sequence field for one copy.
- * Overflow is impossible here because the range was validated and locked at
+ * Value of a sequence variable at a given position in the batch.
+ * Overflow is impossible here because the span was validated and locked at
  * enqueue time (FR-046, FR-049).
  */
-export function sequenceValueFor(range: SequenceRange, copyIndex: number): string {
-  return formatSequence('sequence', range.start + copyIndex * range.step, range.digits)
+export function sequenceValueFor(claim: SequenceClaim, index: number): string {
+  return formatSequence(claim.variableName, claim.start + index * claim.step, claim.digits)
 }
 
 export function createQueue(app: FastifyInstance): PrintQueue {
@@ -80,13 +81,9 @@ export function createQueue(app: FastifyInstance): PrintQueue {
   })
 }
 
-/** Apply per-copy sequence values before rendering. */
+/** The label at a given position in the batch, fully substituted. */
 export function irForCopy(job: PrintJob, copyIndex: number): LabelIR {
-  const values: Record<string, string> = { ...job.manualFieldValues }
-  for (const [name, range] of Object.entries(job.seqRanges)) {
-    values[name] = sequenceValueFor(range, copyIndex)
-  }
-  return resolveVariables(job.snapshot.ir, values)
+  return irForLabel(job, copyIndex)
 }
 
 export { mmToDots }

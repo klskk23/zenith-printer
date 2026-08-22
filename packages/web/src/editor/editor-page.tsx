@@ -30,7 +30,7 @@ import { usePrinters } from '../features/printers/hooks.ts'
 import { PrintDialog } from '../features/print/print-dialog.tsx'
 import { TemplateBar } from '../features/templates/template-bar.tsx'
 import { useProfiles } from '../features/profiles/hooks.ts'
-import { useTemplates, type Template, type VariableField } from '../features/templates/hooks.ts'
+import { useTemplates, type Template } from '../features/templates/hooks.ts'
 import { useWorkspace } from '../app/workspace.tsx'
 import type { Profile } from '../features/profiles/hooks.ts'
 import { CanvasViewport } from './canvas-viewport.tsx'
@@ -39,16 +39,16 @@ import { ElementContextMenu } from './context-menu.tsx'
 import { symbolFitMm } from './barcode-width.ts'
 import { copyElement, duplicateElement, pasteElement } from './clipboard.ts'
 import { imageBoxMm, refit } from './autofit.ts'
-import { previewIr } from './preview-values.ts'
-import { isVariableRef, sampleValues } from '@zenith/shared'
+import { designValues, previewIr } from './preview-values.ts'
+import type { VariableDefinition } from '@zenith/shared'
 import { imageFileFrom, naturalSizeOf, useUploadImage } from '../features/images/hooks.ts'
 import { canRedo, canUndo, commit, initUndo, redo, undo } from './undo.ts'
 import { Inspector } from './inspector.tsx'
-import { VariableFieldPanel } from './variable-field-panel.tsx'
+import { VariablesPanel } from './variables-panel.tsx'
 import { ELEMENT_TYPES, createBlankLabel, createElement, type ElementType } from './elements.ts'
 import { blockingViolations, inspect } from './guards.ts'
 
-type SidePanel = 'element' | 'fields'
+type SidePanel = 'element' | 'variables'
 
 export interface EditorPageProps {
   /** The workspace tab this editor lives in. */
@@ -115,7 +115,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
   const doUndo = useCallback(() => setHistory((current) => undo(current)), [])
   const doRedo = useCallback(() => setHistory((current) => redo(current)), [])
 
-  const [fields, setFields] = useState<VariableField[]>([])
+  const [variables, setVariables] = useState<VariableDefinition[]>([])
   const [template, setTemplate] = useState<Template | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   /**
@@ -216,11 +216,13 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
   /**
    * The design as the canvas should draw it.
    *
-   * `irToSvg` refuses a `$var` it has no value for — correct when printing,
-   * fatal in the editor, which is where bindings are made. Binding an element
-   * threw out of React's render pass and blanked the application.
+   * Evaluation never throws: a design mid-edit is full of states that are not
+   * printable yet, and the editor has to survive all of them. Unresolved names
+   * are reported below the canvas and block printing; they do not stop drawing.
    */
-  const drawn = useMemo(() => previewIr(ir, fields), [ir, fields])
+  const values = useMemo(() => designValues(variables), [variables])
+  const preview = useMemo(() => previewIr(ir, values), [ir, values])
+  const drawn = preview.ir
   const blocking = blockingViolations(violations)
   const selected = ir.elements.find((element) => element.id === selectedId) ?? null
 
@@ -228,7 +230,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
     // Fitted on the way in: a new text element is 30x5 mm holding about 6x3 mm
     // of glyphs, and a new QR code is a 15 mm square holding about 6 mm of
     // symbol.
-    const element = refit(null, createElement(type, ir), ir.dpi, sampleValues(fields))
+    const element = refit(null, createElement(type, ir), ir.dpi, values)
     setIr({ ...ir, elements: [...ir.elements, element] })
     setSelectedId(element.id)
     setPanel('element')
@@ -249,7 +251,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
    */
   const updateElement = (next: LabelElement, mergeKey: string | null = null): void => {
     const previous = ir.elements.find((e) => e.id === next.id) ?? null
-    const fitted = refit(previous, next, ir.dpi, sampleValues(fields))
+    const fitted = refit(previous, next, ir.dpi, values)
     setIr({ ...ir, elements: ir.elements.map((e) => (e.id === fitted.id ? fitted : e)) }, mergeKey)
   }
 
@@ -372,41 +374,9 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
    * Identified by position, because the name is the thing being edited. Every
    * keystroke is a rename; the shared merge key folds them into one entry.
    */
-  const renameField = (index: number, name: string): void => {
-    const previous = fields[index]?.name
-    if (previous === undefined || previous === name) {
-      return
-    }
-
-    setFields(fields.map((field, at) => (at === index ? { ...field, name } : field)))
-    setIr(
-      {
-        ...ir,
-        elements: ir.elements.map((element) =>
-          'content' in element && isVariableRef(element.content) && element.content.$var === previous
-            ? ({ ...element, content: { $var: name } } as LabelElement)
-            : element,
-        ),
-      },
-      `rename-field-${index}`,
-    )
-  }
-
-  /** Point an element at a variable field, or back at fixed content. */
-  const bindElement = (elementId: string, fieldName: string | null): void => {
-    setIr({
-      ...ir,
-      elements: ir.elements.map((element) => {
-        if (element.id !== elementId || !('content' in element)) {
-          return element
-        }
-        return {
-          ...element,
-          content: fieldName === null ? '' : { $var: fieldName },
-        } as LabelElement
-      }),
-    })
-  }
+  // Renaming a variable no longer rewrites element content: references are
+  // written by hand inside the content, so the editor has no business editing
+  // somebody's text. The unresolved-name warning tells them what broke.
 
   const loadTemplate = (loaded: Template): void => {
     setTemplate(loaded)
@@ -416,7 +386,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
       dpi: loaded.dpi,
       elements: loaded.elements,
     })
-    setFields(loaded.variableFields)
+    setVariables(loaded.variables)
     setSelectedId(null)
   }
 
@@ -500,7 +470,8 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
     heightMm: ir.heightMm,
     dpi: ir.dpi,
     elements: ir.elements,
-    variableFields: fields,
+    variables,
+    dataSourceId: template?.dataSourceId ?? null,
   })
 
   return (
@@ -523,7 +494,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           onLoad={loadTemplate}
           onSaved={(saved) => {
             setTemplate(saved)
-            setFields(saved.variableFields)
+            setVariables(saved.variables)
             // The tab now *is* this template's tab: its title, its address and
             // any later save all refer to the same thing.
             workspace.setTemplate(tabId, saved.id)
@@ -748,20 +719,21 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                 <CardHeader className="pb-2">
                   <TabsList>
                     <TabsTrigger value="element">{copy.editor.properties}</TabsTrigger>
-                    <TabsTrigger value="fields">{copy.fields.heading}</TabsTrigger>
+                    <TabsTrigger value="variables">{copy.variables.heading}</TabsTrigger>
                   </TabsList>
                 </CardHeader>
                 <CardContent>
                   <TabsContent value="element" className="mt-0">
                     <Inspector ir={ir} element={selected} onChange={updateElement} onDelete={deleteElement} />
                   </TabsContent>
-                  <TabsContent value="fields" className="mt-0">
-                    <VariableFieldPanel
-                      element={selected}
-                      fields={fields}
-                      onChangeFields={setFields}
-                      onBindElement={bindElement}
-                      onRenameField={renameField}
+                  <TabsContent value="variables" className="mt-0">
+                    <VariablesPanel
+                      variables={variables}
+                      onChange={setVariables}
+                      pools={[]}
+                      onCreatePool={() => {}}
+                      columns={[]}
+                      unresolved={preview.unresolved}
                     />
                   </TabsContent>
                 </CardContent>
@@ -796,7 +768,8 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           templateId={template?.id ?? null}
           profileId={profileId}
           printer={printer}
-          fields={fields}
+          variableValues={values}
+          unresolved={preview.unresolved}
           onClose={() => setPrintOpen(false)}
         />
       )}

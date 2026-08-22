@@ -34,9 +34,9 @@ npm workspaces 四包结构，不新增包：
 
 **Purpose**: 装依赖、备夹具。三条都不触碰既有行为，四条门禁在本阶段结束时仍应全绿。
 
-- [ ] T001 在 `packages/web/package.json` 增加 `@tanstack/react-table` 依赖并 `npm install --workspace=@zenith/web`（research R10）
-- [ ] T002 [P] 新增 shadcn Table 原语 `packages/web/src/components/ui/table.tsx`（`Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`），复用既有 `cn()` 与主题令牌
-- [ ] T003 [P] 建立 CSV 测试夹具目录 `packages/server/tests/fixtures/csv/`，含五个文件：`utf8-leading-zeros.csv`（含 `007`）、`gbk-semicolon.csv`（GBK 编码、分号分隔）、`no-header.csv`、`duplicate-columns.csv`、`quoted-newline.csv`（引号内含换行与分隔符）
+- [X] T001 在 `packages/web/package.json` 增加 `@tanstack/react-table` 依赖并 `npm install --workspace=@zenith/web`（research R10）
+- [X] T002 [P] 新增 shadcn Table 原语 `packages/web/src/components/ui/table.tsx`（`Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`），复用既有 `cn()` 与主题令牌
+- [X] T003 [P] 建立 CSV 测试夹具目录 `packages/server/tests/fixtures/csv/`，含五个文件：`utf8-leading-zeros.csv`（含 `007`）、`gbk-semicolon.csv`（GBK 编码、分号分隔）、`no-header.csv`、`duplicate-columns.csv`、`quoted-newline.csv`（引号内含换行与分隔符）
 
 **Checkpoint**: 依赖与夹具就绪，尚未改动任何行为。
 
@@ -53,47 +53,47 @@ npm workspaces 四包结构，不新增包：
 
 ### 文法解析器（先测后写）
 
-- [ ] T004 [P] 文法契约测试 `packages/shared/tests/template-parse.test.ts`：逐条覆盖 `contracts/variable-grammar.md` 的 15 条边界用例（`版本 ${major}.${minor}`、`批号 ${lot}.{已校验}`、`$${sku}`、`$$${sku}`、`$$`、`${ sku }`、`${}`、`${ }`、`${sk`、`${单价.含税}`、`${a.b.c}`、`${收件 人}`、`${说"明"}`、`价格 $100`）。先跑，必须全红
-- [ ] T005 [P] 求值测试 `packages/shared/tests/template-evaluate.test.ts`：可解析代入其值；`unterminated` 原样输出且**不进入未解析列表**；已闭合但名称不存在 → 原样输出并计入未解析列表；**断言求值函数在任何输入下都不抛异常**（FR-016）
-- [ ] T006 实现扫描器 `packages/shared/src/template/parse.ts`：`parse(content): Segment[]`，`Segment` 联合含 `literal` / `ref{name}` / `unterminated`。**单层命名空间**：花括号内除 `}` 外一律是名称的一部分，无路径分隔、无引号段
-- [ ] T007 实现求值 `packages/shared/src/template/evaluate.ts`：`evaluate(content, lookup): { text: string; unresolved: string[] }` 与 `collectReferences(ir): string[]`（供提交前校验与列引用扫描共用）；另出 `detectNameCollisions(variables, columns): string[]`，常量/自增与列重名时列出名称（FR-009b）
-- [ ] T008 变量定义 schema `packages/shared/src/template/variables.ts`：`{ name, kind: 'constant', value }` 与 `{ name, kind: 'sequence', poolId }` 的 zod 联合；名称校验按 FR-009a（不含 `}`，首尾空白去除，非空）
-- [ ] T009 序号格式化迁移 `packages/shared/src/template/sequence.ts`：把 `formatSequence` 与 `SequenceOverflowError` 从 `packages/shared/src/ir/resolve-variables.ts` 搬来（行为不变）
-- [ ] T010 在 `packages/shared/src/index.ts` 导出 `./template/parse.ts`、`./template/evaluate.ts`、`./template/variables.ts`、`./template/sequence.ts`
+- [X] T004 [P] 文法契约测试 `packages/shared/tests/template-parse.test.ts`：逐条覆盖 `contracts/variable-grammar.md` 的 15 条边界用例（`版本 ${major}.${minor}`、`批号 ${lot}.{已校验}`、`$${sku}`、`$$${sku}`、`$$`、`${ sku }`、`${}`、`${ }`、`${sk`、`${单价.含税}`、`${a.b.c}`、`${收件 人}`、`${说"明"}`、`价格 $100`）。先跑，必须全红
+- [X] T005 [P] 求值测试 `packages/shared/tests/template-evaluate.test.ts`：可解析代入其值；`unterminated` 原样输出且**不进入未解析列表**；已闭合但名称不存在 → 原样输出并计入未解析列表；**断言求值函数在任何输入下都不抛异常**（FR-016）
+- [X] T006 实现扫描器 `packages/shared/src/template/parse.ts`：`parse(content): Segment[]`，`Segment` 联合含 `literal` / `ref{name}` / `unterminated`。**单层命名空间**：花括号内除 `}` 外一律是名称的一部分，无路径分隔、无引号段
+- [X] T007 实现求值 `packages/shared/src/template/evaluate.ts`：`evaluate(content, lookup): { text: string; unresolved: string[] }` 与 `collectReferences(ir): string[]`（供提交前校验与列引用扫描共用）；另出 `detectNameCollisions(variables, columns): string[]`，常量/自增与列重名时列出名称（FR-009b）
+- [X] T008 变量定义 schema `packages/shared/src/template/variables.ts`：`{ name, kind: 'constant', value }` 与 `{ name, kind: 'sequence', poolId }` 的 zod 联合；名称校验按 FR-009a（不含 `}`，首尾空白去除，非空）
+- [X] T009 序号格式化迁移 `packages/shared/src/template/sequence.ts`：把 `formatSequence` 与 `SequenceOverflowError` 从 `packages/shared/src/ir/resolve-variables.ts` 搬来（行为不变）
+- [X] T010 在 `packages/shared/src/index.ts` 导出 `./template/parse.ts`、`./template/evaluate.ts`、`./template/variables.ts`、`./template/sequence.ts`
 
 ### IR 收窄
 
-- [ ] T011 更新 `packages/shared/tests/ir-schema.test.ts`：`content` 恒为字符串，`{ $var: 'x' }` 必须被 schema 拒绝
-- [ ] T012 在 `packages/shared/src/ir/schema.ts` 把 `content` 由 `string | { $var: string }` 收窄为 `string`，删除 `isVariableRef` 与 `isVariableCapable`
-- [ ] T013 删除 `packages/shared/src/ir/resolve-variables.ts` 与 `packages/shared/tests/resolve-variables.test.ts`（`sampleValues` 一并消失——常量与序号不再需要「样例值」这一层）
-- [ ] T014 `packages/shared/src/ir-to-svg/index.ts`：绘制文字/条码/二维码之前先对 `content` 求值；未解析引用沿用既有 `skipUnrenderable` 策略（编辑器容忍，打印路径严格）
-- [ ] T015 更新 `packages/shared/tests/ir-to-svg.test.ts`、`packages/shared/tests/ir-svg-parity.test.ts`、`packages/shared/tests/render-parity.test.ts` 以匹配新的 `content` 类型
+- [X] T011 更新 `packages/shared/tests/ir-schema.test.ts`：`content` 恒为字符串，`{ $var: 'x' }` 必须被 schema 拒绝
+- [X] T012 在 `packages/shared/src/ir/schema.ts` 把 `content` 由 `string | { $var: string }` 收窄为 `string`，删除 `isVariableRef` 与 `isVariableCapable`
+- [X] T013 删除 `packages/shared/src/ir/resolve-variables.ts` 与 `packages/shared/tests/resolve-variables.test.ts`（`sampleValues` 一并消失——常量与序号不再需要「样例值」这一层）
+- [X] T014 `packages/shared/src/ir-to-svg/index.ts`：绘制文字/条码/二维码之前先对 `content` 求值；未解析引用沿用既有 `skipUnrenderable` 策略（编辑器容忍，打印路径严格）
+- [X] T015 更新 `packages/shared/tests/ir-to-svg.test.ts`、`packages/shared/tests/ir-svg-parity.test.ts`、`packages/shared/tests/render-parity.test.ts` 以匹配新的 `content` 类型
 
 ### 术语与错误码
 
-- [ ] T016 [P] `packages/shared/src/terms.ts`：移除 `variableField`，新增 `variable`、`dataSource`、`sequencePool`、`rowSelection`；`FORBIDDEN_SYNONYMS` 同步（`field`/`placeholder` → `variable`，`table`/`dataset` → `dataSource`，`counter` → `sequencePool`）
-- [ ] T017 [P] `packages/server/src/api/errors.ts`：登记 `contracts/rest-api.md` 的 14 个新错误码及其状态码；移除随可变字段消失的旧码
-- [ ] T018 [P] `packages/server/src/i18n/zh-CN.ts`：为 14 个新错误码各写一条三要素文案（什么 / 为什么 / 下一步）
-- [ ] T019 [P] `packages/server/src/i18n/en-US.ts`：同上，英文
-- [ ] T020 [P] `packages/web/src/i18n/zh-CN.ts` 与 `packages/web/src/i18n/en-US.ts`：数据源、序号池、行选择、变量面板的界面文案键位
+- [X] T016 [P] `packages/shared/src/terms.ts`：移除 `variableField`，新增 `variable`、`dataSource`、`sequencePool`、`rowSelection`；`FORBIDDEN_SYNONYMS` 同步（`field`/`placeholder` → `variable`，`table`/`dataset` → `dataSource`，`counter` → `sequencePool`）
+- [X] T017 [P] `packages/server/src/api/errors.ts`：登记 `contracts/rest-api.md` 的 14 个新错误码及其状态码；移除随可变字段消失的旧码
+- [X] T018 [P] `packages/server/src/i18n/zh-CN.ts`：为 14 个新错误码各写一条三要素文案（什么 / 为什么 / 下一步）
+- [X] T019 [P] `packages/server/src/i18n/en-US.ts`：同上，英文
+- [X] T020 [P] `packages/web/src/i18n/zh-CN.ts` 与 `packages/web/src/i18n/en-US.ts`：数据源、序号池、行选择、变量面板的界面文案键位
 
 ### 迁移（先测后写）
 
-- [ ] T021 扩充 `packages/server/tests/unit/migrations.test.ts`：断言迁移 7–10 之后 —— 三张新表与 `job_sequence_claims` 存在且索引齐备；`templates.variables` 与 `templates.data_source_id` 两列存在；`variable_fields` 表不存在；`print_jobs.seq_ranges` 列不存在；**打印机、打印参数与偏移校正值逐字段保留**（FR-052）
-- [ ] T022 迁移 7 于 `packages/server/src/db/migrations/index.ts`：建 `data_sources`、`data_source_rows`（主键 `(source_id, ordinal)`、外键 ON DELETE CASCADE）、`sequence_pools`、`job_sequence_claims(job_id, pool_id, start, end, step, digits)` 及 `job_sequence_claims(pool_id)` 索引
-- [ ] T023 迁移 8 于 `packages/server/src/db/migrations/index.ts`：`templates` 增加 `variables TEXT NOT NULL DEFAULT '[]'` 与 `data_source_id TEXT NULL REFERENCES data_sources(id)` 两列
-- [ ] T024 迁移 9 于 `packages/server/src/db/migrations/variable-migration.ts`（走 `apply` 钩子）：把既有 `print_jobs.seq_ranges` 的内容搬进 `job_sequence_claims`，随后 `DROP COLUMN seq_ranges`、`DROP TABLE variable_fields`
-- [ ] T025 迁移 10 于 `packages/server/src/db/migrations/variable-migration.ts`：既有模板元素内容中的 `{ $var: x }` 改写为 `${x}`，其余内容里字面的 `${` 转义为 `$${`（Assumptions 已声明此为必需的一次性改写）
+- [X] T021 扩充 `packages/server/tests/unit/migrations.test.ts`：断言迁移 7–10 之后 —— 三张新表与 `job_sequence_claims` 存在且索引齐备；`templates.variables` 与 `templates.data_source_id` 两列存在；`variable_fields` 表不存在；`print_jobs.seq_ranges` 列不存在；**打印机、打印参数与偏移校正值逐字段保留**（FR-052）
+- [X] T022 迁移 7 于 `packages/server/src/db/migrations/index.ts`：建 `data_sources`、`data_source_rows`（主键 `(source_id, ordinal)`、外键 ON DELETE CASCADE）、`sequence_pools`、`job_sequence_claims(job_id, pool_id, start, end, step, digits)` 及 `job_sequence_claims(pool_id)` 索引
+- [X] T023 迁移 8 于 `packages/server/src/db/migrations/index.ts`：`templates` 增加 `variables TEXT NOT NULL DEFAULT '[]'` 与 `data_source_id TEXT NULL REFERENCES data_sources(id)` 两列
+- [X] T024 迁移 9 于 `packages/server/src/db/migrations/variable-migration.ts`（走 `apply` 钩子）：把既有 `print_jobs.seq_ranges` 的内容搬进 `job_sequence_claims`，随后 `DROP COLUMN seq_ranges`、`DROP TABLE variable_fields`
+- [X] T025 迁移 10 于 `packages/server/src/db/migrations/variable-migration.ts`：既有模板元素内容中的 `{ $var: x }` 改写为 `${x}`，其余内容里字面的 `${` 转义为 `$${`（Assumptions 已声明此为必需的一次性改写）
 
 ### 拆除旧机制
 
-- [ ] T026 删除 `packages/server/src/domain/variable-field.ts`；`packages/server/src/domain/sequence-allocator.ts` 暂时改为按 `job_sequence_claims` 读写（US1 再补池语义）
-- [ ] T027 `packages/server/src/domain/print-job.ts`：从 `printJobInputSchema` 移除 `manualFieldValues` 与 `sequenceOverrides`；`ContentSnapshot` 预留 `rows` 与 `copiesPerRow`（US2 填充）
-- [ ] T028 `packages/server/src/api/templates.ts`：移除 `DELETE /api/templates/:id/print-form` 端点及其路由注册；`packages/server/src/render/job-pages.ts` 改为对空变量表求值
-- [ ] T029 删除前端旧件：`packages/web/src/editor/variable-field-panel.tsx`、`packages/web/src/features/print/field-form.tsx`、`packages/web/src/features/print/print-form-fields.ts`、`packages/web/tests/print-form-fields.test.ts`；`packages/web/src/features/print/print-dialog.tsx` 与 `packages/web/src/editor/preview-values.ts` 改为走 `@zenith/shared` 的求值。**残余引用由下面两条按清单清理**——`isVariableRef` / `sampleValues` / `variableFields` 还活在 13 个源文件与 9 个测试文件里
-- [ ] T030 清理服务端残余引用：`packages/server/src/domain/template.ts`（移除 `variableFields` 及其取值器）、`packages/server/src/domain/overflow.ts`、`packages/server/src/queue/manager.ts`（`resolveVariables` 改为新求值），以及 `packages/server/tests/unit/domain-helpers.test.ts`、`packages/server/tests/unit/job-pages.test.ts`、`packages/server/tests/integration/template-print.test.ts`、`packages/server/tests/integration/templates-api.test.ts`
-- [ ] T031 清理前端残余引用：`packages/web/src/editor/autofit.ts`、`packages/web/src/editor/guards.ts`、`packages/web/src/editor/layers-panel.tsx`、`packages/web/src/editor/editor-page.tsx`（八处，含变量改名时的元素联动与 `sampleValues` 调用）、`packages/web/src/pages/templates-page.tsx`、`packages/web/src/features/templates/hooks.ts`，以及 `packages/web/tests/guards.test.ts`、`packages/web/tests/preview-values.test.ts`、`packages/web/tests/editor-elements.dom.test.tsx`、`packages/web/tests/print-preview.dom.test.tsx`、`packages/web/tests/open-template.dom.test.tsx`
-- [ ] T032 负向断言 `packages/web/tests/print-preview.dom.test.tsx`：打印对话框**不再**渲染手工字段表单（宪章原则 II —— 页面职责被划走时补一条负向断言，锁住它不再出现在原处）
+- [X] T026 删除 `packages/server/src/domain/variable-field.ts`；`packages/server/src/domain/sequence-allocator.ts` 暂时改为按 `job_sequence_claims` 读写（US1 再补池语义）
+- [X] T027 `packages/server/src/domain/print-job.ts`：从 `printJobInputSchema` 移除 `manualFieldValues` 与 `sequenceOverrides`；`ContentSnapshot` 预留 `rows` 与 `copiesPerRow`（US2 填充）
+- [X] T028 `packages/server/src/api/templates.ts`：移除 `DELETE /api/templates/:id/print-form` 端点及其路由注册；`packages/server/src/render/job-pages.ts` 改为对空变量表求值
+- [X] T029 删除前端旧件：`packages/web/src/editor/variable-field-panel.tsx`、`packages/web/src/features/print/field-form.tsx`、`packages/web/src/features/print/print-form-fields.ts`、`packages/web/tests/print-form-fields.test.ts`；`packages/web/src/features/print/print-dialog.tsx` 与 `packages/web/src/editor/preview-values.ts` 改为走 `@zenith/shared` 的求值。**残余引用由下面两条按清单清理**——`isVariableRef` / `sampleValues` / `variableFields` 还活在 13 个源文件与 9 个测试文件里
+- [X] T030 清理服务端残余引用：`packages/server/src/domain/template.ts`（移除 `variableFields` 及其取值器）、`packages/server/src/domain/overflow.ts`、`packages/server/src/queue/manager.ts`（`resolveVariables` 改为新求值），以及 `packages/server/tests/unit/domain-helpers.test.ts`、`packages/server/tests/unit/job-pages.test.ts`、`packages/server/tests/integration/template-print.test.ts`、`packages/server/tests/integration/templates-api.test.ts`
+- [X] T031 清理前端残余引用：`packages/web/src/editor/autofit.ts`、`packages/web/src/editor/guards.ts`、`packages/web/src/editor/layers-panel.tsx`、`packages/web/src/editor/editor-page.tsx`（八处，含变量改名时的元素联动与 `sampleValues` 调用）、`packages/web/src/pages/templates-page.tsx`、`packages/web/src/features/templates/hooks.ts`，以及 `packages/web/tests/guards.test.ts`、`packages/web/tests/preview-values.test.ts`、`packages/web/tests/editor-elements.dom.test.tsx`、`packages/web/tests/print-preview.dom.test.tsx`、`packages/web/tests/open-template.dom.test.tsx`
+- [X] T032 负向断言 `packages/web/tests/print-preview.dom.test.tsx`：打印对话框**不再**渲染手工字段表单（宪章原则 II —— 页面职责被划走时补一条负向断言，锁住它不再出现在原处）
 
 **Checkpoint**: `npm run typecheck` / `lint` / `test` / `build --workspace=@zenith/web` 四条全绿。
 此时系统仍是一个能用的标签编辑器：不含变量的设计照常打印，`${x}` 显示为字面文本。
@@ -116,26 +116,26 @@ npm workspaces 四包结构，不新增包：
 - [ ] T034 [P] [US1] 重写 `packages/server/tests/unit/sequence-allocator.test.ts`：领取按**池 id** 收窄而非 `template_id`；**两个不同模板引用同一池，各领一批后号码不重叠**（AS-6）；溢出整批回滚；取消任务归还号段
 - [ ] T035 [P] [US1] `packages/server/tests/integration/sequence-pools-api.test.ts`：`GET`/`POST`/`PATCH` 契约；`PATCH` 不能改 `current`；`POST /reset` 无 `confirm` → `422 CONFIRMATION_REQUIRED`，带 `confirm` → `200` 且返回新 `current`；`DELETE` 在仍被设计引用时 → `409 SEQUENCE_POOL_IN_USE` 并列出设计，否则 `204`，且**已发放的号段留存**（FR-006a）
 - [ ] T036 [P] [US1] `packages/server/tests/integration/variables-print.test.ts`：**连续 10 批各 5 张**，逐批断言起始号紧接上批末号，全程无重号无跳号（AS-5、SC-004）；内容含未定义引用 → `422 VARIABLE_NOT_DEFINED` 且 `details.reference` 指出是哪一个；**未保存为模板的设计也能用自增变量**（FR-007）
-- [ ] T037 [P] [US1] `packages/web/tests/variable-panel.dom.test.tsx`：定义常量 `sku = ABC-123` 后，内容为 `零件 ${sku} 号` 的文字元素在画布上显示 `零件 ABC-123 号`（AS-2）；`版本 ${major}.${minor}` 代入两个值且中间点号原样（AS-3）；`$${sku}` 显示字面 `${sku}`（AS-4）
-- [ ] T038 [P] [US1] `packages/web/tests/variable-typing.dom.test.tsx`：在文字内容里**逐字**敲入 `$` → `${` → `${s` → `${sk` → `${sku` → `${sku}`，每一步都断言无错误提示出现、输入框保持聚焦、画布未抛异常（SC-006、FR-013、FR-016）
-- [ ] T039 [P] [US1] `packages/web/tests/print-blocked-unresolved.dom.test.tsx`：内容引用了未定义的名称时，画布原样显示该引用、底部出现阻塞性提示、打印按钮 `disabled`（AS-1）
+- [X] T037 [P] [US1] `packages/web/tests/variable-panel.dom.test.tsx`：定义常量 `sku = ABC-123` 后，内容为 `零件 ${sku} 号` 的文字元素在画布上显示 `零件 ABC-123 号`（AS-2）；`版本 ${major}.${minor}` 代入两个值且中间点号原样（AS-3）；`$${sku}` 显示字面 `${sku}`（AS-4）
+- [X] T038 [P] [US1] `packages/web/tests/variable-typing.dom.test.tsx`：在文字内容里**逐字**敲入 `$` → `${` → `${s` → `${sk` → `${sku` → `${sku}`，每一步都断言无错误提示出现、输入框保持聚焦、画布未抛异常（SC-006、FR-013、FR-016）
+- [X] T039 [P] [US1] `packages/web/tests/print-blocked-unresolved.dom.test.tsx`：内容引用了未定义的名称时，画布原样显示该引用、底部出现阻塞性提示、打印按钮 `disabled`（AS-1）
 
 ### Implementation for User Story 1
 
-- [ ] T040 [P] [US1] `packages/server/src/domain/sequence-pool.ts`：`SequencePool` zod schema（`name` 唯一、`digits`、`step`、`floor`）与 `currentValue(floor, highestConsumed)` 纯函数
-- [ ] T041 [P] [US1] `packages/server/src/db/repositories/sequence-pool-repo.ts`：CRUD + `highestConsumed(poolId)`（查 `job_sequence_claims`，按池 id 索引）
-- [ ] T042 [US1] 重写 `packages/server/src/domain/sequence-allocator.ts`：领取写入 `job_sequence_claims`，`#highestConsumed` 改按 `pool_id` 查询；`suggest` / `allocate` / `release` / `conflictsWithHistory` 的签名由「字段」改为「池」（依赖 T040、T041）
+- [X] T040 [P] [US1] `packages/server/src/domain/sequence-pool.ts`：`SequencePool` zod schema（`name` 唯一、`digits`、`step`、`floor`）与 `currentValue(floor, highestConsumed)` 纯函数
+- [X] T041 [P] [US1] `packages/server/src/db/repositories/sequence-pool-repo.ts`：CRUD + `highestConsumed(poolId)`（查 `job_sequence_claims`，按池 id 索引）
+- [X] T042 [US1] 重写 `packages/server/src/domain/sequence-allocator.ts`：领取写入 `job_sequence_claims`，`#highestConsumed` 改按 `pool_id` 查询；`suggest` / `allocate` / `release` / `conflictsWithHistory` 的签名由「字段」改为「池」（依赖 T040、T041）
 - [ ] T043 [US1] `packages/server/src/api/sequence-pools.ts`：实现 `contracts/rest-api.md` 的五个端点（列表、建立、修改、重置、删除），响应含 `floor`，并在 `packages/server/src/app.ts` 注册
-- [ ] T044 [P] [US1] `packages/server/src/db/repositories/template-repo.ts`：读写 `variables`（JSON）与 `data_source_id` 两列，用 T008 的 schema 校验
-- [ ] T045 [US1] `packages/server/src/api/templates.ts`：模板的建立/更新/读取带上 `variables` 与 `dataSourceId`
-- [ ] T046 [US1] `packages/server/src/api/job-submission.ts`：提交前用 `collectReferences` 校验每个引用可解析，否则 `422 VARIABLE_NOT_DEFINED`；把设计的 `variables` 解析为求值表（依赖 T042）
+- [X] T044 [P] [US1] `packages/server/src/db/repositories/template-repo.ts`：读写 `variables`（JSON）与 `data_source_id` 两列，用 T008 的 schema 校验
+- [X] T045 [US1] `packages/server/src/api/templates.ts`：模板的建立/更新/读取带上 `variables` 与 `dataSourceId`
+- [X] T046 [US1] `packages/server/src/api/job-submission.ts`：提交前用 `collectReferences` 校验每个引用可解析，否则 `422 VARIABLE_NOT_DEFINED`；把设计的 `variables` 解析为求值表（依赖 T042）
 - [ ] T047 [US1] `packages/server/src/render/job-pages.ts`：`valuesForCopy` 由 `job_sequence_claims` 与常量定义合成；`hasPerCopyContent` 按是否存在序号声明判定
 - [ ] T048 [US1] `packages/server/src/api/preview.ts`：移除 `variableValues`，改为用设计的变量定义求值（`rowOrdinal` 留待 US2）
 - [ ] T049 [P] [US1] `packages/web/src/api/types.ts` 与 `packages/web/src/api/client.ts`：序号池端点的类型与调用；移除 print-form 相关类型
-- [ ] T050 [US1] `packages/web/src/editor/variables-panel.tsx`（新建，取代已删的 `variable-field-panel.tsx`）：常量的增删改；自增变量选择或新建序号池；名称按 FR-009a 校验；与所绑数据源的列重名时就地提示（FR-009b）
+- [X] T050 [US1] `packages/web/src/editor/variables-panel.tsx`（新建，取代已删的 `variable-field-panel.tsx`）：常量的增删改；自增变量选择或新建序号池；名称按 FR-009a 校验；与所绑数据源的列重名时就地提示（FR-009b）
 - [ ] T051 [US1] `packages/web/src/editor/preview-values.ts`：改为调用 `@zenith/shared` 的 `evaluate`，返回代入后的 IR 与未解析引用列表；**任何输入都不抛异常**（依赖 T007）
 - [ ] T052 [US1] `packages/web/src/editor/inspector.tsx`：接入变量面板，元素内容输入框改为普通模板串输入（不再有「绑定/未绑定」的概念）
-- [ ] T053 [P] [US1] `packages/web/src/features/sequence-pools/hooks.ts`：序号池的 react-query 读写
+- [X] T053 [P] [US1] `packages/web/src/features/sequence-pools/hooks.ts`：序号池的 react-query 读写
 - [ ] T054 [US1] `packages/web/src/features/sequence-pools/pools-panel.tsx`：列出池与当前值；重置走 `AlertDialog`，显示当前 `floor` 以便说清「从几重置到几」，文案必须写明**可能与已贴出的标签重号**（FR-006、宪章 III.0）；删除同样走确认并列出引用它的设计（FR-006a）
 - [ ] T055 [US1] `packages/web/src/pages/settings-page.tsx`：挂入序号池面板（不新增可导航页面，故不新增路由）
 - [ ] T056 [US1] `packages/web/src/features/print/print-dialog.tsx`：显示未解析引用的阻塞提示并禁用打印按钮（依赖 T051）

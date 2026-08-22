@@ -22,10 +22,10 @@ import {
   allocateSequences,
   assertBarcodesEncodable,
   assertFitsPrinter,
-  assertManualFieldsProvided,
+  assertReferencesResolvable,
   assertTemplateMatchesPrinter,
   buildSnapshot,
-  previewValues,
+  designValues,
   resolveContent,
 } from './job-submission.ts'
 
@@ -65,7 +65,7 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       const profile = input.profileId === undefined ? null : (profiles().find(input.profileId) ?? null)
       const content = resolveContent(template, input.ir, profile)
 
-      const values = { ...previewValues(template), ...input.manualFieldValues }
+      const values = designValues(template)
       return { warnings: checkBatch(content.ir, () => values, input.copies) }
     },
   )
@@ -108,9 +108,9 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       // structural checks first, the sequence claim last, so a rejection never
       // leaves a claimed range stranded.
       assertFitsPrinter(content.ir, printer)
-      assertManualFieldsProvided(template, input.manualFieldValues)
 
-      const values = { ...previewValues(template), ...input.manualFieldValues }
+      const values = designValues(template)
+      assertReferencesResolvable(content.ir, values)
       assertBarcodesEncodable(content.ir, values)
 
       // Overflow is recorded, not enforced. Content past the edge is clipped,
@@ -134,22 +134,25 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         templateId: template?.id ?? null,
         profileId: profile?.id ?? null,
         requestedCopies: input.copies,
-        manualFieldValues: input.manualFieldValues,
-        seqRanges: {},
         // Recorded on the snapshot: the design may be edited afterwards, and
         // history must show what this run actually produced.
-        snapshot: { ...buildSnapshot(printer, content), overflowWarnings },
+        snapshot: {
+          ...buildSnapshot(printer, { ...content, rows: [], copiesPerRow: input.copies }),
+          overflowWarnings,
+        },
       })
 
-      const seqRanges = created
+      const allocator = new SequenceAllocator(app.ctx.db, app.ctx.clock, app.ctx.ids)
+      const seqClaims = created
         ? allocateSequences({
             db: app.ctx.db,
+            clock: app.ctx.clock,
+            ids: app.ctx.ids,
             jobId: job.id,
             template,
-            copies: input.copies,
-            overrides: input.sequenceOverrides,
+            count: input.copies,
           })
-        : job.seqRanges
+        : allocator.claimsFor(job.id)
 
       // Kick the runner without waiting for it. FR-012 requires the response
       // to come back now, not when the labels stop coming out.
@@ -164,7 +167,7 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         jobId: job.id,
         status: job.status,
         requestedCopies: job.requestedCopies,
-        seqRanges,
+        seqClaims,
         deduplicated: !created,
         // Returned so the caller can show what will be clipped; the job is
         // accepted either way.
@@ -234,11 +237,9 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         templateId: original.templateId,
         profileId: original.profileId,
         requestedCopies: request.body.copies,
-        manualFieldValues: original.manualFieldValues,
         // Sequence numbers are deliberately not carried over: a reprint of a
-        // spoiled batch reuses the original range, and that is a decision made
-        // in the print form where the numbers are visible.
-        seqRanges: {},
+        // spoiled batch reuses the original span, which is recorded on the
+        // snapshot it reprints from.
         snapshot: original.snapshot,
       })
 
@@ -276,7 +277,7 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
     store.markCancelled(job.id)
     // The job printed nothing, so holding its numbers would skip them for no
     // reason at all (FR-019).
-    new SequenceAllocator(app.ctx.db).release(job.id)
+    new SequenceAllocator(app.ctx.db, app.ctx.clock, app.ctx.ids).release(job.id)
     return reply.status(HttpStatus.NoContent).send()
   })
 }

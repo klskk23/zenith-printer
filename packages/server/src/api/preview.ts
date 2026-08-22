@@ -8,12 +8,7 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import {
-  MissingVariableError,
-  labelIrSchema,
-  resolveVariables,
-  type LabelIR,
-} from '@zenith/shared'
+import { evaluateIr, labelIrSchema, type LabelIR } from '@zenith/shared'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { maxLabelWidthMm } from '../domain/printer.ts'
@@ -187,14 +182,10 @@ function previewIr(
   if (body.variableValues === undefined) {
     return ir
   }
-  try {
-    return resolveVariables(ir, body.variableValues)
-  } catch (err) {
-    if (err instanceof MissingVariableError) {
-      // The caller has not filled the form in yet. Saying which field is
-      // missing beats rendering a label with a hole in it.
-      throw ApiError.unprocessable('FIELD_VALIDATION_FAILED', { fieldName: err.fieldName })
-    }
-    throw err
+  const { ir: evaluated, unresolved } = evaluateIr(ir, body.variableValues)
+  if (unresolved.length > 0) {
+    // Saying which name is missing beats rendering a label with "${sku}" on it.
+    throw ApiError.unprocessable('VARIABLE_NOT_DEFINED', { reference: unresolved[0], references: unresolved })
   }
+  return evaluated
 }

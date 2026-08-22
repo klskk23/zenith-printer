@@ -16,7 +16,7 @@ const ELEMENTS = [
     yMm: 2,
     widthMm: 40,
     heightMm: 12,
-    content: { $var: 'serial' },
+    content: '${serial}',
     symbology: 'code128',
   },
   {
@@ -26,7 +26,7 @@ const ELEMENTS = [
     yMm: 16,
     widthMm: 40,
     heightMm: 5,
-    content: { $var: 'partNo' },
+    content: '${partNo}',
     fontFamily: 'Noto Sans CJK SC',
     fontSizeMm: 3,
   },
@@ -39,10 +39,11 @@ const TEMPLATE = {
   heightMm: 30,
   dpi: 203,
   elements: ELEMENTS,
-  variableFields: [
-    { name: 'partNo', label: 'Part', source: 'manual', sampleValue: 'ABC-12345' },
-    { name: 'serial', label: 'Serial', source: 'sequence', seqStart: 1, seqDigits: 3, seqStep: 1 },
+  variables: [
+    { name: 'partNo', kind: 'constant', value: 'ABC-12345' },
+    { name: 'serial', kind: 'sequence', poolId: 'pool-1' },
   ],
+  dataSourceId: null,
 }
 
 function seedPrinter(kind: 'niimbot' | 'zpl' = 'niimbot'): string {
@@ -90,10 +91,23 @@ const createTemplate = (body: Record<string, unknown> = TEMPLATE) =>
   app.inject({ method: 'POST', url: '/api/templates', payload: body })
 
 describe('template CRUD', () => {
-  it('stores a template with its variable fields', async () => {
+  it('stores a design with its variables', async () => {
     const res = await createTemplate()
     expect(res.statusCode).toBe(201)
-    expect(res.json().variableFields).toHaveLength(2)
+    expect(res.json().variables).toHaveLength(2)
+  })
+
+  it('stores the data source binding, so "at most one" is structural', async () => {
+    // A column rather than something parsed out of content: a second data
+    // source is then not a rule to check but a thing that cannot be written.
+    const res = await createTemplate({ ...TEMPLATE, dataSourceId: 'ds-1' })
+    expect(res.json().dataSourceId).toBe('ds-1')
+  })
+
+  it('defaults to no data source', async () => {
+    const { dataSourceId, ...withoutBinding } = TEMPLATE
+    expect(dataSourceId).toBeNull()
+    expect((await createTemplate(withoutBinding)).json().dataSourceId).toBeNull()
   })
 
   it('reloads exactly what was saved', async () => {
@@ -103,32 +117,42 @@ describe('template CRUD', () => {
     expect(loaded.widthMm).toBe(50)
   })
 
-  it('rejects duplicate field names', async () => {
+  it('rejects duplicate variable names', async () => {
     const res = await createTemplate({
       ...TEMPLATE,
-      variableFields: [
-        { name: 'partNo', label: 'A', source: 'manual', sampleValue: 'x' },
-        { name: 'partNo', label: 'B', source: 'manual', sampleValue: 'y' },
+      variables: [
+        { name: 'partNo', kind: 'constant', value: 'x' },
+        { name: 'partNo', kind: 'constant', value: 'y' },
       ],
     })
     expect(res.statusCode).toBe(400)
   })
 
-  it('requires a sample value for a manual field', async () => {
-    // FR-039: without it the editor cannot show what the layout will look like.
+  it('rejects a sequence variable with no pool to draw from', async () => {
     const res = await createTemplate({
       ...TEMPLATE,
-      variableFields: [{ name: 'partNo', label: 'Part', source: 'manual' }],
+      variables: [{ name: 'serial', kind: 'sequence' }],
     })
     expect(res.statusCode).toBe(400)
   })
 
-  it('requires the sequence settings for a sequence field', async () => {
+  it('rejects a variable name containing the closing brace', async () => {
+    // `}` ends a reference, so a name holding one could never be written.
     const res = await createTemplate({
       ...TEMPLATE,
-      variableFields: [{ name: 'serial', label: 'Serial', source: 'sequence' }],
+      variables: [{ name: 'a}b', kind: 'constant', value: 'x' }],
     })
     expect(res.statusCode).toBe(400)
+  })
+
+  it('accepts a Chinese column-style name with a dot in it', async () => {
+    // Names come from spreadsheet headers; the grammar reserves only `}`.
+    const res = await createTemplate({
+      ...TEMPLATE,
+      variables: [{ name: '单价.含税', kind: 'constant', value: '19.90' }],
+    })
+    expect(res.statusCode).toBe(201)
+    expect(res.json().variables[0].name).toBe('单价.含税')
   })
 
   it('deletes without breaking anything downstream', async () => {
@@ -253,29 +277,16 @@ describe('concurrent edits', () => {
   })
 })
 
-describe('print form', () => {
-  it('lists what the client must collect', async () => {
+describe('the retired print form endpoint', () => {
+  /**
+   * Its job was to say which values the operator had to type before printing,
+   * and nothing is typed any more. A negative assertion because the endpoint
+   * is easy to reintroduce: the shape of the route file still invites it.
+   */
+  it('is gone', async () => {
     const id = (await createTemplate()).json().id
-    const form = (await app.inject({ method: 'GET', url: `/api/templates/${id}/print-form` })).json()
-
-    expect(form.fields).toHaveLength(2)
-    expect(form.fields.find((f: { name: string }) => f.name === 'partNo')).toMatchObject({
-      source: 'manual',
-      sampleValue: 'ABC-12345',
-    })
-  })
-
-  it('suggests where the sequence should resume', async () => {
-    // FR-048: nobody should have to remember what they printed last week.
-    const id = (await createTemplate()).json().id
-    const form = (await app.inject({ method: 'GET', url: `/api/templates/${id}/print-form` })).json()
-
-    expect(form.fields.find((f: { name: string }) => f.name === 'serial')).toMatchObject({
-      source: 'sequence',
-      suggestedStart: 1,
-      seqDigits: 3,
-      maxRepresentable: 999,
-    })
+    const res = await app.inject({ method: 'GET', url: `/api/templates/${id}/print-form` })
+    expect(res.statusCode).toBe(404)
   })
 })
 

@@ -7,24 +7,29 @@
  * a single design (FR-027, FR-031).
  */
 import { z } from 'zod'
-import { labelElementSchema } from '@zenith/shared'
+import { labelElementSchema, variableDefinitionsSchema } from '@zenith/shared'
+import { isSequenceVariable, type VariableDefinition } from '@zenith/shared'
 import { printerKindSchema } from './printer.ts'
-import { variableFieldSchema, type VariableField } from './variable-field.ts'
 
-export const templateInputSchema = z
-  .object({
-    name: z.string().min(1).max(80),
-    printerKind: printerKindSchema,
-    widthMm: z.number().finite().positive(),
-    heightMm: z.number().finite().positive(),
-    dpi: z.number().int().positive(),
-    elements: z.array(labelElementSchema),
-    variableFields: z.array(variableFieldSchema).default([]),
-  })
-  .refine(
-    (input) => new Set(input.variableFields.map((f) => f.name)).size === input.variableFields.length,
-    { message: 'variable field names must be unique within a template', path: ['variableFields'] },
-  )
+export const templateInputSchema = z.object({
+  name: z.string().min(1).max(80),
+  printerKind: printerKindSchema,
+  widthMm: z.number().finite().positive(),
+  heightMm: z.number().finite().positive(),
+  dpi: z.number().int().positive(),
+  elements: z.array(labelElementSchema),
+  /** Constants and sequences. Data source columns are not declared here. */
+  variables: variableDefinitionsSchema,
+  /**
+   * The one data source this design draws rows from, by id.
+   *
+   * A column rather than something parsed out of element content: that is what
+   * makes "at most one data source" impossible to express rather than a rule
+   * somebody has to remember to check. A dangling id after the source is
+   * deleted is a visible state, not an error — see `bindingIssue`.
+   */
+  dataSourceId: z.string().min(1).nullable().default(null),
+})
 export type TemplateInput = z.infer<typeof templateInputSchema>
 
 export interface Template extends TemplateInput {
@@ -55,11 +60,7 @@ export class TemplateConflictError extends Error {
   }
 }
 
-/** Fields the print form must collect before a job can be submitted (FR-038). */
-export function requiredManualFields(template: Template): VariableField[] {
-  return template.variableFields.filter((field) => field.source === 'manual')
-}
-
-export function sequenceFields(template: Template): VariableField[] {
-  return template.variableFields.filter((field) => field.source === 'sequence')
+/** Sequence variables of a design, which are the ones that claim numbers. */
+export function sequenceVariables(template: Template): Extract<VariableDefinition, { kind: 'sequence' }>[] {
+  return template.variables.filter(isSequenceVariable)
 }

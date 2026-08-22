@@ -261,7 +261,9 @@ describe('page building', () => {
   it('renders every copy when a sequence field varies them', async () => {
     const h = createHarness()
     const printerId = h.seedPrinter()
-    h.enqueue(printerId, 5, { seqRanges: { serial: { start: 1, end: 6, step: 1, digits: 3 } } })
+    h.enqueue(printerId, 5, {
+      seqClaims: [{ poolId: 'pool-1', variableName: 'serial', start: 1, end: 6, step: 1, digits: 3 }],
+    })
 
     await h.queue.drain(printerId)
 
