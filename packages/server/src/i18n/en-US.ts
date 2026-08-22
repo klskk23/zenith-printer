@@ -84,6 +84,16 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'Someone saved a newer version while you were editing',
     next: 'Reload the template and reapply your changes — your current edits are still on screen',
   },
+  DATA_SOURCE_NOT_LINKED: {
+    what: 'This data source is not linked to a spreadsheet',
+    why: 'Its rows are maintained here rather than fetched from Google, so there is nothing to refresh',
+    next: 'Edit its rows directly, or create a data source linked to a Google Sheet',
+  },
+  DATA_SOURCE_REFRESH_IN_PROGRESS: {
+    what: 'This data source is already being refreshed',
+    why: 'Two writers on one table would leave it half new and half old',
+    next: 'Wait for the running refresh to finish and try again',
+  },
   GOOGLE_URL_INVALID: {
     what: 'That is not a Google Sheets link',
     why: 'No spreadsheet id could be found in it — it may be a Docs or Slides link, or a mistyped paste',

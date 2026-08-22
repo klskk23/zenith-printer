@@ -34,6 +34,10 @@ import { DecodeFailedError } from '../csv/encoding.ts'
 import { templatesBrokenByRemoving, templatesUsingDataSource } from '../domain/template-refs.ts'
 import { ApiError, HttpStatus } from './errors.ts'
 import { asApiError, readByWorksheetId, requireSheets, tableOrRefuse } from './google.ts'
+import { SheetsError } from '../domain/google-sheets.ts'
+import { tableFromValues, TableShapeError } from '../domain/sheet-table.ts'
+import { decideRefresh } from '../domain/refresh.ts'
+import { templatesBrokenByRemoving as brokenBy } from '../domain/template-refs.ts'
 
 /** A ten-thousand-row CSV of long Chinese values still fits comfortably. */
 const MAX_UPLOAD_BYTES = 16 * 1024 * 1024
@@ -238,6 +242,98 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
           },
         })),
       )
+    },
+  )
+
+  /**
+   * In-flight refreshes, by data source id.
+   *
+   * Two writers on one table is how a half-replaced table happens: new columns
+   * with old rows, or rows from two different reads. The browser disables its
+   * button, but this service has no authentication and anybody on the network
+   * can call the endpoint directly — so the guard has to be here as well.
+   */
+  const refreshing = new Set<string>()
+
+  typed.post(
+    '/api/data-sources/:id/refresh',
+    {
+      schema: {
+        params: idParams,
+        body: z.object({ confirmColumnChange: z.boolean().optional() }).default({}),
+      },
+    },
+    async (request) => {
+      const repo = sources()
+      const source = require(repo, request.params.id)
+      if (source.link === null) {
+        throw ApiError.unprocessable('DATA_SOURCE_NOT_LINKED', { dataSourceId: source.id })
+      }
+      const sheets = requireSheets(app.ctx)
+
+      if (refreshing.has(source.id)) {
+        throw ApiError.conflict('DATA_SOURCE_REFRESH_IN_PROGRESS', { dataSourceId: source.id })
+      }
+      refreshing.add(source.id)
+      try {
+        let read
+        try {
+          read = await readByWorksheetId(sheets, source.link.spreadsheetId, source.link.worksheetId)
+        } catch (err) {
+          if (err instanceof SheetsError) {
+            // Not an error response: the server did what it was asked and has a
+            // conclusion. The rows that are already here still print, and a 5xx
+            // would invite the browser to retry something that is not retryable.
+            return { outcome: 'failed' as const, reason: err.kind }
+          }
+          throw err
+        }
+
+        let table
+        try {
+          table = tableFromValues(read.values)
+        } catch (err) {
+          if (err instanceof TableShapeError) {
+            return { outcome: 'failed' as const, reason: 'worksheetMissing' as const, detail: err.message }
+          }
+          throw err
+        }
+
+        const decision = decideRefresh(source, table, {
+          confirmed: request.body.confirmColumnChange === true,
+        })
+
+        if (decision.kind === 'refusedTooManyRows') {
+          return { outcome: 'refusedTooManyRows' as const, ...decision, kind: undefined }
+        }
+        if (decision.kind === 'needsConfirmation') {
+          return {
+            outcome: 'needsConfirmation' as const,
+            removedColumns: decision.removedColumns,
+            addedColumns: decision.addedColumns,
+            // Computed on read, never stored — the same rule bindingIssue
+            // follows, and for the same reason.
+            affectedTemplates: brokenBy(app.ctx.db, source.id, decision.removedColumns),
+          }
+        }
+
+        const rowsBefore = source.rowCount
+        repo.replaceLinked(source.id, {
+          columns: table.columns,
+          rows: table.rows,
+          worksheetTitle: read.worksheetTitle,
+        })
+        const after = require(repo, source.id)
+        return {
+          outcome: 'applied' as const,
+          rowsBefore,
+          rowsAfter: after.rowCount,
+          columnsAdded: decision.columnsAdded,
+          lastRefreshedAt: after.link?.lastRefreshedAt ?? null,
+        }
+      } finally {
+        refreshing.delete(source.id)
+      }
     },
   )
 

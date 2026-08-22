@@ -19,6 +19,14 @@ export interface FakeSheetsScript {
   values?: Record<string, string[][]>
   /** Fail every call this way, whatever else the script says. */
   failWith?: SheetsErrorKind
+  /**
+   * Hold every call open this long.
+   *
+   * Without it a fake resolves inside the same tick, and anything that is only
+   * true *while* a read is in flight — the in-progress guard, a disabled
+   * button — cannot be observed at all.
+   */
+  delayMs?: number
 }
 
 export interface FakeSheetsPort extends SheetsPort {
@@ -28,6 +36,13 @@ export interface FakeSheetsPort extends SheetsPort {
 
 export function fakeSheetsPort(script: FakeSheetsScript): FakeSheetsPort {
   const calls = { listWorksheets: 0, readWorksheet: 0 }
+
+  const settle = async <T>(value: T): Promise<T> => {
+    if (script.delayMs !== undefined) {
+      await new Promise((resolve) => setTimeout(resolve, script.delayMs))
+    }
+    return value
+  }
 
   return {
     calls,
@@ -43,7 +58,7 @@ export function fakeSheetsPort(script: FakeSheetsScript): FakeSheetsPort {
         // would go on to build a zero-column data source out of nothing.
         return Promise.reject(new SheetsError('notFound', 404))
       }
-      return Promise.resolve(found)
+      return settle(found)
     },
 
     readWorksheet(spreadsheetId: string, worksheetTitle: string): Promise<string[][]> {
@@ -58,7 +73,7 @@ export function fakeSheetsPort(script: FakeSheetsScript): FakeSheetsPort {
       if (values === undefined) {
         return Promise.reject(new SheetsError('worksheetMissing'))
       }
-      return Promise.resolve(values)
+      return settle(values)
     },
   }
 }

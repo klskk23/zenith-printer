@@ -89,6 +89,16 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '内容不满足所选条码码制的规则，或超出了标签可打印范围',
     next: '按提示修改字段内容后重新提交',
   },
+  DATA_SOURCE_NOT_LINKED: {
+    what: '这个数据源没有链接任何表格',
+    why: '它的内容由本机维护，不是从 Google 表格取来的，因此无从刷新',
+    next: '直接编辑它的内容，或者新建一个链接 Google 表格的数据源',
+  },
+  DATA_SOURCE_REFRESH_IN_PROGRESS: {
+    what: '这个数据源正在刷新',
+    why: '同一张表同时被写两次，会得到一半新一半旧的内容',
+    next: '等上一次刷新结束后再试',
+  },
   GOOGLE_URL_INVALID: {
     what: '这不是一个 Google 表格的链接',
     why: '链接里找不到表格标识，可能粘错了，或者那是 Google 文档／幻灯片的链接',

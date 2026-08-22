@@ -112,19 +112,19 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 
 ### 测试
 
-- [ ] T036 [P] [US2] 编写 `packages/server/tests/integration/google-refresh-api.test.ts`：成功返回 `outcome:'applied'` 与前后行数；`last_refreshed_at` 更新；非链接数据源 `422 DATA_SOURCE_NOT_LINKED`；数据源不存在 `404`
-- [ ] T037 [P] [US2] 在同一文件补：**工作表改名后仍能刷新**（按 `worksheet_id` 取回当前标题），且 `worksheet_title` 被更新
-- [ ] T038 [P] [US2] 在同一文件补：同一数据源的并发刷新只写一次，第二个请求 `409 DATA_SOURCE_REFRESH_IN_PROGRESS`
+- [X] T036 [P] [US2] 编写 `packages/server/tests/integration/google-refresh-api.test.ts`：成功返回 `outcome:'applied'` 与前后行数；`last_refreshed_at` 更新；非链接数据源 `422 DATA_SOURCE_NOT_LINKED`；数据源不存在 `404`
+- [X] T037 [P] [US2] 在同一文件补：**工作表改名后仍能刷新**（按 `worksheet_id` 取回当前标题），且 `worksheet_title` 被更新
+- [X] T038 [P] [US2] 在同一文件补：同一数据源的并发刷新只写一次，第二个请求 `409 DATA_SOURCE_REFRESH_IN_PROGRESS`
 - [ ] T039 [P] [US2] 编写 `packages/web/tests/data-source-refresh.dom.test.tsx`：列表页与编辑页均有刷新入口；进行中时按钮禁用；成功后显示新的刷新时间
 - [ ] T040 [P] [US2] 编写 `packages/web/tests/print-refresh.dom.test.tsx`：打印对话框内有刷新入口；**已勾选行后按刷新，选择被清空并给出原因**
 - [ ] T041 [P] [US2] 在 `packages/web/tests/data-source-refresh.dom.test.tsx` 补：挂载数据源页与打印对话框、推进假定时器，断言**没有任何刷新请求被发出**（FR-014）。否定式需求无人验证时，日后有人加个轮询也不会有测试变红
 
 ### 实现
 
-- [ ] T042 [US2] 在 `packages/server/src/domain/refresh.ts` 实现刷新决策纯函数：读取结果 + 现有列 → `RefreshOutcome`（见 `data-model.md` §3）
-- [ ] T043 [US2] 在 `packages/server/src/api/data-sources.ts` 实现 `POST /api/data-sources/:id/refresh`，含按 `worksheet_id` 换取当前标题、进行中互斥，使 T036–T038 变绿
-- [ ] T044 [US2] 在 `packages/server/src/api/data-sources.ts` 的数据源响应中加入 `sourceKind`、`spreadsheetTitle`、`worksheetTitle`、`lastRefreshedAt`（既有字段一个不变）
-- [ ] T045 [P] [US2] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 与 `types.ts` 加入 `DATA_SOURCE_NOT_LINKED`、`DATA_SOURCE_REFRESH_IN_PROGRESS` 的文案
+- [X] T042 [US2] 在 `packages/server/src/domain/refresh.ts` 实现刷新决策纯函数：读取结果 + 现有列 → `RefreshOutcome`（见 `data-model.md` §3）
+- [X] T043 [US2] 在 `packages/server/src/api/data-sources.ts` 实现 `POST /api/data-sources/:id/refresh`，含按 `worksheet_id` 换取当前标题、进行中互斥，使 T036–T038 变绿
+- [X] T044 [US2] 在 `packages/server/src/api/data-sources.ts` 的数据源响应中加入 `sourceKind`、`spreadsheetTitle`、`worksheetTitle`、`lastRefreshedAt`（既有字段一个不变）
+- [X] T045 [P] [US2] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 与 `types.ts` 加入 `DATA_SOURCE_NOT_LINKED`、`DATA_SOURCE_REFRESH_IN_PROGRESS` 的文案
 - [ ] T046 [US2] 在 `packages/web/src/features/data-sources/refresh-button.tsx` 实现共用的刷新按钮（进行中状态、禁止重复触发），使 T039 变绿
 - [ ] T047 [US2] 在 `packages/web/src/features/data-sources/data-sources-page.tsx` 与 `data-source-editor.tsx` 显示来源与上次刷新时间，并接入刷新按钮
 - [ ] T048 [US2] 在 `packages/web/src/features/print/print-dialog.tsx` 接入刷新按钮，**置于行选择器之前**；刷新成功后清空 `selection`，使 T040 变绿
