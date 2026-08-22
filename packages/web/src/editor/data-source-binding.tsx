@@ -12,6 +12,7 @@ import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } f
 import { Alert } from '../components/ui/alert.tsx'
 import { copy } from '../i18n/index.ts'
 import { useDataSources } from '../features/data-sources/hooks.ts'
+import { RefreshButton } from '../features/data-sources/refresh-button.tsx'
 import type { BindingIssue } from '../features/templates/hooks.ts'
 
 export interface DataSourceBindingProps {
@@ -62,6 +63,26 @@ export function DataSourceBinding({
           </p>
           <p className="mt-1 opacity-90">{copy.dataSources.rebindHint}</p>
         </Alert>
+      )}
+
+      {/*
+        Refresh from here too.
+        
+        The column names below are what a design writes in `${}`. Somebody adds
+        a column in Google while this editor is open, and without this the only
+        way to see it is to leave, refresh on the list page, and come back —
+        by which point they have probably typed the name from memory instead,
+        which is a reference that resolves to nothing.
+      */}
+      {bound?.sourceKind === 'google-sheets' && (
+        <div className="space-y-1">
+          <RefreshButton source={bound} />
+          <p className="text-[11px] text-muted-foreground" data-binding-freshness>
+            {bound.lastRefreshedAt === undefined
+              ? copy.dataSources.neverRefreshed
+              : copy.dataSources.lastRefreshed(new Date(bound.lastRefreshedAt).toLocaleString())}
+          </p>
+        </div>
       )}
 
       {bound !== undefined && (

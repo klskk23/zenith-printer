@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DataSourcesPage } from '../src/features/data-sources/data-sources-page.tsx'
+import { DataSourceBinding } from '../src/editor/data-source-binding.tsx'
 
 let refreshes: number
 let refreshReply: Record<string, unknown>
@@ -172,5 +173,42 @@ describe('nothing refreshes on its own', () => {
     await vi.advanceTimersByTimeAsync(10 * 60 * 1000)
 
     expect(refreshes).toBe(0)
+  })
+})
+
+describe('refreshing from the design editor', () => {
+  it('is offered beside the columns a design references', async () => {
+    // The column names in that panel are what a design writes in `${}`. Add a
+    // column in Google with the editor open and, without this, the only way to
+    // see it is to leave, refresh elsewhere, and come back — by which point
+    // somebody has probably typed the name from memory, which is a reference
+    // that resolves to nothing.
+    render(
+      wrap(
+        <DataSourceBinding dataSourceId="ds-1" onChange={() => undefined} bindingIssue={null} />,
+      ),
+    )
+    expect(await screen.findByRole('button', { name: '刷新' })).toBeDefined()
+  })
+
+  it('says how fresh those column names are', async () => {
+    render(
+      wrap(
+        <DataSourceBinding dataSourceId="ds-1" onChange={() => undefined} bindingIssue={null} />,
+      ),
+    )
+    await screen.findByRole('button', { name: '刷新' })
+    expect(document.querySelector('[data-binding-freshness]')?.textContent).toMatch(/上次刷新/)
+  })
+
+  it('is not offered for a table maintained here', async () => {
+    sources = [{ ...LOCAL, id: 'ds-1' }]
+    render(
+      wrap(
+        <DataSourceBinding dataSourceId="ds-1" onChange={() => undefined} bindingIssue={null} />,
+      ),
+    )
+    await screen.findByText(/列/)
+    expect(screen.queryByRole('button', { name: '刷新' })).toBeNull()
   })
 })

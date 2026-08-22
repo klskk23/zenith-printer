@@ -22,7 +22,6 @@ import { usePreferences } from '../features/preferences/context.tsx'
 import { PREFERENCE_KEYS, type Preferences } from '../features/preferences/store.ts'
 import { LOCALES } from '../features/preferences/locale.ts'
 import { FONT_FAMILIES, type FontFamilyKey } from '../editor/elements.ts'
-import { PoolsPanel } from '../features/sequence-pools/pools-panel.tsx'
 
 function Row({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
   return (
@@ -195,12 +194,6 @@ export function SettingsPage(): React.JSX.Element {
 
       <p className="text-[11px] text-muted-foreground">{copy.settings.localOnlyHint}</p>
 
-      {/*
-        Sequence pools live here rather than on a page of their own: they are
-        set up rarely and referenced from the design, so a navigable page would
-        be a tab nobody opens twice.
-      */}
-      <PoolsPanel />
     </div>
   )
 }

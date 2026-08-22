@@ -10,15 +10,23 @@
  * accepted trade for links being shareable.
  */
 
+/**
+ * Also the sidebar's order, top to bottom.
+ *
+ * Settings sits last because it is where somebody goes once and then rarely
+ * again — the day-to-day entries should not be below it.
+ */
 export const TAB_KINDS = [
   'index',
   'design',
   'templates',
+  'data-sources',
   'printers',
   'queue',
   'history',
   'settings',
-  'data-sources',
+  // Never in the sidebar: the editor needs a table to open, and an entry that
+  // opened an empty one would be a dead end. Reached from the list instead.
   'data-source',
 ] as const
 

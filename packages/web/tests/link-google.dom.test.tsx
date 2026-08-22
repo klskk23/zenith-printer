@@ -7,7 +7,7 @@
  * until a label prints wrong.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DataSourcesPage } from '../src/features/data-sources/data-sources-page.tsx'
 
@@ -156,9 +156,13 @@ describe('the three steps', () => {
   })
 
   it('fills the name box with the worksheet name', async () => {
+    // Scoped to the dialog: the sequence-pool panel on the same page has a
+    // field labelled the same way, and a document-wide query finds both.
     await openToPreview()
     await waitFor(() =>
-      expect((screen.getByLabelText('名称') as HTMLInputElement).value).toBe('本月出货'),
+      expect(
+        (within(screen.getByRole('dialog')).getByLabelText('名称') as HTMLInputElement).value,
+      ).toBe('本月出货'),
     )
   })
 

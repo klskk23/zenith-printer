@@ -13,6 +13,7 @@ import { copy } from '../../i18n/index.ts'
 import { UploadDialog } from './upload-dialog.tsx'
 import { LinkGoogleDialog } from './link-google-dialog.tsx'
 import { RefreshButton } from './refresh-button.tsx'
+import { PoolsPanel } from '../sequence-pools/pools-panel.tsx'
 import { useDataSources,
   useGoogleStatus,
   useUnlinkDataSource, useDeleteDataSource, useRenameDataSource, type DataSource } from './hooks.ts'
@@ -187,6 +188,17 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
           </CardContent>
         </Card>
       ))}
+
+      {/*
+        Sequence pools sit here, with the tables.
+        
+        They used to be on the settings page, which opens by saying its settings
+        only affect this browser — and a pool is server state that everybody
+        draws serials from. Both of these are places a variable gets its value,
+        which is what the design references; that is the thing they have in
+        common, and settings was never it.
+      */}
+      <PoolsPanel />
 
       {uploading && <UploadDialog onClose={() => setUploading(false)} />}
       {replacing !== null && (
