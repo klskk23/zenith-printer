@@ -11,7 +11,9 @@ import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { copy } from '../../i18n/index.ts'
 import { UploadDialog } from './upload-dialog.tsx'
-import { useDataSources, useDeleteDataSource, useRenameDataSource, type DataSource } from './hooks.ts'
+import { LinkGoogleDialog } from './link-google-dialog.tsx'
+import { useDataSources,
+  useGoogleStatus, useDeleteDataSource, useRenameDataSource, type DataSource } from './hooks.ts'
 
 export interface DataSourcesPageProps {
   onOpen?: (id: string) => void
@@ -23,6 +25,8 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
   const remove = useDeleteDataSource()
 
   const [uploading, setUploading] = useState(false)
+  const [linking, setLinking] = useState(false)
+  const google = useGoogleStatus()
   const [replacing, setReplacing] = useState<DataSource | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
@@ -31,12 +35,40 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
     <div className="space-y-3" data-data-sources-page>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">{copy.dataSources.heading}</h2>
-        <Button size="sm" onClick={() => setUploading(true)}>
-          {copy.dataSources.upload}
-        </Button>
+        <div className="flex items-center gap-2">
+          {/*
+            Disabled rather than hidden when no Google identity is configured:
+            somebody looking for the feature should learn that it exists and
+            what is missing, not conclude it was never built.
+          */}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={google.data?.configured !== true}
+            title={google.data?.configured === true ? undefined : copy.dataSources.googleNotConfigured}
+            onClick={() => setLinking(true)}
+          >
+            {copy.dataSources.linkGoogle}
+          </Button>
+          <Button size="sm" onClick={() => setUploading(true)}>
+            {copy.dataSources.upload}
+          </Button>
+        </div>
       </div>
 
       <p className="text-[11px] text-muted-foreground">{copy.dataSources.explain}</p>
+      {/* Says which address to share with, so the answer is on the page rather
+          than only inside a failure message. */}
+      {google.data?.configured === true && google.data.clientEmail !== null && (
+        <p className="text-[11px] text-muted-foreground" data-google-robot>
+          {copy.dataSources.googleShareWith(google.data.clientEmail)}
+        </p>
+      )}
+      {google.data?.configured === false && (
+        <p className="text-[11px] text-muted-foreground">{copy.dataSources.googleNotConfigured}</p>
+      )}
+
+      <LinkGoogleDialog open={linking} onOpenChange={setLinking} />
 
       {sources.data !== undefined && sources.data.length === 0 && (
         <Card>

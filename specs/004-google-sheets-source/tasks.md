@@ -95,10 +95,10 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 - [X] T029 [US1] 在 `packages/server/src/api/data-sources.ts` 实现 `POST /api/data-sources/google`，使 T023 变绿
 - [X] T030 [P] [US1] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 与 `types.ts` 加入五个新错误码的三要素文案：`GOOGLE_URL_INVALID`、`GOOGLE_NOT_CONFIGURED`、`GOOGLE_NOT_SHARED`、`GOOGLE_SPREADSHEET_NOT_FOUND`、`GOOGLE_CREDENTIALS_INVALID`
 - [X] T031 [P] [US1] 在同上文件加入 `GOOGLE_RATE_LIMITED`、`GOOGLE_UNREACHABLE`、`GOOGLE_WORKSHEET_NOT_FOUND`、`GOOGLE_WORKSHEET_EMPTY` 的文案。`GOOGLE_NOT_SHARED` 的「下一步」须带出机器身份邮箱
-- [ ] T032 [US1] 在 `packages/web/src/features/data-sources/hooks.ts` 加入 `useGoogleStatus`、`useListWorksheets`、`usePreviewWorksheet`、`useCreateLinkedSource`
-- [ ] T033 [US1] 在 `packages/web/src/features/data-sources/link-google-dialog.tsx` 实现三步对话框（粘链接 → 选工作表 → 预览+命名确认），使 T024 变绿
-- [ ] T034 [US1] 在 `packages/web/src/features/data-sources/data-sources-page.tsx` 加入「链接 Google 表格」入口，未配置时禁用并说明由部署方配置
-- [ ] T035 [P] [US1] 在 `packages/web/src/i18n/{zh-CN,en-US}.ts` 加入本故事的界面文案
+- [X] T032 [US1] 在 `packages/web/src/features/data-sources/hooks.ts` 加入 `useGoogleStatus`、`useListWorksheets`、`usePreviewWorksheet`、`useCreateLinkedSource`
+- [X] T033 [US1] 在 `packages/web/src/features/data-sources/link-google-dialog.tsx` 实现三步对话框（粘链接 → 选工作表 → 预览+命名确认），使 T024 变绿
+- [X] T034 [US1] 在 `packages/web/src/features/data-sources/data-sources-page.tsx` 加入「链接 Google 表格」入口，未配置时禁用并说明由部署方配置
+- [X] T035 [P] [US1] 在 `packages/web/src/i18n/{zh-CN,en-US}.ts` 加入本故事的界面文案
 
 **检查点**：US1 可独立交付——能接入一张表并用它打印，尚不能刷新。
 

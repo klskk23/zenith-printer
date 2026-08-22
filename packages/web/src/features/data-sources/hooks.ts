@@ -6,6 +6,19 @@ export interface DataSource {
   name: string
   columns: string[]
   rowCount: number
+  /**
+   * Whether the rows are maintained here or come from somewhere else.
+   *
+   * A linked source is read-only locally: editing it here and having the next
+   * refresh wipe that edit is the failure this distinction exists to prevent.
+   */
+  sourceKind: 'local' | 'google-sheets'
+  /** Present only when linked. Flattened onto the same object by the server. */
+  spreadsheetId?: string
+  spreadsheetTitle?: string
+  worksheetId?: number
+  worksheetTitle?: string
+  lastRefreshedAt?: string
   createdAt: string
   updatedAt: string
 }
@@ -141,6 +154,62 @@ export function useDeleteDataSource() {
     // `confirm` is always sent: the dialog has already asked. The flag exists
     // so the endpoint cannot be reached by an idempotent retry.
     mutationFn: (id: string) => request<void>(`/data-sources/${id}?confirm=true`, { method: 'DELETE' }),
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+export interface GoogleStatus {
+  configured: boolean
+  /** The address a spreadsheet must be shared with, when configured. */
+  clientEmail: string | null
+}
+
+export interface WorksheetList {
+  spreadsheetId: string
+  spreadsheetTitle: string
+  worksheets: Array<{ id: number; title: string }>
+}
+
+export interface WorksheetPreview {
+  spreadsheetTitle: string
+  worksheetTitle: string
+  columns: string[]
+  sampleRows: Array<Record<string, string>>
+  totalRows: number
+  suggestedName: string
+  nameTaken: boolean
+}
+
+const GOOGLE_STATUS_KEY = ['google-status']
+
+export function useGoogleStatus() {
+  return useQuery({
+    queryKey: GOOGLE_STATUS_KEY,
+    queryFn: () => request<GoogleStatus>('/google/status'),
+    // Deployment configuration; it does not change while somebody is looking.
+    staleTime: Infinity,
+  })
+}
+
+export function useListWorksheets() {
+  return useMutation({
+    mutationFn: (url: string) =>
+      request<WorksheetList>('/google/worksheets', { method: 'POST', body: { url } }),
+  })
+}
+
+export function usePreviewWorksheet() {
+  return useMutation({
+    mutationFn: (input: { spreadsheetId: string; worksheetId: number }) =>
+      request<WorksheetPreview>('/google/preview', { method: 'POST', body: input }),
+  })
+}
+
+export function useCreateLinkedSource() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { spreadsheetId: string; worksheetId: number; name: string }) =>
+      request<DataSource>('/data-sources/google', { method: 'POST', body: input }),
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })
 }
