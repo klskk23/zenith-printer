@@ -19,14 +19,16 @@
 # Measured on a NIIMBOT B3S_P at /dev/ttyACM0, same host, same device, same
 # node_modules, only the interpreter changed:
 #
-#   26.0.0  handshake 118ms, model B3S_P     26.4.0  timeout, model unknown
-#   26.1.0  ok                               26.7.0  timeout
-#   26.2.0  ok
-#   26.3.1  ok
+#   26.0.0  7/7 ok, 116-120ms                26.4.0  0/7, always times out
+#   26.1.0  2/2 ok                           26.7.0  0/3, always times out
+#   26.2.0  2/2 ok
+#   26.3.1  7/7 ok, 118-121ms
 #
-# Under 26.4 a byte dump shows the response arriving only after the timeout has
-# already fired, on teardown — the write goes out and the device replies; it is
-# the delivery to the stream that stalls.
+# Timestamped: on 26.3 the reply lands 1.1ms after the write; on 26.4 nothing
+# arrives until the 1000ms timeout wakes the event loop. The device answers —
+# what stalls is the fd's readability waking the loop at all. Which layer moved
+# (Node's polling, or how @serialport/bindings-cpp's poller rides on it) was
+# not established; this is measured behaviour, not a citation.
 #
 # Before raising this: plug in a printer and run `zenith probe --address
 # /dev/ttyACM0` on the candidate version. A green test suite proves nothing
