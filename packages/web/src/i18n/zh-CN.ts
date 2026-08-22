@@ -300,6 +300,16 @@ export const copy = {
     gridHint: '像电子表格一样用：方向键移动，Shift+方向键框选，Ctrl+A 全选，Ctrl+C 复制，Ctrl+V 粘贴。可以直接粘贴从 Google 表格或 Excel 复制的区块；超出末行会自动加行，超出最后一列会被拒绝——列名是引用用的名字，不能凭空多出来。',
     patchFailed: '这次改动没有保存成功。请检查后重试；表格上显示的是本地的编辑，可能与服务器不一致。',
     rebindHint: '在设计的属性栏里重新选择一张同形状的表即可复原',
+    menu: {
+      cut: '剪切',
+      copy: '复制',
+      paste: '粘贴',
+      deleteRow: '删除本行',
+      deleteRows: (from: number, to: number): string => `删除第 ${from} 到 ${to} 行`,
+      insertRowBelow: '在下方插入一行',
+      duplicateRow: '复制本行',
+      duplicateRows: (from: number, to: number): string => `复制第 ${from} 到 ${to} 行`,
+    },
   },
 
   rowSelection: {

@@ -305,6 +305,16 @@ export const copy: Copy = {
     gridHint: 'Works like a spreadsheet: arrow keys to move, shift+arrows to select a range, Ctrl+A for everything, Ctrl+C to copy, Ctrl+V to paste. Blocks copied from Google Sheets or Excel paste straight in; rows past the end are appended, columns past the last are refused — a column name is a reference name and cannot be conjured up.',
     patchFailed: 'That change was not saved. Check and retry; the grid is showing your local edit, which may differ from the server.',
     rebindHint: 'Pick another table of the same shape in the design properties to fix it',
+    menu: {
+      cut: 'Cut',
+      copy: 'Copy',
+      paste: 'Paste',
+      deleteRow: 'Delete row',
+      deleteRows: (from: number, to: number): string => `Delete rows ${from} to ${to}`,
+      insertRowBelow: 'Insert row below',
+      duplicateRow: 'Duplicate row',
+      duplicateRows: (from: number, to: number): string => `Duplicate rows ${from} to ${to}`,
+    },
   },
 
   rowSelection: {

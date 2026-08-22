@@ -168,3 +168,29 @@ body {
 .dsg-container::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-muted-foreground);
 }
+
+/*
+ * The grid's right-click menu.
+ *
+ * The library paints it `background: white; color: black`, which is invisible
+ * as a decision until the dark theme turns it into a white slab. These are the
+ * same tokens every other popover on the page uses.
+ */
+.dsg-context-menu {
+  background: var(--color-popover);
+  color: var(--color-popover-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px 0 color-mix(in oklch, var(--color-foreground) 12%, transparent);
+  padding: 0.25rem;
+  font-size: 0.75rem;
+}
+.dsg-context-menu-item {
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+.dsg-context-menu-item:hover {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+}

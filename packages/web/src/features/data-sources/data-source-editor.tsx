@@ -27,6 +27,7 @@ import 'react-datasheet-grid/dist/style.css'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { AddRowsBar } from './add-rows.tsx'
+import { GridContextMenu } from './grid-context-menu.tsx'
 import {
   diffRows,
   emptyHistory,
@@ -201,6 +202,8 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
         // the foot of the page; this one is built from the same primitives as
         // everything around it.
         addRowsComponent={AddRowsBar}
+        // The only way to delete a row, so it cannot stay English on white.
+        contextMenuComponent={GridContextMenu}
       />
     </div>
   )

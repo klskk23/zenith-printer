@@ -12,6 +12,7 @@ import {
 } from '../src/features/data-sources/grid-operations.ts'
 import { giveElementsSize } from './support/layout.ts'
 import { activateCell, pasteTsv } from './support/grid.ts'
+import { renderMenuItem } from '../src/features/data-sources/grid-context-menu.tsx'
 
 /**
  * Pasting a block from a spreadsheet, through our own grid configuration.
@@ -143,5 +144,52 @@ describe('pasting a block', () => {
     await pasteTsv('X\tY')
 
     expect(patches).toHaveLength(0)
+  })
+})
+
+/**
+ * Deleting a row.
+ *
+ * The right-click menu is the only way to do it in this editor, which makes it
+ * the one operation whose entire path — menu label, library action, our
+ * translation to a patch — had no test at all. It is driven here by calling the
+ * menu item's own action, because happy-dom does no layout and the menu is
+ * positioned from pointer coordinates.
+ */
+describe('the right-click menu', () => {
+  it('labels its items in the interface language, not the library default', () => {
+    // The library renders 'Delete row' on a hard-coded white background. Both
+    // halves of that are wrong here; this is the half a test can see.
+    expect(renderMenuItem({ type: 'DELETE_ROW', action: () => {} })).toBe('删除本行')
+    expect(renderMenuItem({ type: 'INSERT_ROW_BELLOW', action: () => {} })).toBe('在下方插入一行')
+    expect(renderMenuItem({ type: 'COPY', action: () => {} })).toBe('复制')
+  })
+
+  it('names the range when several rows are selected', () => {
+    expect(renderMenuItem({ type: 'DELETE_ROWS', action: () => {}, fromRow: 2, toRow: 5 })).toBe(
+      '删除第 2 到 5 行',
+    )
+  })
+
+  it('turns a deleted row into a patch naming the ordinal it had', () => {
+    // The row that goes is named by the position it *held*, not the position
+    // the table ends up with: the server deletes by ordinal out of the current
+    // table and only then renumbers what is left. Deleting the first of two
+    // rows is therefore `deletes: [1]`, after which the survivor becomes row 1
+    // on its own — no upsert needed to move it.
+    const patch = patchFromOperations(
+      [{ 订单号: 'A-002', 收件人: '李四' }],
+      [{ type: 'DELETE', fromRowIndex: 0, toRowIndex: 1 }],
+    )
+    expect(patch.deletes).toEqual([1])
+    expect(patch.upserts).toEqual([])
+  })
+
+  it('names every ordinal when a block of rows is deleted at once', () => {
+    const patch = patchFromOperations(
+      [{ 订单号: 'A-001', 收件人: '张三' }],
+      [{ type: 'DELETE', fromRowIndex: 1, toRowIndex: 3 }],
+    )
+    expect(patch.deletes).toEqual([2, 3])
   })
 })
