@@ -32,6 +32,31 @@ const ROWS = Array.from({ length: 10 }, (_unused, i) => ({
 
 let sources: Array<typeof SOURCE>
 let patched: Array<Record<string, unknown>>
+/**
+ * The rows, as the server would hold them.
+ *
+ * Stateful on purpose. A stub that returned the same rows whatever was PATCHed
+ * could not tell an undo that worked from one that silently did nothing —
+ * before and after would compare equal either way.
+ */
+let serverRows: Array<{ ordinal: number; values: Record<string, string> }>
+
+function applyPatch(body: {
+  upserts?: Array<{ ordinal: number; values: Record<string, string> }>
+  deletes?: number[]
+}): void {
+  const byOrdinal = new Map(serverRows.map((row) => [row.ordinal, row.values]))
+  for (const ordinal of body.deletes ?? []) {
+    byOrdinal.delete(ordinal)
+  }
+  for (const upsert of body.upserts ?? []) {
+    byOrdinal.set(upsert.ordinal, { ...(byOrdinal.get(upsert.ordinal) ?? {}), ...upsert.values })
+  }
+  // Renumbered contiguously, as the repository does.
+  serverRows = [...byOrdinal.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, values], index) => ({ ordinal: index + 1, values }))
+}
 
 function wrap(node: React.ReactNode): React.JSX.Element {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -41,6 +66,7 @@ function wrap(node: React.ReactNode): React.JSX.Element {
 beforeEach(() => {
   sources = [SOURCE]
   patched = []
+  serverRows = ROWS.map((row) => ({ ordinal: row.ordinal, values: { ...row.values } }))
   vi.stubGlobal(
     'fetch',
     vi.fn((input: string, init?: RequestInit) => {
@@ -55,11 +81,13 @@ beforeEach(() => {
         } as unknown as Response)
 
       if (url.includes('/rows') && init?.method === 'PATCH') {
-        patched.push(JSON.parse(String(init.body)) as Record<string, unknown>)
-        return json(SOURCE)
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>
+        patched.push(body)
+        applyPatch(body as never)
+        return json({ ...SOURCE, rowCount: serverRows.length })
       }
       if (url.includes('/rows')) {
-        return json({ rows: ROWS, page: 1, pageSize: 10, total: 12 })
+        return json({ rows: serverRows, page: 1, pageSize: 10_000, total: serverRows.length })
       }
       return json({ dataSources: sources })
     }),
@@ -203,6 +231,98 @@ describe('the table editor', () => {
     expect(count.value).toBe('10')
   })
 
+  it('offers undo and redo, greyed out until there is something to undo', async () => {
+    // A key combination as the only undo is no undo for anyone who does not
+    // know it.
+    openEditor()
+    await screen.findByText('收件人')
+    expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('undoes an edit by putting the server back, not just the screen', async () => {
+    // The rows live on the server, so an undo that only changed local state
+    // would be undone again by the next refetch.
+    openEditor()
+    await screen.findByText('收件人')
+
+    fireEvent.click(screen.getByRole('button', { name: '加行' }))
+    await vi.waitFor(() => expect(patched.length).toBe(1))
+    await vi.waitFor(() =>
+      expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(false),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '撤销' }))
+    await vi.waitFor(() => expect(patched.length).toBe(2))
+    // The added row is taken off again.
+    expect(patched[1]).toMatchObject({ deletes: [11] })
+  })
+
+  it('offers a redo once something has been undone', async () => {
+    openEditor()
+    await screen.findByText('收件人')
+
+    fireEvent.click(screen.getByRole('button', { name: '加行' }))
+    await vi.waitFor(() =>
+      expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(false),
+    )
+    fireEvent.click(screen.getByRole('button', { name: '撤销' }))
+
+    await vi.waitFor(() =>
+      expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(false),
+    )
+  })
+
+  it('undoes on Ctrl+Z', async () => {
+    openEditor()
+    await screen.findByText('收件人')
+
+    fireEvent.click(screen.getByRole('button', { name: '加行' }))
+    await vi.waitFor(() => expect(patched.length).toBe(1))
+
+    fireEvent.keyDown(document.querySelector('[data-data-source-editor]')!, {
+      key: 'z',
+      ctrlKey: true,
+    })
+    await vi.waitFor(() => expect(patched.length).toBe(2))
+  })
+
+  it('redoing puts the row back, which is the upsert half of the diff', async () => {
+    // Undo of an added row is a delete; redo of it is an upsert. Without this
+    // the upsert half of `diffRows` is never exercised through the UI — a gap
+    // that only showed up when a deliberate break failed to turn anything red.
+    openEditor()
+    await screen.findByText('收件人')
+
+    fireEvent.click(screen.getByRole('button', { name: '加行' }))
+    await vi.waitFor(() => expect(patched.length).toBe(1))
+    await vi.waitFor(() =>
+      expect((screen.getByRole('button', { name: '撤销' }) as HTMLButtonElement).disabled).toBe(false),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '撤销' }))
+    await vi.waitFor(() => expect(patched.length).toBe(2))
+    await vi.waitFor(() =>
+      expect((screen.getByRole('button', { name: '重做' }) as HTMLButtonElement).disabled).toBe(false),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '重做' }))
+    await vi.waitFor(() => expect(patched.length).toBe(3))
+    const upserts = patched[2]?.upserts as Array<{ ordinal: number }>
+    expect(upserts.map((u) => u.ordinal)).toEqual([11])
+    expect(patched[2]?.deletes).toEqual([])
+  })
+
+  it('does not undo on a bare Z, which is a cell edit', async () => {
+    openEditor()
+    await screen.findByText('收件人')
+    fireEvent.click(screen.getByRole('button', { name: '加行' }))
+    await vi.waitFor(() => expect(patched.length).toBe(1))
+
+    fireEvent.keyDown(document.querySelector('[data-data-source-editor]')!, { key: 'z' })
+    expect(patched).toHaveLength(1)
+  })
+
   it('does not offer a per-row delete button any more', async () => {
     // Rows are removed by selecting them and pressing Delete, like a
     // spreadsheet; a button per row was the form-shaped version of this page.
@@ -235,9 +355,11 @@ describe('the tab title', () => {
     return null
   }
 
-  it('names the table, not the page kind', async () => {
+  it('names the table, prefixed by what kind of tab it is', async () => {
+    // A bare table name in a strip that also holds designs does not say which
+    // of the two it is, and they are edited very differently.
     openEditorTab()
-    expect(await screen.findByText('订单表')).toBeDefined()
+    expect(await screen.findByText('数据源-订单表')).toBeDefined()
   })
 
   it('falls back to the generic name only until the list arrives', async () => {

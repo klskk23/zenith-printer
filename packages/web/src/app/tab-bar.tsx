@@ -27,6 +27,7 @@ import type { WorkspaceTab } from './workspace-state.ts'
 import { useTemplates } from '../features/templates/hooks.ts'
 import { Button } from '../components/ui/button.tsx'
 import { useDataSources } from '../features/data-sources/hooks.ts'
+import { ScrollArea } from '../components/ui/scroll-area.tsx'
 
 /**
  * What a tab is called.
@@ -48,8 +49,12 @@ function tabTitle(
   dataSourceName: string | undefined,
 ): string {
   if (tab.kind === 'data-source') {
-    // The list may not have loaded yet; the generic name beats a blank.
-    return dataSourceName ?? copy.workspace.tabs['data-source']
+    // Prefixed with the kind: a bare table name in a strip that also holds
+    // designs does not say which of the two it is, and the two are edited very
+    // differently. The list may not have loaded yet; the bare kind beats a blank.
+    return dataSourceName === undefined
+      ? copy.workspace.tabs['data-source']
+      : copy.workspace.dataSourceTab(dataSourceName)
   }
   if (tab.kind !== 'design') {
     return copy.workspace.tabs[tab.kind]
@@ -77,7 +82,14 @@ export function TabBar(): React.JSX.Element {
 
   return (
     <>
-      <div data-tab-bar className="flex items-stretch gap-px overflow-x-auto border-b border-border bg-muted/40">
+      {/*
+        The strip scrolls sideways once there are more tabs than fit. Radix
+        draws the bar so it matches the rest of the application rather than the
+        platform, and hides it until the strip is hovered — a permanent
+        horizontal bar under a row of tabs reads as a second border.
+      */}
+      <ScrollArea orientation="horizontal" className="border-b border-border bg-muted/40">
+        <div data-tab-bar className="flex items-stretch gap-px">
         {tabs.map((tab) => {
           const isActive = tab.id === state.activeId
           return (
@@ -127,7 +139,8 @@ export function TabBar(): React.JSX.Element {
             </div>
           )
         })}
-      </div>
+        </div>
+      </ScrollArea>
 
       <AlertDialog open={pendingClose !== null} onOpenChange={(open) => !open && setPendingClose(null)}>
         <AlertDialogContent>

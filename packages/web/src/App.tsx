@@ -101,7 +101,11 @@ function Workspace({ connection }: { connection: ConnectionState }): React.JSX.E
                 // `hidden` rather than unmounting: an inactive tab keeps its
                 // selection, zoom and undo history, which is the whole promise
                 // of switching away and back.
-                tab.id === state.activeId ? 'overflow-auto' : 'hidden',
+                // The page-level scroller, shared by every tab. Left native:
+                // some tabs (the designer) manage their own scrolling inside
+                // it, and nesting Radix viewports makes the inner one unable to
+                // reach the outer.
+                tab.id === state.activeId ? 'scrollbar-themed overflow-auto' : 'hidden',
               )}
             >
               <TabContent tab={tab} />

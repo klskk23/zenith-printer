@@ -31,6 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog.tsx'
+import { ScrollArea } from '../../components/ui/scroll-area.tsx'
 import {
   useAddPrinter,
   useDeletePrinter,
@@ -248,12 +249,14 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
         <EditPrinterDialog printer={printer} open={editing} onOpenChange={setEditing} />
 
         <Dialog open={profilesOpen} onOpenChange={setProfilesOpen}>
-          <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-h-[85vh] overflow-hidden">
+            <ScrollArea className="max-h-[80vh] pr-3">
             <DialogHeader>
               <DialogTitle>{copy.printers.manageProfiles}</DialogTitle>
               <DialogDescription>{printer.name}</DialogDescription>
             </DialogHeader>
             <ProfilesPanel printerId={printer.id} capabilities={printer.capabilities} />
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       </CardContent>

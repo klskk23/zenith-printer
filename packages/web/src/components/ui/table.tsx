@@ -9,7 +9,9 @@ import { cn } from '../../lib/utils.ts'
  */
 export function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>): React.JSX.Element {
   return (
-    <div className="relative w-full overflow-x-auto">
+    // Native, like shadcn's own Table: a table is often already inside a
+    // scrolling region, and a Radix viewport here would nest two of them.
+    <div className="scrollbar-themed relative w-full overflow-x-auto">
       <table className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   )

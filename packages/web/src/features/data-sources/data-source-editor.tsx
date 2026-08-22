@@ -25,7 +25,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DataSheetGrid, keyColumn, type DataSheetGridRef } from 'react-datasheet-grid'
 import 'react-datasheet-grid/dist/style.css'
 import { Alert } from '../../components/ui/alert.tsx'
+import { Button } from '../../components/ui/button.tsx'
 import { AddRowsBar } from './add-rows.tsx'
+import {
+  diffRows,
+  emptyHistory,
+  pushHistory,
+  redo as redoStep,
+  undo as undoStep,
+  type History,
+} from './table-history.ts'
 import { copy } from '../../i18n/index.ts'
 import {
   emptyGridRow,
@@ -80,12 +89,52 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
     [rows.data?.rows, columnNames],
   )
 
+  /**
+   * Undo and redo.
+   *
+   * The stack holds whole tables rather than inverse operations. Going back
+   * then means diffing the table we want against the one there is and sending
+   * that — the same shape as any other edit, and it cannot drift from the thing
+   * it describes the way a hand-written inverse can.
+   *
+   * `value` is what the server currently holds; the stack records what it held
+   * before each edit.
+   */
+  const [history, setHistory] = useState<History<GridRow[]>>(emptyHistory)
+
   const onChange = (next: GridRow[], operations: GridOperation[]): void => {
     const changes = patchFromOperations(next, operations)
     if (changes.upserts.length === 0 && changes.deletes.length === 0) {
       return
     }
+    setHistory((current) => pushHistory(current, value))
     patch.mutate({ id: dataSourceId, ...changes })
+  }
+
+  const step = (direction: 'undo' | 'redo'): void => {
+    const taken = direction === 'undo' ? undoStep(history, value) : redoStep(history, value)
+    if (taken.state === null) {
+      return
+    }
+    const changes = diffRows(value, taken.state)
+    setHistory(taken.history)
+    if (changes.upserts.length > 0 || changes.deletes.length > 0) {
+      patch.mutate({ id: dataSourceId, ...changes })
+    }
+  }
+
+  /**
+   * Bound on the container rather than on the document.
+   *
+   * A page-wide Ctrl+Z would fight the designer's own undo when both are open,
+   * and the two histories are not the same history.
+   */
+  const onKeyDown = (event: React.KeyboardEvent): void => {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') {
+      return
+    }
+    event.preventDefault()
+    step(event.shiftKey ? 'redo' : 'undo')
   }
 
   if (source === undefined) {
@@ -93,12 +142,41 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
   }
 
   return (
-    <div className="flex h-full flex-col gap-2" data-data-source-editor>
+    <div
+      className="flex h-full flex-col gap-2"
+      data-data-source-editor
+      onKeyDown={onKeyDown}
+      // Needed for the key handler: without it the container never receives a
+      // keydown, and the grid's own focus traps are the only focusable things.
+      tabIndex={-1}
+    >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">{source.name}</h2>
-        <span className="text-xs text-muted-foreground">
-          {copy.dataSources.rowCount(rows.data?.total ?? source.rowCount)}
-        </span>
+        <div className="flex items-center gap-2">
+          {/* Buttons as well as the shortcut: an editor whose only undo is a
+              key combination has no undo for anyone who does not know it. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!history.canUndo}
+            title={copy.dataSources.undoTitle}
+            onClick={() => step('undo')}
+          >
+            {copy.dataSources.undo}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!history.canRedo}
+            title={copy.dataSources.redoTitle}
+            onClick={() => step('redo')}
+          >
+            {copy.dataSources.redo}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {copy.dataSources.rowCount(rows.data?.total ?? source.rowCount)}
+          </span>
+        </div>
       </div>
 
       <p className="text-[11px] text-muted-foreground" data-paste-hint>

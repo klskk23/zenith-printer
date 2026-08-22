@@ -50,6 +50,7 @@ import { useDataSourceRows, useDataSources } from '../features/data-sources/hook
 import { useSequencePools } from '../features/sequence-pools/hooks.ts'
 import { ELEMENT_TYPES, createBlankLabel, createElement, type ElementType } from './elements.ts'
 import { blockingViolations, inspect } from './guards.ts'
+import { ScrollArea } from '../components/ui/scroll-area.tsx'
 
 type SidePanel = 'element' | 'variables'
 
@@ -635,7 +636,8 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
       <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1 pt-3" {...columnLayout}>
         {/* Left: what the label is, what can go on it, and what is on it. */}
         <ResizablePanel id="left" defaultSize="16" minSize="12" maxSize="30">
-          <aside className="h-full space-y-4 overflow-y-auto pr-3">
+          <ScrollArea className="h-full">
+            <aside className="h-full space-y-4 pr-3">
             <section className="space-y-1.5">
               <h3 className="text-xs font-semibold">{copy.editor.canvas}</h3>
               <div className="space-y-1">
@@ -679,6 +681,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
               <LayersPanel ir={ir} selectedId={selectedId} onSelect={setSelectedId} onChange={setIr} />
             </section>
           </aside>
+          </ScrollArea>
         </ResizablePanel>
 
         <ResizableHandle withHandle />
@@ -737,7 +740,8 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
 
         {/* Right: the selected element, and the fields it can be bound to. */}
         <ResizablePanel id="right" defaultSize="24" minSize="16" maxSize="40">
-          <aside className="h-full overflow-y-auto pl-3">
+          <ScrollArea className="h-full">
+            <aside className="h-full pl-3">
             <Card>
               {/*
                 Radix Tabs unmounts the inactive panel, which is fine here — both
@@ -785,6 +789,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
               </Tabs>
             </Card>
           </aside>
+          </ScrollArea>
         </ResizablePanel>
       </ResizablePanelGroup>
 

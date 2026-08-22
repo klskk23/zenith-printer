@@ -38,6 +38,7 @@ import {
   type Selection,
 } from './selection.ts'
 import { useDataSources } from '../data-sources/hooks.ts'
+import { ScrollArea } from '../../components/ui/scroll-area.tsx'
 
 export interface PrintDialogProps {
   ir: LabelIR
@@ -185,7 +186,8 @@ export function PrintDialog({
     // trap, the Escape key and the scroll lock with it, and it stacks properly
     // with the confirmations that open on top of it.
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[90vh] space-y-4 overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-hidden">
+        <ScrollArea className="max-h-[85vh] space-y-4 pr-3">
         <DialogHeader>
           <DialogTitle>{copy.print.heading}</DialogTitle>
           <DialogDescription>{printer.name}</DialogDescription>
@@ -265,6 +267,7 @@ export function PrintDialog({
             </DialogFooter>
           </>
         )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   )

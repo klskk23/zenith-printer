@@ -117,7 +117,11 @@ export function CanvasViewport({ marginNote, ...props }: ViewportProps): React.J
       <div
         ref={areaRef}
         data-canvas-area
-        className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4"
+        // Not a ScrollArea: the label is centred with flex, and Radix's
+        // viewport wraps its children in a `display: table` element that breaks
+        // that. The wheel handler above also needs the element that actually
+        // scrolls, which Radix does not hand out.
+        className="scrollbar-themed flex min-h-0 flex-1 items-center justify-center overflow-auto p-4"
       >
         <div className="inline-block">
           <div className="flex">

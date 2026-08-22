@@ -106,14 +106,45 @@ body {
 }
 
 /*
- * The grid scrolls itself, so it cannot be wrapped in the Radix ScrollArea the
- * layer panel and tab bar use. This gives its native scrollbar the same shape
- * those have — 8px, a rounded thumb in the border colour, no track — so the one
- * place with a browser-default scrollbar stops standing out.
+ * A native scrollbar shaped like the ScrollArea component's.
+ *
+ * For regions that cannot use ScrollArea: ones that centre their content (its
+ * viewport wraps children in a `display: table` element), ones that attach a
+ * wheel handler to the scrolling element (Radix scrolls an inner element you
+ * were not given), and ones belonging to a third-party component that manages
+ * its own scrolling.
+ *
+ * Same shape either way — 8px, rounded thumb in the border colour, no track —
+ * so which mechanism a region happens to use is not visible.
  *
  * Both syntaxes are needed: the standard properties cover Firefox and recent
  * Chromium, the `::-webkit-` rules cover Safari and older Chromium.
  */
+.scrollbar-themed {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.scrollbar-themed::-webkit-scrollbar {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+.scrollbar-themed::-webkit-scrollbar-track,
+.scrollbar-themed::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scrollbar-themed::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: var(--color-border);
+}
+
+.scrollbar-themed::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-muted-foreground);
+}
+
+/* The data source grid owns its scrolling, so it takes the class above. */
 .dsg-container {
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) transparent;
