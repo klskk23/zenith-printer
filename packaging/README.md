@@ -27,8 +27,17 @@ make deb        # 出 dist/zenith-printer_<版本>_<架构>.deb
 | `lintian`（可选） | `make deb-check` 时顺带查一遍 | `sudo apt install lintian` |
 
 字体不是可选项。渲染器按宪章要求关掉了系统字体加载，只读 `fonts/full`，所以那几个文件
-的**字节**决定了打印出来是什么样。`make fonts` 从系统字体目录取，随即对 `MANIFEST.sha256`
-校验；校验不过就是构建失败，打包脚本开头也会再验一次。
+的**字节**决定了打印出来是什么样。
+
+`make fonts` 有两个来源，按顺序：**系统字体**（但仅当它的哈希已经和清单一致），否则
+**钉死版本的 Debian 包**——URL 与 .deb 的 sha256 都写在 `scripts/fetch-fonts.sh` 里。
+
+第二个来源是后加的，因为原来"照抄本机现有的字体"让清单变成了一个无解的绊线：Debian 的
+`fonts-dejavu-mono` 2.37-6 / -8 / -9 装出来的 `DejaVuSansMono.ttf` 是三份不同的文件，
+于是在一台机器上校验通过的检出，在另一台上无论如何都过不去。钉住包版本之后，清单才成了
+一个能被满足的约束。
+
+（trixie 上的实际表现：三个 20MB 的 Noto 走系统，只有 487KB 的 DejaVu 需要下载。）
 
 > 顺带修了一处：CI 里那句 `sha256sum -c fonts/MANIFEST.sha256` 是从仓库根目录跑的，而清单
 > 里记的是裸文件名，实际每个文件都报 `FAILED open or read`。现在统一走 `make fonts-verify`。
@@ -120,30 +129,40 @@ make deb DEB_REVISION=2
 
 ```
 preflight  →  verify  →  package  →  publish
-             (check)     (deb +      (/opt/www)
+ (秒级)      (全量测试)   (deb +      (/opt/www)
                           容器实装)
 ```
 
-运行器必须是 **shell executor**，tag 为 `nkg-debian`。docker executor 写不到宿主机的
-`/opt/www`，而那正是最后一段的全部意义。
+运行器是 **docker executor**，tag `nkg-debian`，配置见 `packaging/ci/gitlab-runner.toml`。
+每个 job 从干净的 `debian:trixie-slim` 起，自己装环境（`packaging/ci/setup.sh`）——
+一分钟左右，换来一个没人需要手工维护的构建环境。真嫌慢，`packaging/ci/Dockerfile`
+把同样的环境烤成镜像，改一行 `image:` 即可。
 
-### 运行器一次性准备
+### 运行器配置里唯一不能少的一行
 
-```bash
-sudo apt-get install -y fonts-noto-cjk fonts-dejavu-core dpkg-dev binutils
-sudo install -d -o gitlab-runner -g gitlab-runner -m 0755 /opt/www/zenith-printer
-curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash - && sudo apt-get install -y nodejs
-# 可选，用于容器实装测试；没有就把 INSTALL_TEST 设成 0
-sudo apt-get install -y docker.io && sudo adduser gitlab-runner docker
+```toml
+volumes = ["/cache", "/opt/www/zenith-printer:/opt/www/zenith-printer"]
 ```
 
-上面每一项 `preflight` 都会查，缺哪个就报哪个、连命令一起给——运行器没准备好会在几秒内
-失败，而不是四分钟之后。
+docker executor 只看得见挂进来的东西。没有这行，包会完整地构建出来，然后无处可去。
+`preflight` 第一件事就是查这个，缺了直接点名。
 
-### preflight 还查一件事：标签和 package.json 必须一致
+宿主机上先建好目录（job 在容器里是 root，写进去即可，不需要额外授权）：
 
-版本号只有一处：根 `package.json`。标签只是这次发布的名字。两者对不上意味着有人打标签
-时忘了改版本，而那会让 `v0.2.0` 这个发布往磁盘上放一个 `0.1.0` 的包。
+```bash
+sudo install -d -m 0755 /opt/www/zenith-printer
+```
+
+`privileged` 是 **false**，也不挂 docker socket。实装测试曾经需要 docker-in-docker，
+现在不需要了：job 容器本身就是个一次性的 Debian，包直接装在里面。
+
+### preflight 为什么不装工具链
+
+它存在的意义是**几秒内失败**。所以版本号是用 sed 从 `package.json` 里读的，而不是先
+装 Node 再 `node -p`。它查两件事：`/opt/www` 挂没挂上、可不可写；以及——
+
+**标签必须和 `package.json` 对得上。** 版本号只有一处，标签只是这次发布的名字。对不上
+意味着有人打标签时忘了改版本，那会让 `v0.2.0` 这个发布往磁盘上放一个 `0.1.0` 的包。
 
 ```bash
 npm version 0.2.0 --no-git-tag-version
@@ -161,14 +180,23 @@ git tag v0.2.0 && git push origin v0.2.0
 
 **同一个版本不会被悄悄覆盖。** 目标文件已存在就直接失败：一个版本号应当只对应一个二进制，
 覆盖之后磁盘上没有任何东西能说明别人装的是哪一个。确实要重发，把 `FORCE_PUBLISH` 设成
-`1` 跑一次。
-
-旧版本不会被自动清理——那是删除已发布产物，交给人做。
+`1` 跑一次。旧版本不会被自动清理——那是删除已发布产物，交给人做。
 
 ### 变量
 
 | 变量 | 默认 | 作用 |
 |---|---|---|
-| `PUBLISH_DIR` | `/opt/www/zenith-printer` | 产物落点 |
-| `INSTALL_TEST` | `1` | 设 `0` 跳过容器实装测试（运行器没有 docker 时）。跳过的是这条线上最强的一道检查 |
+| `PUBLISH_DIR` | `/opt/www/zenith-printer` | 产物落点，必须与 runner 的 volume 一致 |
+| `DEB_MAINTAINER` | 触发者的名字与邮箱 | Debian control 的 Maintainer；设成项目变量可固定为团队别名 |
+| `INSTALL_TEST` | `1` | 设 `0` 跳过容器实装测试。跳过的是这条线上最强的一道检查 |
 | `FORCE_PUBLISH` | `0` | 设 `1` 允许覆盖已发布的同名文件 |
+
+### 为什么 CI 里要显式装 npm 12
+
+`package.json` 里有 `allowScripts`，那是 npm 12 的机制：npm 12 认得它，于是拒绝执行三个
+BLE 包的安装脚本——那三个包本项目一行都不 import。而 NodeSource 的 nodejs 26 当前捆的是
+**npm 11**，它不认得，照跑不误，node-gyp 随即因为没有 g++ 而失败。
+
+装个编译器也能"修好"，但那是去编译一份服务永远不会加载的代码。对齐 lockfile 当初所用的
+npm 才是真的修好。`make check-node` 现在会直接把这条讲出来，而不是让人从 npm 两百行输出
+里自己看出来。

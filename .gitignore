@@ -44,3 +44,6 @@ packages/web/public/fonts/
 *service-account*.json
 *google-credentials*.json
 gcp-key*.json
+
+# Pinned font packages downloaded by scripts/fetch-fonts.sh
+fonts/.cache/

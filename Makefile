@@ -23,6 +23,7 @@ DEB_ARCH     := $(shell dpkg --print-architecture 2>/dev/null || echo unknown)
 DEB_FILE      = $(DIST_DIR)/zenith-printer_$(DEB_VERSION)_$(DEB_ARCH).deb
 
 NODE_MAJOR_MIN := 26
+NPM_MAJOR_MIN  := 12
 
 FONT_FULL   := fonts/full
 FONT_SUBSET := fonts/subset
@@ -61,6 +62,15 @@ check-node: ## Verify the Node.js runtime is new enough
 	  printf '\n\033[1;31m[deps]\033[0m node $(NODE_MAJOR_MIN)+ required, found %s\n' "$$(node -v)"; \
 	  printf '       needed for: running .ts sources without a compile step\n'; \
 	  printf '       install:    curl -fsSL https://deb.nodesource.com/setup_$(NODE_MAJOR_MIN).x | sudo -E bash - && sudo apt-get install -y nodejs\n\n'; \
+	  exit 1; \
+	fi
+	@npmmajor=$$(npm -v | cut -d. -f1); \
+	if [ "$$npmmajor" -lt $(NPM_MAJOR_MIN) ]; then \
+	  printf '\n\033[1;31m[deps]\033[0m npm $(NPM_MAJOR_MIN)+ required, found %s\n' "$$(npm -v)"; \
+	  printf '       needed for: package.json carries an `allowScripts` block, and only npm $(NPM_MAJOR_MIN)\n'; \
+	  printf '                   honours it. Older npm runs the install scripts of three BLE\n'; \
+	  printf '                   packages nothing here loads, and node-gyp then needs a compiler.\n'; \
+	  printf '       install:    npm install -g npm@^$(NPM_MAJOR_MIN)\n\n'; \
 	  exit 1; \
 	fi
 	@printf '\033[32m[deps]\033[0m node %s, npm %s\n' "$$(node -v)" "$$(npm -v)"
@@ -218,6 +228,11 @@ deb-install-test: ## Install the .deb in a throwaway Debian container and boot i
 	$(call require_tool,docker,installing the package somewhere disposable,sudo apt-get install docker.io)
 	$(call require_file,$(DEB_FILE),there is nothing to install yet,make deb)
 	bash packaging/deb/install-test.sh '$(DEB_FILE)'
+
+.PHONY: deb-install-test-here
+deb-install-test-here: ## The same test, in THIS root — only inside a disposable container
+	$(call require_file,$(DEB_FILE),there is nothing to install yet,make deb)
+	bash packaging/deb/install-test-body.sh '$(DEB_FILE)'
 
 .PHONY: clean
 clean: ## Remove build output, keep node_modules and fonts

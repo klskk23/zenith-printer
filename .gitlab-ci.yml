@@ -4,19 +4,19 @@
 # day checking is the GitHub workflow's job, and this one exists to turn a tag
 # into an installable .deb sitting in /opt/www/zenith-printer.
 #
-# The runner must be a **shell** executor tagged `nkg-debian`. A docker executor
-# cannot write to the host's /opt/www, which is the whole point of the last
-# stage. What that runner needs, once:
+# Built for a **docker executor** tagged `nkg-debian`. The runner block that
+# goes with it is packaging/ci/gitlab-runner.toml, and one line in it is
+# load-bearing: /opt/www/zenith-printer has to be bind-mounted into the job, or
+# the last stage has nowhere to write. The preflight stage checks exactly that
+# before anything spends four minutes building.
 #
-#   sudo apt-get install -y fonts-noto-cjk fonts-dejavu-core dpkg-dev binutils
-#   sudo install -d -o gitlab-runner -g gitlab-runner -m 0755 /opt/www/zenith-printer
-#   # Node 26 — Debian ships 20/22, so the NodeSource repository is required:
-#   curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash - && sudo apt-get install -y nodejs
-#   # Optional, for the install test; without it set INSTALL_TEST=0:
-#   sudo apt-get install -y docker.io && sudo adduser gitlab-runner docker
-#
-# The preflight stage checks every one of those and says which is missing, so a
-# runner that is not ready fails in seconds rather than four minutes in.
+# Every job starts from a bare Debian image and installs what it needs
+# (packaging/ci/setup.sh). That costs roughly a minute per job and buys a build
+# environment nobody has to maintain by hand. If that minute starts to matter,
+# packaging/ci/Dockerfile builds the same environment as an image — point
+# `image:` at it and drop the before_script.
+
+image: debian:trixie-slim
 
 stages:
   - preflight
@@ -39,20 +39,46 @@ default:
 
 variables:
   PUBLISH_DIR: "/opt/www/zenith-printer"
-  # Set to "0" in the project's CI/CD variables if the runner has no docker.
-  # That skips the strongest check this pipeline has — see the install-test job.
+  # Set to "0" in the project's CI/CD variables to skip the install test. It is
+  # the strongest check this pipeline has, so skipping it should be a decision.
   INSTALL_TEST: "1"
   # Set to "1" for one run to republish a tag that is already on disk.
   FORCE_PUBLISH: "0"
-  GIT_SUBMODULE_STRATEGY: none
+  DEBIAN_FRONTEND: "noninteractive"
+  # The Debian control file requires a maintainer. A CI container has no git
+  # identity to fall back on, so name whoever cut the release — that is who the
+  # Maintainer field is for, and it is a real address rather than an invented
+  # one. Override it with a project CI/CD variable to pin it to a team alias.
+  DEB_MAINTAINER: "$GITLAB_USER_NAME <$GITLAB_USER_EMAIL>"
+  GIT_SUBMODULE_STRATEGY: "none"
 
-# No node_modules cache on purpose. It is 350MB, GitLab would upload and
-# download it once per job, and `npm ci` deletes the directory before it starts
-# anyway. What actually makes the install fast is npm's own HTTP cache in
-# ~/.npm, and on a shell runner that persists between jobs for free.
+# The runner mounts /cache. npm downloads ~240 packages twice per pipeline
+# (once for the checks, once into the tree the package is built from), and
+# scripts/fetch-fonts.sh may pull a pinned font package — both are worth
+# keeping between jobs. No node_modules cache: it is 350MB, and `npm ci`
+# deletes the directory before it starts anyway.
+.cache_env: &cache_env
+  - |
+    if mkdir -p /cache/npm /cache/zenith-fonts 2>/dev/null; then
+      export npm_config_cache=/cache/npm
+      export ZENITH_FONT_CACHE=/cache/zenith-fonts
+    else
+      echo "[ci] /cache is not writable; continuing without it"
+    fi
+
+.build_env: &build_env
+  before_script:
+    - *cache_env
+    - bash packaging/ci/setup.sh build
+
+.runtime_env: &runtime_env
+  before_script:
+    - bash packaging/ci/setup.sh runtime
 
 # ---------------------------------------------------------------------------
 
+# No toolchain here on purpose: this stage exists to fail in seconds, so it
+# reads the version with sed rather than installing Node to run `node -p`.
 preflight:
   stage: preflight
   script:
@@ -63,7 +89,10 @@ preflight:
       # lives (the Makefile and the .deb both read it). If the two disagree,
       # somebody tagged without bumping, and publishing would put 0.1.0 on disk
       # under a v0.2.0 release.
-      PKG_VERSION="$(node -p "require('./package.json').version")"
+      PKG_VERSION="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' package.json | head -1)"
+      [ -n "$PKG_VERSION" ] || fail "could not read the version from package.json" \
+        "the preflight stage has no Node yet, so it reads the field directly" \
+        "check that package.json still has a top-level \"version\" line"
       if [ "$CI_COMMIT_TAG" != "v$PKG_VERSION" ]; then
         fail "tag $CI_COMMIT_TAG does not match package.json ($PKG_VERSION)" \
              "the .deb takes its version from package.json, not from the tag" \
@@ -71,47 +100,22 @@ preflight:
       fi
       echo "version $PKG_VERSION matches tag $CI_COMMIT_TAG"
 
-      command -v node >/dev/null || fail "node not installed" \
-        "the service runs TypeScript sources directly" \
-        "curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash - && sudo apt-get install -y nodejs"
-      MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-      [ "$MAJOR" -ge 26 ] || fail "node $MAJOR is too old" \
-        "type stripping and node:sqlite need 26+" \
-        "install nodejs 26 from the NodeSource repository"
-
-      command -v dpkg-deb >/dev/null || fail "dpkg-deb not installed" \
-        "it assembles the package" "sudo apt-get install -y dpkg-dev"
-
-      # scripts/fetch-fonts.sh copies from these exact paths, and the renderer
-      # runs with system font loading disabled — so a missing font package is a
-      # release that cannot render text, not a cosmetic problem.
-      for f in /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc \
-               /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf; do
-        [ -f "$f" ] || fail "missing system font: $f" \
-          "the bundled fonts are copied from these and checksum-verified" \
-          "sudo apt-get install -y fonts-noto-cjk fonts-dejavu-core"
-      done
-
-      # Checked here rather than in the publish stage: finding out that the
-      # runner cannot write to /opt/www after a four-minute build is a waste of
-      # everybody's afternoon.
-      [ -d "$PUBLISH_DIR" ] || fail "$PUBLISH_DIR does not exist" \
-        "the pipeline publishes into it" \
-        "sudo install -d -o gitlab-runner -g gitlab-runner -m 0755 $PUBLISH_DIR"
-      [ -w "$PUBLISH_DIR" ] || fail "$PUBLISH_DIR is not writable by $(id -un)" \
-        "the publish stage copies the .deb there" \
-        "sudo chown -R $(id -un) $PUBLISH_DIR"
-
-      if [ "$INSTALL_TEST" = "1" ] && ! docker info >/dev/null 2>&1; then
-        fail "docker is not usable by $(id -un)" \
-          "the install test installs the package in a throwaway container — the only check that covers the vendored dependency tree" \
-          "sudo apt-get install -y docker.io && sudo adduser $(id -un) docker (then restart the runner), or set INSTALL_TEST=0"
-      fi
+      # A docker-executor job only sees this directory if the runner bind-mounts
+      # it. Finding that out after a four-minute build is a waste of everybody's
+      # afternoon, so it is the first thing checked.
+      [ -d "$PUBLISH_DIR" ] || fail "$PUBLISH_DIR is not present in the job container" \
+        "the publish stage writes the .deb there, and a docker executor only sees what is mounted" \
+        "add \"$PUBLISH_DIR:$PUBLISH_DIR\" to volumes in [runners.docker] — see packaging/ci/gitlab-runner.toml"
+      touch "$PUBLISH_DIR/.ci-write-probe" && rm -f "$PUBLISH_DIR/.ci-write-probe" \
+        || fail "$PUBLISH_DIR is mounted read-only" \
+             "the publish stage has to write into it" \
+             "drop the :ro suffix from the volume in [runners.docker]"
 
       echo "preflight ok"
 
 verify:
   stage: verify
+  <<: *build_env
   script:
     - make deps
     - make fonts
@@ -120,6 +124,7 @@ verify:
 
 package:
   stage: package
+  <<: *build_env
   script:
     - make deps
     - make fonts
@@ -137,19 +142,20 @@ package:
       dotenv: build.env
     expire_in: 30 days
 
+# Installs the package into this job's own container, boots it as the service
+# user and calls the API. The container is a disposable Debian that the runner
+# throws away afterwards, which is exactly what the test needs — no docker
+# socket, no docker-in-docker, no privileged mode.
 install-test:
   stage: package
+  <<: *runtime_env
   needs:
     - job: package
       artifacts: true
   rules:
     - if: '$INSTALL_TEST == "1"'
   script:
-    # Installs the package in a disposable Debian container, boots it as the
-    # service user and calls the API. A vendored dependency tree has exactly
-    # one interesting failure mode — a package that resolved on the build
-    # machine and is not in the .deb — and this is what covers it.
-    - make deb-install-test
+    - make deb-install-test-here
 
 publish:
   stage: publish
@@ -174,8 +180,10 @@ publish:
         exit 1
       fi
 
-      # 0644 and 0755: this directory is served over HTTP, so the web server
-      # has to be able to read what lands in it.
+      # 0644: this directory is served over HTTP, so the web server has to be
+      # able to read what lands in it. The job runs as root in the container,
+      # so the files come out root-owned on the host — read-only is all a web
+      # server needs.
       install -m 0644 "$DEB_PATH" "$TARGET"
 
       cd "$PUBLISH_DIR"
