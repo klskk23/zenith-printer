@@ -173,3 +173,55 @@ describe('submission', () => {
     expect(await time(100)).toBeLessThan(SUBMIT_BUDGET_MS)
   })
 })
+
+/**
+ * SC-003: the first label starts within a second, whatever the batch size.
+ *
+ * Measured as "time from handing the job to the queue until the driver is
+ * given its first page" rather than wall-clock to paper, since there is no
+ * paper here. The number that used to grow with the batch was exactly this
+ * one: five hundred renders had to finish before the driver saw anything.
+ *
+ * The runner's timeout is derived from the budget so the two cannot drift —
+ * a timeout failure carries no assertion message, which is what made an
+ * earlier version of this look like flakiness for a whole feature.
+ */
+describe('time to the first page', () => {
+  const FIRST_PAGE_BUDGET_MS = 1000
+
+  it(
+    'hands the driver a five-hundred-page job as fast as a one-page job',
+    async () => {
+      const { pageSource } = await import('../../src/render/job-pages.ts')
+      const { renderLabel } = await import('../../src/render/pipeline.ts')
+
+      const job = (copies: number) =>
+        ({
+          id: 'j',
+          requestedCopies: copies,
+          seqClaims: [
+            { poolId: 'p', variableName: 'serial', start: 1, end: copies, step: 1, digits: 4 },
+          ],
+          snapshot: { ir: RICH_IR, rows: [], copiesPerRow: 1, constants: {} },
+        }) as never
+
+      const timeToFirst = (copies: number): number =>
+        elapsedMs(() => {
+          const source = pageSource(job(copies), (ir) => renderLabel({ ir, fonts }).bitmap)
+          source.at(0)
+        })
+
+      // Warm the renderer so the first call's cost is not attributed to size.
+      timeToFirst(1)
+
+      const one = timeToFirst(1)
+      const many = timeToFirst(500)
+
+      expect(many).toBeLessThan(FIRST_PAGE_BUDGET_MS)
+      // The point of the change: the cost of starting does not follow the
+      // batch. Five hundred renders take seconds; one takes milliseconds.
+      expect(many).toBeLessThan(one * 5 + 50)
+    },
+    FIRST_PAGE_BUDGET_MS + 10_000,
+  )
+})

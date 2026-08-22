@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { buildJobPages, contentIndex, hasPerLabelContent, valuesForLabel } from '../../src/render/job-pages.ts'
+import { contentIndex, hasPerLabelContent, pageSource, valuesForLabel } from '../../src/render/job-pages.ts'
 import type { BinaryBitmap } from '../../src/drivers/port.ts'
 import type { ContentSnapshot, PrintJob } from '../../src/domain/print-job.ts'
+import type { LabelIR } from '@zenith/shared'
 
 const snapshot: ContentSnapshot = {
   templateName: 'part label',
@@ -47,6 +48,12 @@ function makeJob(overrides: Partial<PrintJob> = {}): PrintJob {
 
 const page = (n: number): BinaryBitmap => ({ widthDots: n, heightDots: 1, data: new Uint8Array(1) })
 
+/** Pull every page, for the assertions that are about content rather than timing. */
+function drain(job: PrintJob, render: (ir: LabelIR) => BinaryBitmap): BinaryBitmap[] {
+  const source = pageSource(job, render)
+  return Array.from({ length: source.total }, (_unused, index) => source.at(index))
+}
+
 describe('per-copy values', () => {
   it('steps the sequence once per label when there is no data source', () => {
     // FR-044: eighty labels, eighty serials. This is what printing a numbered
@@ -82,7 +89,7 @@ describe('page building', () => {
     const rendered: string[] = []
     const job = makeJob({ requestedCopies: 5, seqClaims: [{ poolId: 'pool-1', variableName: 'serial', start: 1, end: 5, step: 1, digits: 3 }] })
 
-    const pages = buildJobPages(job, (ir) => {
+    const pages = drain(job, (ir) => {
       const code = ir.elements.find((e) => e.id === 'code')
       rendered.push(code !== undefined && 'content' in code ? String(code.content) : '')
       return page(rendered.length)
@@ -95,7 +102,7 @@ describe('page building', () => {
   it('gives every copy a distinct bitmap when they differ', () => {
     const job = makeJob({ requestedCopies: 3, seqClaims: [{ poolId: 'pool-1', variableName: 'serial', start: 1, end: 3, step: 1, digits: 3 }] })
     let n = 0
-    const pages = buildJobPages(job, () => page((n += 1)))
+    const pages = drain(job, () => page((n += 1)))
     expect(new Set(pages).size).toBe(3)
   })
 
@@ -106,7 +113,7 @@ describe('page building', () => {
     staticSnapshot.ir.elements = staticSnapshot.ir.elements.filter((e) => e.id !== 'code')
     const job = makeJob({ requestedCopies: 100, seqClaims: [], snapshot: staticSnapshot })
 
-    const pages = buildJobPages(job, () => {
+    const pages = drain(job, () => {
       calls += 1
       return page(1)
     })
@@ -130,7 +137,7 @@ describe('page building', () => {
       seqClaims: [{ poolId: 'pool-1', variableName: 'serial', start: 1, end: 2, step: 1, digits: 3 }],
     })
 
-    buildJobPages(job, (ir) => {
+    drain(job, (ir) => {
       const part = ir.elements.find((e) => e.id === 'part')
       const code = ir.elements.find((e) => e.id === 'code')
       seen.push({
@@ -151,7 +158,7 @@ describe('page building', () => {
   it('does not mutate the stored snapshot', () => {
     const job = makeJob({ requestedCopies: 3 })
     const before = structuredClone(job.snapshot)
-    buildJobPages(job, () => page(1))
+    drain(job, () => page(1))
     expect(job.snapshot).toEqual(before)
   })
 })
@@ -200,5 +207,96 @@ describe('snapshot self-containment', () => {
     rowed.copiesPerRow = 1
     const job = makeJob({ requestedCopies: 3, snapshot: rowed, seqClaims: [] })
     expect(() => valuesForLabel(job, 2)).toThrow(/row 2 of 1/)
+  })
+})
+
+describe('laziness', () => {
+  /**
+   * The point of the whole change. A thousand-label job used to render a
+   * thousand bitmaps before the first label could start; the wait grew with
+   * the batch, and during it nothing distinguished "working" from "hung".
+   *
+   * These assert the *timing* of rendering. Asserting the pages are correct
+   * would pass just as well against the eager version — it was correct, only
+   * slow.
+   */
+  it('renders nothing when the source is built', () => {
+    let calls = 0
+    pageSource(makeJob({ requestedCopies: 1000 }), () => {
+      calls += 1
+      return page(1)
+    })
+    expect(calls).toBe(0)
+  })
+
+  it('renders exactly one page when the first is asked for', () => {
+    let calls = 0
+    const source = pageSource(makeJob({ requestedCopies: 1000 }), () => {
+      calls += 1
+      return page(1)
+    })
+    source.at(0)
+    expect(calls).toBe(1)
+  })
+
+  it('knows the total before any page is rendered', () => {
+    // The driver needs it up front: TSPL's PRINT carries it, and progress is
+    // reported against it. An Iterable could not say.
+    const source = pageSource(makeJob({ requestedCopies: 1000 }), () => page(1))
+    expect(source.total).toBe(1000)
+  })
+
+  it('counts rows times copies, not rows', () => {
+    const rowed = structuredClone(snapshot)
+    rowed.constants = {}
+    rowed.rows = [{ partNo: 'A' }, { partNo: 'B' }]
+    rowed.copiesPerRow = 3
+    const source = pageSource(makeJob({ requestedCopies: 6, snapshot: rowed }), () => page(1))
+    expect(source.total).toBe(6)
+  })
+
+  it('renders identical copies once and hands the same bitmap back', () => {
+    // A hundred pointers to one bitmap, not a hundred bitmaps.
+    let calls = 0
+    const staticSnapshot = structuredClone(snapshot)
+    staticSnapshot.ir.elements = staticSnapshot.ir.elements.filter((e) => e.id !== 'code')
+    const source = pageSource(
+      makeJob({ requestedCopies: 100, seqClaims: [], snapshot: staticSnapshot }),
+      () => {
+        calls += 1
+        return page(1)
+      },
+    )
+
+    const first = source.at(0)
+    const last = source.at(99)
+
+    expect(calls).toBe(1)
+    expect(last).toBe(first)
+  })
+
+  it('still renders nothing for identical copies until one is asked for', () => {
+    let calls = 0
+    const staticSnapshot = structuredClone(snapshot)
+    staticSnapshot.ir.elements = staticSnapshot.ir.elements.filter((e) => e.id !== 'code')
+    pageSource(makeJob({ requestedCopies: 100, seqClaims: [], snapshot: staticSnapshot }), () => {
+      calls += 1
+      return page(1)
+    })
+    expect(calls).toBe(0)
+  })
+
+  it('can be asked for pages out of order, which is what a reprint does', () => {
+    const seen: number[] = []
+    const source = pageSource(makeJob({ requestedCopies: 10 }), (ir) => {
+      const code = ir.elements.find((e) => e.id === 'code')
+      seen.push(Number(code !== undefined && 'content' in code ? code.content : 0))
+      return page(1)
+    })
+
+    source.at(5)
+    source.at(2)
+
+    expect(seen).toEqual([6, 3])
   })
 })

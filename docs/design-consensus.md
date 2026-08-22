@@ -374,3 +374,19 @@ CLI 未暴露此命令（只有 print/info/scan/server/flash），需写代码�
 
 - [lovell/sharp#1549 — font-family on SVG text has no effect](https://github.com/lovell/sharp/issues/1549)
 - [lovell/sharp#2936 — SVG font rendering differences since 0.29.0](https://github.com/lovell/sharp/issues/2936)
+
+## 待办：搁置中的 TSPL 驱动需跟随端口变更
+
+`tspl-gp3120tu` 分支上的 TSPL 驱动是 `PrinterDriver` 的第四个实现，它写于
+`printPages(pages: BinaryBitmap[], ...)` 的年代。003 把这个参数改成了
+`PageSource`（`{ total, at(index) }`，见
+`specs/003-variables-data-sources/contracts/driver-port.md`）。
+
+该分支恢复时必须一并改：
+
+- `printPages` 的签名，以及循环里 `pages.at(index)` 的按需取页
+- `PRINT` 命令携带的份数改用 `pages.total`——这正是端口带 `total` 而不用
+  `Iterable` 的原因
+
+**不要把整个 source 抽干再开始发送。** 那会把等待原样搬回第一张标签之前，
+流式的机器还在，好处一点不剩。

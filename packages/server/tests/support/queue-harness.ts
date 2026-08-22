@@ -15,6 +15,7 @@ import {
   PrinterDeviceError,
   PrinterUnreachableError,
   type BinaryBitmap,
+  type PageSource,
   type PreflightResult,
   type PrinterDriver,
   type PrintOptions,
@@ -37,12 +38,22 @@ export interface FakeDriverOptions {
   failAfterPages?: { pages: number; error: Error }
   /** Milliseconds each page takes, for observing overlap. */
   pageDelayMs?: number
+  /** Renders so far, read the moment printing starts. */
+  countRenders?: () => number
 }
 
 export class FakePrinterDriver implements PrinterDriver {
   readonly kind = 'niimbot' as const
   readonly calls: string[] = []
   pagesRequested = 0
+  /**
+   * Renders that had happened by the time printing began.
+   *
+   * The one number that tells a streaming implementation from an eager one.
+   * Asserting the pages come out right would pass against both — the eager
+   * version was correct, only slow.
+   */
+  rendersBeforeFirstPage: number | null = null
   connectCount = 0
   disconnectCount = 0
   lastOptions: PrintOptions | null = null
@@ -83,19 +94,23 @@ export class FakePrinterDriver implements PrinterDriver {
   }
 
   async printPages(
-    pages: BinaryBitmap[],
+    pages: PageSource,
     options: PrintOptions,
     onProgress: (pagesPrinted: number) => void,
   ): Promise<void> {
     this.calls.push('printPages')
-    this.pagesRequested = pages.length
+    this.pagesRequested = pages.total
+    this.rendersBeforeFirstPage = this.#options.countRenders?.() ?? null
     this.lastOptions = options
 
-    for (let index = 0; index < pages.length; index += 1) {
+    for (let index = 0; index < pages.total; index += 1) {
       const failure = this.#options.failAfterPages
       if (failure !== undefined && index === failure.pages) {
         throw failure.error
       }
+      // Pulled one at a time, like a real driver: a fake that drained the
+      // source up front could not tell a lazy implementation from an eager one.
+      pages.at(index)
       if (this.#options.pageDelayMs !== undefined) {
         await new Promise((resolve) => setTimeout(resolve, this.#options.pageDelayMs))
       }
@@ -161,7 +176,10 @@ export function createHarness(driverOptions: (printerId: string) => FakeDriverOp
     clock,
     logger: silentLogger,
     createDriver: (printerId) => {
-      const driver = new FakePrinterDriver(driverOptions(printerId))
+      const driver = new FakePrinterDriver({
+        ...driverOptions(printerId),
+        countRenders: () => renderCalls.length,
+      })
       drivers.set(printerId, driver)
       return driver
     },

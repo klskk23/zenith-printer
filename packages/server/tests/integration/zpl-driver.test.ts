@@ -3,7 +3,17 @@ import { inflateSync } from 'node:zlib'
 import { FakeTransport } from '../../src/drivers/fake/fake-transport.ts'
 import { ZplDriver, densityToDarkness, PC310T_CAPABILITIES } from '../../src/drivers/zpl/zpl-driver.ts'
 import { buildLabel, crc16, parseHostStatus, toHexData, toZ64Data } from '../../src/drivers/zpl/zpl-builder.ts'
-import { PrinterUnreachableError, type BinaryBitmap } from '../../src/drivers/port.ts'
+import { PrinterUnreachableError, type BinaryBitmap, type PageSource } from '../../src/drivers/port.ts'
+
+/**
+ * The port's page source, from a plain array.
+ *
+ * Drivers pull pages one at a time now; these tests care about what is sent,
+ * not about how the pages arrive, so they wrap a list.
+ */
+function source(pages: BinaryBitmap[]): PageSource {
+  return { total: pages.length, at: (index: number) => pages[index]! }
+}
 
 function bitmapFrom(rows: string[]): BinaryBitmap {
   const heightDots = rows.length
@@ -144,7 +154,7 @@ describe('driver', () => {
     // progress to "sent it all, no idea".
     const { driver, transport } = makeDriver({ encoding: 'hex' })
     await driver.connect()
-    await driver.printPages([SAMPLE, SAMPLE, SAMPLE], PRINT_OPTIONS, () => {})
+    await driver.printPages(source([SAMPLE, SAMPLE, SAMPLE]), PRINT_OPTIONS, () => {})
 
     // One ~HS write may precede; count only label payloads.
     const labels = transport.writes.filter((w) => new TextDecoder().decode(w).startsWith('^XA'))
@@ -155,14 +165,14 @@ describe('driver', () => {
     const seen: number[] = []
     const { driver } = makeDriver({ encoding: 'hex' })
     await driver.connect()
-    await driver.printPages([SAMPLE, SAMPLE], PRINT_OPTIONS, (n) => seen.push(n))
+    await driver.printPages(source([SAMPLE, SAMPLE]), PRINT_OPTIONS, (n) => seen.push(n))
     expect(seen).toEqual([1, 2])
   })
 
   it('sets darkness once, on the first label only', async () => {
     const { driver, transport } = makeDriver({ encoding: 'hex' })
     await driver.connect()
-    await driver.printPages([SAMPLE, SAMPLE], PRINT_OPTIONS, () => {})
+    await driver.printPages(source([SAMPLE, SAMPLE]), PRINT_OPTIONS, () => {})
     expect(sentText(transport).match(/\^MD/g)).toHaveLength(1)
   })
 
@@ -174,7 +184,7 @@ describe('driver', () => {
 
   it('refuses to print when not connected', async () => {
     const { driver } = makeDriver()
-    await expect(driver.printPages([SAMPLE], PRINT_OPTIONS, () => {})).rejects.toThrow(
+    await expect(driver.printPages(source([SAMPLE]), PRINT_OPTIONS, () => {})).rejects.toThrow(
       PrinterUnreachableError,
     )
   })

@@ -16,7 +16,7 @@ import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { TemplateRepo } from '../db/repositories/template-repo.ts'
 import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { SequenceAllocator } from '../domain/sequence-allocator.ts'
-import { checkBatch } from '../domain/overflow.ts'
+import { checkLabel } from '../domain/overflow.ts'
 import { ApiError, HttpStatus } from './errors.ts'
 import { BarcodeEmptyValueError, assertBarcodeValuesPresent } from '../domain/barcode-refs.ts'
 import {
@@ -70,7 +70,7 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       const content = resolveContent(template, input.ir, profile)
 
       const values = designValues(template)
-      return { warnings: checkBatch(content.ir, () => values, input.copies) }
+      return { warnings: checkLabel(content.ir, values, 0) }
     },
   )
 
@@ -146,11 +146,13 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       // and whether that is acceptable is a judgement about this label that the
       // operator is better placed to make. Holding back ninety-nine good labels
       // because one will be clipped is the worse outcome.
-      const overflowWarnings = checkBatch(
-        content.ir,
-        () => ({ ...values, ...(selected.rows[0] ?? {}) }),
-        1,
-      )
+      // Checked once, against the design — not once per label. Encoding a
+      // barcode for every row would put a thousand encodes before the first
+      // label comes out, which is the wait the page source exists to remove
+      // (FR-045). What that gives up is knowing which *rows* overflow; the
+      // print dialog says so rather than leaving silence to be read as
+      // "checked, and fine" (FR-045a).
+      const overflowWarnings = checkLabel(content.ir, { ...values, ...(selected.rows[0] ?? {}) }, 0)
 
       if (printer.queueState === 'paused') {
         throw ApiError.conflict('QUEUE_PAUSED', { printerId: printer.id })

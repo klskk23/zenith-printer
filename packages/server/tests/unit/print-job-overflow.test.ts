@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { labelIrSchema, type LabelIR } from '@zenith/shared'
-import { checkBatch, checkLabel } from '../../src/domain/overflow.ts'
+import { checkLabel } from '../../src/domain/overflow.ts'
 
 function ir(elements: unknown[]): LabelIR {
   return labelIrSchema.parse({ widthMm: 50, heightMm: 30, dpi: 203, elements })
@@ -85,28 +85,30 @@ describe('variable content', () => {
   })
 })
 
-describe('a batch', () => {
-  const design = ir([variableBarcode])
-  const serials = ['A1', 'B2', 'A'.repeat(40), 'D4', 'A'.repeat(45)]
-  const valuesFor = (row: number): Record<string, string> => ({ serial: serials[row] ?? 'A1' })
-
-  it('checks every row, not just the first', () => {
-    const warnings = checkBatch(design, valuesFor, serials.length)
-    expect(warnings.map((w) => w.rowIndex)).toEqual([2, 4])
+describe('the check runs once, not once per label', () => {
+  /**
+   * FR-045. The batch check encoded a barcode for every copy, so a
+   * thousand-label job did a thousand encodes before the first label could
+   * come out — exactly the wait the page source exists to remove.
+   *
+   * The assertion that bites lives at the API level, where a batch size is
+   * available: a thousand-row job whose barcode overflows on every row now
+   * produces one warning rather than a thousand. See
+   * tests/integration/data-source-print.test.ts.
+   */
+  it('catches an overflow the design itself has', () => {
+    // What is still checked: the design, measured with the values the editor
+    // draws it with.
+    const design = ir([variableBarcode])
+    expect(checkLabel(design, { serial: 'A'.repeat(45) }, 0)).toHaveLength(1)
   })
 
-  it('reports all bad rows at once, so they can be fixed in one pass', () => {
-    expect(checkBatch(design, valuesFor, serials.length)).toHaveLength(2)
-  })
-
-  it('returns nothing for a clean batch', () => {
-    expect(checkBatch(design, () => ({ serial: 'A1' }), 100)).toEqual([])
-  })
-
-  it('scales to a full hundred-label run', () => {
-    const warnings = checkBatch(design, (row) => ({ serial: row === 99 ? 'A'.repeat(40) : 'A1' }), 100)
-    expect(warnings).toHaveLength(1)
-    expect(warnings[0]!.rowIndex).toBe(99)
+  it('says nothing about rows it was not given', () => {
+    // The honest consequence of FR-045: whether row 700 overflows is something
+    // the physical labels reveal, and the print dialog says so out loud rather
+    // than leaving silence to be read as "checked, and fine" (FR-045a).
+    const design = ir([variableBarcode])
+    expect(checkLabel(design, { serial: 'A1' }, 0)).toEqual([])
   })
 })
 
@@ -135,22 +137,16 @@ describe('overflow is not a failure', () => {
 describe('what history keeps', () => {
   it('carries warnings on the snapshot, not by reference to the design', () => {
     const design = ir([variableBarcode])
-    const warnings = checkBatch(design, () => ({ serial: 'A'.repeat(40) }), 2)
+    const warnings = checkLabel(design, { serial: 'A'.repeat(40) }, 0)
     const snapshot = { widthMm: 50, heightMm: 30, overflowWarnings: warnings }
 
     // Editing the design afterwards must not change the record.
     const edited = ir([{ ...variableBarcode, xMm: 0 }])
-    expect(checkBatch(edited, () => ({ serial: 'A'.repeat(40) }), 2).length)
-      .not.toBe(0)
-    expect(snapshot.overflowWarnings).toHaveLength(2)
-  })
-
-  it('keeps one entry per affected row', () => {
-    const design = ir([variableBarcode])
-    expect(checkBatch(design, () => ({ serial: 'A'.repeat(40) }), 3)).toHaveLength(3)
+    expect(checkLabel(edited, { serial: 'A'.repeat(40) }, 0).length).not.toBe(0)
+    expect(snapshot.overflowWarnings).toHaveLength(1)
   })
 
   it('stores nothing for a clean run', () => {
-    expect(checkBatch(ir([fixedBarcode]), () => ({}), 5)).toEqual([])
+    expect(checkLabel(ir([fixedBarcode]), {}, 0)).toEqual([])
   })
 })

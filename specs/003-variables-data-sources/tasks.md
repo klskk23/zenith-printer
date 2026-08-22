@@ -229,26 +229,26 @@ npm workspaces 四包结构，不新增包：
 > 这组测试要压住的是「惰性」本身。断言「结果正确」不足以发现预先渲染 —— 数组版也正确，
 > 只是慢。因此断言的是**渲染发生的时机与次数**。
 
-- [ ] T104 [P] [US3] `packages/server/tests/unit/page-source.test.ts`：构造 `pageSource(job, render)` 时 `render` **调用次数为 0**；`at(0)` 后为 1；`total` 与「行数 × 份数」一致；同一行的多份复用同一次渲染
-- [ ] T105 [P] [US3] 扩充 `packages/server/tests/support/queue-harness.ts` 记录 `renderPage` 的调用序，并在 `packages/server/tests/integration/queue.test.ts` 断言**驱动发出第一页时，渲染调用次数不超过 1**
-- [ ] T106 [P] [US3] 扩充 `packages/server/tests/integration/performance.test.ts`：500 张任务从提交到第一页交付驱动的耗时 < 1 秒（SC-003）。**vitest 超时须显式设置为大于测试自身预算**，否则失败会表现为无断言信息的超时
-- [ ] T107 [P] [US3] `packages/server/tests/integration/partial-failure.test.ts`：大批量中途驱动抛错，`pagesPrinted` 如实记录已发出张数；崩溃导致不可知时为 `null`（AS-3、FR-053 既有语义）
+- [X] T104 [P] [US3] `packages/server/tests/unit/page-source.test.ts`：构造 `pageSource(job, render)` 时 `render` **调用次数为 0**；`at(0)` 后为 1；`total` 与「行数 × 份数」一致；同一行的多份复用同一次渲染
+- [X] T105 [P] [US3] 扩充 `packages/server/tests/support/queue-harness.ts` 记录 `renderPage` 的调用序，并在 `packages/server/tests/integration/queue.test.ts` 断言**驱动发出第一页时，渲染调用次数不超过 1**
+- [X] T106 [P] [US3] 扩充 `packages/server/tests/integration/performance.test.ts`：500 张任务从提交到第一页交付驱动的耗时 < 1 秒（SC-003）。**vitest 超时须显式设置为大于测试自身预算**，否则失败会表现为无断言信息的超时
+- [X] T107 [P] [US3] `packages/server/tests/integration/partial-failure.test.ts`：大批量中途驱动抛错，`pagesPrinted` 如实记录已发出张数；崩溃导致不可知时为 `null`（AS-3、FR-053 既有语义）
 
-- [ ] T108 [P] [US3] 改写 `packages/server/tests/unit/print-job-overflow.test.ts`：注入条码编码计数器，断言提交 1000 张的任务时**编码次数与行数无关**；设计本身的越界仍被检出（FR-045）
-- [ ] T109 [P] [US3] 更新既有驱动测试的调用形态为 `PageSource`：`packages/server/tests/unit/dry-run-driver.test.ts`、`packages/server/tests/unit/driver-lifecycle.test.ts`（9 处）、`packages/server/tests/integration/zpl-driver.test.ts`（5 处）、`packages/server/tests/integration/niimbot-driver.test.ts`、`packages/server/tests/integration/printers-api.test.ts`
+- [X] T108 [P] [US3] 改写 `packages/server/tests/unit/print-job-overflow.test.ts`：注入条码编码计数器，断言提交 1000 张的任务时**编码次数与行数无关**；设计本身的越界仍被检出（FR-045）
+- [X] T109 [P] [US3] 更新既有驱动测试的调用形态为 `PageSource`：`packages/server/tests/unit/dry-run-driver.test.ts`、`packages/server/tests/unit/driver-lifecycle.test.ts`（9 处）、`packages/server/tests/integration/zpl-driver.test.ts`（5 处）、`packages/server/tests/integration/niimbot-driver.test.ts`、`packages/server/tests/integration/printers-api.test.ts`
 
 
 ### Implementation for User Story 3
 
-- [ ] T110 [US3] `packages/server/src/drivers/port.ts`：新增 `PageSource { readonly total: number; at(index: number): BinaryBitmap }`，`PrinterDriver.printPages` 的首参由 `BinaryBitmap[]` 改为 `PageSource`（contracts/driver-port.md）
-- [ ] T111 [US3] `packages/server/src/render/job-pages.ts`：`buildJobPages` 改为 `pageSource(job, render): PageSource`，按下标惰性渲染，**MUST NOT 预先构建数组**（依赖 T110）
-- [ ] T112 [US3] `packages/server/src/queue/print-queue.ts`：改为构造 `PageSource` 后立即交给驱动，第一页渲染完即开始输出（依赖 T111）
-- [ ] T113 [US3] `packages/server/src/domain/overflow.ts` 与 `packages/server/src/api/print-jobs.ts`：**停止逐份展开的 `checkBatch`**，改为只检查设计本身（用编辑器同款的代入值）。这是 FR-045 的落点，也是 SC-003 的前提 —— 现状是 1000 行的任务要在开印前编 1000 次条码，正好抵消流式渲染换来的那一秒
-- [ ] T114 [P] [US3] `packages/server/src/drivers/niimbot/niimbot-driver.ts` 与 `packages/server/src/drivers/niimbot/bitmap-source.ts`：逐页取用，每页发出后上报进度
-- [ ] T115 [P] [US3] `packages/server/src/drivers/zpl/zpl-driver.ts`：同上
-- [ ] T116 [P] [US3] `packages/server/src/drivers/dry-run/dry-run-driver.ts`：同上
-- [ ] T117 [US3] `packages/cli/src/commands/zpl-test.ts:135`：`printPages` 的调用改为 `PageSource`（CLI 是端口的第五个消费方，漏掉它会直接打红 `typecheck` 门禁）
-- [ ] T118 [US3] 在 `docs/design-consensus.md` 或 `tspl-gp3120tu` 分支的 README 记一条待办：搁置中的 TSPL 驱动需跟随本次端口变更（contracts/driver-port.md 已列为受影响的第四个驱动）
+- [X] T110 [US3] `packages/server/src/drivers/port.ts`：新增 `PageSource { readonly total: number; at(index: number): BinaryBitmap }`，`PrinterDriver.printPages` 的首参由 `BinaryBitmap[]` 改为 `PageSource`（contracts/driver-port.md）
+- [X] T111 [US3] `packages/server/src/render/job-pages.ts`：`buildJobPages` 改为 `pageSource(job, render): PageSource`，按下标惰性渲染，**MUST NOT 预先构建数组**（依赖 T110）
+- [X] T112 [US3] `packages/server/src/queue/print-queue.ts`：改为构造 `PageSource` 后立即交给驱动，第一页渲染完即开始输出（依赖 T111）
+- [X] T113 [US3] `packages/server/src/domain/overflow.ts` 与 `packages/server/src/api/print-jobs.ts`：**停止逐份展开的 `checkBatch`**，改为只检查设计本身（用编辑器同款的代入值）。这是 FR-045 的落点，也是 SC-003 的前提 —— 现状是 1000 行的任务要在开印前编 1000 次条码，正好抵消流式渲染换来的那一秒
+- [X] T114 [P] [US3] `packages/server/src/drivers/niimbot/niimbot-driver.ts` 与 `packages/server/src/drivers/niimbot/bitmap-source.ts`：逐页取用，每页发出后上报进度
+- [X] T115 [P] [US3] `packages/server/src/drivers/zpl/zpl-driver.ts`：同上
+- [X] T116 [P] [US3] `packages/server/src/drivers/dry-run/dry-run-driver.ts`：同上
+- [X] T117 [US3] `packages/cli/src/commands/zpl-test.ts:135`：`printPages` 的调用改为 `PageSource`（CLI 是端口的第五个消费方，漏掉它会直接打红 `typecheck` 门禁）
+- [X] T118 [US3] 在 `docs/design-consensus.md` 或 `tspl-gp3120tu` 分支的 README 记一条待办：搁置中的 TSPL 驱动需跟随本次端口变更（contracts/driver-port.md 已列为受影响的第四个驱动）
 
 **Checkpoint**: 三个用户故事均独立可用。
 

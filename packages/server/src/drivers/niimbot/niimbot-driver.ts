@@ -29,12 +29,12 @@ import type { PacketFrameLogger } from '../frame-logger.ts'
 import {
   PrinterDeviceError,
   PrinterUnreachableError,
-  type BinaryBitmap,
   type PreflightResult,
   type PrinterCapabilities,
   type PrinterDriver,
   type PrintOptions,
   type ProgressHandler,
+  type PageSource,
 } from '../port.ts'
 import { BitmapImageSource } from './bitmap-source.ts'
 
@@ -211,20 +211,18 @@ export class NiimbotDriver implements PrinterDriver {
   }
 
   async printPages(
-    pages: BinaryBitmap[],
+    pages: PageSource,
     options: PrintOptions,
     onProgress: ProgressHandler,
   ): Promise<void> {
     const client = this.#require()
 
-    const encoded = pages.map((page) =>
-      ImageEncoder.encode(new BitmapImageSource(page), options.printDirection),
-    )
-
     const task = client.abstraction.newPrintTask(this.#options.printTaskName, {
       density: options.density,
       labelType: options.labelType as LabelType,
-      totalPages: pages.length,
+      // Needed before the first page, which is why the source carries a total
+      // rather than being something we count by draining it.
+      totalPages: pages.total,
       statusPollIntervalMs: this.#options.statusPollIntervalMs ?? 500,
       statusTimeoutMs: this.#options.statusTimeoutMs ?? 8000,
     })
@@ -241,7 +239,13 @@ export class NiimbotDriver implements PrinterDriver {
 
     try {
       await task.printInit()
-      for (const image of encoded) {
+      // Rendered and encoded one page at a time, inside the loop: doing it up
+      // front would put the whole batch's wait back before the first label.
+      for (let index = 0; index < pages.total; index += 1) {
+        const image = ImageEncoder.encode(
+          new BitmapImageSource(pages.at(index)),
+          options.printDirection,
+        )
         await task.printPage(image, 1)
         await task.waitForPageFinished()
       }

@@ -133,7 +133,9 @@ export function registerZplTest(program: Command): void {
               await driver.connect()
               try {
                 await driver.printPages(
-                  [rendered.bitmap],
+                  // One page, wrapped in the port's shape. The driver pulls it
+                  // rather than being handed an array (contracts/driver-port.md).
+                  { total: 1, at: () => rendered.bitmap },
                   { density: 3, labelType: 1, printDirection: 'top' },
                   () => {},
                 )

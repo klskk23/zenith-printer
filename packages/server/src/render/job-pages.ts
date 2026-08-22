@@ -6,7 +6,7 @@
  * whole content of this module.
  */
 import { evaluateIrStrict, formatSequence, type LabelIR } from '@zenith/shared'
-import type { BinaryBitmap } from '../drivers/port.ts'
+import type { BinaryBitmap, PageSource } from '../drivers/port.ts'
 import type { PrintJob } from '../domain/print-job.ts'
 
 export interface RenderOne {
@@ -70,13 +70,29 @@ export function irForLabel(job: PrintJob, labelIndex: number): LabelIR {
   return evaluateIrStrict(job.snapshot.ir, valuesForLabel(job, labelIndex))
 }
 
-/** Build every page for a job. */
-export function buildJobPages(job: PrintJob, render: RenderOne): BinaryBitmap[] {
+/**
+ * The job's pages, rendered on demand.
+ *
+ * Nothing is rendered here: the first bitmap is produced when the driver asks
+ * for it, which is what lets a thousand-label job start printing in the time
+ * one label takes to render.
+ *
+ * When every label is identical the single render is cached and handed back for
+ * every index — a hundred pointers to one bitmap rather than a hundred bitmaps.
+ */
+export function pageSource(job: PrintJob, render: RenderOne): PageSource {
+  const total = job.requestedCopies
+
   if (!hasPerLabelContent(job)) {
-    // Identical copies: render once and hand back the same object repeatedly.
-    const single = render(irForLabel(job, 0))
-    return Array.from({ length: job.requestedCopies }, () => single)
+    let single: BinaryBitmap | null = null
+    return {
+      total,
+      at: () => {
+        single ??= render(irForLabel(job, 0))
+        return single
+      },
+    }
   }
 
-  return Array.from({ length: job.requestedCopies }, (_unused, index) => render(irForLabel(job, index)))
+  return { total, at: (index) => render(irForLabel(job, index)) }
 }

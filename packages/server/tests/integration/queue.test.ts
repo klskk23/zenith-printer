@@ -338,3 +338,60 @@ describe('restart recovery', () => {
     expect(h.queue.recoverInterruptedJobs()).toEqual([])
   })
 })
+
+describe('streaming', () => {
+  /**
+   * The whole point of the page source.
+   *
+   * A thousand-label job used to render a thousand bitmaps before the first
+   * one could start printing. These assert *when* rendering happens, not that
+   * the pages are right — the eager version produced correct pages too.
+   */
+  it('has rendered nothing by the time the driver starts printing', async () => {
+    const h = createHarness()
+    const printerId = h.seedPrinter()
+    h.enqueue(printerId, 500, {
+      seqClaims: [{ poolId: 'pool-1', variableName: 'serial', start: 1, end: 500, step: 1, digits: 4 }],
+    })
+
+    await h.queue.drain(printerId)
+
+    expect(h.drivers.get(printerId)?.rendersBeforeFirstPage).toBe(0)
+  })
+
+  it('tells the driver the total before any page exists', async () => {
+    // TSPL's PRINT carries it and progress is measured against it, so it
+    // cannot be something counted by draining the source.
+    const h = createHarness()
+    const printerId = h.seedPrinter()
+    h.enqueue(printerId, 500, {
+      seqClaims: [{ poolId: 'pool-1', variableName: 'serial', start: 1, end: 500, step: 1, digits: 4 }],
+    })
+
+    await h.queue.drain(printerId)
+
+    expect(h.drivers.get(printerId)?.pagesRequested).toBe(500)
+  })
+
+  it('still renders every varying page by the end', async () => {
+    const h = createHarness()
+    const printerId = h.seedPrinter()
+    h.enqueue(printerId, 20, {
+      seqClaims: [{ poolId: 'pool-1', variableName: 'serial', start: 1, end: 20, step: 1, digits: 4 }],
+    })
+
+    await h.queue.drain(printerId)
+
+    expect(h.renderCalls).toHaveLength(20)
+  })
+
+  it('renders once for a batch of identical labels, however long', async () => {
+    const h = createHarness()
+    const printerId = h.seedPrinter()
+    h.enqueue(printerId, 500)
+
+    await h.queue.drain(printerId)
+
+    expect(h.renderCalls).toEqual([0])
+  })
+})

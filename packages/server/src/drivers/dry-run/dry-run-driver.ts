@@ -11,12 +11,12 @@
  * Enable with ZENITH_DRY_RUN=1.
  */
 import type {
-  BinaryBitmap,
   PreflightResult,
   PrinterCapabilities,
   PrinterDriver,
   PrintOptions,
   ProgressHandler,
+  PageSource,
 } from '../port.ts'
 import type { Logger } from '../frame-logger.ts'
 
@@ -103,22 +103,26 @@ export class DryRunDriver implements PrinterDriver {
   }
 
   async printPages(
-    pages: BinaryBitmap[],
+    pages: PageSource,
     options: PrintOptions,
     onProgress: ProgressHandler,
   ): Promise<void> {
+    const first = pages.total === 0 ? null : pages.at(0)
     this.#options.logger.info(
       {
         printerId: this.#options.printerId,
         jobId: this.#options.jobId,
-        pages: pages.length,
+        pages: pages.total,
         density: options.density,
-        sizeDots: pages[0] === undefined ? null : `${pages[0].widthDots}x${pages[0].heightDots}`,
+        sizeDots: first === null ? null : `${first.widthDots}x${first.heightDots}`,
       },
       'dry run: would have printed',
     )
 
-    for (let index = 0; index < pages.length; index += 1) {
+    for (let index = 0; index < pages.total; index += 1) {
+      // Taken even though nothing is sent: a dry run that skipped rendering
+      // would not exercise the path it exists to rehearse.
+      pages.at(index)
       if (this.#options.pageDelayMs !== undefined && this.#options.pageDelayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, this.#options.pageDelayMs))
       }

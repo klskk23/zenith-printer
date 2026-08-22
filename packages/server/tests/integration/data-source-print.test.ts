@@ -389,3 +389,42 @@ describe('a design with no data source', () => {
     expect(res.json().requestedCopies).toBe(3)
   })
 })
+
+describe('the overflow check does not scale with the batch', () => {
+  /**
+   * FR-045. The check used to run per copy, encoding a barcode for each — a
+   * thousand encodes before the first label could come out, which is exactly
+   * the wait the page source exists to remove.
+   *
+   * A thousand-row batch whose barcode overflows on every row is the case that
+   * tells the two apart: per-row checking reports a thousand warnings, checking
+   * the design reports one.
+   */
+  it('reports one warning for a batch where every row would overflow', async () => {
+    const wide = 'A'.repeat(60)
+    const lines = ['订单号,条码']
+    for (let i = 1; i <= 500; i += 1) {
+      lines.push(`A-${i},${wide}`)
+    }
+    const { payload, headers } = multipart(lines.join('\n'), '宽条码表')
+    const sourceId = (
+      await app.inject({ method: 'POST', url: '/api/data-sources', payload, headers })
+    ).json().id
+
+    const templateId = await seedDesign(sourceId, {
+      elements: [
+        {
+          id: 'b', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12,
+          content: '${条码}', symbology: 'code128', moduleWidthDots: 2,
+        },
+      ],
+    })
+
+    const res = await submit({ printerId, templateId, copies: 1, rowSelection: { all: true } })
+
+    expect(res.statusCode).toBe(202)
+    expect(res.json().requestedCopies).toBe(500)
+    // One, not five hundred.
+    expect(res.json().overflowWarnings.length).toBeLessThanOrEqual(1)
+  })
+})

@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { DryRunDriver } from '../../src/drivers/dry-run/dry-run-driver.ts'
 import { silentLogger } from '../support/queue-harness.ts'
-import type { BinaryBitmap } from '../../src/drivers/port.ts'
+import type { BinaryBitmap, PageSource } from '../../src/drivers/port.ts'
+
+/**
+ * The port's page source, from a plain array.
+ *
+ * Drivers pull pages one at a time now; these tests care about what is sent,
+ * not about how the pages arrive, so they wrap a list.
+ */
+function source(pages: BinaryBitmap[]): PageSource {
+  return { total: pages.length, at: (index: number) => pages[index]! }
+}
 
 const page: BinaryBitmap = { widthDots: 400, heightDots: 240, data: new Uint8Array(50 * 240) }
 const OPTIONS = { density: 3, labelType: 1, printDirection: 'top' as const }
@@ -43,13 +53,13 @@ describe('kind-specific capabilities', () => {
 describe('going through the motions', () => {
   it('reports progress for every page', async () => {
     const seen: number[] = []
-    await makeDriver().printPages([page, page, page], OPTIONS, (n) => seen.push(n))
+    await makeDriver().printPages(source([page, page, page]), OPTIONS, (n) => seen.push(n))
     expect(seen).toEqual([1, 2, 3])
   })
 
   it('handles a full hundred-copy batch', async () => {
     const seen: number[] = []
-    await makeDriver().printPages(Array.from({ length: 100 }, () => page), OPTIONS, (n) => seen.push(n))
+    await makeDriver().printPages(source(Array.from({ length: 100 }, () => page)), OPTIONS, (n) => seen.push(n))
     expect(seen).toHaveLength(100)
     expect(seen.at(-1)).toBe(100)
   })
@@ -73,13 +83,13 @@ describe('going through the motions', () => {
   it('honours a per-page delay', async () => {
     const driver = new DryRunDriver({ kind: 'niimbot', printerId: 'p1', logger: silentLogger, pageDelayMs: 5 })
     const started = Date.now()
-    await driver.printPages([page, page], OPTIONS, () => {})
+    await driver.printPages(source([page, page]), OPTIONS, () => {})
     expect(Date.now() - started).toBeGreaterThanOrEqual(8)
   })
 
   it('accepts an empty batch', async () => {
     const seen: number[] = []
-    await makeDriver().printPages([], OPTIONS, (n) => seen.push(n))
+    await makeDriver().printPages(source([]), OPTIONS, (n) => seen.push(n))
     expect(seen).toEqual([])
   })
 })

@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import type { NiimbotAbstractClient } from '@mmote/niimbluelib'
 import { NiimbotDriver } from '../../src/drivers/niimbot/niimbot-driver.ts'
-import { PrinterDeviceError, PrinterUnreachableError, type BinaryBitmap } from '../../src/drivers/port.ts'
+import {
+  PrinterDeviceError,
+  PrinterUnreachableError,
+  type BinaryBitmap,
+  type PageSource,
+} from '../../src/drivers/port.ts'
 import { B3SP_METADATA, FakeNiimbotClient, type FakeClientOptions } from '../support/fake-niimbot-client.ts'
+
+/**
+ * The port's page source, from a plain array.
+ *
+ * Drivers pull pages one at a time now; these tests care about what is sent,
+ * not about how the pages arrive, so they wrap a list.
+ */
+function source(pages: BinaryBitmap[]): PageSource {
+  return { total: pages.length, at: (index: number) => pages[index]! }
+}
 
 function makeDriver(options: FakeClientOptions = {}): { driver: NiimbotDriver; client: FakeNiimbotClient } {
   const client = new FakeNiimbotClient({ metadata: B3SP_METADATA, ...options })
@@ -93,7 +108,7 @@ describe('resource release', () => {
   it('releases the print task when a page fails midway', async () => {
     const { driver, client } = makeDriver({ failOnPage: { index: 1, error: new Error('jam') } })
     await driver.connect()
-    await expect(driver.printPages([page(), page(), page()], PRINT_OPTIONS, () => {})).rejects.toThrow()
+    await expect(driver.printPages(source([page(), page(), page()]), PRINT_OPTIONS, () => {})).rejects.toThrow()
     // printEnd must still have run, or the printer stays in a print state.
     expect(client.printEndCount).toBe(1)
   })
@@ -101,7 +116,7 @@ describe('resource release', () => {
   it('releases the print task on success too', async () => {
     const { driver, client } = makeDriver()
     await driver.connect()
-    await driver.printPages([page()], PRINT_OPTIONS, () => {})
+    await driver.printPages(source([page()]), PRINT_OPTIONS, () => {})
     expect(client.printEndCount).toBe(1)
   })
 
@@ -114,7 +129,7 @@ describe('resource release', () => {
 
   it('refuses to print when not connected', async () => {
     const { driver } = makeDriver()
-    await expect(driver.printPages([page()], PRINT_OPTIONS, () => {})).rejects.toThrow(
+    await expect(driver.printPages(source([page()]), PRINT_OPTIONS, () => {})).rejects.toThrow(
       PrinterUnreachableError,
     )
   })
@@ -208,7 +223,7 @@ describe('printing', () => {
   it('follows the init / page / wait / finish sequence', async () => {
     const { driver, client } = makeDriver()
     await driver.connect()
-    await driver.printPages([page(), page()], PRINT_OPTIONS, () => {})
+    await driver.printPages(source([page(), page()]), PRINT_OPTIONS, () => {})
 
     const sequence = client.callNames().filter((name) => name !== 'connect')
     expect(sequence).toEqual([
@@ -226,7 +241,7 @@ describe('printing', () => {
   it('passes the requested density and label type through', async () => {
     const { driver, client } = makeDriver()
     await driver.connect()
-    await driver.printPages([page()], { density: 4, labelType: 2, printDirection: 'top' }, () => {})
+    await driver.printPages(source([page()]), { density: 4, labelType: 2, printDirection: 'top' }, () => {})
 
     const task = client.calls.find((call) => call.name === 'newPrintTask')
     expect(task?.args[0]).toBe('B1')
@@ -236,7 +251,7 @@ describe('printing', () => {
   it('encodes one image per requested copy', async () => {
     const { driver, client } = makeDriver()
     await driver.connect()
-    await driver.printPages([page(), page(), page()], PRINT_OPTIONS, () => {})
+    await driver.printPages(source([page(), page(), page()]), PRINT_OPTIONS, () => {})
     expect(client.printedPages).toHaveLength(3)
   })
 
@@ -246,7 +261,7 @@ describe('printing', () => {
     const { driver, client } = makeDriver()
     await driver.connect()
 
-    const printing = driver.printPages([page(), page()], PRINT_OPTIONS, (n) => seen.push(n))
+    const printing = driver.printPages(source([page(), page()]), PRINT_OPTIONS, (n) => seen.push(n))
     client.emit('printprogress', { page: 1, pagesTotal: 2, pagePrintProgress: 100, pageFeedProgress: 100 })
     client.emit('printprogress', { page: 2, pagesTotal: 2, pagePrintProgress: 100, pageFeedProgress: 100 })
     await printing
@@ -258,7 +273,7 @@ describe('printing', () => {
     const seen: number[] = []
     const { driver, client } = makeDriver()
     await driver.connect()
-    const printing = driver.printPages([page()], PRINT_OPTIONS, (n) => seen.push(n))
+    const printing = driver.printPages(source([page()]), PRINT_OPTIONS, (n) => seen.push(n))
     client.emit('printprogress', { page: 1, pagesTotal: 1, pagePrintProgress: 40, pageFeedProgress: 0 })
     await printing
     expect(seen).toEqual([])
@@ -268,7 +283,7 @@ describe('printing', () => {
     const seen: number[] = []
     const { driver, client } = makeDriver()
     await driver.connect()
-    await driver.printPages([page()], PRINT_OPTIONS, (n) => seen.push(n))
+    await driver.printPages(source([page()]), PRINT_OPTIONS, (n) => seen.push(n))
     client.emit('printprogress', { page: 9, pagesTotal: 9, pagePrintProgress: 100, pageFeedProgress: 100 })
     expect(seen).toEqual([])
   })

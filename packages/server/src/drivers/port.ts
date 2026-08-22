@@ -64,6 +64,29 @@ export interface PrintOptions {
 
 export type ProgressHandler = (pagesPrinted: number) => void
 
+/**
+ * The pages of one job, produced on demand.
+ *
+ * An array used to be handed over instead, which meant a thousand-label job
+ * rendered a thousand bitmaps — twelve megabytes of them, all resident — before
+ * the first label could start coming out. The wait grew with the batch, and
+ * during it there was nothing to distinguish "working" from "hung".
+ *
+ * `total` is here rather than left to be counted because drivers genuinely need
+ * it up front: TSPL's PRINT command carries it, progress is reported against
+ * it, and the printed count is measured from it. That is why this is not an
+ * `Iterable`, which cannot say how many.
+ *
+ * `at` is synchronous because rendering is. An `AsyncIterable` would make the
+ * whole path async — the queue, four drivers, the render callback — in exchange
+ * for nothing, since there is no I/O to wait on.
+ */
+export interface PageSource {
+  readonly total: number
+  /** Render (or return) the page at this index. Indices are 0-based. */
+  at(index: number): BinaryBitmap
+}
+
 export interface PrinterDriver {
   readonly kind: 'niimbot' | 'zpl'
   connect(): Promise<void>
@@ -72,9 +95,15 @@ export interface PrinterDriver {
   probe(): Promise<PrinterCapabilities>
   /** Check the device can print right now (FR-014, FR-015). */
   preflight(requestedCopies: number): Promise<PreflightResult>
-  /** Print each page in order, reporting progress between pages. */
+  /**
+   * Print each page in order, reporting progress between pages.
+   *
+   * Drivers MUST take pages one at a time. Draining the source up front would
+   * put the wait back exactly where it was, with the streaming machinery in
+   * place and none of its benefit.
+   */
   printPages(
-    pages: BinaryBitmap[],
+    pages: PageSource,
     options: PrintOptions,
     onProgress: ProgressHandler,
   ): Promise<void>

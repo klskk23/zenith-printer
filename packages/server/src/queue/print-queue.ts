@@ -11,7 +11,7 @@
  * reconnect state machine.
  */
 import type { LabelIR } from '@zenith/shared'
-import { buildJobPages } from '../render/job-pages.ts'
+import { pageSource } from '../render/job-pages.ts'
 import type { Clock } from '../clock.ts'
 import type { Logger } from '../drivers/frame-logger.ts'
 import {
@@ -19,6 +19,7 @@ import {
   PrinterUnreachableError,
   type BinaryBitmap,
   type PrinterDriver,
+  type PageSource,
 } from '../drivers/port.ts'
 import type { JobRepo } from '../db/repositories/job-repo.ts'
 import type { PrinterRepo } from '../db/repositories/printer-repo.ts'
@@ -204,14 +205,17 @@ export class PrintQueue {
   }
 
   /**
-   * One bitmap per copy. Sequence fields make copies differ, so the work is
-   * delegated to `buildJobPages`, which decides between one render and many.
+   * The job's pages, produced on demand.
+   *
+   * Nothing is rendered by this call. The driver pulls page zero, starts
+   * printing it, and pulls the next — so the time to the first label is one
+   * render regardless of how many were asked for.
    */
-  #buildPages(job: PrintJob): BinaryBitmap[] {
+  #buildPages(job: PrintJob): PageSource {
     // The correction comes from the job's snapshot rather than from the
     // printer as it stands now: it was captured at submission, and the printer
     // is expected to be recalibrated between then and here.
-    return buildJobPages(job, (ir) =>
+    return pageSource(job, (ir) =>
       this.#deps.renderPage(ir, {
         offsetXDots: job.snapshot.offsetXDots,
         offsetYDots: job.snapshot.offsetYDots,

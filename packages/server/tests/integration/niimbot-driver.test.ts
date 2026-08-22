@@ -3,8 +3,18 @@ import type { NiimbotAbstractClient } from '@mmote/niimbluelib'
 import { NiimbotDriver } from '../../src/drivers/niimbot/niimbot-driver.ts'
 import { BitmapImageSource } from '../../src/drivers/niimbot/bitmap-source.ts'
 import { rotatedSize, sourceFor } from '../../src/drivers/niimbot/rotate.ts'
-import type { BinaryBitmap } from '../../src/drivers/port.ts'
+import type { BinaryBitmap, PageSource } from '../../src/drivers/port.ts'
 import { B3SP_METADATA, FakeNiimbotClient } from '../support/fake-niimbot-client.ts'
+
+/**
+ * The port's page source, from a plain array.
+ *
+ * Drivers pull pages one at a time now; these tests care about what is sent,
+ * not about how the pages arrive, so they wrap a list.
+ */
+function source(pages: BinaryBitmap[]): PageSource {
+  return { total: pages.length, at: (index: number) => pages[index]! }
+}
 
 /** '#' sets a dot. */
 function bitmapFrom(rows: string[]): BinaryBitmap {
@@ -86,7 +96,7 @@ describe('encoded page data', () => {
       address: '/dev/ttyACM0',
     })
     await driver.connect()
-    await driver.printPages([bitmap], { density: 3, labelType: 1, printDirection: 'top' }, () => {})
+    await driver.printPages(source([bitmap]), { density: 3, labelType: 1, printDirection: 'top' }, () => {})
 
     const encoded = client.printedPages[0]
     if (encoded === undefined) {

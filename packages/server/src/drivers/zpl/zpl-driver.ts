@@ -17,13 +17,13 @@
 import {
   PrinterDeviceError,
   PrinterUnreachableError,
-  type BinaryBitmap,
   type PreflightResult,
   type PrinterCapabilities,
   type PrinterDriver,
   type PrintOptions,
   type ProgressHandler,
   type PrinterTransport,
+  type PageSource,
 } from '../port.ts'
 import { HOST_STATUS_QUERY, buildLabel, parseHostStatus, type GraphicEncoding } from './zpl-builder.ts'
 
@@ -172,7 +172,7 @@ export class ZplDriver implements PrinterDriver {
   }
 
   async printPages(
-    pages: BinaryBitmap[],
+    pages: PageSource,
     options: PrintOptions,
     onProgress: ProgressHandler,
   ): Promise<void> {
@@ -184,11 +184,10 @@ export class ZplDriver implements PrinterDriver {
       PC310T_CAPABILITIES.densityMax,
     )
 
-    for (let index = 0; index < pages.length; index += 1) {
-      const page = pages[index]
-      if (page === undefined) {
-        continue
-      }
+    for (let index = 0; index < pages.total; index += 1) {
+      // Rendered here rather than before the loop: the first label starts
+      // coming out after one render, not after all of them.
+      const page = pages.at(index)
 
       const zpl = buildLabel(page, {
         darkness: index === 0 ? darkness : undefined,
@@ -201,7 +200,7 @@ export class ZplDriver implements PrinterDriver {
         await transport.write(encoder.encode(zpl))
       } catch (err) {
         throw new PrinterDeviceError(
-          `failed to send label ${index + 1} of ${pages.length}: ${err instanceof Error ? err.message : String(err)}`,
+          `failed to send label ${index + 1} of ${pages.total}: ${err instanceof Error ? err.message : String(err)}`,
         )
       }
 

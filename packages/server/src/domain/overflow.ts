@@ -1,11 +1,12 @@
 /**
- * Per-label overflow check.
+ * Overflow check for the design.
  *
- * Runs over the *resolved* content of every label in a batch, not over the
- * design. That distinction is the point: a barcode bound to a variable field
- * has no fixed width, because width is moduleWidth x moduleCount and the module
- * count follows the content. Row 7 of a hundred can overflow while the design
- * and the other ninety-nine are fine.
+ * **Runs once, not once per label.** It used to walk every copy in the batch,
+ * which meant encoding a barcode for every one of them — a thousand encodes
+ * before the first label could come out, which is precisely the wait the page
+ * source exists to remove (FR-045). Whether row 7 of a thousand overflows is
+ * now something the physical labels reveal, and the print dialog says so rather
+ * than staying quiet and being read as "checked, and fine" (FR-045a).
  *
  * The result is advice. Overflow does not stop a batch (FR-067, FR-089):
  * content past the edge is clipped, and whether that is acceptable is a
@@ -119,23 +120,5 @@ export function checkLabel(
     }
   }
 
-  return warnings
-}
-
-/**
- * Warnings for a whole batch.
- *
- * Every row is checked and every warning returned. Reporting only the first
- * would send someone round the loop once per bad row.
- */
-export function checkBatch(
-  ir: LabelIR,
-  valuesFor: (rowIndex: number) => Record<string, string>,
-  copies: number,
-): OverflowWarning[] {
-  const warnings: OverflowWarning[] = []
-  for (let rowIndex = 0; rowIndex < copies; rowIndex += 1) {
-    warnings.push(...checkLabel(ir, valuesFor(rowIndex), rowIndex))
-  }
   return warnings
 }
