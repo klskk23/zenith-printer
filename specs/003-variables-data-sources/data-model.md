@@ -46,12 +46,33 @@
 | `floor` | INTEGER | **重置下限**，默认 0 |
 | `createdAt` | TEXT | ISO 8601 |
 
-**当前值不是存储字段**，而是 `max(floor, 已消耗最大值)`——已消耗最大值来自任务记录里
-的 `seqRanges`（research R5）。历史是号码的唯一凭据；`floor` 只是一条「从此处重新开始」
-的声明。
+**当前值不是存储字段**，而是 `max(floor, 已消耗最大值)`——已消耗最大值来自下面的
+`JobSequenceClaim`（research R5）。历史是号码的唯一凭据；`floor` 只是一条「从此处
+重新开始」的声明。
 
 **状态转换**：重置 = 把 `floor` 设为目标值。这是不可撤销且可能导致重号的操作，
 **MUST 要求显式确认并说明后果**（FR-006、宪章 III.0）。
+
+### JobSequenceClaim（号段领取记录）
+
+一条任务对一个序号池的领取。**它取代了既有的 `print_jobs.seq_ranges` JSON 列。**
+
+| 字段 | 类型 | 约束 |
+|---|---|---|
+| `jobId` | TEXT | 外键 → `print_jobs(id)` ON DELETE CASCADE |
+| `poolId` | TEXT | 外键 → `sequence_pools(id)`。**建索引** |
+| `start` / `end` | INTEGER | 该任务实际占用的首尾号（闭区间） |
+| `step` | INTEGER | 步长 |
+| `digits` | INTEGER | 补零宽度。**存储而非从 `end` 推断**——三位数的池只走到 80 时要印 `080` |
+
+主键 `(jobId, poolId)`。
+
+**为什么是一张表而不是继续用 JSON 列**：池可被多个模板共用（FR-005），所以「已消耗最大值」
+的扫描无法再靠 `template_id` 索引收窄。留在 JSON 里意味着每次提交都要全表扫描并解析
+（research R5）。改成表之后，`SELECT MAX(end) WHERE pool_id = ?` 走索引即可。
+
+`seq_ranges` 列**一并删除**而不是保留：两份都记录号码、都可能被写，而它们不一致时无从
+判断哪个印在了实物上——那正是 R5 拒绝独立计数器的同一条理由。
 
 ## 变更的实体
 
@@ -108,9 +129,9 @@ values = { ...row, ...seq }
 
 | # | 内容 | 破坏性 |
 |---|---|---|
-| 7 | 建 `data_sources`、`data_source_rows`、`sequence_pools` | 否 |
+| 7 | 建 `data_sources`、`data_source_rows`、`sequence_pools`、`job_sequence_claims` | 否 |
 | 8 | `templates` 增加 `variables` 列 | 否 |
-| 9 | 删除 `variable_fields` 表 | **是**（当前无生产数据，FR-051） |
+| 9 | 既有 `print_jobs.seq_ranges` 搬进 `job_sequence_claims`，随后删除该列与 `variable_fields` 表 | **是**（当前无生产数据，FR-051） |
 | 10 | 既有模板元素内容中的 `{ $var: x }` 改写为 `${x}`；字面 `${` 转义为 `$${` | **是** |
 
 **迁移 MUST 保留**打印机、打印参数与偏移校正值（FR-052）——偏移是对着实物量出来的。
@@ -124,6 +145,8 @@ values = { ...row, ...seq }
 SequencePool ──┐
                ├─ 被 Template.variables 引用（按 id）
 Constant ──────┘
+     │
+     └──< JobSequenceClaim >── PrintJob   （号码的唯一凭据，current 由此推导）
 
 DataSource ──< DataSourceRow
      ▲

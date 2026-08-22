@@ -67,16 +67,25 @@
 
 ```jsonc
 { "pools": [
-  { "id": "pool-1", "name": "整机流水", "digits": 6, "step": 1,
+  { "id": "pool-1", "name": "整机流水", "digits": 6, "step": 1, "floor": 0,
     "current": 741, "nextValue": 742 }
 ] }
 ```
 
-`current` 由 `max(floor, 已消耗最大值)` 推导，不是存储字段。
+`current` 由 `max(floor, 已消耗最大值)` 推导，不是存储字段。`floor` 是存储字段，随响应
+返回——重置对话框要说清「从 741 重置到几」，就得先知道上一次的下限是多少。
 
 ### `POST /api/sequence-pools` / `PATCH /api/sequence-pools/:id`
 
 可改 `name`、`digits`、`step`。**不能**用 PATCH 改 `current`。
+
+### `DELETE /api/sequence-pools/:id`
+
+- 仍被设计引用 → `409 SEQUENCE_POOL_IN_USE`，`details.affectedTemplates` 列出设计
+- 否则 `204`
+
+删除只移除池本身。已发放的号段留在 `job_sequence_claims` 里，因为那些号码印在实物上，
+是补打与追溯的依据（FR-006a、research R5）。
 
 ### `POST /api/sequence-pools/:id/reset`
 
@@ -105,6 +114,10 @@
 - `所选行数 × copies > 1000` → `422 BATCH_TOO_LARGE`，`details` 含 `requested` 与 `maxLabels`
 - 设计引用了两个数据源 → `422 MULTIPLE_DATA_SOURCES`
 - 内容中有无法解析的引用 → `422 VARIABLE_NOT_DEFINED`，`details.reference` 指出是哪一个
+- 所选行序号已不存在 → `422 ROW_SELECTION_STALE`，`details.missingOrdinals` 列出缺失的
+  序号（FR-033a）。`{ "all": true }` 不会触发此错误
+- 被条码或二维码引用的列在所选行中有空值 → `422 BARCODE_EMPTY_VALUE`，
+  `details.column` 与 `details.ordinals` 指出列名与行号（FR-045b）
 
 **移除**：`manualFieldValues`、`sequenceOverrides`。
 
@@ -134,6 +147,9 @@
 | `BATCH_TOO_LARGE` | 422 | 超过单任务 1000 张 |
 | `MULTIPLE_DATA_SOURCES` | 422 | 一个设计引用了多个数据源 |
 | `VARIABLE_NOT_DEFINED` | 422 | 引用无法解析 |
+| `SEQUENCE_POOL_IN_USE` | 409 | 删除序号池时仍被引用 |
+| `ROW_SELECTION_STALE` | 422 | 所选行序号已不存在 |
+| `BARCODE_EMPTY_VALUE` | 422 | 条码/二维码引用的列在所选行中为空 |
 
-每个码 MUST 在两种语言的错误映射中给出**三要素**文案（发生了什么 / 可能的原因 /
+以上 15 个码 MUST 在两种语言的错误映射中给出**三要素**文案（发生了什么 / 可能的原因 /
 下一步做什么）。既有的 `i18n-completeness` 测试会强制这一点。
