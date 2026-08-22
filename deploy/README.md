@@ -105,7 +105,42 @@ bind，一行 `ZENITH_GOOGLE_CREDENTIALS`）。**密钥绝不进镜像**——�
 
 ## 三之二、探测打印机失败时
 
-先看日志。**niimbluelib 会把握手阶段的真实原因打到 `console.error`，而它自己吞掉了那个
+### 先确认 Node 版本——**26.4 及以后串口是坏的**
+
+`deploy/Dockerfile` 把基础镜像钉死在 `node:26.3-trixie-slim`，这不是随手写的版本号。
+**Node 26.4.0 打断了本服务依赖的串口读取路径**：打印机答了，但那份数据在 niimbluelib 的
+一秒包超时之内没有被交给流，于是每一次探测都以 `Timeout waiting response` 收场，一台好
+端端的打印机看上去像是死了。
+
+同一台主机、同一台 B3S_P、同一份 node_modules，只换解释器：
+
+| Node | 结果 |
+|---|---|
+| 26.0.0 | 握手 118ms，识别 B3S_P |
+| 26.1.0 / 26.2.0 / 26.3.1 | 同上，正常 |
+| **26.4.0** | **超时，型号 unknown** |
+| 26.7.0 | 超时 |
+
+抓串口原始字节能看得更清楚——26.4 下应答其实到了，只是在超时**之后**、进程拆链路时才冒
+出来：
+
+```
+node 26.3:  << 55 55 c2 ...   << 55 55 b5 ...   << 55 55 48 ...   （十个包，握手走完）
+node 26.4:  Error: Timeout waiting response (waited for c2)
+            readable-events=0  bytes-read=0
+            << 55 55 c2 01 03 c0 aa aa    ← 迟到的应答
+```
+
+所以：**镜像不要改用浮动的 `node:26` 标签**，那等于把版本交给运气。有一条测试专门盯着这
+个钉子（`packages/server/tests/unit/node-version-pin.test.ts`），改成浮动标签或升到 26.4
+以上都会变红。要升版本，先插上打印机跑
+`zenith probe --address /dev/ttyACM0` 实测——测试套件全绿说明不了任何事，里面没有一行会
+打开串口。
+
+主机上做开发同理：`make doctor` 会在 26.4+ 上给出告警（只是告警，不拦——不碰打印机的活
+不受影响）。
+
+### 其次看日志。**niimbluelib 会把握手阶段的真实原因打到 `console.error`，而它自己吞掉了那个
 异常**——所以原因多半已经在容器日志里，只是没进结构化日志：
 
 ```bash

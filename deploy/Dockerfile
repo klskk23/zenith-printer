@@ -11,7 +11,27 @@
 # ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
-FROM node:26-trixie-slim AS builder
+# Node is PINNED, and not to a floating major. Node 26.4.0 broke the serial
+# read path this service depends on: the printer answers, but the stream never
+# emits `readable` inside niimbluelib's one-second packet timeout, so every
+# probe fails with "Timeout waiting response" and the label printer looks dead.
+#
+# Measured on a NIIMBOT B3S_P at /dev/ttyACM0, same host, same device, same
+# node_modules, only the interpreter changed:
+#
+#   26.0.0  handshake 118ms, model B3S_P     26.4.0  timeout, model unknown
+#   26.1.0  ok                               26.7.0  timeout
+#   26.2.0  ok
+#   26.3.1  ok
+#
+# Under 26.4 a byte dump shows the response arriving only after the timeout has
+# already fired, on teardown — the write goes out and the device replies; it is
+# the delivery to the stream that stalls.
+#
+# Before raising this: plug in a printer and run `zenith probe --address
+# /dev/ttyACM0` on the candidate version. A green test suite proves nothing
+# here — nothing in it opens a serial port.
+FROM node:26.3-trixie-slim AS builder
 
 # curl for the pinned font packages, dpkg-dev for unpacking them, and the two
 # Debian font packages as the fast path: scripts/fetch-fonts.sh takes the
@@ -76,7 +96,9 @@ RUN mkdir -p /runtime \
 # ---------------------------------------------------------------------------
 # Runtime
 # ---------------------------------------------------------------------------
-FROM node:26-trixie-slim AS runtime
+# Same pin as the builder, and for the same reason — this is the stage that
+# actually talks to the printer.
+FROM node:26.3-trixie-slim AS runtime
 
 # The service derives its own root from import.meta.url, three levels up from
 # packages/server/src — so this tree has to keep the repository's shape, and

@@ -74,6 +74,11 @@ check-node: ## Verify the Node.js runtime is new enough
 	  exit 1; \
 	fi
 	@printf '\033[32m[deps]\033[0m node %s, npm %s\n' "$$(node -v)" "$$(npm -v)"
+	@# A warning, not a gate: it only bites when a serial printer is attached,
+	@# and plenty of work here never touches one. The deployment image pins its
+	@# own version — see deploy/Dockerfile and the test that keeps it pinned.
+	@node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>26||(a===26&&b>=4)?1:0)' || \
+	  printf '\033[1;33m[deps]\033[0m node %s stalls serial reads — a USB printer will time out on every probe\n       measured: 26.0-26.3 fine, 26.4 onwards broken. Use 26.3.x for printer work.\n' "$$(node -v)"
 
 .PHONY: check-docker
 check-docker: ## Verify docker and compose are usable
