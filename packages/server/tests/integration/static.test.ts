@@ -72,3 +72,23 @@ describe('without a frontend build', () => {
     expect(res.json().code).toBe('NOT_FOUND')
   })
 })
+
+describe('which build is being served', () => {
+  beforeEach(async () => {
+    await registerStatic(app, { root })
+    await app.ready()
+  })
+
+  /**
+   * The process hands out whatever `dist` is on disk. A fix that has not been
+   * rebuilt is invisible: the source is right, the page is wrong, and nothing
+   * says so. This endpoint is how "am I looking at my change?" gets answered
+   * without reading the logs.
+   */
+  it('reports when the frontend was built', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/frontend-build' })
+    expect(res.statusCode).toBe(200)
+    expect(typeof res.json().builtAt).toBe('string')
+    expect(Number.isFinite(res.json().ageMinutes)).toBe(true)
+  })
+})

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RowSelectionPanel } from '../src/features/print/row-selection.tsx'
 import { EMPTY, type Selection } from '../src/features/print/selection.ts'
@@ -261,5 +262,31 @@ describe('the first page, before anything is clicked', () => {
       .filter((url) => url.includes('/rows'))
       .map((url) => /pageSize=(\d+)/.exec(url)?.[1])
     expect(sizes).not.toContain('1')
+  })
+})
+
+describe('under StrictMode, which is how the app actually runs', () => {
+  /**
+   * `main.tsx` wraps the app in `<StrictMode>`; no test did. StrictMode mounts,
+   * unmounts and remounts every component, which is exactly the sequence that
+   * catches state living outside React — and TanStack Table v9 keeps its state
+   * in a store rather than in React.
+   */
+  it('shows ten rows on the first render', async () => {
+    render(
+      <StrictMode>
+        {wrap(
+          <RowSelectionPanel
+            dataSourceId="ds-1"
+            selection={EMPTY}
+            onChange={() => undefined}
+            copies={1}
+          />,
+        )}
+      </StrictMode>,
+    )
+
+    await screen.findByText('收件人1')
+    expect(screen.getAllByRole('row')).toHaveLength(11)
   })
 })

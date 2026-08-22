@@ -5,7 +5,7 @@
  * no separate frontend host. Unknown non-API paths fall through to index.html
  * so client-side routing works on a hard refresh.
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import fastifyStatic from '@fastify/static'
 import type { FastifyInstance } from 'fastify'
@@ -25,6 +25,29 @@ export async function registerStatic(app: FastifyInstance, options: StaticOption
 
   // Read once at boot: the shell never changes while the process runs, and
   // this keeps the not-found handler synchronous.
-  const shell = readFileSync(join(options.root, 'index.html'), 'utf8')
+  const shellPath = join(options.root, 'index.html')
+  const shell = readFileSync(shellPath, 'utf8')
   app.spaFallback = () => shell
+
+  /**
+   * Say which build is being served, and how old it is.
+   *
+   * This process hands out whatever `dist` happens to be on disk. A source fix
+   * that has not been rebuilt is therefore invisible: the code is correct, the
+   * running page is not, and nothing anywhere says so. That exact confusion
+   * cost a round trip once — a bug was reported as unfixed while the fix sat
+   * in the source, five minutes newer than the bundle being served.
+   */
+  const builtAt = statSync(shellPath).mtime
+  const ageMinutes = Math.round((Date.now() - builtAt.getTime()) / 60_000)
+  app.log.info(
+    { root: options.root, builtAt: builtAt.toISOString(), ageMinutes },
+    'serving frontend build',
+  )
+
+  /** For "am I looking at my change?" — answerable without reading the logs. */
+  app.get('/api/frontend-build', async () => ({
+    builtAt: builtAt.toISOString(),
+    ageMinutes: Math.round((Date.now() - builtAt.getTime()) / 60_000),
+  }))
 }
