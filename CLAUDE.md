@@ -47,7 +47,7 @@
 
 ## 技术栈（宪章已锁定）
 
-全栈 TypeScript，前后端同仓，单进程部署。
+全栈 TypeScript，前后端同仓，单进程部署（交付形态为单个 privileged 容器，见 `deploy/`）。
 
 - **后端**：Node.js + Fastify + zod + SQLite
 - **前端**：Vite + React + Tailwind CSS + **shadcn/ui**；编辑器用 **SVG DOM，不用 canvas**

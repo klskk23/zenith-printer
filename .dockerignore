@@ -1,0 +1,40 @@
+# Everything the image builds for itself, plus everything it must never carry.
+#
+# node_modules is the important one: it is 350MB of the *host's* tree, with
+# native binaries built for the host. The image runs `npm ci` itself so that
+# what ships is what the lockfile says, built for the image's own platform.
+node_modules
+packages/*/node_modules
+packages/web/dist
+build
+dist
+coverage
+.git
+.github
+.vitest
+*.tsbuildinfo
+
+# Runtime state. A database copied into an image would ship one machine's
+# label templates to every other machine.
+data
+uploads
+*.db
+*.db-journal
+
+# Credentials never belong in a layer — an image is copied and pushed, and a
+# deleted file in an earlier layer is still in the image.
+.env
+.env.*
+*service-account*.json
+*google-credentials*.json
+gcp-key*.json
+
+# Documentation and specs: 40MB of markdown that the service never reads.
+specs
+docs
+.specify
+.claude
+
+# The full fonts are copied in explicitly, verified, at a known point in the
+# Dockerfile — not swept in with the rest of the tree.
+fonts/.cache

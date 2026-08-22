@@ -14,13 +14,13 @@ BUILD_DIR ?= build
 DIST_DIR  ?= dist
 STAMPS     = $(BUILD_DIR)/stamps
 
-# The one place a version number lives. `npm version` moves it and everything
-# downstream — the .deb filename, the control file — follows.
+# The one place a version number lives. `npm version` moves it and the image
+# tag follows.
 VERSION      := $(shell node -p "require('./package.json').version" 2>/dev/null || echo 0.0.0)
-DEB_REVISION ?= 1
-DEB_VERSION   = $(VERSION)-$(DEB_REVISION)
-DEB_ARCH     := $(shell dpkg --print-architecture 2>/dev/null || echo unknown)
-DEB_FILE      = $(DIST_DIR)/zenith-printer_$(DEB_VERSION)_$(DEB_ARCH).deb
+# One image name in one place: the compose file reads it from the same
+# variable, so `make image` and `docker compose up` cannot disagree.
+IMAGE        ?= zenith-printer
+IMAGE_TAG    ?= $(VERSION)
 
 NODE_MAJOR_MIN := 26
 NPM_MAJOR_MIN  := 12
@@ -75,11 +75,15 @@ check-node: ## Verify the Node.js runtime is new enough
 	fi
 	@printf '\033[32m[deps]\033[0m node %s, npm %s\n' "$$(node -v)" "$$(npm -v)"
 
-.PHONY: check-deb-tools
-check-deb-tools: ## Verify the Debian packaging tools are present
-	$(call require_tool,dpkg-deb,building the .deb,sudo apt-get install dpkg-dev)
-	$(call require_tool,dpkg,reading the target architecture,part of any Debian system)
-	@printf '\033[32m[deps]\033[0m dpkg-deb ok, target architecture %s\n' '$(DEB_ARCH)'
+.PHONY: check-docker
+check-docker: ## Verify docker and compose are usable
+	$(call require_tool,docker,building and running the deployment image,sudo apt-get install docker.io docker-compose-v2)
+	@docker compose version >/dev/null 2>&1 || { \
+	  printf '\n\033[1;31m[deps]\033[0m docker compose v2 not available\n'; \
+	  printf '       needed for: deploy/docker-compose.yml\n'; \
+	  printf '       install:    sudo apt-get install docker-compose-v2\n\n'; \
+	  exit 1; }
+	@printf '\033[32m[deps]\033[0m docker %s\n' "$$(docker --version | cut -d' ' -f3 | tr -d ,)"
 
 .PHONY: check-subset-tools
 check-subset-tools: ## Verify fonttools is available for regenerating the web subsets
@@ -94,7 +98,7 @@ check-subset-tools: ## Verify fonttools is available for regenerating the web su
 .PHONY: doctor
 doctor: check-node ## Report on every tool and asset the build can use
 	@printf '\n--- optional tools ---\n'
-	@for t in dpkg-deb python3 lintian objdump; do \
+	@for t in docker python3; do \
 	  if command -v $$t >/dev/null 2>&1; then printf '  \033[32mok     \033[0m %s\n' "$$t"; \
 	  else printf '  \033[33mabsent \033[0m %s\n' "$$t"; fi; \
 	done
@@ -108,7 +112,7 @@ doctor: check-node ## Report on every tool and asset the build can use
 	  else printf '  \033[33mabsent \033[0m web font link           (make web-fonts-link)\n'; fi
 	@if [ -f '$(WEB_DIST)' ]; then printf '  \033[32mok     \033[0m packages/web/dist       (built %s)\n' "$$(date -r '$(WEB_DIST)' '+%Y-%m-%d %H:%M')"; \
 	  else printf '  \033[33mabsent \033[0m packages/web/dist       (make build)\n'; fi
-	@printf '\nversion %s  ->  %s\n\n' '$(VERSION)' '$(DEB_FILE)'
+	@printf '\nversion %s  ->  %s:%s\n\n' '$(VERSION)' '$(IMAGE)' '$(IMAGE_TAG)'
 
 # ---------------------------------------------------------------------------
 # Dependencies
@@ -199,40 +203,39 @@ test-hardware: deps fonts-verify ## The suite that needs a real printer attached
 check: typecheck lint test ## Everything CI checks, in CI's order
 
 # ---------------------------------------------------------------------------
-# Packaging
+# Deployment image
 # ---------------------------------------------------------------------------
+# The image builds the frontend and vendors its dependencies itself, so it does
+# not need `make build` first — a build that depended on the host's tree would
+# ship whatever happened to be lying in it.
 
-.PHONY: deb
-deb: check-deb-tools build ## Build dist/zenith-printer_<version>_<arch>.deb
-	bash packaging/deb/build-deb.sh \
-	  --version '$(DEB_VERSION)' \
-	  --arch '$(DEB_ARCH)' \
-	  --build-dir '$(BUILD_DIR)' \
-	  --out-dir '$(DIST_DIR)'
+.PHONY: image
+image: check-docker ## Build the deployment image
+	docker build -f deploy/Dockerfile -t '$(IMAGE):$(IMAGE_TAG)' -t '$(IMAGE):latest' .
+	@printf '\n\033[32m[image]\033[0m %s:%s  (%s)\n\n' '$(IMAGE)' '$(IMAGE_TAG)' \
+	  "$$(docker image inspect '$(IMAGE):$(IMAGE_TAG)' --format '{{.Size}}' | numfmt --to=iec)"
 
-.PHONY: deb-check
-deb-check: ## Inspect the built .deb (contents, control, lintian if present)
-	$(call require_file,$(DEB_FILE),there is nothing to inspect yet,make deb)
-	@dpkg-deb --info '$(DEB_FILE)'
-	@dpkg-deb --contents '$(DEB_FILE)' | head -40
-	@printf '...\n\n'
-	@command -v lintian >/dev/null 2>&1 && lintian --no-tag-display-limit '$(DEB_FILE)' || \
-	  printf '\033[33m[deb]\033[0m lintian not installed; skipped\n'
+.PHONY: image-smoke
+image-smoke: ## Start the image on a scratch volume, call it, tear it down
+	$(call require_tool,docker,running the image,sudo apt-get install docker.io)
+	bash deploy/smoke.sh '$(IMAGE):$(IMAGE_TAG)'
+
+.PHONY: up
+up: check-docker ## docker compose up -d, from deploy/
+	docker compose -f deploy/docker-compose.yml up -d
+	docker compose -f deploy/docker-compose.yml ps
+
+.PHONY: down
+down: check-docker ## docker compose down (the data volume is kept)
+	docker compose -f deploy/docker-compose.yml down
+
+.PHONY: logs
+logs: check-docker ## Follow the service log
+	docker compose -f deploy/docker-compose.yml logs -f
 
 # ---------------------------------------------------------------------------
 # Housekeeping
 # ---------------------------------------------------------------------------
-
-.PHONY: deb-install-test
-deb-install-test: ## Install the .deb in a throwaway Debian container and boot it
-	$(call require_tool,docker,installing the package somewhere disposable,sudo apt-get install docker.io)
-	$(call require_file,$(DEB_FILE),there is nothing to install yet,make deb)
-	bash packaging/deb/install-test.sh '$(DEB_FILE)'
-
-.PHONY: deb-install-test-here
-deb-install-test-here: ## The same test, in THIS root — only inside a disposable container
-	$(call require_file,$(DEB_FILE),there is nothing to install yet,make deb)
-	bash packaging/deb/install-test-body.sh '$(DEB_FILE)'
 
 .PHONY: clean
 clean: ## Remove build output, keep node_modules and fonts
@@ -248,4 +251,4 @@ distclean: clean ## Also remove node_modules (fonts and data are left alone)
 help: ## This list
 	@printf '\nZenith Printer — make targets\n\n'
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\n  version %s   arch %s\n\n' '$(VERSION)' '$(DEB_ARCH)'
+	@printf '\n  version %s   image %s:%s\n\n' '$(VERSION)' '$(IMAGE)' '$(IMAGE_TAG)'

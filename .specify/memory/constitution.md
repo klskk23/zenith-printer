@@ -1,30 +1,32 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.2.0 → 1.3.0
-Bump rationale: MINOR —— 实质性扩展既有条款（原则 II）的约束范围，新增界面渲染测试
-要求与「页面可达性」质量门槛；技术栈表新增测试环境两行。未移除或重定义任何原则。
+Version change: 1.3.0 → 1.4.0
+Bump rationale: MINOR —— 新增一条部署形态约束，未移除或重定义任何原则。既有的
+「单进程部署」不变，本次只是明确那一个进程住在哪里。
 
-Modified principles:
-- II. 测试标准 —— 新增「界面渲染测试」四条，并在理由中记录触发本次修订的事故。
+Modified principles: 无
 
 Added sections:
-- 技术约束与质量门槛 → 技术栈表新增「测试运行器」「界面测试环境」两行
-- 技术约束与质量门槛 → 其他约束新增「页面可达性」
+- 技术约束与质量门槛 → 其他约束新增「部署形态」
 
 Removed sections: 无
 
-修订动因（2026-08-21）：
-002 功能实现期间，项目在 929 个测试全绿的状态下交付了一个白屏的标签设计页。
-覆盖几何、吸附、撤销、越界判定的测试无一挂载过组件，因此渲染期抛出的引用错误
-无人察觉。同期一个端点只被测了「未确认时拒绝」而未测「确认后是否执行」，
-于是它构建完数据即返回、什么也没打印，同样一路绿灯。两者共同的形状是
-「测了拦截路径，没测执行路径」。
+修订动因（2026-08-22）：
+此前的部署路径是 Debian 包加 systemd unit，`Depends: nodejs (>= 26)`。它要求每台目标
+机器先配好 NodeSource 源——Debian 自带的是 20/22——而 `apt install nodejs` 装到的并不是
+它。依赖不满足时 dpkg 会拒绝安装，这一步是对的；但代价是每多一台机器就多一次外部源的
+配置，且那台机器上的 Node 版本此后不再受本项目控制。
+
+另一条路是把 Node 运行时打进包里做成自包含。那消除了外部依赖，代价是 Node 的安全更新
+从 apt 的责任变成本项目的责任——出一次 CVE 就得重新打包发布。
+
+容器同时避开两者：镜像自带运行时，而运行时的更新是换一次基础镜像，不是本项目维护一份
+Node 分发。这条决定连同它的安全代价（privileged 实际等同宿主机 root）记在下面。
 
 Templates requiring updates:
-- .specify/templates/plan-template.md —— Constitution Check 增加界面渲染测试提示 ✅ 已同步
-- .specify/templates/tasks-template.md —— 测试任务段落增加页面渲染断言与
-  「测执行路径而非仅测拦截路径」提示 ✅ 已同步
+- .specify/templates/ —— 无部署相关引用，无需同步 ✅
+- docs/design-consensus.md I. 运行时与部署 —— 已同步 ✅
 -->
 
 # Zenith Printer Constitution
@@ -196,6 +198,19 @@ Web 界面、REST API、运维 CLI 与文档必须表现为同一个产品，而
   型号元数据读取，**MUST NOT** 硬编码。新增型号支持 **MUST** 记录实测结果与固件版本。
 - **资源安全**：设备连接 **MUST** 具备确定性的释放路径（成功与失败路径均需释放）；
   并发访问同一设备 **MUST** 通过互斥保护。
+- **部署形态**：服务 **MUST** 以单个容器交付，镜像自带 Node 运行时与全部依赖，
+  **MUST NOT** 要求宿主机预装 Node 或配置外部软件源。持久数据（SQLite 与上传的图片）
+  **MUST** 落在具名卷中，**MUST NOT** 随镜像分发。
+  - 容器 **MUST** 以 `privileged` 运行，并 **MUST** 把宿主机 `/dev` 以 bind 方式挂入。
+    仅 `privileged` 是不够的：Docker 给特权容器的 `/dev` 是一份 **tmpfs**，即容器启动那
+    一刻的设备节点快照，之后插上的打印机永远不会出现（容器内
+    `grep ' /dev ' /proc/self/mountinfo` 可辨：`tmpfs` 是快照，`devtmpfs` 是真的）。
+    精臣打印机是随插随拔的 USB CDC 设备，这一条是它能被找到的前提。
+  - 代价记录在案：`privileged` 实际等同于宿主机 root。本服务本就无鉴权，因此它与整台
+    宿主机一样，**MUST** 只暴露在局域网或 VPN 上。
+  - **MUST NOT** 改用系统软件包（.deb）或自包含单二进制。前者要求每台目标机器配置
+    NodeSource 源（Debian 自带的 Node 是 20/22，`apt install nodejs` 装不到需要的版本）；
+    后者把 Node 的安全更新变成本项目的责任。两者都已评估并否决，理由见本文件头部。
 - **质量门槛（CI 强制）**：类型检查通过、Lint 无错误、测试全绿、核心逻辑覆盖率 ≥ 80%。
   任一项失败即阻断合并，**MUST NOT** 以"后续修复"为由绕过。
 - **页面可达性**：每个可导航到的页面 **MUST** 有渲染断言。新增页面而不加该断言的 PR
@@ -237,4 +252,4 @@ Web 界面、REST API、运维 CLI 与文档必须表现为同一个产品，而
 - 运行时开发指引参见 `CLAUDE.md` 与当前功能的 `specs/<###-feature-name>/plan.md`。
 - 架构决策依据参见 `docs/design-consensus.md`；与之冲突的实现 **MUST** 先修订该文档。
 
-**Version**: 1.3.0 | **Ratified**: 2026-08-20 | **Last Amended**: 2026-08-21
+**Version**: 1.4.0 | **Ratified**: 2026-08-20 | **Last Amended**: 2026-08-22

@@ -2,7 +2,7 @@
  * Fastify application.
  *
  * Single process: the same server that exposes the API also serves the built
- * frontend, so deployment is one systemd unit.
+ * frontend, so deployment is one container.
  *
  * zod validates every external input before it reaches business logic
  * (constitution: "Boundary validation"), and every failure leaves through one

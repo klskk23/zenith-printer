@@ -10,19 +10,24 @@
 4. 记下密钥里的 `client_email`，形如
    `zenith@my-project.iam.gserviceaccount.com` —— 这就是要分享给的对象
 
-密钥文件放到服务能读、别人读不到的地方：
+密钥文件放到服务能读、别人读不到的地方。**这份文件能读到所有被分享给它的表格**，
+所以权限收紧到只有属主可读：
 
 ```bash
-sudo install -o zenith -g zenith -m 0400 ~/Downloads/key.json /etc/zenith/google.json
+sudo install -m 0400 ~/Downloads/key.json /etc/zenith/google.json
 ```
 
-`0400` 且属主为服务用户：**这份文件能读到所有被分享给它的表格**。
+部署形态是容器（宪章 v1.4.0），所以密钥以只读方式挂进去，并用环境变量指出路径——
+`deploy/docker-compose.yml` 里那两行注释放开即可：
 
-在 systemd 单元里指出路径：
-
-```ini
-Environment=ZENITH_GOOGLE_CREDENTIALS=/etc/zenith/google.json
+```yaml
+volumes:
+  - /etc/zenith/google.json:/run/secrets/google.json:ro
+environment:
+  ZENITH_GOOGLE_CREDENTIALS: /run/secrets/google.json
 ```
+
+**绝不要把密钥 COPY 进镜像**：镜像会被复制、被推送，而早先层里删掉的文件仍然在镜像里。
 
 未设置该变量时，界面上链接 Google 表的入口不出现，其余功能不受影响。
 

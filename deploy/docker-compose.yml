@@ -1,0 +1,90 @@
+# Zenith Printer — deployment.
+#
+#   cd deploy && docker compose up -d
+#
+# One container, one process, one volume. The service listens on 3000 and
+# serves both the API and the editor; there is no reverse proxy and no second
+# process to keep alive.
+#
+# There is NO AUTHENTICATION. Anyone who can reach port 3000 can print labels
+# and cancel other people's jobs. That is a deliberate trade for a tool used
+# from a bench, and it is why this belongs on a LAN or a VPN and nowhere with a
+# route to the internet.
+
+# Fixed, so the project and its volume are named the same wherever this file is
+# checked out. Compose otherwise names the project after the directory, which
+# here would be "deploy".
+name: zenith-printer
+
+services:
+  zenith-printer:
+    image: ${ZENITH_IMAGE:-zenith-printer}:${ZENITH_VERSION:-latest}
+    # So `docker compose up --build` works straight from a checkout. The
+    # context is the repository root because the image builds the whole
+    # workspace, not just this directory.
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: zenith-printer
+    restart: unless-stopped
+
+    # The printer is the reason. A NIIMBOT arrives as a USB CDC device at
+    # /dev/ttyACM0, and reaching it from a container means either enumerating
+    # devices that do not exist yet or taking the whole set.
+    privileged: true
+
+    volumes:
+      # Privileged ALONE is not enough for a printer that gets unplugged.
+      # Docker gives a privileged container a *tmpfs* /dev — a snapshot of the
+      # device nodes that existed when it started — so a printer plugged in
+      # afterwards never appears. Bind-mounting the host's /dev hands over the
+      # real devtmpfs, where hotplug shows up. (Verify with
+      # `grep ' /dev ' /proc/self/mountinfo` inside the container: tmpfs means
+      # the snapshot, devtmpfs means the real thing.)
+      - /dev:/dev
+
+      # The database, the uploaded images, everything anybody has drawn. A
+      # named volume rather than a bind mount so that `docker compose down`
+      # cannot take it with it; `docker volume rm zenith-data` is the one way
+      # to lose it, which is a command somebody has to mean.
+      - zenith-data:/data
+
+      # A Google service-account key, if Sheets data sources are wanted. Read
+      # only, and never copied into the image — a key baked into a layer is in
+      # every copy of that image forever. Uncomment both this and the variable
+      # below together.
+      # - ./google.json:/run/secrets/google.json:ro
+
+    ports:
+      # Host-side 0.0.0.0 on purpose: colleagues reach this from their own
+      # machines. Narrow it to one interface — "192.168.1.10:3000:3000" — if
+      # the host has a leg on a network this should not be on.
+      - "3000:3000"
+
+    environment:
+      # Labels carry dates, and a container is UTC unless told otherwise. Set
+      # this to the shop floor's timezone or a shift boundary will print on the
+      # wrong day.
+      TZ: ${TZ:-Asia/Shanghai}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Runs every motion except the printing itself — for a demo, or a check
+      # that must not consume stock.
+      # ZENITH_DRY_RUN: "1"
+      # ZENITH_GOOGLE_CREDENTIALS: /run/secrets/google.json
+
+    # A restart while a job is printing leaves the printed count unverifiable,
+    # so the service marks such jobs failed with an unknown count on the way
+    # back up. Give it a moment to finish the label under the head first.
+    stop_grace_period: 30s
+
+    # An appliance that runs for months should not fill the disk with its own
+    # logs. Ten files of 10MB is weeks of history at info level.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "10"
+
+volumes:
+  zenith-data:
+    name: zenith-data

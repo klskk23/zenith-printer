@@ -249,7 +249,7 @@ interface HeartbeatData { paperInserted?: boolean; lidClosed?: boolean; chargeLe
 |---|---|
 | 访问边界 | **局域网 + VPN，不暴露公网**；认证后续再做 |
 | 后端框架 | **Fastify**（内建 schema 校验，契合宪章「zod 边界校验」） |
-| 部署形态 | **单进程**：Vite build 静态文件由后端托管，一个 systemd service |
+| 部署形态 | **单进程、单容器**：Vite build 静态文件由后端托管；privileged 容器 + bind `/dev`（打印机热插拔），见 `deploy/` |
 | 数据 | SQLite（Device / Profile / Template / 任务历史） |
 | PC310T 地址 | **静态 IP**，不需要发现机制 |
 

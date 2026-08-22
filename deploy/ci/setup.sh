@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Turn a bare debian:trixie-slim container into one that can build this
-# project, or install what it built.
+# Turn a bare debian:trixie-slim container into one that can build and check
+# this project — install dependencies, verify fonts, compile the frontend, run
+# the suite.
+#
+# Building the *deployment* image needs none of this: that job uses the docker
+# client, and deploy/Dockerfile brings its own toolchain.
 #
 # Run once per CI job: a docker-executor runner starts every job from a clean
 # image, so there is nothing to carry over. Kept as a script rather than inline
@@ -8,16 +12,13 @@
 # then this — when a pipeline fails for reasons that look like the environment.
 set -euo pipefail
 
-MODE="${1:-build}"
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends ca-certificates curl gnupg make
 
 # Node from NodeSource rather than from Debian: trixie ships 20/22, and this
-# repository needs 26. Installing the same *package* the target will have is
-# also what puts the interpreter at /usr/bin/node — the path baked into the
-# systemd unit, which cannot resolve anything from PATH.
+# repository needs 26.
 if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 26 ]; then
   curl -fsSL https://deb.nodesource.com/setup_26.x | bash - >/dev/null
   apt-get install -y -qq nodejs
@@ -35,26 +36,14 @@ if [ "$(npm -v | cut -d. -f1)" -lt 12 ]; then
   npm install -g npm@^12 >/dev/null 2>&1
 fi
 
-case "$MODE" in
-  build)
-    # dpkg-dev for dpkg-deb; binutils for objdump, which reads the real glibc
-    # floor off the shipped binaries instead of guessing it.
-    #
-    # The two font packages are only the fast path: scripts/fetch-fonts.sh uses
-    # the system copy when it already hashes to the manifest and downloads the
-    # pinned Debian package when it does not. On trixie that means the three
-    # 20MB Noto files come from apt and only DejaVu (487KB) is fetched.
-    apt-get install -y -qq --no-install-recommends \
-      dpkg-dev binutils fonts-noto-cjk fonts-dejavu-core
-    ;;
-  runtime)
-    # Installing the .deb needs nothing further — its own dependencies pull in
-    # adduser and init-system-helpers.
-    ;;
-  *)
-    echo "usage: setup.sh [build|runtime]" >&2
-    exit 2
-    ;;
-esac
+# dpkg-dev unpacks the pinned font packages; binutils is occasionally the
+# fastest way to answer a question about a shipped binary.
+#
+# The two font packages are only the fast path: scripts/fetch-fonts.sh uses the
+# system copy when it already hashes to the manifest and downloads the pinned
+# Debian package when it does not. On trixie that means the three 20MB Noto
+# files come from apt and only DejaVu (487KB) is fetched.
+apt-get install -y -qq --no-install-recommends \
+  dpkg-dev binutils fonts-noto-cjk fonts-dejavu-core
 
-echo "[setup] $MODE environment ready: node $(node -v) at $(command -v node)"
+echo "[setup] build environment ready: node $(node -v), npm $(npm -v), at $(command -v node)"

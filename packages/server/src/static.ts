@@ -1,8 +1,8 @@
 /**
  * Serve the built frontend from the same process as the API.
  *
- * Single-process deployment (plan.md): one systemd unit, no reverse proxy,
- * no separate frontend host. Unknown non-API paths fall through to index.html
+ * Single-process deployment: one container, no reverse proxy, no separate
+ * frontend host. Unknown non-API paths fall through to index.html
  * so client-side routing works on a hard refresh.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
