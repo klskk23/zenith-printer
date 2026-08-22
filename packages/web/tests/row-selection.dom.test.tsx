@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RowSelectionPanel } from '../src/features/print/row-selection.tsx'
 import { EMPTY, type Selection } from '../src/features/print/selection.ts'
+import { PrintDialog } from '../src/features/print/print-dialog.tsx'
 
 /**
  * Choosing rows in the print dialog.
@@ -42,12 +43,26 @@ beforeEach(() => {
         } as unknown as Response)
 
       if (url.includes('/rows')) {
+        // Honours pageSize, like the server does. A stub that always returned
+        // ten rows could not reproduce the reported bug, which was two
+        // requests for the same page at different sizes colliding in the cache.
         const page = Number(/page=(\d+)/.exec(url)?.[1] ?? 1)
-        const rows = Array.from({ length: 10 }, (_unused, i) => {
-          const ordinal = (page - 1) * 10 + i + 1
+        const pageSize = Number(/pageSize=(\d+)/.exec(url)?.[1] ?? 10)
+        const rows = Array.from({ length: pageSize }, (_unused, i) => {
+          const ordinal = (page - 1) * pageSize + i + 1
           return { ordinal, values: { 订单号: `A-${ordinal}`, 收件人: `收件人${ordinal}` } }
         })
-        return json({ rows, page, pageSize: 10, total: TOTAL })
+        return json({ rows, page, pageSize, total: TOTAL })
+      }
+      if (url.includes('/preflight')) {
+        return json({ warnings: [] })
+      }
+      if (url.includes('/preview')) {
+        return Promise.resolve({
+          ok: true, status: 200,
+          headers: new Headers({ 'content-type': 'image/png', 'X-Clipped': 'false' }),
+          blob: () => Promise.resolve(new Blob([new Uint8Array([1])], { type: 'image/png' })),
+        } as unknown as Response)
       }
       return json({ dataSources: [SOURCE] })
     }),
@@ -177,5 +192,74 @@ describe('what the panel says out loud', () => {
   it('says nothing is selected rather than showing a zero', async () => {
     panel()
     expect(await screen.findByText(/一行都没选/)).toBeDefined()
+  })
+})
+
+describe('the first page, before anything is clicked', () => {
+  /**
+   * The reported bug: the panel opened showing one row, and ten only appeared
+   * after paging forward and back.
+   *
+   * Reproduced through the real dialog rather than a stand-in, because the
+   * cause was the *combination* — the dialog fetches one row purely to read the
+   * table's total, and that request shared a cache key with the panel's ten-row
+   * request. A synthetic component with the same two hooks does not reproduce
+   * it; the ordering only comes out through the component that actually ships.
+   */
+  const PRINTER = {
+    id: 'prn-1',
+    name: 'w',
+    kind: 'niimbot',
+    capabilities: { model: 'B3S_P', dpi: 203, printheadPixels: 576 },
+    queueState: 'running',
+  }
+
+  const IR = { widthMm: 50, heightMm: 30, dpi: 203, elements: [] }
+
+  it('shows ten rows the moment the dialog opens', async () => {
+    render(
+      wrap(
+        <PrintDialog
+          ir={IR as never}
+          templateId="tpl-1"
+          profileId={null}
+          printer={PRINTER as never}
+          variableValues={{}}
+          unresolved={[]}
+          dataSourceId="ds-1"
+          onClose={() => undefined}
+        />,
+      ),
+    )
+
+    await screen.findByText('收件人1')
+    // Header plus ten. One row here is the bug.
+    expect(screen.getAllByRole('row')).toHaveLength(11)
+  })
+
+  it('reads the table total without spending a row request on it', async () => {
+    // The count is already on the data source; fetching a page to read it is
+    // both a wasted request and what caused the collision.
+    render(
+      wrap(
+        <PrintDialog
+          ir={IR as never}
+          templateId="tpl-1"
+          profileId={null}
+          printer={PRINTER as never}
+          variableValues={{}}
+          unresolved={[]}
+          dataSourceId="ds-1"
+          onClose={() => undefined}
+        />,
+      ),
+    )
+
+    await screen.findByText('收件人1')
+    const sizes = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('/rows'))
+      .map((url) => /pageSize=(\d+)/.exec(url)?.[1])
+    expect(sizes).not.toContain('1')
   })
 })

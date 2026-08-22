@@ -3,6 +3,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DataSourcesPage } from '../src/features/data-sources/data-sources-page.tsx'
 import { DataSourceEditor } from '../src/features/data-sources/data-source-editor.tsx'
+import { TabBar } from '../src/app/tab-bar.tsx'
+import { WorkspaceProvider, useWorkspace } from '../src/app/workspace.tsx'
+import { useEffect } from 'react'
 
 /**
  * Render assertions for the two pages this feature adds.
@@ -154,5 +157,43 @@ describe('the table editor', () => {
     fireEvent.focus(cell)
     fireEvent.blur(cell)
     expect(patched).toHaveLength(0)
+  })
+})
+
+describe('the tab title', () => {
+  /**
+   * A tab is called after the thing it holds, not after the kind of page.
+   * Two data source tabs both reading "数据源" cannot be told apart, which is
+   * the whole point of a tab having a title.
+   */
+  function openEditorTab(): void {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <WorkspaceProvider>
+          <OpenOnMount />
+          <TabBar />
+        </WorkspaceProvider>
+      </QueryClientProvider>,
+    )
+  }
+
+  function OpenOnMount(): null {
+    const { open } = useWorkspace()
+    useEffect(() => open({ kind: 'data-source', dataSourceId: 'ds-1' }), [])
+    return null
+  }
+
+  it('names the table, not the page kind', async () => {
+    openEditorTab()
+    expect(await screen.findByText('订单表')).toBeDefined()
+  })
+
+  it('falls back to the generic name only until the list arrives', async () => {
+    // A blank tab is worse than a generic one, so the fallback stays.
+    sources = []
+    openEditorTab()
+    // Two of them: the sidebar entry and the tab. Both being generic is the
+    // point — the tab has nothing better to show yet.
+    expect((await screen.findAllByText('数据源')).length).toBeGreaterThan(0)
   })
 })

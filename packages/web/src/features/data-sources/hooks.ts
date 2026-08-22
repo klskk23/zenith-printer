@@ -24,7 +24,20 @@ export interface RowPage {
 }
 
 const KEY = ['data-sources']
-const rowsKey = (id: string, page: number): unknown[] => ['data-source-rows', id, page]
+/**
+ * Includes the page *size*.
+ *
+ * Leaving it out meant two requests for the same page at different sizes shared
+ * one cache entry, and whichever landed first decided what everybody saw. The
+ * print dialog fetched a single row to read the table's total, so the row
+ * selector opened showing one row of ten.
+ */
+const rowsKey = (id: string, page: number, pageSize: number): unknown[] => [
+  'data-source-rows',
+  id,
+  page,
+  pageSize,
+]
 
 export function useDataSources() {
   return useQuery({
@@ -37,7 +50,7 @@ export function useDataSources() {
 
 export function useDataSourceRows(id: string | null, page: number, pageSize = 10) {
   return useQuery({
-    queryKey: rowsKey(id ?? '', page),
+    queryKey: rowsKey(id ?? '', page, pageSize),
     queryFn: () => request<RowPage>(`/data-sources/${id}/rows?page=${page}&pageSize=${pageSize}`),
     enabled: id !== null,
     refetchInterval: false,

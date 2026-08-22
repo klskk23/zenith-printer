@@ -37,7 +37,7 @@ import {
   toRowSelection,
   type Selection,
 } from './selection.ts'
-import { useDataSourceRows } from '../data-sources/hooks.ts'
+import { useDataSources } from '../data-sources/hooks.ts'
 
 export interface PrintDialogProps {
   ir: LabelIR
@@ -97,9 +97,11 @@ export function PrintDialog({
   // A printer that has never been probed has no head width or dpi, so nothing
   // downstream can decide what fits. An unresolved reference blocks for a
   // blunter reason: the label would come out reading "${sku}".
-  // Only for the totals and the ceiling check; the rows themselves are read
-  // by the selection panel.
-  const rowCount = useDataSourceRows(dataSourceId, 1, 1).data?.total ?? 0
+  // The count comes off the data source, which already carries it. Fetching a
+  // page of rows to read a number is a wasted request, and it was the request
+  // that collided with the selection panel's.
+  const rowCount =
+    useDataSources().data?.find((source) => source.id === dataSourceId)?.rowCount ?? 0
   const chosenRows = dataSourceId === null ? 0 : selectedCount(selection, rowCount)
   const labels = dataSourceId === null ? copies : labelTotal(selection, rowCount, copies)
   const firstOrdinal =

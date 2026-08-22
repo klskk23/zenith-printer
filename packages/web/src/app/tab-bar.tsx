@@ -26,6 +26,7 @@ import { useWorkspace } from './workspace.tsx'
 import type { WorkspaceTab } from './workspace-state.ts'
 import { useTemplates } from '../features/templates/hooks.ts'
 import { Button } from '../components/ui/button.tsx'
+import { useDataSources } from '../features/data-sources/hooks.ts'
 
 /**
  * What a tab is called.
@@ -34,20 +35,35 @@ import { Button } from '../components/ui/button.tsx'
  * three open designs are all labelled "标签设计" and telling them apart means
  * clicking through them.
  */
-function tabTitle(tab: WorkspaceTab, templateName: string | undefined): string {
+/**
+ * What a tab is called.
+ *
+ * Named tabs carry the name of the *thing* — which design, which table — not
+ * the kind of page. Two data source tabs both reading "数据源" cannot be told
+ * apart, which is the whole reason a tab has a title.
+ */
+function tabTitle(
+  tab: WorkspaceTab,
+  templateName: string | undefined,
+  dataSourceName: string | undefined,
+): string {
+  if (tab.kind === 'data-source') {
+    // The list may not have loaded yet; the generic name beats a blank.
+    return dataSourceName ?? copy.workspace.tabs['data-source']
+  }
   if (tab.kind !== 'design') {
     return copy.workspace.tabs[tab.kind]
   }
   if (tab.templateId === null) {
     return copy.workspace.untitledDesign
   }
-  // The list may not have loaded yet; the generic name is better than a blank.
   return templateName ?? copy.workspace.tabs.design
 }
 
 export function TabBar(): React.JSX.Element {
   const { tabs, state, activate, close } = useWorkspace()
   const templates = useTemplates()
+  const dataSources = useDataSources()
   const [pendingClose, setPendingClose] = useState<WorkspaceTab | null>(null)
 
   const requestClose = (tab: WorkspaceTab): void => {
@@ -86,7 +102,11 @@ export function TabBar(): React.JSX.Element {
                   className={cn('h-1.5 w-1.5 rounded-full', isActive ? 'bg-primary' : 'bg-transparent')}
                 />
                 <span className="whitespace-nowrap">
-                  {tabTitle(tab, templates.data?.find((t) => t.id === tab.templateId)?.name)}
+                  {tabTitle(
+                    tab,
+                    templates.data?.find((t) => t.id === tab.templateId)?.name,
+                    dataSources.data?.find((source) => source.id === tab.dataSourceId)?.name,
+                  )}
                 </span>
                 {tab.isDirty && (
                   <span className="text-primary" title={copy.workspace.unsavedMark} aria-label={copy.workspace.unsavedMark}>
