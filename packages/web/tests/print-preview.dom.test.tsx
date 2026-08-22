@@ -94,6 +94,7 @@ function open(over: Partial<React.ComponentProps<typeof PrintDialog>> = {}): voi
         printer={PRINTER as never}
         variableValues={variableValues}
         unresolved={unresolved}
+        dataSourceId={null}
         onClose={() => undefined}
         {...over}
       />,

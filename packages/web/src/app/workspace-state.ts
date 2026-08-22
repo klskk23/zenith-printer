@@ -24,6 +24,8 @@ export interface WorkspaceTab {
   kind: TabKind
   /** Designs only; `null` is an unsaved blank design. */
   templateId: string | null
+  /** Data source editor only. */
+  dataSourceId?: string
   isDirty: boolean
 }
 
@@ -59,10 +61,22 @@ export function openTab(
     return { ...state, activeId: existing.id }
   }
 
+  // A data source editor is per-table, like a design is per-template: opening
+  // the same one twice should return to it rather than stack another tab.
+  if (descriptor.kind === 'data-source') {
+    const open = state.tabs.find(
+      (tab) => tab.kind === 'data-source' && tab.dataSourceId === descriptor.dataSourceId,
+    )
+    if (open !== undefined) {
+      return { ...state, activeId: open.id }
+    }
+  }
+
   const tab: WorkspaceTab = {
     id: nextId(),
     kind: descriptor.kind,
     templateId: descriptor.templateId ?? null,
+    ...(descriptor.dataSourceId === undefined ? {} : { dataSourceId: descriptor.dataSourceId }),
     isDirty: false,
   }
   return { tabs: [...state.tabs, tab], activeId: tab.id }

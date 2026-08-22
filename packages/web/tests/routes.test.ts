@@ -66,8 +66,20 @@ describe('tabFromPath', () => {
 
   it('round-trips every kind', () => {
     for (const kind of TAB_KINDS) {
-      const descriptor = kind === 'design' ? { kind, templateId: 'tpl-1' } : { kind }
+      const descriptor =
+        kind === 'design'
+          ? { kind, templateId: 'tpl-1' }
+          : kind === 'data-source'
+            ? { kind, dataSourceId: 'ds-1' }
+            : { kind }
       expect(tabFromPath(pathForTab(descriptor))).toMatchObject({ kind })
     }
+  })
+
+  it('keeps the list and the editor apart, one character of path aside', () => {
+    // `/data-sources` and `/data-sources/ds-1` differ by a segment and mean
+    // different pages; the list must not swallow the editor.
+    expect(tabFromPath('/data-sources')).toEqual({ kind: 'data-sources' })
+    expect(tabFromPath('/data-sources/ds-1')).toEqual({ kind: 'data-source', dataSourceId: 'ds-1' })
   })
 })

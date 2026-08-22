@@ -41,6 +41,8 @@ export const copy: Copy = {
       queue: 'Print queue',
       history: 'Print history',
       settings: 'Settings',
+      'data-sources': 'Data sources',
+      'data-source': 'Data source',
     },
     untitledDesign: 'Untitled design',
     close: 'Close',
@@ -244,9 +246,71 @@ export const copy: Copy = {
     submitting: 'Submitting…',
     queued: 'Added to the queue',
     queuedDetail: (jobId: string): string => `Job ${jobId}`,
+    batchTooLarge: (labels: number, max: number): string =>
+      `This batch is ${labels} labels, above the per-job limit of ${max}. Reduce the rows or copies and submit in several batches`,
     needsProbe: 'This printer has not been probed, so its printable area is unknown',
   },
 
+  dataSources: {
+    heading: 'Data sources',
+    explain:
+      'A data source is one table. A design binds to one of them and references its columns as ${column} inside content.',
+    empty: 'No data sources yet. Upload a CSV, or copy a block of cells from a spreadsheet and paste it in',
+    upload: 'Upload CSV',
+    uploading: 'Importing…',
+    uploadProgress: (done: number, total: number): string => `parsed ${done} of ${total} rows`,
+    name: 'Name',
+    rename: 'Rename',
+    renameHint: 'Renaming affects no references: designs bind by id, and column references use only the column name',
+    columns: 'Columns',
+    rowCount: (n: number): string => `${n} rows`,
+    columnList: (names: string[]): string => names.join(', '),
+    open: 'Edit',
+    replace: 'Replace',
+    delete: 'Delete',
+    encoding: 'Character encoding',
+    encodingAuto: 'Detect',
+    delimiter: 'Separator',
+    delimiterAuto: 'Detect',
+    detected: (encoding: string, delimiter: string): string =>
+      `decoded as ${encoding}, separated by ${delimiter === '\t' ? 'tab' : delimiter}`,
+    retryHint: 'If the text is mojibake, or a whole row landed in one column, set these by hand and retry',
+    deleteTitle: (name: string): string => `Delete "${name}"?`,
+    deleteWarning:
+      'The rows in this table are deleted and cannot be recovered. Designs using it are not deleted, but will show a warning — rebind them to another table of the same shape to fix them.',
+    deleteAffected: (names: string[]): string => `Designs using it: ${names.join(', ')}`,
+    deleteConfirm: 'Delete',
+    replaceTitle: 'Replacing would remove columns',
+    replaceWarning: (columns: string[], templates: string[]): string =>
+      `The new file has no: ${columns.join(', ')}. These designs reference them and would break: ${templates.join(', ')}`,
+    replaceConfirm: 'Replace anyway',
+    addRow: 'Add row',
+    deleteRow: 'Delete this row',
+    pasteHint: 'Select a cell and press Ctrl+V to paste a block copied from a spreadsheet',
+    pasteTooWide: (needed: number, available: number): string =>
+      `The pasted block is ${needed} columns wide; only ${available} remain from here. Column names are reference names and cannot be conjured up — upload a CSV to add columns`,
+    page: (page: number, total: number): string => `Page ${page} of ${total}`,
+    prev: 'Previous',
+    next: 'Next',
+    bindingMissing: 'The bound data source has been deleted',
+    bindingColumns: (columns: string[]): string => `The bound data source has no: ${columns.join(', ')}`,
+    rebindHint: 'Pick another table of the same shape in the design properties to fix it',
+  },
+
+  rowSelection: {
+    heading: 'Rows to print',
+    selectAll: (n: number): string => `Select all (${n} rows)`,
+    clear: 'Clear selection',
+    rangeLabel: 'Row range',
+    rangePlaceholder: 'e.g. 5-12',
+    rangeApply: 'Apply',
+    rangeInvalid: 'Cannot read that range. Write it as 5-12, or 5-12, 20',
+    selected: (rows: number, labels: number): string => `${rows} rows selected, ${labels} labels`,
+    none: 'No rows selected. This design uses a data source, and each row is one label',
+    widthNotChecked:
+      'Content width is not checked per row — a barcode on some rows may run past the label edge, which only the printed labels will show',
+    ordinal: 'Row',
+  },
   pools: {
     heading: 'Sequence pools',
     explain:
@@ -480,5 +544,6 @@ export const copy: Copy = {
     confirmTitle: 'Confirm this action?',
     loading: 'Loading…',
     retry: 'Retry',
+    error: 'Something went wrong',
   },
 }

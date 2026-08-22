@@ -25,7 +25,15 @@ import { TemplatesPage } from './pages/templates-page.tsx'
 import { QueuePage } from './pages/queue-page.tsx'
 import { HistoryPage } from './pages/history-page.tsx'
 import { SettingsPage } from './pages/settings-page.tsx'
+import { DataSourcesPage } from './features/data-sources/data-sources-page.tsx'
+import { DataSourceEditor } from './features/data-sources/data-source-editor.tsx'
 import { PreferencesProvider } from './features/preferences/context.tsx'
+
+/** The list, wired so opening a table lands in its editor tab. */
+function DataSourcesPageTab(): React.JSX.Element {
+  const { open } = useWorkspace()
+  return <DataSourcesPage onOpen={(id) => open({ kind: 'data-source', dataSourceId: id })} />
+}
 
 function TabContent({ tab }: { tab: WorkspaceTab }): React.JSX.Element {
   switch (tab.kind) {
@@ -37,6 +45,10 @@ function TabContent({ tab }: { tab: WorkspaceTab }): React.JSX.Element {
       return <EditorPage tabId={tab.id} templateId={tab.templateId} />
     case 'templates':
       return <TemplatesPage />
+    case 'data-sources':
+      return <DataSourcesPageTab />
+    case 'data-source':
+      return <DataSourceEditor dataSourceId={tab.dataSourceId ?? ''} />
     case 'printers':
       return <PrintersPage />
     case 'queue':

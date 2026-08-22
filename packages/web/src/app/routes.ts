@@ -18,6 +18,8 @@ export const TAB_KINDS = [
   'queue',
   'history',
   'settings',
+  'data-sources',
+  'data-source',
 ] as const
 
 export type TabKind = (typeof TAB_KINDS)[number]
@@ -26,6 +28,8 @@ export interface TabDescriptor {
   kind: TabKind
   /** Designs only. `null` is an unsaved blank design. */
   templateId?: string | null
+  /** Data source editor only. */
+  dataSourceId?: string
 }
 
 /** Kinds that exist at most once; opening again switches to the open one. */
@@ -36,22 +40,27 @@ const SINGLETON_KINDS = new Set<TabKind>([
   'queue',
   'history',
   'settings',
+  'data-sources',
 ])
 
 export function isSingletonKind(kind: TabKind): boolean {
   return SINGLETON_KINDS.has(kind)
 }
 
-const STATIC_PATHS: Record<Exclude<TabKind, 'design'>, string> = {
+const STATIC_PATHS: Record<Exclude<TabKind, 'design' | 'data-source'>, string> = {
   index: '/',
   templates: '/templates',
   printers: '/printers',
   queue: '/queue',
   history: '/history',
   settings: '/settings',
+  'data-sources': '/data-sources',
 }
 
 export function pathForTab(descriptor: TabDescriptor): string {
+  if (descriptor.kind === 'data-source') {
+    return `/data-sources/${descriptor.dataSourceId ?? ''}`
+  }
   if (descriptor.kind === 'design') {
     // An unsaved design has no id to put in the address, so it gets a name of
     // its own rather than leaving the address pointing at the previous tab.
@@ -69,6 +78,11 @@ export function tabFromPath(path: string): TabDescriptor | null {
     if (value === normalised) {
       return { kind: kind as TabKind }
     }
+  }
+
+  const source = /^\/data-sources\/([^/]+)$/.exec(normalised)
+  if (source !== null) {
+    return { kind: 'data-source', dataSourceId: source[1]! }
   }
 
   const design = /^\/design\/([^/]+)$/.exec(normalised)

@@ -45,6 +45,9 @@ import { imageFileFrom, naturalSizeOf, useUploadImage } from '../features/images
 import { canRedo, canUndo, commit, initUndo, redo, undo } from './undo.ts'
 import { Inspector } from './inspector.tsx'
 import { VariablesPanel } from './variables-panel.tsx'
+import { DataSourceBinding } from './data-source-binding.tsx'
+import { useDataSourceRows, useDataSources } from '../features/data-sources/hooks.ts'
+import { useSequencePools } from '../features/sequence-pools/hooks.ts'
 import { ELEMENT_TYPES, createBlankLabel, createElement, type ElementType } from './elements.ts'
 import { blockingViolations, inspect } from './guards.ts'
 
@@ -116,6 +119,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
   const doRedo = useCallback(() => setHistory((current) => redo(current)), [])
 
   const [variables, setVariables] = useState<VariableDefinition[]>([])
+  const [dataSourceId, setDataSourceId] = useState<string | null>(null)
   const [template, setTemplate] = useState<Template | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   /**
@@ -220,7 +224,21 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
    * printable yet, and the editor has to survive all of them. Unresolved names
    * are reported below the canvas and block printing; they do not stop drawing.
    */
-  const values = useMemo(() => designValues(variables), [variables])
+  /**
+   * The bound table's first row, so `${列名}` draws as what it will say.
+   *
+   * Without it every data-source reference renders blank, and the canvas is
+   * the only place the layout can be judged.
+   */
+  const sources = useDataSources()
+  const pools = useSequencePools().data ?? []
+  const firstRow = useDataSourceRows(dataSourceId, 1, 1).data?.rows[0]?.values ?? {}
+  const columns = sources.data?.find((source) => source.id === dataSourceId)?.columns ?? []
+
+  const values = useMemo(
+    () => ({ ...firstRow, ...designValues(variables) }),
+    [variables, JSON.stringify(firstRow)],
+  )
   const preview = useMemo(() => previewIr(ir, values), [ir, values])
   const drawn = preview.ir
   const blocking = blockingViolations(violations)
@@ -387,6 +405,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
       elements: loaded.elements,
     })
     setVariables(loaded.variables)
+    setDataSourceId(loaded.dataSourceId)
     setSelectedId(null)
   }
 
@@ -471,7 +490,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
     dpi: ir.dpi,
     elements: ir.elements,
     variables,
-    dataSourceId: template?.dataSourceId ?? null,
+    dataSourceId,
   })
 
   return (
@@ -495,6 +514,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           onSaved={(saved) => {
             setTemplate(saved)
             setVariables(saved.variables)
+            setDataSourceId(saved.dataSourceId)
             // The tab now *is* this template's tab: its title, its address and
             // any later save all refer to the same thing.
             workspace.setTemplate(tabId, saved.id)
@@ -726,13 +746,18 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                   <TabsContent value="element" className="mt-0">
                     <Inspector ir={ir} element={selected} onChange={updateElement} onDelete={deleteElement} />
                   </TabsContent>
-                  <TabsContent value="variables" className="mt-0">
+                  <TabsContent value="variables" className="mt-0 space-y-3">
+                    <DataSourceBinding
+                      dataSourceId={dataSourceId}
+                      onChange={setDataSourceId}
+                      bindingIssue={template?.bindingIssue ?? null}
+                    />
                     <VariablesPanel
                       variables={variables}
                       onChange={setVariables}
-                      pools={[]}
-                      onCreatePool={() => {}}
-                      columns={[]}
+                      pools={pools}
+                      onCreatePool={() => setPanel('variables')}
+                      columns={columns}
                       unresolved={preview.unresolved}
                     />
                   </TabsContent>
@@ -770,6 +795,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           printer={printer}
           variableValues={values}
           unresolved={preview.unresolved}
+          dataSourceId={dataSourceId}
           onClose={() => setPrintOpen(false)}
         />
       )}

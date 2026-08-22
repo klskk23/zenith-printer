@@ -19,7 +19,10 @@ export interface SidebarProps {
 export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
   const { open, activeTab } = useWorkspace()
 
-  const entries: TabKind[] = [...TAB_KINDS]
+  // The data source *editor* is reached from the list, never from here: it
+  // needs a table to edit, and an entry that opened an empty one would be a
+  // dead end.
+  const entries: TabKind[] = TAB_KINDS.filter((kind) => kind !== 'data-source')
 
   return (
     <nav className="w-40 shrink-0 border-r border-border p-2">

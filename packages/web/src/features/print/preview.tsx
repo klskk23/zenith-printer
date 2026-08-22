@@ -32,6 +32,11 @@ export interface PreviewProps {
   profileId: string | null
   /** Copy one's field values, or null while the form is incomplete. */
   variableValues: Record<string, string> | null
+  /**
+   * Which row of the bound table to draw. Undefined means the first, which is
+   * the first label the batch will produce (FR-041).
+   */
+  rowOrdinal?: number
   copies: number
 }
 
@@ -40,6 +45,7 @@ export function Preview({
   printerId,
   profileId,
   variableValues,
+  rowOrdinal,
   copies,
 }: PreviewProps): React.JSX.Element {
   const [url, setUrl] = useState<string | null>(null)
@@ -52,6 +58,7 @@ export function Preview({
     ir,
     ...(profileId === null ? {} : { profileId }),
     ...(variableValues === null ? {} : { variableValues }),
+    ...(rowOrdinal === undefined ? {} : { rowOrdinal }),
   })
 
   useEffect(() => {

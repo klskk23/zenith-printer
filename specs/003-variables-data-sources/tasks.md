@@ -159,57 +159,57 @@ npm workspaces 四包结构，不新增包：
 > CSV 那一组测试压的是「印出来才发现」的一类数据损坏：`007` 变 `7`、中文变乱码、
 > 整行落进一列。它们都要用 T003 的真实字节夹具，不能用手搓的字符串。
 
-- [ ] T057 [P] [US2] `packages/shared/tests/csv-delimited.test.ts`：RFC 4180 引号规则（`""` 转义、引号内含分隔符与换行）、`\r\n` 与 `\n` 两种行尾、末行无换行
-- [ ] T058 [P] [US2] `packages/server/tests/unit/csv-import.test.ts`：分隔符在 `,`/`;`/`\t` 间按表头行计数探测；GBK 夹具解码出正确中文；无表头拒绝；重复列名拒绝并指出列名；空白列名拒绝；超 10,000 行拒绝并给出行数与上限；`007` 逐字保留；数据行列数与表头不一致时的处理
-- [ ] T059 [P] [US2] `packages/server/tests/unit/row-selection.test.ts`：`{all:true}` 在提交时展开为全部 ordinal；`ranges` 与 `ids` 合并去重；**结果始终按 ordinal 升序，与勾选先后无关**（AS-9、FR-037）；空选择产出空数组
-- [ ] T060 [P] [US2] `packages/server/tests/unit/template-refs.test.ts`：从模板内容里扫出被引用的**列名**；按 `dataSourceId` 找出引用某数据源的全部设计（供删除与替换的影响面提示使用）
-- [ ] T061 [P] [US2] `packages/server/tests/integration/data-sources-api.test.ts`：上传建立 / 分页读行 / `PATCH` 增改删 / 改名 / 删除；名称重复 → `409 DATA_SOURCE_NAME_TAKEN`（建立与改名两条路径都要拦）；**改名后设计的绑定与全部 `${列名}` 引用不受影响**（AS-4c、FR-019）；**删除即使仍被引用也 `204`**，无 `confirm` 则 `422 CONFIRMATION_REQUIRED`（FR-028）；替换导致旧列消失 → `409 DATA_SOURCE_COLUMNS_REMOVED` 且列出 `removedColumns` 与 `affectedTemplates`，带 `confirm=true` 后 `200`（AS-4a、FR-021a）；`PATCH` 引入表中没有的列 → `422 DATA_SOURCE_UNKNOWN_COLUMN`
-- [ ] T062 [P] [US2] `packages/server/tests/integration/data-source-print.test.ts`：区间 `5-12` → 印 8 张且内容与对应行逐字一致；份数 2 → 每行连续两张、**含序号在内完全相同**（AS-10、FR-036）；未选行 → `422 NO_ROWS_SELECTED`；常量与所绑数据源的列重名 → `422 VARIABLE_NAME_COLLIDES` 且指出名称（FR-009b）；行数×份数 > 1000 → `422 BATCH_TOO_LARGE` 且**在打印任何东西之前**拒绝
-- [ ] T063 [P] [US2] `packages/server/tests/unit/binding-issue.test.ts`：`bindingIssue` 为 `null` / `sourceMissing`（所绑数据源已删）/ `columnsMissing`（引用的列在当前表中不存在，列出列名）三态；**断言它是读取时算出来的**——先建立正常绑定并读到 `null`，再删除数据源，同一模板重新读出 `sourceMissing`，中间不做任何写入（FR-028a）
-- [ ] T064 [P] [US2] `packages/web/tests/binding-warning.dom.test.tsx`：模板列表对 `bindingIssue` 非空的设计显示警告标记；设计页同样显示，且打印按钮不可用（FR-028a、FR-014）
-- [ ] T065 [P] [US2] `packages/server/tests/integration/snapshot-frozen.test.ts`：任务提交后修改数据源（改值、删行），该任务的历史内容与补打结果均不变（AS-12、FR-039、FR-040、SC-005）
-- [ ] T066 [P] [US2] `packages/server/tests/integration/selection-refusals.test.ts`：勾选 `5-12` 后删除第 7 行再提交 → `422 ROW_SELECTION_STALE` 且 `details.missingOrdinals` 含 7，而 `{all:true}` 在同样情形下照常提交（FR-033a）；条码引用的列在所选行中有空值 → `422 BARCODE_EMPTY_VALUE` 且指出列名与行号，**并注入计数器断言该校验一次条码都没编**（划清 FR-045b 与 FR-045 的边界）
-- [ ] T067 [P] [US2] `packages/server/tests/integration/csv-import-performance.test.ts`：10,000 行 CSV 从收到请求到可用于打印 < 30 秒（SC-002-pre）。这条测的是写入策略而非机器速度 —— 逐行 `INSERT` 会稳定超时，单事务批量写入不会
-- [ ] T068 [P] [US2] `packages/web/tests/paste-table.test.ts`：TSV 按制表符分列、换行分行；从选中单元格起覆盖；超出末行追加新行；**超出最后一列拒绝并说明原因**（FR-049）；粘贴内容不构成表格时作为单个单元格的值（FR-050）
-- [ ] T069 [P] [US2] `packages/web/tests/data-sources-page.dom.test.tsx`：**渲染断言**（挂载不抛异常）；空状态可见；「新建」入口可达（宪章原则 II、plan 的页面表）
-- [ ] T070 [P] [US2] `packages/web/tests/data-source-editor.dom.test.tsx`：**渲染断言**；表格渲染出表头与首页数据；粘贴入口可达；编辑单元格与增删行触发正确的请求体
-- [ ] T071 [P] [US2] `packages/web/tests/row-selection.dom.test.tsx`：行选择区**渲染断言**；每页 10 行；「全选」按钮标明总行数且选中整表而非当前页（FR-034）；区间输入 `5-12` 选中 8 行；乱序勾选后提交的选择按行号排列
+- [X] T057 [P] [US2] `packages/shared/tests/csv-delimited.test.ts`：RFC 4180 引号规则（`""` 转义、引号内含分隔符与换行）、`\r\n` 与 `\n` 两种行尾、末行无换行
+- [X] T058 [P] [US2] `packages/server/tests/unit/csv-import.test.ts`：分隔符在 `,`/`;`/`\t` 间按表头行计数探测；GBK 夹具解码出正确中文；无表头拒绝；重复列名拒绝并指出列名；空白列名拒绝；超 10,000 行拒绝并给出行数与上限；`007` 逐字保留；数据行列数与表头不一致时的处理
+- [X] T059 [P] [US2] `packages/server/tests/unit/row-selection.test.ts`：`{all:true}` 在提交时展开为全部 ordinal；`ranges` 与 `ids` 合并去重；**结果始终按 ordinal 升序，与勾选先后无关**（AS-9、FR-037）；空选择产出空数组
+- [X] T060 [P] [US2] `packages/server/tests/unit/template-refs.test.ts`：从模板内容里扫出被引用的**列名**；按 `dataSourceId` 找出引用某数据源的全部设计（供删除与替换的影响面提示使用）
+- [X] T061 [P] [US2] `packages/server/tests/integration/data-sources-api.test.ts`：上传建立 / 分页读行 / `PATCH` 增改删 / 改名 / 删除；名称重复 → `409 DATA_SOURCE_NAME_TAKEN`（建立与改名两条路径都要拦）；**改名后设计的绑定与全部 `${列名}` 引用不受影响**（AS-4c、FR-019）；**删除即使仍被引用也 `204`**，无 `confirm` 则 `422 CONFIRMATION_REQUIRED`（FR-028）；替换导致旧列消失 → `409 DATA_SOURCE_COLUMNS_REMOVED` 且列出 `removedColumns` 与 `affectedTemplates`，带 `confirm=true` 后 `200`（AS-4a、FR-021a）；`PATCH` 引入表中没有的列 → `422 DATA_SOURCE_UNKNOWN_COLUMN`
+- [X] T062 [P] [US2] `packages/server/tests/integration/data-source-print.test.ts`：区间 `5-12` → 印 8 张且内容与对应行逐字一致；份数 2 → 每行连续两张、**含序号在内完全相同**（AS-10、FR-036）；未选行 → `422 NO_ROWS_SELECTED`；常量与所绑数据源的列重名 → `422 VARIABLE_NAME_COLLIDES` 且指出名称（FR-009b）；行数×份数 > 1000 → `422 BATCH_TOO_LARGE` 且**在打印任何东西之前**拒绝
+- [X] T063 [P] [US2] `packages/server/tests/unit/binding-issue.test.ts`：`bindingIssue` 为 `null` / `sourceMissing`（所绑数据源已删）/ `columnsMissing`（引用的列在当前表中不存在，列出列名）三态；**断言它是读取时算出来的**——先建立正常绑定并读到 `null`，再删除数据源，同一模板重新读出 `sourceMissing`，中间不做任何写入（FR-028a）
+- [X] T064 [P] [US2] `packages/web/tests/binding-warning.dom.test.tsx`：模板列表对 `bindingIssue` 非空的设计显示警告标记；设计页同样显示，且打印按钮不可用（FR-028a、FR-014）
+- [X] T065 [P] [US2] `packages/server/tests/integration/snapshot-frozen.test.ts`：任务提交后修改数据源（改值、删行），该任务的历史内容与补打结果均不变（AS-12、FR-039、FR-040、SC-005）
+- [X] T066 [P] [US2] `packages/server/tests/integration/selection-refusals.test.ts`：勾选 `5-12` 后删除第 7 行再提交 → `422 ROW_SELECTION_STALE` 且 `details.missingOrdinals` 含 7，而 `{all:true}` 在同样情形下照常提交（FR-033a）；条码引用的列在所选行中有空值 → `422 BARCODE_EMPTY_VALUE` 且指出列名与行号，**并注入计数器断言该校验一次条码都没编**（划清 FR-045b 与 FR-045 的边界）
+- [X] T067 [P] [US2] `packages/server/tests/integration/csv-import-performance.test.ts`：10,000 行 CSV 从收到请求到可用于打印 < 30 秒（SC-002-pre）。这条测的是写入策略而非机器速度 —— 逐行 `INSERT` 会稳定超时，单事务批量写入不会
+- [X] T068 [P] [US2] `packages/web/tests/paste-table.test.ts`：TSV 按制表符分列、换行分行；从选中单元格起覆盖；超出末行追加新行；**超出最后一列拒绝并说明原因**（FR-049）；粘贴内容不构成表格时作为单个单元格的值（FR-050）
+- [X] T069 [P] [US2] `packages/web/tests/data-sources-page.dom.test.tsx`：**渲染断言**（挂载不抛异常）；空状态可见；「新建」入口可达（宪章原则 II、plan 的页面表）
+- [X] T070 [P] [US2] `packages/web/tests/data-source-editor.dom.test.tsx`：**渲染断言**；表格渲染出表头与首页数据；粘贴入口可达；编辑单元格与增删行触发正确的请求体
+- [X] T071 [P] [US2] `packages/web/tests/row-selection.dom.test.tsx`：行选择区**渲染断言**；每页 10 行；「全选」按钮标明总行数且选中整表而非当前页（FR-034）；区间输入 `5-12` 选中 8 行；乱序勾选后提交的选择按行号排列
 
 ### Implementation for User Story 2
 
-- [ ] T072 [P] [US2] `packages/shared/src/csv/parse-delimited.ts`：引号感知的分隔文本切分（供服务端 CSV 与前端粘贴共用，research R4/R11），并在 `packages/shared/src/index.ts` 导出
-- [ ] T073 [P] [US2] `packages/server/src/domain/data-source.ts`：`DataSource` 与 `DataSourceRow` 的 zod schema、`MAX_ROWS = 10000`、名称与列名校验（FR-019、FR-023a、FR-026a）
-- [ ] T074 [P] [US2] `packages/server/src/csv/encoding.ts`：`TextDecoder` 按 UTF-8（含 BOM）→ GB18030 → Big5 顺序探测，判据为无 U+FFFD；支持手工指定（research R2）
-- [ ] T075 [P] [US2] `packages/server/src/csv/delimiter.ts`：在 `,`/`;`/`\t` 中取表头行（引号外）出现最多者；全为 0 时按逗号处理（research R3）
-- [ ] T076 [US2] `packages/server/src/csv/import.ts`：编码 → 分隔符 → 切分 → 表头校验 → 行数校验的完整导入管线，**一切皆文本、不做任何类型推断**（FR-024）（依赖 T072、T074、T075）
-- [ ] T077 [US2] `packages/server/src/db/repositories/data-source-repo.ts`：建立/替换/分页读行/增改删行/删除；`row_count` 冗余字段随写更新（research R7）
-- [ ] T078 [P] [US2] `packages/server/src/domain/row-selection.ts`：`{all} | {ranges, ids}` 的展开，结果按 ordinal 升序去重（research R9）
-- [ ] T079 [P] [US2] `packages/server/src/domain/template-refs.ts`：按 `data_source_id` 查出引用某数据源的设计（一次索引查询，不再扫描内容字符串），并用 `collectReferences` 取出它们引用的列名，供删除与替换的影响面提示使用（依赖 T007）
-- [ ] T080 [US2] `packages/server/src/api/data-sources.ts`：六个端点（列表、读行、建立、替换、编辑、删除），multipart 沿用 `@fastify/multipart` 的既有用法；并在 `packages/server/src/app.ts` 注册（依赖 T076–T079）
-- [ ] T081 [US2] `packages/server/src/domain/print-job.ts`：`printJobInputSchema` 增加可选 `rowSelection`；`ContentSnapshot` 落实 `rows` 与 `copiesPerRow`；`MAX_COPIES` 之外新增 `MAX_LABELS_PER_JOB = 1000`
-- [ ] T082 [US2] `packages/server/src/api/job-submission.ts`：展开行选择 → 抄入快照 → 校验张数上限、零行、名称重名（FR-009b）；**上限校验先于任何渲染与领号**（FR-043）。「多数据源」无需校验——绑定是模板上的单个字段，写不出第二个（依赖 T078、T079、T081）
-- [ ] T083 [US2] `packages/server/src/domain/barcode-refs.ts`：找出被条码/二维码引用的列，在所选行中**逐列比较字符串**查空值（不编码）；`packages/server/src/api/job-submission.ts` 接入该校验与行选择过期校验（FR-033a、FR-045b）
-- [ ] T084 [US2] `packages/server/src/render/job-pages.ts`：`row = snapshot.rows[floor(index / copiesPerRow)]`，与序号值合并后求值（data-model 的 `irForCopy`）
-- [ ] T085 [US2] `packages/server/src/api/preview.ts`：新增可选 `rowOrdinal`，缺省取打印顺序上的第一行（FR-041）
-- [ ] T086 [P] [US2] `packages/web/src/api/types.ts` 与 `packages/web/src/api/client.ts`：数据源端点、`rowSelection` 提交字段的类型与调用
-- [ ] T087 [P] [US2] `packages/web/src/features/data-sources/hooks.ts`：列表、分页读行、上传、替换、编辑、删除的 react-query 封装
-- [ ] T088 [P] [US2] `packages/web/src/features/data-sources/paste.ts`：剪贴板 `text/plain` 的表格还原（依赖 T072），含追加行、拒绝新增列、非表格降级为单格（FR-046–FR-050）
-- [ ] T089 [US2] `packages/web/src/features/data-sources/columns.tsx`：TanStack Table 的列定义，两处共用（编辑页与行选择），编辑能力不共用（research R10）
-- [ ] T090 [US2] `packages/server/src/domain/binding-issue.ts` 与 `packages/server/src/api/templates.ts`：读取模板时计算 `bindingIssue`（所绑数据源是否存在、其列是否覆盖内容里引用的名字），**不落库**——存储的状态会与数据源的实际情况漂移，而漂移的方向恰好是「显示正常、实则已断」（FR-028a，依赖 T079）
-- [ ] T091 [US2] `packages/web/src/pages/templates-page.tsx` 与 `packages/web/src/editor/data-source-binding.tsx`：对 `bindingIssue` 非空的设计显示警告标记并说明可以重新绑定（FR-028a）
-- [ ] T092 [US2] `packages/web/src/features/data-sources/data-sources-page.tsx`：列表页，显示每个数据源的行数与列名（FR-027）；空状态与「新建」入口
-- [ ] T093 [US2] `packages/web/src/features/data-sources/data-source-editor.tsx`：可编辑表格 —— 单元格编辑、增行、删行、粘贴（依赖 T088、T089）
-- [ ] T094 [P] [US2] `packages/web/src/features/data-sources/upload-dialog.tsx`：CSV 上传，名称默认取自来源文件名（去扩展名）且可改（FR-020）；失败时可手工指定编码与分隔符后重试（FR-022、FR-022a）
-- [ ] T095 [US2] 导入进度反馈：`packages/server/src/api/data-sources.ts` 按已解析行数上报，`packages/web/src/features/data-sources/upload-dialog.tsx` 显示进度（宪章 III.0：超 2 秒的操作 MUST 有进度；万行导入的预算是 30 秒）
-- [ ] T096 [P] [US2] `packages/web/src/features/data-sources/destructive-dialogs.tsx`：替换确认（列出会断掉的设计与消失的列名）与删除确认（理由是**表内的行不可恢复**，不列引用者、不因被引用而拦）两个对话框，外加就地改名（FR-021a、FR-028）
-- [ ] T097 [US2] `packages/web/src/app/routes.ts`：`TAB_KINDS` 与 `STATIC_PATHS` 增加 `data-sources`（`/data-sources`）与数据源编辑（`/data-sources/:id`）；`packages/web/tests/routes.test.ts` 同步扩充
-- [ ] T098 [US2] `packages/web/src/app/sidebar.tsx` 与 `packages/web/src/app/workspace.tsx`：接入两个新页面
-- [ ] T099 [P] [US2] `packages/web/src/features/print/selection.ts`：前端侧的选择状态（全选 / 区间 / 勾选）与紧凑表示的互转，纯函数
-- [ ] T100 [US2] `packages/web/src/features/print/row-selection.tsx`：打印对话框中的行选择区，每页 10 行、全选标明行数、区间输入（依赖 T089、T099）
-- [ ] T101 [US2] `packages/web/src/features/print/print-dialog.tsx`：接入行选择；张数显示为「所选行数 × 份数」；**明确写出「未按行检查内容宽度」**（FR-045a）
-- [ ] T102 [US2] `packages/web/src/features/print/preview.tsx`：预览打印顺序上的第一张（依赖 T085）
+- [X] T072 [P] [US2] `packages/shared/src/csv/parse-delimited.ts`：引号感知的分隔文本切分（供服务端 CSV 与前端粘贴共用，research R4/R11），并在 `packages/shared/src/index.ts` 导出
+- [X] T073 [P] [US2] `packages/server/src/domain/data-source.ts`：`DataSource` 与 `DataSourceRow` 的 zod schema、`MAX_ROWS = 10000`、名称与列名校验（FR-019、FR-023a、FR-026a）
+- [X] T074 [P] [US2] `packages/server/src/csv/encoding.ts`：`TextDecoder` 按 UTF-8（含 BOM）→ GB18030 → Big5 顺序探测，判据为无 U+FFFD；支持手工指定（research R2）
+- [X] T075 [P] [US2] `packages/server/src/csv/delimiter.ts`：在 `,`/`;`/`\t` 中取表头行（引号外）出现最多者；全为 0 时按逗号处理（research R3）
+- [X] T076 [US2] `packages/server/src/csv/import.ts`：编码 → 分隔符 → 切分 → 表头校验 → 行数校验的完整导入管线，**一切皆文本、不做任何类型推断**（FR-024）（依赖 T072、T074、T075）
+- [X] T077 [US2] `packages/server/src/db/repositories/data-source-repo.ts`：建立/替换/分页读行/增改删行/删除；`row_count` 冗余字段随写更新（research R7）
+- [X] T078 [P] [US2] `packages/server/src/domain/row-selection.ts`：`{all} | {ranges, ids}` 的展开，结果按 ordinal 升序去重（research R9）
+- [X] T079 [P] [US2] `packages/server/src/domain/template-refs.ts`：按 `data_source_id` 查出引用某数据源的设计（一次索引查询，不再扫描内容字符串），并用 `collectReferences` 取出它们引用的列名，供删除与替换的影响面提示使用（依赖 T007）
+- [X] T080 [US2] `packages/server/src/api/data-sources.ts`：六个端点（列表、读行、建立、替换、编辑、删除），multipart 沿用 `@fastify/multipart` 的既有用法；并在 `packages/server/src/app.ts` 注册（依赖 T076–T079）
+- [X] T081 [US2] `packages/server/src/domain/print-job.ts`：`printJobInputSchema` 增加可选 `rowSelection`；`ContentSnapshot` 落实 `rows` 与 `copiesPerRow`；`MAX_COPIES` 之外新增 `MAX_LABELS_PER_JOB = 1000`
+- [X] T082 [US2] `packages/server/src/api/job-submission.ts`：展开行选择 → 抄入快照 → 校验张数上限、零行、名称重名（FR-009b）；**上限校验先于任何渲染与领号**（FR-043）。「多数据源」无需校验——绑定是模板上的单个字段，写不出第二个（依赖 T078、T079、T081）
+- [X] T083 [US2] `packages/server/src/domain/barcode-refs.ts`：找出被条码/二维码引用的列，在所选行中**逐列比较字符串**查空值（不编码）；`packages/server/src/api/job-submission.ts` 接入该校验与行选择过期校验（FR-033a、FR-045b）
+- [X] T084 [US2] `packages/server/src/render/job-pages.ts`：`row = snapshot.rows[floor(index / copiesPerRow)]`，与序号值合并后求值（data-model 的 `irForCopy`）
+- [X] T085 [US2] `packages/server/src/api/preview.ts`：新增可选 `rowOrdinal`，缺省取打印顺序上的第一行（FR-041）
+- [X] T086 [P] [US2] `packages/web/src/api/types.ts` 与 `packages/web/src/api/client.ts`：数据源端点、`rowSelection` 提交字段的类型与调用
+- [X] T087 [P] [US2] `packages/web/src/features/data-sources/hooks.ts`：列表、分页读行、上传、替换、编辑、删除的 react-query 封装
+- [X] T088 [P] [US2] `packages/web/src/features/data-sources/paste.ts`：剪贴板 `text/plain` 的表格还原（依赖 T072），含追加行、拒绝新增列、非表格降级为单格（FR-046–FR-050）
+- [X] T089 [US2] `packages/web/src/features/data-sources/columns.tsx`：TanStack Table 的列定义，两处共用（编辑页与行选择），编辑能力不共用（research R10）
+- [X] T090 [US2] `packages/server/src/domain/binding-issue.ts` 与 `packages/server/src/api/templates.ts`：读取模板时计算 `bindingIssue`（所绑数据源是否存在、其列是否覆盖内容里引用的名字），**不落库**——存储的状态会与数据源的实际情况漂移，而漂移的方向恰好是「显示正常、实则已断」（FR-028a，依赖 T079）
+- [X] T091 [US2] `packages/web/src/pages/templates-page.tsx` 与 `packages/web/src/editor/data-source-binding.tsx`：对 `bindingIssue` 非空的设计显示警告标记并说明可以重新绑定（FR-028a）
+- [X] T092 [US2] `packages/web/src/features/data-sources/data-sources-page.tsx`：列表页，显示每个数据源的行数与列名（FR-027）；空状态与「新建」入口
+- [X] T093 [US2] `packages/web/src/features/data-sources/data-source-editor.tsx`：可编辑表格 —— 单元格编辑、增行、删行、粘贴（依赖 T088、T089）
+- [X] T094 [P] [US2] `packages/web/src/features/data-sources/upload-dialog.tsx`：CSV 上传，名称默认取自来源文件名（去扩展名）且可改（FR-020）；失败时可手工指定编码与分隔符后重试（FR-022、FR-022a）
+- [X] T095 [US2] 导入进度反馈：`packages/server/src/api/data-sources.ts` 按已解析行数上报，`packages/web/src/features/data-sources/upload-dialog.tsx` 显示进度（宪章 III.0：超 2 秒的操作 MUST 有进度；万行导入的预算是 30 秒）
+- [X] T096 [P] [US2] `packages/web/src/features/data-sources/destructive-dialogs.tsx`：替换确认（列出会断掉的设计与消失的列名）与删除确认（理由是**表内的行不可恢复**，不列引用者、不因被引用而拦）两个对话框，外加就地改名（FR-021a、FR-028）
+- [X] T097 [US2] `packages/web/src/app/routes.ts`：`TAB_KINDS` 与 `STATIC_PATHS` 增加 `data-sources`（`/data-sources`）与数据源编辑（`/data-sources/:id`）；`packages/web/tests/routes.test.ts` 同步扩充
+- [X] T098 [US2] `packages/web/src/app/sidebar.tsx` 与 `packages/web/src/app/workspace.tsx`：接入两个新页面
+- [X] T099 [P] [US2] `packages/web/src/features/print/selection.ts`：前端侧的选择状态（全选 / 区间 / 勾选）与紧凑表示的互转，纯函数
+- [X] T100 [US2] `packages/web/src/features/print/row-selection.tsx`：打印对话框中的行选择区，每页 10 行、全选标明行数、区间输入（依赖 T089、T099）
+- [X] T101 [US2] `packages/web/src/features/print/print-dialog.tsx`：接入行选择；张数显示为「所选行数 × 份数」；**明确写出「未按行检查内容宽度」**（FR-045a）
+- [X] T102 [US2] `packages/web/src/features/print/preview.tsx`：预览打印顺序上的第一张（依赖 T085）
 
-- [ ] T103 [US2] `packages/web/src/editor/data-source-binding.tsx`、`packages/web/src/editor/preview-values.ts` 与 `packages/web/src/features/data-sources/hooks.ts`：属性栏里选择设计所绑的数据源（可清空）并列出其列名供插入；编辑器对 `${列名}` 代入所绑数据源的**首行值**（FR-009、FR-015）。少了这一步，引用了数据源的设计在画布上永远是空白 —— 而画布正是判断排版的唯一依据
+- [X] T103 [US2] `packages/web/src/editor/data-source-binding.tsx`、`packages/web/src/editor/preview-values.ts` 与 `packages/web/src/features/data-sources/hooks.ts`：属性栏里选择设计所绑的数据源（可清空）并列出其列名供插入；编辑器对 `${列名}` 代入所绑数据源的**首行值**（FR-009、FR-015）。少了这一步，引用了数据源的设计在画布上永远是空白 —— 而画布正是判断排版的唯一依据
 
 
 **Checkpoint**: US1 与 US2 均可独立验收。一个模板覆盖一整批内容不同的标签已经成立。

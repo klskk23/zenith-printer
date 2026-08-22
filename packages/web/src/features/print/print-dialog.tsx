@@ -28,6 +28,16 @@ import {
 } from '../../components/ui/dialog.tsx'
 import { OverflowNotice, type OverflowWarning } from './overflow-notice.tsx'
 import { Preview } from './preview.tsx'
+import { RowSelectionPanel } from './row-selection.tsx'
+import {
+  EMPTY,
+  MAX_LABELS_PER_JOB,
+  labelTotal,
+  selectedCount,
+  toRowSelection,
+  type Selection,
+} from './selection.ts'
+import { useDataSourceRows } from '../data-sources/hooks.ts'
 
 export interface PrintDialogProps {
   ir: LabelIR
@@ -49,6 +59,8 @@ export interface PrintDialogProps {
    * which is waste that looks like output.
    */
   unresolved: readonly string[]
+  /** The data source this design is bound to, or null. */
+  dataSourceId: string | null
   /**
    * The machine this is going to.
    *
@@ -67,9 +79,11 @@ export function PrintDialog({
   printer,
   variableValues,
   unresolved,
+  dataSourceId,
   onClose,
 }: PrintDialogProps): React.JSX.Element {
   const [copies, setCopies] = useState(1)
+  const [selection, setSelection] = useState<Selection>(EMPTY)
   const [submitting, setSubmitting] = useState(false)
   const [warnings, setWarnings] = useState<OverflowWarning[]>([])
   const [error, setError] = useState<ApiRequestError | null>(null)
@@ -83,12 +97,26 @@ export function PrintDialog({
   // A printer that has never been probed has no head width or dpi, so nothing
   // downstream can decide what fits. An unresolved reference blocks for a
   // blunter reason: the label would come out reading "${sku}".
+  // Only for the totals and the ceiling check; the rows themselves are read
+  // by the selection panel.
+  const rowCount = useDataSourceRows(dataSourceId, 1, 1).data?.total ?? 0
+  const chosenRows = dataSourceId === null ? 0 : selectedCount(selection, rowCount)
+  const labels = dataSourceId === null ? copies : labelTotal(selection, rowCount, copies)
+  const firstOrdinal =
+    selection.kind === 'all'
+      ? 1
+      : [...selection.ordinals].sort((a, b) => a - b)[0]
+
   const blocked =
     printer.capabilities === null
       ? copy.print.needsProbe
       : unresolved.length > 0
         ? copy.variables.unresolved(unresolved.join('、'))
-        : null
+        : dataSourceId !== null && chosenRows === 0
+          ? copy.rowSelection.none
+          : labels > MAX_LABELS_PER_JOB
+            ? copy.print.batchTooLarge(labels, MAX_LABELS_PER_JOB)
+            : null
 
   const jobBody = (): Record<string, unknown> => ({
     printerId: printer.id,
@@ -100,6 +128,7 @@ export function PrintDialog({
     ...(templateId === null ? {} : { templateId }),
     ...(profileId === null ? {} : { profileId }),
     copies,
+    ...(dataSourceId === null ? {} : { rowSelection: toRowSelection(selection) }),
   })
 
   /**
@@ -178,15 +207,28 @@ export function PrintDialog({
               />
             </div>
 
+            {dataSourceId !== null && (
+              <RowSelectionPanel
+                dataSourceId={dataSourceId}
+                selection={selection}
+                onChange={setSelection}
+                copies={copies}
+              />
+            )}
+
             {/*
               The first label of the batch, not a composite of none of them:
-              a sequence counts up, so copy 40 is not copy 1 (FR-041).
+              a sequence counts up and each row differs, so label 40 is not
+              label 1 (FR-041).
             */}
             <Preview
               ir={ir}
               printerId={printer.id}
               profileId={profileId}
               variableValues={unresolved.length > 0 ? null : variableValues}
+              // The first row of the batch in print order, which is the first
+              // label that will actually come out.
+              rowOrdinal={dataSourceId === null ? undefined : firstOrdinal}
               copies={copies}
             />
 

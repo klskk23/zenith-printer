@@ -101,7 +101,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
           (tab) => tab.kind === wanted.kind && tab.templateId === wanted.templateId,
         )
         return existing === undefined
-          ? openTab(s, { kind: wanted.kind, templateId: wanted.templateId }, nextId)
+          ? openTab(s, { kind: wanted.kind, templateId: wanted.templateId, dataSourceId: wanted.dataSourceId }, nextId)
           : activateTab(s, existing.id)
       })
     }

@@ -54,6 +54,20 @@ export function TemplatesPage(): React.JSX.Element {
               <p className="text-[11px] text-muted-foreground">
                 {copy.templates.fieldCount(template.variables.length)}
               </p>
+              {/*
+                The design cannot resolve its references right now. Computed on
+                read from the data source's current state, never stored — a
+                stored copy drifts towards "looks fine, is actually broken"
+                (FR-028a).
+              */}
+              {template.bindingIssue !== null && (
+                <p className="text-[11px] text-destructive" data-binding-issue>
+                  {'! '}
+                  {template.bindingIssue.kind === 'sourceMissing'
+                    ? copy.dataSources.bindingMissing
+                    : copy.dataSources.bindingColumns(template.bindingIssue.columns)}
+                </p>
+              )}
               <div className="flex flex-wrap gap-1.5">
                 <Button size="sm" onClick={() => open({ kind: 'design', templateId: template.id })}>
                   {copy.templates.open}

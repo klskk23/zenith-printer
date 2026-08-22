@@ -23,6 +23,7 @@ import { ImageRepo } from '../db/repositories/image-repo.ts'
 import { encodeMonochromePng } from '../render/png.ts'
 import { ApiError } from './errors.ts'
 import { resolveContent } from './job-submission.ts'
+import { DataSourceRepo } from '../db/repositories/data-source-repo.ts'
 import { TemplateRepo } from '../db/repositories/template-repo.ts'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
@@ -41,6 +42,14 @@ const previewBody = z.object({
   templateId: z.string().min(1).optional(),
   /** Values for this copy's variable fields, so the preview is a real label. */
   variableValues: z.record(z.string(), z.string()).optional(),
+  /**
+   * Which row of the bound data source to draw.
+   *
+   * Defaults to the first, which is the first label the batch will produce —
+   * a label that will genuinely be printed rather than a composite of none of
+   * them (FR-041).
+   */
+  rowOrdinal: z.number().int().min(1).optional(),
   profileId: z.string().min(1).optional(),
   /**
    * Position correction in dots.
@@ -167,9 +176,16 @@ function thresholdFor(
  */
 function previewIr(
   app: FastifyInstance,
-  body: { ir: LabelIR; templateId?: string; variableValues?: Record<string, string> },
+  body: {
+    ir: LabelIR
+    templateId?: string
+    variableValues?: Record<string, string>
+    rowOrdinal?: number
+  },
 ): LabelIR {
   let ir = body.ir
+  let rowValues: Record<string, string> = {}
+
   if (body.templateId !== undefined) {
     const templates = new TemplateRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
     const template = templates.find(body.templateId)
@@ -177,12 +193,18 @@ function previewIr(
       throw ApiError.notFound({ templateId: body.templateId })
     }
     ir = resolveContent(template, null, null).ir
+
+    if (template.dataSourceId !== null) {
+      const sources = new DataSourceRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+      const ordinal = body.rowOrdinal ?? sources.ordinals(template.dataSourceId)[0]
+      rowValues = ordinal === undefined ? {} : (sources.rowsAt(template.dataSourceId, [ordinal])[0] ?? {})
+    }
   }
 
-  if (body.variableValues === undefined) {
+  if (body.variableValues === undefined && Object.keys(rowValues).length === 0) {
     return ir
   }
-  const { ir: evaluated, unresolved } = evaluateIr(ir, body.variableValues)
+  const { ir: evaluated, unresolved } = evaluateIr(ir, { ...rowValues, ...body.variableValues })
   if (unresolved.length > 0) {
     // Saying which name is missing beats rendering a label with "${sku}" on it.
     throw ApiError.unprocessable('VARIABLE_NOT_DEFINED', { reference: unresolved[0], references: unresolved })

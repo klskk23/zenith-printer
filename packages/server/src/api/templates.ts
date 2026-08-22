@@ -9,12 +9,13 @@ import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { maxLabelWidthMm } from '../domain/printer.ts'
-import { TemplateConflictError, templateInputSchema } from '../domain/template.ts'
+import { TemplateConflictError, templateInputSchema, type Template } from '../domain/template.ts'
 import { profileInputSchema } from '../domain/profile.ts'
 import { TemplateRepo } from '../db/repositories/template-repo.ts'
 import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { ApiError, HttpStatus } from './errors.ts'
+import { bindingIssueFor } from '../domain/template-refs.ts'
 
 const idParams = z.object({ id: z.string().min(1) })
 const printerParams = z.object({ printerId: z.string().min(1) })
@@ -45,11 +46,23 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
     }
   }
 
-  typed.get('/api/templates', async () => ({ templates: templates().list() }))
+  /**
+   * `bindingIssue` is attached here, computed from the current state of the
+   * data source. Never stored: a stored copy drifts, and it drifts towards
+   * "looks fine, is actually broken" (FR-028a).
+   */
+  const withBindingIssue = (template: Template) => ({
+    ...template,
+    bindingIssue: bindingIssueFor(app.ctx.db, template),
+  })
+
+  typed.get('/api/templates', async () => ({
+    templates: templates().list().map(withBindingIssue),
+  }))
 
   typed.post('/api/templates', { schema: { body: templateInputSchema } }, async (request, reply) => {
     assertFits(request.body)
-    return reply.status(HttpStatus.Created).send(templates().create(request.body))
+    return reply.status(HttpStatus.Created).send(withBindingIssue(templates().create(request.body)))
   })
 
   typed.get('/api/templates/:id', { schema: { params: idParams } }, async (request) => {
@@ -57,7 +70,7 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
     if (template === undefined) {
       throw ApiError.notFound({ templateId: request.params.id })
     }
-    return template
+    return withBindingIssue(template)
   })
 
   typed.put(
@@ -72,7 +85,7 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
       const { version, ...input } = request.body
       assertFits(input)
       try {
-        return templates().update(request.params.id, input, version)
+        return withBindingIssue(templates().update(request.params.id, input, version))
       } catch (err) {
         if (err instanceof TemplateConflictError) {
           // Nothing is written on this path: the caller still holds their edits
