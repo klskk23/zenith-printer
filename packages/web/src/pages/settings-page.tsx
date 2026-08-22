@@ -22,6 +22,7 @@ import { usePreferences } from '../features/preferences/context.tsx'
 import { PREFERENCE_KEYS, type Preferences } from '../features/preferences/store.ts'
 import { LOCALES } from '../features/preferences/locale.ts'
 import { FONT_FAMILIES, type FontFamilyKey } from '../editor/elements.ts'
+import { ImagePruneCard } from '../features/images/prune-card.tsx'
 
 function Row({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
   return (
@@ -194,6 +195,9 @@ export function SettingsPage(): React.JSX.Element {
 
       <p className="text-[11px] text-muted-foreground">{copy.settings.localOnlyHint}</p>
 
+      {/* Kept below the local preferences and boxed, because it is the one
+          thing on this page that reaches past this browser. */}
+      <ImagePruneCard />
     </div>
   )
 }

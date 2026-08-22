@@ -6,7 +6,7 @@
  * it from disk rather than from a data URI several megabytes long.
  */
 import { useMutation } from '@tanstack/react-query'
-import { upload } from '../../api/client.ts'
+import { request, upload } from '../../api/client.ts'
 
 /** Mirrors the server's `images` row. */
 export interface ImageAsset {
@@ -73,4 +73,31 @@ export async function naturalSizeOf(file: File): Promise<{ width: number; height
   } finally {
     URL.revokeObjectURL(url)
   }
+}
+
+/** What the server reports after a sweep. */
+export interface ImagePruneResult {
+  outcome: 'planned' | 'removed'
+  removed: number
+  strayFilesRemoved: number
+  keptReferenced: number
+  keptTooNew: number
+  bytesFreed: number
+  minAgeHours: number
+}
+
+/**
+ * Remove uploaded images no design points at any more.
+ *
+ * Always `confirm: true` — this hook exists behind a confirmation dialog, and
+ * the server's report-only mode is for the command line, where there is no
+ * dialog to put the question in. Sending the request twice, once to look and
+ * once to act, would only add a round trip: an image nothing references and
+ * that is past the grace period cannot be reached from anywhere in the product,
+ * so there is nothing for a report to change anybody's mind about.
+ */
+export function useImagePrune() {
+  return useMutation<ImagePruneResult, Error, void>({
+    mutationFn: () => request<ImagePruneResult>('/images/prune', { method: 'POST', body: { confirm: true } }),
+  })
 }
