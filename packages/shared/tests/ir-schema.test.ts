@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  isVariableRef,
-  labelElementSchema,
-  labelIrSchema,
-  referencedVariables,
-  strokeWidthDotsSchema,
-} from '../src/ir/schema.ts'
+import { hasContent, labelElementSchema, labelIrSchema, strokeWidthDotsSchema } from '../src/ir/schema.ts'
 
 const line = {
   id: 'l1',
@@ -70,21 +64,7 @@ describe('element content', () => {
   }
 
   it('accepts a literal string', () => {
-    const parsed = labelElementSchema.parse({ ...text, content: 'ABC-12345' })
-    expect(isVariableRef(parsed.type === 'text' ? parsed.content : '')).toBe(false)
-  })
-
-  it('accepts a variable reference', () => {
-    const parsed = labelElementSchema.parse({ ...text, content: { $var: 'partNo' } })
-    expect(parsed.type).toBe('text')
-    if (parsed.type === 'text') {
-      expect(isVariableRef(parsed.content)).toBe(true)
-    }
-  })
-
-  it('rejects a variable name that is not an identifier', () => {
-    expect(() => labelElementSchema.parse({ ...text, content: { $var: '1bad' } })).toThrow()
-    expect(() => labelElementSchema.parse({ ...text, content: { $var: '' } })).toThrow()
+    expect(labelElementSchema.parse({ ...text, content: 'ABC-12345' })).toMatchObject({ content: 'ABC-12345' })
   })
 
   it('rejects an unsupported barcode symbology', () => {
@@ -116,24 +96,42 @@ describe('label', () => {
   })
 })
 
-describe('referencedVariables', () => {
-  it('collects each field once, in document order', () => {
-    const ir = labelIrSchema.parse({
-      widthMm: 50,
-      heightMm: 30,
-      dpi: 203,
-      elements: [
-        { id: 'a', type: 'barcode', xMm: 1, yMm: 1, widthMm: 30, heightMm: 10, content: { $var: 'serial' }, symbology: 'code128' },
-        { id: 'b', type: 'text', xMm: 1, yMm: 12, widthMm: 30, heightMm: 5, content: { $var: 'partNo' }, fontFamily: 'F', fontSizeMm: 3 },
-        { id: 'c', type: 'text', xMm: 1, yMm: 18, widthMm: 30, heightMm: 5, content: { $var: 'serial' }, fontFamily: 'F', fontSizeMm: 3 },
-        { id: 'd', type: 'text', xMm: 1, yMm: 24, widthMm: 30, heightMm: 5, content: 'fixed', fontFamily: 'F', fontSizeMm: 3 },
-      ],
-    })
-    expect(referencedVariables(ir)).toEqual(['serial', 'partNo'])
+describe('element content', () => {
+  const text = { id: 't', type: 'text', xMm: 1, yMm: 1, widthMm: 30, heightMm: 5, fontFamily: 'F', fontSizeMm: 3 }
+
+  it('accepts a template string, references and all', () => {
+    const parsed = labelElementSchema.parse({ ...text, content: '零件 ${sku} 号' })
+    expect(parsed).toMatchObject({ content: '零件 ${sku} 号' })
   })
 
-  it('returns nothing for a fully literal label', () => {
-    expect(referencedVariables(labelIrSchema.parse({ widthMm: 50, heightMm: 30, dpi: 203, elements: [line] }))).toEqual([])
+  it('accepts empty content', () => {
+    expect(labelElementSchema.parse({ ...text, content: '' })).toMatchObject({ content: '' })
+  })
+
+  it('rejects the retired { $var } binding shape', () => {
+    // Content is a template string now. A design that still carries the old
+    // shape must fail loudly at the schema rather than render as "[object
+    // Object]" on a label.
+    expect(() => labelElementSchema.parse({ ...text, content: { $var: 'sku' } })).toThrow()
+  })
+
+  it('rejects a non-string content on a barcode', () => {
+    const barcode = { id: 'b', type: 'barcode', xMm: 1, yMm: 1, widthMm: 30, heightMm: 10, symbology: 'code128' }
+    expect(() => labelElementSchema.parse({ ...barcode, content: { $var: 'serial' } })).toThrow()
+  })
+})
+
+describe('hasContent', () => {
+  it('is true for the three element types that carry text', () => {
+    const text = labelElementSchema.parse({
+      id: 't', type: 'text', xMm: 1, yMm: 1, widthMm: 30, heightMm: 5,
+      content: 'x', fontFamily: 'F', fontSizeMm: 3,
+    })
+    expect(hasContent(text)).toBe(true)
+  })
+
+  it('is false for a line, which has no content to reference variables from', () => {
+    expect(hasContent(labelElementSchema.parse(line))).toBe(false)
   })
 })
 

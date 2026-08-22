@@ -22,8 +22,14 @@ export const TERMS = {
   profile: 'profile',
   /** Reusable label design. Never "layout" or "design". */
   template: 'template',
-  /** Named content slot filled at print time. Never "placeholder". */
-  variableField: 'variableField',
+  /** A named value referenced as ${name}. Never "field" or "placeholder". */
+  variable: 'variable',
+  /** One table of rows, referenced by a design. Never "dataset" or "sheet". */
+  dataSource: 'dataSource',
+  /** Standalone counter a design can draw serials from. Never "counter". */
+  sequencePool: 'sequencePool',
+  /** Which rows of a data source one job prints. Never "filter". */
+  rowSelection: 'rowSelection',
   /** Printhead resolution in dots per inch. */
   dpi: 'dpi',
   /** Position correction applied at render time, stored in millimetres. */
@@ -44,6 +50,12 @@ export const FORBIDDEN_SYNONYMS: Readonly<Record<string, Term>> = {
   preset: 'profile',
   layout: 'template',
   design: 'template',
-  placeholder: 'variableField',
+  placeholder: 'variable',
+  field: 'variable',
+  variableField: 'variable',
+  dataset: 'dataSource',
+  sheet: 'dataSource',
+  counter: 'sequencePool',
+  filter: 'rowSelection',
   resolution: 'dpi',
 }

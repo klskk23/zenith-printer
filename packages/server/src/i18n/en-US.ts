@@ -134,6 +134,76 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'Something unexpected went wrong',
     next: 'Give the time of the action to whoever maintains this service so they can check the logs',
   },
+  CSV_NO_HEADER: {
+    what: 'The CSV file has no usable header row',
+    why: 'The first row contains a blank column name',
+    next: 'Give every column a name in the first row and upload again',
+  },
+  CSV_DUPLICATE_COLUMN: {
+    what: 'The CSV header has duplicate column names',
+    why: 'A duplicate name leaves ${column} with no way to say which column it means',
+    next: 'Give the duplicated columns distinct names and upload again',
+  },
+  CSV_TOO_MANY_ROWS: {
+    what: 'The CSV has more rows than one data source may hold',
+    why: 'A single data source is limited to 10,000 rows',
+    next: 'Split the file, or filter out the rows you do not need first',
+  },
+  CSV_DECODE_FAILED: {
+    what: 'The character encoding of the CSV could not be determined',
+    why: 'UTF-8, GB18030 and Big5 all decoded to mojibake',
+    next: 'Pick the encoding by hand in the upload dialog and retry',
+  },
+  DATA_SOURCE_NAME_TAKEN: {
+    what: 'That data source name is already in use',
+    why: 'The name is how a data source is picked from a list; duplicates cannot be told apart',
+    next: 'Choose a different name and retry',
+  },
+  DATA_SOURCE_COLUMNS_REMOVED: {
+    what: 'The new file is missing columns that designs still reference',
+    why: 'Those references would lose their values once the table is replaced',
+    next: 'Confirm to replace anyway, or add the missing columns and upload again',
+  },
+  DATA_SOURCE_UNKNOWN_COLUMN: {
+    what: 'A column that this table does not have',
+    why: 'Column names are reference names; they cannot be conjured up',
+    next: 'To add a column, upload a CSV that contains it',
+  },
+  NO_ROWS_SELECTED: {
+    what: 'No rows are selected',
+    why: 'The design references a data source, and each row is one label',
+    next: 'Tick the rows you want to print in the row selection panel',
+  },
+  BATCH_TOO_LARGE: {
+    what: 'This job would print more labels than one job may hold',
+    why: 'Selected rows times copies exceeds 1000 labels',
+    next: 'Reduce the rows or the copies and submit in several batches',
+  },
+  VARIABLE_NOT_DEFINED: {
+    what: 'The content contains a reference that cannot be resolved',
+    why: 'That name is neither a variable defined in the design nor a column of the bound data source',
+    next: 'Define it in the variables panel, or change it to an existing name',
+  },
+  VARIABLE_NAME_COLLIDES: {
+    what: 'A variable name is also a column of the bound data source',
+    why: 'One name pointing at two values leaves no way to say which is meant',
+    next: 'Rename the variable, or use the column value instead',
+  },
+  SEQUENCE_POOL_IN_USE: {
+    what: 'Designs still reference this sequence pool',
+    why: 'Deleting it would leave their sequence variables with no value',
+    next: 'Point those designs at another pool, or make the variable a constant',
+  },
+  ROW_SELECTION_STALE: {
+    what: 'Some of the selected rows no longer exist',
+    why: 'They were deleted between selecting them and submitting',
+    next: 'Select the rows to print again',
+  },
+  BARCODE_EMPTY_VALUE: {
+    what: 'A column used by a barcode is empty in some selected rows',
+    why: 'Barcode content cannot be empty; those rows would fail mid-batch',
+    next: 'Fill in those cells, or untick those rows',
+  },
 }
 
 export const EN_US: LocaleBundle = { device: DEVICE, app: APP }

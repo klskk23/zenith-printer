@@ -25,7 +25,6 @@ import {
   renderQrcodeSvg,
 } from '../barcode/index.ts'
 import {
-  isVariableRef,
   type EllipseElement,
   type LabelElement,
   type LabelIR,
@@ -62,15 +61,6 @@ export interface IrToSvgOptions {
   skipUnrenderable?: boolean
 }
 
-export class UnresolvedVariableError extends Error {
-  readonly fieldName: string
-
-  constructor(fieldName: string) {
-    super(`element still references variable "${fieldName}"; call resolveVariables first`)
-    this.name = 'UnresolvedVariableError'
-    this.fieldName = fieldName
-  }
-}
 
 /**
  * Fixed-precision number formatting. Without this, platform differences in
@@ -87,13 +77,6 @@ function escapeXml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-}
-
-function literal(content: string | { $var: string }): string {
-  if (isVariableRef(content)) {
-    throw new UnresolvedVariableError(content.$var)
-  }
-  return content
 }
 
 /** Rotation about the element's own top-left corner. */
@@ -168,7 +151,7 @@ function renderText(element: TextElement, grid: LayoutGrid): string {
   const anchor = element.align === 'center' ? 'middle' : element.align === 'right' ? 'end' : 'start'
   const anchorX = element.align === 'center' ? widthDots / 2 : element.align === 'right' ? widthDots : 0
   const lineHeightDots = Math.round(fontSizeDots * TEXT_LINE_HEIGHT)
-  const lines = textLines(literal(element.content))
+  const lines = textLines(element.content)
 
   // Every line is positioned absolutely. `dy` would work in resvg — measured
   // pixel-identical — but it makes each line's position depend on the
@@ -291,7 +274,7 @@ function renderElement(
       // differ and the element's declared width did nothing at all.
       const rendered = renderBarcodeSvg({
         symbology: element.symbology,
-        content: literal(element.content),
+        content: element.content,
         heightDots: grid.lengthToDots(element.heightMm),
         moduleWidthDots: element.moduleWidthDots,
         showHumanReadable: element.showHumanReadable,
@@ -311,7 +294,7 @@ function renderElement(
       // Probe once at the element's own width to learn the module count, then
       // pick the largest multiple that still fits the declared box (FR-002).
       const probe = renderQrcodeSvg({
-        content: literal(element.content),
+        content: element.content,
         moduleWidthDots: element.moduleWidthDots,
         errorCorrectionLevel: element.errorCorrectionLevel,
       })
@@ -324,7 +307,7 @@ function renderElement(
         moduleWidthDots === probe.moduleWidthDots
           ? probe
           : renderQrcodeSvg({
-              content: literal(element.content),
+              content: element.content,
               moduleWidthDots,
               errorCorrectionLevel: element.errorCorrectionLevel,
             })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { UnresolvedVariableError, irToSvg } from '../src/ir-to-svg/index.ts'
+import { irToSvg } from '../src/ir-to-svg/index.ts'
 import { labelIrSchema, type LabelIR } from '../src/ir/schema.ts'
 import { rotatedBounds } from '../src/geometry/index.ts'
 import { dotsToMm } from '../src/units.ts'
@@ -133,26 +133,17 @@ describe('images', () => {
   })
 })
 
-describe('unresolved variables', () => {
-  it('refuses to render an element that still holds a reference', () => {
-    // resolveVariables must run first; rendering a raw reference would silently
-    // print the literal placeholder onto physical stock.
+describe('content is drawn verbatim', () => {
+  it('draws an unsubstituted reference as text rather than refusing', () => {
+    // irToSvg no longer inspects content for references: after evaluation
+    // `$${sku}` legitimately *is* the literal text `${sku}`, so a scanner here
+    // could not tell a real placeholder from an escaped one. The guard lives
+    // in evaluateIrStrict, which decides from the parse (see
+    // template-evaluate.test.ts).
     const label = ir([
-      { id: 't', type: 'text', xMm: 2, yMm: 2, widthMm: 40, heightMm: 5, content: { $var: 'partNo' }, fontFamily: 'F', fontSizeMm: 3 },
+      { id: 't', type: 'text', xMm: 2, yMm: 2, widthMm: 40, heightMm: 5, content: '${partNo}', fontFamily: 'F', fontSizeMm: 3 },
     ])
-    expect(() => irToSvg(label)).toThrow(UnresolvedVariableError)
-  })
-
-  it('names the offending field', () => {
-    const label = ir([
-      { id: 'b', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 10, content: { $var: 'serial' }, symbology: 'code128' },
-    ])
-    try {
-      irToSvg(label)
-      expect.unreachable('should have thrown')
-    } catch (err) {
-      expect((err as UnresolvedVariableError).fieldName).toBe('serial')
-    }
+    expect(irToSvg(label)).toContain('${partNo}')
   })
 })
 

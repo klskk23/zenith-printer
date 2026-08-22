@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import { irToSvg } from '../src/ir-to-svg/index.ts'
 import { labelIrSchema, type LabelIR } from '../src/ir/schema.ts'
-import { resolveVariables } from '../src/ir/resolve-variables.ts'
+import { evaluateIrStrict } from '../src/template/evaluate.ts'
 
 function label(elements: unknown[]): LabelIR {
   return labelIrSchema.parse({ widthMm: 50, heightMm: 30, dpi: 203, elements })
@@ -60,19 +60,19 @@ describe('purity', () => {
 describe('resolved content', () => {
   it('gives identical output for identical resolved values', () => {
     const template = label([
-      { id: 'b', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 10, content: { $var: 'serial' }, symbology: 'code128' },
+      { id: 'b', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 10, content: '${serial}', symbology: 'code128' },
     ])
-    const a = irToSvg(resolveVariables(template, { serial: '001' }))
-    const b = irToSvg(resolveVariables(template, { serial: '001' }))
+    const a = irToSvg(evaluateIrStrict(template, { serial: '001' }))
+    const b = irToSvg(evaluateIrStrict(template, { serial: '001' }))
     expect(a).toBe(b)
   })
 
   it('gives different output for different values', () => {
     const template = label([
-      { id: 'b', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 10, content: { $var: 'serial' }, symbology: 'code128' },
+      { id: 'b', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 10, content: '${serial}', symbology: 'code128' },
     ])
-    expect(irToSvg(resolveVariables(template, { serial: '001' }))).not.toBe(
-      irToSvg(resolveVariables(template, { serial: '002' })),
+    expect(irToSvg(evaluateIrStrict(template, { serial: '001' }))).not.toBe(
+      irToSvg(evaluateIrStrict(template, { serial: '002' })),
     )
   })
 })

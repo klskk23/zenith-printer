@@ -144,6 +144,76 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '发生了预期之外的故障',
     next: '请把操作时间提供给维护人员，以便查阅日志',
   },
+  CSV_NO_HEADER: {
+    what: 'CSV 文件没有可用的表头',
+    why: '首行含有空白的列名，无法作为列名使用',
+    next: '在首行补齐每一列的名称后重新上传',
+  },
+  CSV_DUPLICATE_COLUMN: {
+    what: 'CSV 表头中有重复的列名',
+    why: '重复的列名会让 ${列名} 无从判定指向哪一列',
+    next: '把重复的列名改成不同的名称后重新上传',
+  },
+  CSV_TOO_MANY_ROWS: {
+    what: 'CSV 行数超过单个数据源的上限',
+    why: '单个数据源最多 10,000 行',
+    next: '把文件拆成多份，或先在电子表格里筛掉不需要的行',
+  },
+  CSV_DECODE_FAILED: {
+    what: '无法确定 CSV 文件的字符编码',
+    why: '按 UTF-8、GB18030、Big5 解码都得到了乱码',
+    next: '在上传对话框里手工指定编码后重试',
+  },
+  DATA_SOURCE_NAME_TAKEN: {
+    what: '数据源名称已被占用',
+    why: '名称是在下拉框里挑选数据源的依据，重名无从分辨',
+    next: '换一个名称后重试',
+  },
+  DATA_SOURCE_COLUMNS_REMOVED: {
+    what: '新文件缺少正在被引用的列',
+    why: '有设计引用了这些列，替换后它们会失去取值',
+    next: '确认后继续替换，或补齐这些列再上传',
+  },
+  DATA_SOURCE_UNKNOWN_COLUMN: {
+    what: '出现了这张表里没有的列',
+    why: '列名是引用的名字，不能凭空新增',
+    next: '需要增列时请重新上传一份含该列的 CSV',
+  },
+  NO_ROWS_SELECTED: {
+    what: '一行都没有选中',
+    why: '设计引用了数据源，每一行对应一张标签',
+    next: '在行选择区勾选需要打印的行',
+  },
+  BATCH_TOO_LARGE: {
+    what: '单个任务的标签总数超过上限',
+    why: '所选行数乘以份数超过了 1000 张',
+    next: '减少所选行或份数，分几次提交',
+  },
+  VARIABLE_NOT_DEFINED: {
+    what: '内容里有无法解析的变量引用',
+    why: '该名称既不是设计里定义的变量，也不是所绑数据源的列',
+    next: '在变量面板里定义它，或改成已有的名称',
+  },
+  VARIABLE_NAME_COLLIDES: {
+    what: '变量名与数据源的列重名',
+    why: '同一个名称指向两处取值，无法判定用哪一个',
+    next: '给变量改名，或改用该列的取值',
+  },
+  SEQUENCE_POOL_IN_USE: {
+    what: '序号池仍被设计引用',
+    why: '删除后这些设计的序号变量会失去取值',
+    next: '先把这些设计改用其他序号池，或改为常量',
+  },
+  ROW_SELECTION_STALE: {
+    what: '所选的行已经不存在',
+    why: '勾选之后、提交之前，这些行被删除了',
+    next: '重新选择要打印的行',
+  },
+  BARCODE_EMPTY_VALUE: {
+    what: '条码引用的列在所选行中有空值',
+    why: '条码内容不能为空，这一行会在打印中途失败',
+    next: '补上这些单元格的值，或取消勾选这些行',
+  },
 }
 
 export const ZH_CN: LocaleBundle = { device: DEVICE_ERROR_COPY, app: APP_ERROR_COPY }

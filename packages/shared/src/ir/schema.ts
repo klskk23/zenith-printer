@@ -13,19 +13,18 @@
  */
 import { z } from 'zod'
 
-/** Reference to a variable field, resolved at print time (FR-037). */
-export const variableRefSchema = z.object({
-  $var: z.string().min(1).regex(/^[A-Za-z][A-Za-z0-9_]*$/, 'field name must be an identifier'),
-})
-export type VariableRef = z.infer<typeof variableRefSchema>
-
-/** Element content: either a literal, or a slot filled in at print time. */
-export const contentSchema = z.union([z.string(), variableRefSchema])
+/**
+ * Element content: a template string.
+ *
+ * It used to be `string | { $var }` — a slot either held literal text or was
+ * bound, wholesale, to one variable. That shape could not express "零件
+ * ${sku} 号", and it made "is this element bound?" a concept the editor, the
+ * renderer and the print form each had to agree about. References are now
+ * inline (`${名称}`) and parsed by `@zenith/shared/template`, so content is
+ * just a string and binding is not a property of an element at all.
+ */
+export const contentSchema = z.string()
 export type Content = z.infer<typeof contentSchema>
-
-export function isVariableRef(content: Content): content is VariableRef {
-  return typeof content !== 'string'
-}
 
 export const rotationSchema = z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)])
 export type Rotation = z.infer<typeof rotationSchema>
@@ -176,22 +175,9 @@ export const labelIrSchema = z
   )
 export type LabelIR = z.infer<typeof labelIrSchema>
 
-/** Elements that can carry a variable field (FR-037). */
-export type VariableCapableElement = TextElement | BarcodeElement | QrcodeElement
+/** Elements whose content can carry `${}` references. */
+export type ContentElement = TextElement | BarcodeElement | QrcodeElement
 
-export function isVariableCapable(element: LabelElement): element is VariableCapableElement {
+export function hasContent(element: LabelElement): element is ContentElement {
   return element.type === 'text' || element.type === 'barcode' || element.type === 'qrcode'
-}
-
-/** Names of every variable field referenced by a label, in document order. */
-export function referencedVariables(ir: LabelIR): string[] {
-  const names: string[] = []
-  for (const element of ir.elements) {
-    if (isVariableCapable(element) && isVariableRef(element.content)) {
-      if (!names.includes(element.content.$var)) {
-        names.push(element.content.$var)
-      }
-    }
-  }
-  return names
 }

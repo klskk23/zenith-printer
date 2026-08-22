@@ -7,6 +7,7 @@
  */
 import type { Migration } from '../index.ts'
 import { migrateOffsets } from './offset-migration.ts'
+import { claimsFromSeqRanges, rewriteElementContent } from './variable-migration.ts'
 
 const initialSchema = `
   CREATE TABLE printers (
@@ -211,6 +212,98 @@ const profileThreshold = `
                        CHECK (threshold BETWEEN 1 AND 255);
 `
 
+
+/**
+ * Data sources, sequence pools, and the claims that record issued serials.
+ *
+ * Row values are JSON rather than real columns: column names come from
+ * somebody's spreadsheet header — arbitrary Chinese text — and the whole set
+ * changes when a data source is replaced. JSON makes "column" data rather than
+ * schema.
+ *
+ * `job_sequence_claims` replaces the `seq_ranges` JSON blob on print_jobs. A
+ * pool is shared across designs, so its current value can no longer be derived
+ * by narrowing on template_id; without an indexable row per claim, every
+ * submission would scan the whole job table and parse JSON.
+ */
+const dataSourcesAndPools = `
+  CREATE TABLE data_sources (
+    id         TEXT PRIMARY KEY,
+    -- A label, not an identifier: designs bind by id, so renaming is free.
+    name       TEXT NOT NULL UNIQUE,
+    columns    TEXT NOT NULL,
+    -- Denormalised so the list page does not COUNT(*) over ten thousand rows.
+    row_count  INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE data_source_rows (
+    source_id   TEXT NOT NULL REFERENCES data_sources(id) ON DELETE CASCADE,
+    -- Position in the table, 1-based. This is what a "5-12" selection means.
+    ordinal     INTEGER NOT NULL,
+    values_json TEXT NOT NULL,
+    PRIMARY KEY (source_id, ordinal)
+  );
+
+  CREATE TABLE sequence_pools (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL UNIQUE,
+    digits     INTEGER NOT NULL CHECK (digits BETWEEN 1 AND 12),
+    step       INTEGER NOT NULL DEFAULT 1 CHECK (step >= 1),
+    -- Reset floor. The current value is max(floor, highest claimed) — history
+    -- stays the only evidence of what was printed; this is just a declaration
+    -- that numbering starts again here.
+    floor      INTEGER NOT NULL DEFAULT 0 CHECK (floor >= 0),
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE job_sequence_claims (
+    job_id        TEXT NOT NULL REFERENCES print_jobs(id) ON DELETE CASCADE,
+    pool_id       TEXT NOT NULL REFERENCES sequence_pools(id) ON DELETE CASCADE,
+    variable_name TEXT NOT NULL,
+    start_value   INTEGER NOT NULL,
+    end_value     INTEGER NOT NULL,
+    step          INTEGER NOT NULL,
+    -- Stored, never inferred from end_value: a pool set to three digits that
+    -- only reached 80 must still print "080", or the labels do not sort.
+    digits        INTEGER NOT NULL,
+    PRIMARY KEY (job_id, pool_id)
+  );
+
+  CREATE INDEX idx_job_sequence_claims_pool ON job_sequence_claims (pool_id, end_value);
+`
+
+/**
+ * A design's variable definitions, and the one data source it is bound to.
+ *
+ * The binding is a column rather than something parsed out of element content:
+ * that is what makes "at most one data source" impossible to violate instead of
+ * a rule somebody has to check.
+ *
+ * No ON DELETE clause. A dangling id is exactly the state that must be visible
+ * — the templates list and the design page show a warning for it. Cascading to
+ * NULL would turn "bound to a table that is gone" into "never bound to
+ * anything", and those are different situations for whoever has to fix it.
+ */
+const templateVariables = `
+  ALTER TABLE templates ADD COLUMN variables TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE templates ADD COLUMN data_source_id TEXT;
+`
+
+/**
+ * Retire the variable-field mechanism.
+ *
+ * Destructive, and only acceptable because there is no production data yet
+ * (FR-051). The row-level moves happen in `migrateVariables` before these
+ * statements run.
+ */
+const dropVariableFields = `
+  DROP TABLE variable_fields;
+  ALTER TABLE print_jobs DROP COLUMN manual_field_values;
+  ALTER TABLE print_jobs DROP COLUMN seq_ranges;
+`
+
 export const migrations: Migration[] = [
   { id: 1, name: 'initial_schema', up: initialSchema },
   { id: 2, name: 'template_version', up: templateVersion },
@@ -218,4 +311,11 @@ export const migrations: Migration[] = [
   { id: 4, name: 'drop_profile_offsets', up: dropProfileOffsets },
   { id: 5, name: 'profile_halftone', up: profileHalftone },
   { id: 6, name: 'profile_threshold', up: profileThreshold },
+  { id: 7, name: 'data_sources_and_pools', up: dataSourcesAndPools },
+  { id: 8, name: 'template_variables', up: templateVariables },
+  // Reads seq_ranges, so it must land before migration 10 drops the column.
+  // `apply` runs *after* `up`, hence the empty `up` here rather than folding
+  // the move into the migration that does the dropping.
+  { id: 9, name: 'claims_from_seq_ranges', up: '', apply: claimsFromSeqRanges },
+  { id: 10, name: 'drop_variable_fields', up: dropVariableFields, apply: rewriteElementContent },
 ]

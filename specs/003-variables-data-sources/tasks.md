@@ -53,7 +53,7 @@ npm workspaces 四包结构，不新增包：
 
 ### 文法解析器（先测后写）
 
-- [ ] T004 [P] 文法契约测试 `packages/shared/tests/template-parse.test.ts`：逐条覆盖 `contracts/variable-grammar.md` 的 13 条边界用例（`版本 ${major}.${minor}`、`批号 ${lot}.{已校验}`、`$${sku}`、`$$${sku}`、`${ sku }`、`${}`、`${ }`、`${sk`、`${单价.含税}`、`${a.b.c}`、`${收件 人}`、`${说"明"}`、`价格 $100`）。先跑，必须全红
+- [ ] T004 [P] 文法契约测试 `packages/shared/tests/template-parse.test.ts`：逐条覆盖 `contracts/variable-grammar.md` 的 15 条边界用例（`版本 ${major}.${minor}`、`批号 ${lot}.{已校验}`、`$${sku}`、`$$${sku}`、`$$`、`${ sku }`、`${}`、`${ }`、`${sk`、`${单价.含税}`、`${a.b.c}`、`${收件 人}`、`${说"明"}`、`价格 $100`）。先跑，必须全红
 - [ ] T005 [P] 求值测试 `packages/shared/tests/template-evaluate.test.ts`：可解析代入其值；`unterminated` 原样输出且**不进入未解析列表**；已闭合但名称不存在 → 原样输出并计入未解析列表；**断言求值函数在任何输入下都不抛异常**（FR-016）
 - [ ] T006 实现扫描器 `packages/shared/src/template/parse.ts`：`parse(content): Segment[]`，`Segment` 联合含 `literal` / `ref{name}` / `unterminated`。**单层命名空间**：花括号内除 `}` 外一律是名称的一部分，无路径分隔、无引号段
 - [ ] T007 实现求值 `packages/shared/src/template/evaluate.ts`：`evaluate(content, lookup): { text: string; unresolved: string[] }` 与 `collectReferences(ir): string[]`（供提交前校验与列引用扫描共用）；另出 `detectNameCollisions(variables, columns): string[]`，常量/自增与列重名时列出名称（FR-009b）
