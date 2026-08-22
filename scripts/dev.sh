@@ -13,7 +13,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-node --watch --experimental-strip-types packages/server/src/index.ts &
+# `--env-file-if-exists`, not `--env-file`: a missing .env is the normal case
+# for anybody who configures the service through systemd instead.
+node --env-file-if-exists=.env --watch --experimental-strip-types packages/server/src/index.ts &
 SERVER_PID=$!
 
 cleanup() {

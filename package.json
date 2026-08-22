@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "start": "node --experimental-strip-types packages/server/src/index.ts",
+    "start": "node --env-file-if-exists=.env --experimental-strip-types packages/server/src/index.ts",
     "dev": "bash scripts/dev.sh",
     "typecheck": "tsc --build --force && tsc --noEmit -p packages/web",
     "lint": "eslint .",
