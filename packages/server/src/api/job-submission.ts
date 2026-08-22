@@ -23,7 +23,14 @@ import type { Clock, IdGenerator } from '../clock.ts'
 import { maxLabelWidthMm, type Printer } from '../domain/printer.ts'
 import type { Profile } from '../domain/profile.ts'
 import type { Template } from '../domain/template.ts'
-import type { ContentSnapshot, SequenceClaim } from '../domain/print-job.ts'
+import {
+  MAX_LABELS_PER_JOB,
+  type ContentSnapshot,
+  type RowSelection,
+  type SequenceClaim,
+} from '../domain/print-job.ts'
+import { DataSourceRepo } from '../db/repositories/data-source-repo.ts'
+import { StaleRowSelectionError, expandSelection, labelCount } from '../domain/row-selection.ts'
 import { SequenceAllocator, SequenceOverflowError } from '../domain/sequence-allocator.ts'
 import { ApiError } from './errors.ts'
 import { DEFAULT_THRESHOLD } from '../render/binarize.ts'
@@ -263,4 +270,105 @@ export function resolveContent(
           elements: template?.elements,
         })
   return { ir, template, profile }
+}
+
+export interface SelectRowsOptions {
+  db: Database
+  clock: Clock
+  ids: IdGenerator
+  template: Template | null
+  selection: RowSelection | undefined
+  copies: number
+}
+
+export interface SelectedRows {
+  /** Row values in print order, one entry per label-worth of content. */
+  rows: Array<Record<string, string>>
+  /** The same rows with their table positions, for error messages. */
+  selectedRows: Array<{ ordinal: number; values: Record<string, string> }>
+  /** Columns of the bound source, for the name-collision check. */
+  columns: string[]
+  /** Total labels: rows x copies, or just copies when there is no source. */
+  labelCount: number
+}
+
+/**
+ * Resolve which rows this job prints, and copy their values out.
+ *
+ * Everything here happens before a label is burned, and the order matters: the
+ * batch-size ceiling is checked before anything is rendered or any serial is
+ * claimed, so an oversized request cannot leave a claimed span behind (FR-043).
+ */
+export function selectRows(options: SelectRowsOptions): SelectedRows {
+  const sourceId = options.template?.dataSourceId ?? null
+  if (sourceId === null) {
+    const count = options.copies
+    if (count > MAX_LABELS_PER_JOB) {
+      throw ApiError.unprocessable('BATCH_TOO_LARGE', {
+        requested: count,
+        maxLabels: MAX_LABELS_PER_JOB,
+      })
+    }
+    return { rows: [], selectedRows: [], columns: [], labelCount: count }
+  }
+
+  const repo = new DataSourceRepo({ db: options.db, clock: options.clock, ids: options.ids })
+  const source = repo.find(sourceId)
+  if (source === undefined) {
+    // The design points at a table that is gone. The templates list shows this
+    // as a warning; here it simply cannot print.
+    throw ApiError.unprocessable('VARIABLE_NOT_DEFINED', { dataSourceId: sourceId })
+  }
+
+  if (options.selection === undefined) {
+    throw ApiError.unprocessable('NO_ROWS_SELECTED', { dataSourceId: sourceId })
+  }
+
+  let ordinals: number[]
+  try {
+    ordinals = expandSelection(options.selection, repo.ordinals(sourceId))
+  } catch (err) {
+    if (err instanceof StaleRowSelectionError) {
+      throw ApiError.unprocessable('ROW_SELECTION_STALE', { missingOrdinals: err.missingOrdinals })
+    }
+    throw err
+  }
+
+  if (ordinals.length === 0) {
+    throw ApiError.unprocessable('NO_ROWS_SELECTED', { dataSourceId: sourceId })
+  }
+
+  const count = labelCount(ordinals.length, options.copies)
+  if (count > MAX_LABELS_PER_JOB) {
+    // Refused rather than split into several jobs behind the operator's back:
+    // a batch that quietly became three is three things to reconcile against
+    // one intention.
+    throw ApiError.unprocessable('BATCH_TOO_LARGE', {
+      requested: count,
+      maxLabels: MAX_LABELS_PER_JOB,
+      rows: ordinals.length,
+      copies: options.copies,
+    })
+  }
+
+  const values = repo.rowsAt(sourceId, ordinals)
+  return {
+    rows: values,
+    selectedRows: ordinals.map((ordinal, index) => ({ ordinal, values: values[index] ?? {} })),
+    columns: source.columns,
+    labelCount: count,
+  }
+}
+
+/**
+ * Stand-ins for the bound source's columns, so the resolvability check knows
+ * they *will* have values without needing a row to prove it.
+ */
+export function columnPlaceholders(selected: SelectedRows): Record<string, string> {
+  const first = selected.rows[0]
+  const placeholders: Record<string, string> = {}
+  for (const column of selected.columns) {
+    placeholders[column] = first?.[column] ?? ''
+  }
+  return placeholders
 }

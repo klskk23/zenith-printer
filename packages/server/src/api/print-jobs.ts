@@ -18,11 +18,15 @@ import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { SequenceAllocator } from '../domain/sequence-allocator.ts'
 import { checkBatch } from '../domain/overflow.ts'
 import { ApiError, HttpStatus } from './errors.ts'
+import { BarcodeEmptyValueError, assertBarcodeValuesPresent } from '../domain/barcode-refs.ts'
 import {
   allocateSequences,
   assertBarcodesEncodable,
   assertFitsPrinter,
+  assertNoNameCollisions,
   assertReferencesResolvable,
+  columnPlaceholders,
+  selectRows,
   assertTemplateMatchesPrinter,
   buildSnapshot,
   designValues,
@@ -110,14 +114,43 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       assertFitsPrinter(content.ir, printer)
 
       const values = designValues(template)
-      assertReferencesResolvable(content.ir, values)
-      assertBarcodesEncodable(content.ir, values)
+
+      // The rows this job will print, copied out of the data source now. From
+      // here on the job is self-contained: editing the table afterwards cannot
+      // change what history says, or what a reprint produces (FR-039).
+      const selected = selectRows({
+        db: app.ctx.db,
+        clock: app.ctx.clock,
+        ids: app.ctx.ids,
+        template,
+        selection: input.rowSelection,
+        copies: input.copies,
+      })
+
+      assertNoNameCollisions(template, selected.columns)
+      assertReferencesResolvable(content.ir, { ...values, ...columnPlaceholders(selected) })
+      assertBarcodesEncodable(content.ir, { ...values, ...(selected.rows[0] ?? {}) })
+      try {
+        assertBarcodeValuesPresent(content.ir, selected.selectedRows, values)
+      } catch (err) {
+        if (err instanceof BarcodeEmptyValueError) {
+          throw ApiError.unprocessable('BARCODE_EMPTY_VALUE', {
+            column: err.column,
+            ordinals: err.ordinals,
+          })
+        }
+        throw err
+      }
 
       // Overflow is recorded, not enforced. Content past the edge is clipped,
       // and whether that is acceptable is a judgement about this label that the
       // operator is better placed to make. Holding back ninety-nine good labels
       // because one will be clipped is the worse outcome.
-      const overflowWarnings = checkBatch(content.ir, () => values, input.copies)
+      const overflowWarnings = checkBatch(
+        content.ir,
+        () => ({ ...values, ...(selected.rows[0] ?? {}) }),
+        1,
+      )
 
       if (printer.queueState === 'paused') {
         throw ApiError.conflict('QUEUE_PAUSED', { printerId: printer.id })
@@ -133,11 +166,11 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         printerId: printer.id,
         templateId: template?.id ?? null,
         profileId: profile?.id ?? null,
-        requestedCopies: input.copies,
+        requestedCopies: selected.labelCount,
         // Recorded on the snapshot: the design may be edited afterwards, and
         // history must show what this run actually produced.
         snapshot: {
-          ...buildSnapshot(printer, { ...content, rows: [], copiesPerRow: input.copies }),
+          ...buildSnapshot(printer, { ...content, rows: selected.rows, copiesPerRow: input.copies }),
           overflowWarnings,
         },
       })
@@ -150,7 +183,9 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
             ids: app.ctx.ids,
             jobId: job.id,
             template,
-            count: input.copies,
+            // Distinct serials needed: one per row when there is a data source,
+            // otherwise one per copy (FR-036).
+            count: selected.rows.length > 0 ? selected.rows.length : input.copies,
           })
         : allocator.claimsFor(job.id)
 
