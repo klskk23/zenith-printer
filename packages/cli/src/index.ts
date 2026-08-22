@@ -21,6 +21,7 @@ import { registerKeepalive } from './commands/keepalive.ts'
 import { registerPrintTest } from './commands/print-test.ts'
 import { registerZplTest } from './commands/zpl-test.ts'
 import { registerTemplateIo } from './commands/template-io.ts'
+import { registerDataSourceRefresh } from './commands/data-source-refresh.ts'
 
 const program = new Command()
 
@@ -36,6 +37,7 @@ registerRfid(program)
 registerRenderTest(program)
 registerKeepalive(program)
 registerTemplateIo(program)
+registerDataSourceRefresh(program)
 registerPrintTest(program)
 registerZplTest(program)
 

@@ -207,7 +207,7 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 - [X] T075 [US5] 在 `packages/server/src/api/data-sources.ts` 支持请求体的 `confirmColumnChange`，使 T070 变绿
 - [X] T076 [US5] 在 `packages/web/src/features/data-sources/column-change-dialog.tsx` 实现确认框，使 T072 变绿
 - [X] T077 [US5] 在 `packages/web/src/features/data-sources/refresh-button.tsx` 接入该确认框，确认后带 `confirmColumnChange` 重发
-- [ ] T078 [P] [US5] 在 `packages/web/src/i18n/{zh-CN,en-US}.ts` 加入确认框文案，须说明后果：引用这些列的设计将取不到值
+- [X] T078 [P] [US5] 在 `packages/web/src/i18n/{zh-CN,en-US}.ts` 加入确认框文案，须说明后果：引用这些列的设计将取不到值
 
 **检查点**：五个故事全部完成，Web 端功能完整。
 
@@ -217,16 +217,16 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 
 ### 命令行（FR-035~037）
 
-- [ ] T079 编写 `packages/cli/tests/data-source-refresh.test.ts`：对着真实服务器跑——成功退出 `0`；数据源不存在退出 `4`；服务不可达退出 `3`；`--json` 输出可解析
-- [ ] T080 在同一文件补：`needsConfirmation` 在不加标志时退出 `4`；加 `--confirm-column-change` 后退出 `0`
-- [ ] T081 在 `packages/cli/src/commands/data-source-refresh.ts` 实现该命令（走 REST，与 `template-io` 同一做法），使 T079、T080 变绿
-- [ ] T082 在 `packages/cli/src/index.ts` 注册该命令
+- [X] T079 编写 `packages/cli/tests/data-source-refresh.test.ts`：对着真实服务器跑——成功退出 `0`；数据源不存在退出 `4`；服务不可达退出 `3`；`--json` 输出可解析
+- [X] T080 在同一文件补：`needsConfirmation` 在不加标志时退出 `4`；加 `--confirm-column-change` 后退出 `0`
+- [X] T081 在 `packages/cli/src/commands/data-source-refresh.ts` 实现该命令（走 REST，与 `template-io` 同一做法），使 T079、T080 变绿
+- [X] T082 在 `packages/cli/src/index.ts` 注册该命令
 
 ### 可观测性（FR-038、FR-039）
 
-- [ ] T083 [P] 编写 `packages/server/tests/unit/refresh-logging.test.ts`：每次刷新记一条结构化结论（数据源、结果、前后行数、失败原因）；**日志中不含任何行内容**
-- [ ] T084 在 `packages/server/src/api/data-sources.ts` 的刷新路径加入该日志，使 T083 变绿
-- [ ] T085 [P] 编写 `packages/server/tests/unit/credentials-not-leaked.test.ts`：静态断言——`packages/server/src` 中对私钥字段的引用只出现在 `integrations/google-sheets-client.ts` 一处（FR-004、FR-004a 可被静态审查的依据）
+- [X] T083 [P] 编写 `packages/server/tests/unit/refresh-logging.test.ts`：每次刷新记一条结构化结论（数据源、结果、前后行数、失败原因）；**日志中不含任何行内容**
+- [X] T084 在 `packages/server/src/api/data-sources.ts` 的刷新路径加入该日志，使 T083 变绿
+- [X] T085 [P] 编写 `packages/server/tests/unit/credentials-not-leaked.test.ts`：静态断言——`packages/server/src` 中对私钥字段的引用只出现在 `integrations/google-sheets-client.ts` 一处（FR-004、FR-004a 可被静态审查的依据）
 
 ### 需要联网的核实（手工，不是测试）
 
@@ -235,16 +235,19 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 > 把它们塞进一个措辞不覆盖的口子，不如放到手工验收里——它们核实的本就是**关于 Google 的
 > 事实**，而不是本系统的行为；本系统的行为已由假实现全覆盖。
 
-- [ ] T086 [P] 按 `quickstart.md` 第五节**手工核实 HW-1**：文本 `007`、日期、货币三列在 `FORMATTED_VALUE` 下的实际返回值，与表格中显示的逐字比对。把结论回写到 `research.md` R3
-- [ ] T087 [P] 按 `quickstart.md` 第五节**手工核实 HW-2**：存在但未分享的表格返回 403 还是 404。据结果收敛 T066 里 404 的补充文案，并回写到 `research.md` R7
+- [ ] T086 [P] **待人工执行（需真实 Google 凭据与表格，此环境没有）**：按 `quickstart.md` 第五节**手工核实 HW-1**：文本 `007`、日期、货币三列在 `FORMATTED_VALUE` 下的实际返回值，与表格中显示的逐字比对。把结论回写到 `research.md` R3
+- [ ] T087 [P] **待人工执行（同上）**：按 `quickstart.md` 第五节**手工核实 HW-2**：存在但未分享的表格返回 403 还是 404。据结果收敛 T066 里 404 的补充文案，并回写到 `research.md` R7
 
 ### 收尾
 
-- [ ] T088 [P] 更新 `docs/google-sheets-data-source.md`，加入「实现状态（2026-08-22）」一节，体例照 `docs/variables-and-data-sources.md` §11
-- [ ] T089 [P] 在 `README.md` 补充 Google 表格数据源的使用说明，指向 `quickstart.md`
-- [ ] T090 跑完整门禁：`npm run typecheck`、`npx eslint .`、`npm test`、`npm run build --workspace=@zenith/web`
-- [ ] T091 断网跑一次 `npm test`，确认全绿（FR-040 的实际验收，不是推断）
-- [ ] T092 按 `quickstart.md` 第三节走完 A–G 七组手工验收
+> **未完成的四条（2026-08-22）**，各自的原因写在下面对应条目里。它们不是被遗漏，
+> 而是需要这台机器上没有的东西，或需要一个本功能不该顺手创建的产物。
+
+- [X] T088 [P] 更新 `docs/google-sheets-data-source.md`，加入「实现状态（2026-08-22）」一节，体例照 `docs/variables-and-data-sources.md` §11
+- [ ] T089 [P] **不做，理由如下**：仓库中没有 `README.md`。为一个功能新建整个项目的 README 需要凭空编造大量与本功能无关的内容。说明已落在 `.env.example`（含宪章要求的依赖前置条件）与 `quickstart.md` 第一节。若日后新建 README，把这两处链接进去即可
+- [X] T090 跑完整门禁：`npm run typecheck`、`npx eslint .`、`npm test`、`npm run build --workspace=@zenith/web`
+- [X] T091 断网跑一次 `npm test`，确认全绿（FR-040 的实际验收，不是推断）
+- [ ] T092 **待人工执行（需真实 Google 凭据与打印机）**：按 `quickstart.md` 第三节走完 A–G 七组手工验收
 
 ---
 

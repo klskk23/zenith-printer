@@ -312,6 +312,21 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
       if (refreshing.has(source.id)) {
         throw ApiError.conflict('DATA_SOURCE_REFRESH_IN_PROGRESS', { dataSourceId: source.id })
       }
+
+      /**
+       * One line per refresh, so "where did this batch of labels get its data"
+       * has an answer months later (Principle V).
+       *
+       * Never the row values. Business data does not belong in logs, which is
+       * the same boundary the credentials rule guards — a different door into
+       * the same room.
+       */
+      const log = (conclusion: Record<string, unknown>): void => {
+        app.log.info(
+          { event: 'data_source_refresh', dataSourceId: source.id, ...conclusion },
+          'data source refresh',
+        )
+      }
       refreshing.add(source.id)
       try {
         let read
@@ -322,6 +337,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
             // Not an error response: the server did what it was asked and has a
             // conclusion. The rows that are already here still print, and a 5xx
             // would invite the browser to retry something that is not retryable.
+            log({ outcome: 'failed', reason: err.kind })
             return { outcome: 'failed' as const, reason: err.kind }
           }
           throw err
@@ -332,6 +348,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
           table = tableFromValues(read.values)
         } catch (err) {
           if (err instanceof TableShapeError) {
+            log({ outcome: 'failed', reason: 'worksheetMissing' })
             return { outcome: 'failed' as const, reason: 'worksheetMissing' as const, detail: err.message }
           }
           throw err
@@ -342,9 +359,11 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
         })
 
         if (decision.kind === 'refusedTooManyRows') {
+          log({ outcome: 'refusedTooManyRows', rowCount: decision.rowCount, limit: decision.limit })
           return { outcome: 'refusedTooManyRows' as const, ...decision, kind: undefined }
         }
         if (decision.kind === 'needsConfirmation') {
+          log({ outcome: 'needsConfirmation', removedColumns: decision.removedColumns })
           return {
             outcome: 'needsConfirmation' as const,
             removedColumns: decision.removedColumns,
@@ -356,6 +375,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
         }
 
         const rowsBefore = source.rowCount
+        log({ outcome: 'applied', rowsBefore, rowsAfter: table.rows.length })
         repo.replaceLinked(source.id, {
           columns: table.columns,
           rows: table.rows,
