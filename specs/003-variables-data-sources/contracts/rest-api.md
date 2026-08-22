@@ -42,6 +42,16 @@
   与 `details.affectedTemplates` 列出会断掉的设计
 - 带 `confirm=true` → `200`
 
+### `PATCH /api/data-sources/:id`
+
+改名。`{ "name": "本周订单" }`。
+
+- `409 DATA_SOURCE_NAME_TAKEN` 名称已被占用
+- 否则 `200`
+
+**改名对引用零影响**：设计按 id 绑定，列引用是裸名（FR-019）。这里没有「会断掉哪些
+设计」的提示，因为一个也不会断。
+
 ### `PATCH /api/data-sources/:id/rows`
 
 站内编辑与粘贴的落点。请求体为行的增改删指令：
@@ -57,9 +67,11 @@
 
 ### `DELETE /api/data-sources/:id`
 
-- 未带 `confirm=true` 且有设计引用它 → `409 DATA_SOURCE_IN_USE`，
-  `details.affectedTemplates` 列出设计
-- 否则 `204`
+- 未带 `confirm=true` → `422 CONFIRMATION_REQUIRED`（表内的行不可恢复）
+- 带 `confirm=true` → `204`，**即使有设计正在引用它**
+
+不设引用拦截（FR-028）：列引用是裸名，把设计重新绑到另一张同形状的表即可全部复原。
+断掉的设计由模板列表与设计页上的警告标记指出（FR-028a），而不是由这里拦住。
 
 ## 新增：序号池
 
@@ -127,6 +139,18 @@
 **整个端点移除**。它的职责（告诉前端有哪些字段要填）已不存在：常量与序号不询问取值，
 数据源取值来自所选行。
 
+### `GET /api/templates`
+
+每个模板增加只读字段 `bindingIssue`，**读取时计算，不存储**（FR-028a）：
+
+```jsonc
+{ "bindingIssue": null }
+{ "bindingIssue": { "kind": "sourceMissing" } }
+{ "bindingIssue": { "kind": "columnsMissing", "columns": ["收件人"] } }
+```
+
+存储这个状态会与数据源的实际情况漂移，而漂移的方向恰好是「显示正常、实则已断」。
+
 ### `POST /api/preview`
 
 `variableValues` 替换为 `rowOrdinal`（可选）：预览指定序号的行；缺省为打印顺序上的
@@ -141,7 +165,6 @@
 | `CSV_TOO_MANY_ROWS` | 422 | 超过 10,000 行 |
 | `CSV_DECODE_FAILED` | 422 | 编码无法确定 |
 | `DATA_SOURCE_NAME_TAKEN` | 409 | 名称重复 |
-| `DATA_SOURCE_IN_USE` | 409 | 删除时仍被引用 |
 | `DATA_SOURCE_COLUMNS_REMOVED` | 409 | 替换会移除被引用的列 |
 | `DATA_SOURCE_UNKNOWN_COLUMN` | 422 | 编辑/粘贴引入表中没有的列 |
 | `NO_ROWS_SELECTED` | 422 | 一行都没选 |
@@ -152,5 +175,5 @@
 | `ROW_SELECTION_STALE` | 422 | 所选行序号已不存在 |
 | `BARCODE_EMPTY_VALUE` | 422 | 条码/二维码引用的列在所选行中为空 |
 
-以上 15 个码 MUST 在两种语言的错误映射中给出**三要素**文案（发生了什么 / 可能的原因 /
+以上 14 个码 MUST 在两种语言的错误映射中给出**三要素**文案（发生了什么 / 可能的原因 /
 下一步做什么）。既有的 `i18n-completeness` 测试会强制这一点。

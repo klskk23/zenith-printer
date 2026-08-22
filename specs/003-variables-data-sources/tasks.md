@@ -72,8 +72,8 @@ npm workspaces 四包结构，不新增包：
 ### 术语与错误码
 
 - [ ] T016 [P] `packages/shared/src/terms.ts`：移除 `variableField`，新增 `variable`、`dataSource`、`sequencePool`、`rowSelection`；`FORBIDDEN_SYNONYMS` 同步（`field`/`placeholder` → `variable`，`table`/`dataset` → `dataSource`，`counter` → `sequencePool`）
-- [ ] T017 [P] `packages/server/src/api/errors.ts`：登记 `contracts/rest-api.md` 的 15 个新错误码及其状态码；移除随可变字段消失的旧码
-- [ ] T018 [P] `packages/server/src/i18n/zh-CN.ts`：为 15 个新错误码各写一条三要素文案（什么 / 为什么 / 下一步）
+- [ ] T017 [P] `packages/server/src/api/errors.ts`：登记 `contracts/rest-api.md` 的 14 个新错误码及其状态码；移除随可变字段消失的旧码
+- [ ] T018 [P] `packages/server/src/i18n/zh-CN.ts`：为 14 个新错误码各写一条三要素文案（什么 / 为什么 / 下一步）
 - [ ] T019 [P] `packages/server/src/i18n/en-US.ts`：同上，英文
 - [ ] T020 [P] `packages/web/src/i18n/zh-CN.ts` 与 `packages/web/src/i18n/en-US.ts`：数据源、序号池、行选择、变量面板的界面文案键位
 
@@ -163,49 +163,53 @@ npm workspaces 四包结构，不新增包：
 - [ ] T058 [P] [US2] `packages/server/tests/unit/csv-import.test.ts`：分隔符在 `,`/`;`/`\t` 间按表头行计数探测；GBK 夹具解码出正确中文；无表头拒绝；重复列名拒绝并指出列名；空白列名拒绝；超 10,000 行拒绝并给出行数与上限；`007` 逐字保留；数据行列数与表头不一致时的处理
 - [ ] T059 [P] [US2] `packages/server/tests/unit/row-selection.test.ts`：`{all:true}` 在提交时展开为全部 ordinal；`ranges` 与 `ids` 合并去重；**结果始终按 ordinal 升序，与勾选先后无关**（AS-9、FR-037）；空选择产出空数组
 - [ ] T060 [P] [US2] `packages/server/tests/unit/template-refs.test.ts`：从模板内容里扫出被引用的**列名**；按 `dataSourceId` 找出引用某数据源的全部设计（供删除与替换的影响面提示使用）
-- [ ] T061 [P] [US2] `packages/server/tests/integration/data-sources-api.test.ts`：上传建立 / 分页读行 / `PATCH` 增改删 / 删除；名称重复 → `409 DATA_SOURCE_NAME_TAKEN`；删除时仍被引用 → `409 DATA_SOURCE_IN_USE` 且列出设计；替换导致旧列消失 → `409 DATA_SOURCE_COLUMNS_REMOVED` 且列出 `removedColumns` 与 `affectedTemplates`，带 `confirm=true` 后 `200`（AS-4a、FR-021a）；`PATCH` 引入表中没有的列 → `422 DATA_SOURCE_UNKNOWN_COLUMN`
+- [ ] T061 [P] [US2] `packages/server/tests/integration/data-sources-api.test.ts`：上传建立 / 分页读行 / `PATCH` 增改删 / 改名 / 删除；名称重复 → `409 DATA_SOURCE_NAME_TAKEN`（建立与改名两条路径都要拦）；**改名后设计的绑定与全部 `${列名}` 引用不受影响**（AS-4c、FR-019）；**删除即使仍被引用也 `204`**，无 `confirm` 则 `422 CONFIRMATION_REQUIRED`（FR-028）；替换导致旧列消失 → `409 DATA_SOURCE_COLUMNS_REMOVED` 且列出 `removedColumns` 与 `affectedTemplates`，带 `confirm=true` 后 `200`（AS-4a、FR-021a）；`PATCH` 引入表中没有的列 → `422 DATA_SOURCE_UNKNOWN_COLUMN`
 - [ ] T062 [P] [US2] `packages/server/tests/integration/data-source-print.test.ts`：区间 `5-12` → 印 8 张且内容与对应行逐字一致；份数 2 → 每行连续两张、**含序号在内完全相同**（AS-10、FR-036）；未选行 → `422 NO_ROWS_SELECTED`；常量与所绑数据源的列重名 → `422 VARIABLE_NAME_COLLIDES` 且指出名称（FR-009b）；行数×份数 > 1000 → `422 BATCH_TOO_LARGE` 且**在打印任何东西之前**拒绝
-- [ ] T063 [P] [US2] `packages/server/tests/integration/snapshot-frozen.test.ts`：任务提交后修改数据源（改值、删行），该任务的历史内容与补打结果均不变（AS-12、FR-039、FR-040、SC-005）
-- [ ] T064 [P] [US2] `packages/server/tests/integration/selection-refusals.test.ts`：勾选 `5-12` 后删除第 7 行再提交 → `422 ROW_SELECTION_STALE` 且 `details.missingOrdinals` 含 7，而 `{all:true}` 在同样情形下照常提交（FR-033a）；条码引用的列在所选行中有空值 → `422 BARCODE_EMPTY_VALUE` 且指出列名与行号，**并注入计数器断言该校验一次条码都没编**（划清 FR-045b 与 FR-045 的边界）
-- [ ] T065 [P] [US2] `packages/server/tests/integration/csv-import-performance.test.ts`：10,000 行 CSV 从收到请求到可用于打印 < 30 秒（SC-002-pre）。这条测的是写入策略而非机器速度 —— 逐行 `INSERT` 会稳定超时，单事务批量写入不会
-- [ ] T066 [P] [US2] `packages/web/tests/paste-table.test.ts`：TSV 按制表符分列、换行分行；从选中单元格起覆盖；超出末行追加新行；**超出最后一列拒绝并说明原因**（FR-049）；粘贴内容不构成表格时作为单个单元格的值（FR-050）
-- [ ] T067 [P] [US2] `packages/web/tests/data-sources-page.dom.test.tsx`：**渲染断言**（挂载不抛异常）；空状态可见；「新建」入口可达（宪章原则 II、plan 的页面表）
-- [ ] T068 [P] [US2] `packages/web/tests/data-source-editor.dom.test.tsx`：**渲染断言**；表格渲染出表头与首页数据；粘贴入口可达；编辑单元格与增删行触发正确的请求体
-- [ ] T069 [P] [US2] `packages/web/tests/row-selection.dom.test.tsx`：行选择区**渲染断言**；每页 10 行；「全选」按钮标明总行数且选中整表而非当前页（FR-034）；区间输入 `5-12` 选中 8 行；乱序勾选后提交的选择按行号排列
+- [ ] T063 [P] [US2] `packages/server/tests/unit/binding-issue.test.ts`：`bindingIssue` 为 `null` / `sourceMissing`（所绑数据源已删）/ `columnsMissing`（引用的列在当前表中不存在，列出列名）三态；**断言它是读取时算出来的**——先建立正常绑定并读到 `null`，再删除数据源，同一模板重新读出 `sourceMissing`，中间不做任何写入（FR-028a）
+- [ ] T064 [P] [US2] `packages/web/tests/binding-warning.dom.test.tsx`：模板列表对 `bindingIssue` 非空的设计显示警告标记；设计页同样显示，且打印按钮不可用（FR-028a、FR-014）
+- [ ] T065 [P] [US2] `packages/server/tests/integration/snapshot-frozen.test.ts`：任务提交后修改数据源（改值、删行），该任务的历史内容与补打结果均不变（AS-12、FR-039、FR-040、SC-005）
+- [ ] T066 [P] [US2] `packages/server/tests/integration/selection-refusals.test.ts`：勾选 `5-12` 后删除第 7 行再提交 → `422 ROW_SELECTION_STALE` 且 `details.missingOrdinals` 含 7，而 `{all:true}` 在同样情形下照常提交（FR-033a）；条码引用的列在所选行中有空值 → `422 BARCODE_EMPTY_VALUE` 且指出列名与行号，**并注入计数器断言该校验一次条码都没编**（划清 FR-045b 与 FR-045 的边界）
+- [ ] T067 [P] [US2] `packages/server/tests/integration/csv-import-performance.test.ts`：10,000 行 CSV 从收到请求到可用于打印 < 30 秒（SC-002-pre）。这条测的是写入策略而非机器速度 —— 逐行 `INSERT` 会稳定超时，单事务批量写入不会
+- [ ] T068 [P] [US2] `packages/web/tests/paste-table.test.ts`：TSV 按制表符分列、换行分行；从选中单元格起覆盖；超出末行追加新行；**超出最后一列拒绝并说明原因**（FR-049）；粘贴内容不构成表格时作为单个单元格的值（FR-050）
+- [ ] T069 [P] [US2] `packages/web/tests/data-sources-page.dom.test.tsx`：**渲染断言**（挂载不抛异常）；空状态可见；「新建」入口可达（宪章原则 II、plan 的页面表）
+- [ ] T070 [P] [US2] `packages/web/tests/data-source-editor.dom.test.tsx`：**渲染断言**；表格渲染出表头与首页数据；粘贴入口可达；编辑单元格与增删行触发正确的请求体
+- [ ] T071 [P] [US2] `packages/web/tests/row-selection.dom.test.tsx`：行选择区**渲染断言**；每页 10 行；「全选」按钮标明总行数且选中整表而非当前页（FR-034）；区间输入 `5-12` 选中 8 行；乱序勾选后提交的选择按行号排列
 
 ### Implementation for User Story 2
 
-- [ ] T070 [P] [US2] `packages/shared/src/csv/parse-delimited.ts`：引号感知的分隔文本切分（供服务端 CSV 与前端粘贴共用，research R4/R11），并在 `packages/shared/src/index.ts` 导出
-- [ ] T071 [P] [US2] `packages/server/src/domain/data-source.ts`：`DataSource` 与 `DataSourceRow` 的 zod schema、`MAX_ROWS = 10000`、名称与列名校验（FR-019、FR-023a、FR-026a）
-- [ ] T072 [P] [US2] `packages/server/src/csv/encoding.ts`：`TextDecoder` 按 UTF-8（含 BOM）→ GB18030 → Big5 顺序探测，判据为无 U+FFFD；支持手工指定（research R2）
-- [ ] T073 [P] [US2] `packages/server/src/csv/delimiter.ts`：在 `,`/`;`/`\t` 中取表头行（引号外）出现最多者；全为 0 时按逗号处理（research R3）
-- [ ] T074 [US2] `packages/server/src/csv/import.ts`：编码 → 分隔符 → 切分 → 表头校验 → 行数校验的完整导入管线，**一切皆文本、不做任何类型推断**（FR-024）（依赖 T070、T072、T073）
-- [ ] T075 [US2] `packages/server/src/db/repositories/data-source-repo.ts`：建立/替换/分页读行/增改删行/删除；`row_count` 冗余字段随写更新（research R7）
-- [ ] T076 [P] [US2] `packages/server/src/domain/row-selection.ts`：`{all} | {ranges, ids}` 的展开，结果按 ordinal 升序去重（research R9）
-- [ ] T077 [P] [US2] `packages/server/src/domain/template-refs.ts`：按 `data_source_id` 查出引用某数据源的设计（一次索引查询，不再扫描内容字符串），并用 `collectReferences` 取出它们引用的列名，供删除与替换的影响面提示使用（依赖 T007）
-- [ ] T078 [US2] `packages/server/src/api/data-sources.ts`：六个端点（列表、读行、建立、替换、编辑、删除），multipart 沿用 `@fastify/multipart` 的既有用法；并在 `packages/server/src/app.ts` 注册（依赖 T074–T077）
-- [ ] T079 [US2] `packages/server/src/domain/print-job.ts`：`printJobInputSchema` 增加可选 `rowSelection`；`ContentSnapshot` 落实 `rows` 与 `copiesPerRow`；`MAX_COPIES` 之外新增 `MAX_LABELS_PER_JOB = 1000`
-- [ ] T080 [US2] `packages/server/src/api/job-submission.ts`：展开行选择 → 抄入快照 → 校验张数上限、零行、名称重名（FR-009b）；**上限校验先于任何渲染与领号**（FR-043）。「多数据源」无需校验——绑定是模板上的单个字段，写不出第二个（依赖 T076、T077、T079）
-- [ ] T081 [US2] `packages/server/src/domain/barcode-refs.ts`：找出被条码/二维码引用的列，在所选行中**逐列比较字符串**查空值（不编码）；`packages/server/src/api/job-submission.ts` 接入该校验与行选择过期校验（FR-033a、FR-045b）
-- [ ] T082 [US2] `packages/server/src/render/job-pages.ts`：`row = snapshot.rows[floor(index / copiesPerRow)]`，与序号值合并后求值（data-model 的 `irForCopy`）
-- [ ] T083 [US2] `packages/server/src/api/preview.ts`：新增可选 `rowOrdinal`，缺省取打印顺序上的第一行（FR-041）
-- [ ] T084 [P] [US2] `packages/web/src/api/types.ts` 与 `packages/web/src/api/client.ts`：数据源端点、`rowSelection` 提交字段的类型与调用
-- [ ] T085 [P] [US2] `packages/web/src/features/data-sources/hooks.ts`：列表、分页读行、上传、替换、编辑、删除的 react-query 封装
-- [ ] T086 [P] [US2] `packages/web/src/features/data-sources/paste.ts`：剪贴板 `text/plain` 的表格还原（依赖 T070），含追加行、拒绝新增列、非表格降级为单格（FR-046–FR-050）
-- [ ] T087 [US2] `packages/web/src/features/data-sources/columns.tsx`：TanStack Table 的列定义，两处共用（编辑页与行选择），编辑能力不共用（research R10）
-- [ ] T088 [US2] `packages/web/src/features/data-sources/data-sources-page.tsx`：列表页，显示每个数据源的行数与列名（FR-027）；空状态与「新建」入口
-- [ ] T089 [US2] `packages/web/src/features/data-sources/data-source-editor.tsx`：可编辑表格 —— 单元格编辑、增行、删行、粘贴（依赖 T086、T087）
-- [ ] T090 [P] [US2] `packages/web/src/features/data-sources/upload-dialog.tsx`：CSV 上传，名称默认取自来源文件名（去扩展名）且可改（FR-020）；失败时可手工指定编码与分隔符后重试（FR-022、FR-022a）
-- [ ] T091 [US2] 导入进度反馈：`packages/server/src/api/data-sources.ts` 按已解析行数上报，`packages/web/src/features/data-sources/upload-dialog.tsx` 显示进度（宪章 III.0：超 2 秒的操作 MUST 有进度；万行导入的预算是 30 秒）
-- [ ] T092 [P] [US2] `packages/web/src/features/data-sources/destructive-dialogs.tsx`：替换（列出会断掉的设计）与删除（列出正在引用的设计）两个确认对话框（FR-021a、FR-028）
-- [ ] T093 [US2] `packages/web/src/app/routes.ts`：`TAB_KINDS` 与 `STATIC_PATHS` 增加 `data-sources`（`/data-sources`）与数据源编辑（`/data-sources/:id`）；`packages/web/tests/routes.test.ts` 同步扩充
-- [ ] T094 [US2] `packages/web/src/app/sidebar.tsx` 与 `packages/web/src/app/workspace.tsx`：接入两个新页面
-- [ ] T095 [P] [US2] `packages/web/src/features/print/selection.ts`：前端侧的选择状态（全选 / 区间 / 勾选）与紧凑表示的互转，纯函数
-- [ ] T096 [US2] `packages/web/src/features/print/row-selection.tsx`：打印对话框中的行选择区，每页 10 行、全选标明行数、区间输入（依赖 T087、T095）
-- [ ] T097 [US2] `packages/web/src/features/print/print-dialog.tsx`：接入行选择；张数显示为「所选行数 × 份数」；**明确写出「未按行检查内容宽度」**（FR-045a）
-- [ ] T098 [US2] `packages/web/src/features/print/preview.tsx`：预览打印顺序上的第一张（依赖 T083）
+- [ ] T072 [P] [US2] `packages/shared/src/csv/parse-delimited.ts`：引号感知的分隔文本切分（供服务端 CSV 与前端粘贴共用，research R4/R11），并在 `packages/shared/src/index.ts` 导出
+- [ ] T073 [P] [US2] `packages/server/src/domain/data-source.ts`：`DataSource` 与 `DataSourceRow` 的 zod schema、`MAX_ROWS = 10000`、名称与列名校验（FR-019、FR-023a、FR-026a）
+- [ ] T074 [P] [US2] `packages/server/src/csv/encoding.ts`：`TextDecoder` 按 UTF-8（含 BOM）→ GB18030 → Big5 顺序探测，判据为无 U+FFFD；支持手工指定（research R2）
+- [ ] T075 [P] [US2] `packages/server/src/csv/delimiter.ts`：在 `,`/`;`/`\t` 中取表头行（引号外）出现最多者；全为 0 时按逗号处理（research R3）
+- [ ] T076 [US2] `packages/server/src/csv/import.ts`：编码 → 分隔符 → 切分 → 表头校验 → 行数校验的完整导入管线，**一切皆文本、不做任何类型推断**（FR-024）（依赖 T072、T074、T075）
+- [ ] T077 [US2] `packages/server/src/db/repositories/data-source-repo.ts`：建立/替换/分页读行/增改删行/删除；`row_count` 冗余字段随写更新（research R7）
+- [ ] T078 [P] [US2] `packages/server/src/domain/row-selection.ts`：`{all} | {ranges, ids}` 的展开，结果按 ordinal 升序去重（research R9）
+- [ ] T079 [P] [US2] `packages/server/src/domain/template-refs.ts`：按 `data_source_id` 查出引用某数据源的设计（一次索引查询，不再扫描内容字符串），并用 `collectReferences` 取出它们引用的列名，供删除与替换的影响面提示使用（依赖 T007）
+- [ ] T080 [US2] `packages/server/src/api/data-sources.ts`：六个端点（列表、读行、建立、替换、编辑、删除），multipart 沿用 `@fastify/multipart` 的既有用法；并在 `packages/server/src/app.ts` 注册（依赖 T076–T079）
+- [ ] T081 [US2] `packages/server/src/domain/print-job.ts`：`printJobInputSchema` 增加可选 `rowSelection`；`ContentSnapshot` 落实 `rows` 与 `copiesPerRow`；`MAX_COPIES` 之外新增 `MAX_LABELS_PER_JOB = 1000`
+- [ ] T082 [US2] `packages/server/src/api/job-submission.ts`：展开行选择 → 抄入快照 → 校验张数上限、零行、名称重名（FR-009b）；**上限校验先于任何渲染与领号**（FR-043）。「多数据源」无需校验——绑定是模板上的单个字段，写不出第二个（依赖 T078、T079、T081）
+- [ ] T083 [US2] `packages/server/src/domain/barcode-refs.ts`：找出被条码/二维码引用的列，在所选行中**逐列比较字符串**查空值（不编码）；`packages/server/src/api/job-submission.ts` 接入该校验与行选择过期校验（FR-033a、FR-045b）
+- [ ] T084 [US2] `packages/server/src/render/job-pages.ts`：`row = snapshot.rows[floor(index / copiesPerRow)]`，与序号值合并后求值（data-model 的 `irForCopy`）
+- [ ] T085 [US2] `packages/server/src/api/preview.ts`：新增可选 `rowOrdinal`，缺省取打印顺序上的第一行（FR-041）
+- [ ] T086 [P] [US2] `packages/web/src/api/types.ts` 与 `packages/web/src/api/client.ts`：数据源端点、`rowSelection` 提交字段的类型与调用
+- [ ] T087 [P] [US2] `packages/web/src/features/data-sources/hooks.ts`：列表、分页读行、上传、替换、编辑、删除的 react-query 封装
+- [ ] T088 [P] [US2] `packages/web/src/features/data-sources/paste.ts`：剪贴板 `text/plain` 的表格还原（依赖 T072），含追加行、拒绝新增列、非表格降级为单格（FR-046–FR-050）
+- [ ] T089 [US2] `packages/web/src/features/data-sources/columns.tsx`：TanStack Table 的列定义，两处共用（编辑页与行选择），编辑能力不共用（research R10）
+- [ ] T090 [US2] `packages/server/src/domain/binding-issue.ts` 与 `packages/server/src/api/templates.ts`：读取模板时计算 `bindingIssue`（所绑数据源是否存在、其列是否覆盖内容里引用的名字），**不落库**——存储的状态会与数据源的实际情况漂移，而漂移的方向恰好是「显示正常、实则已断」（FR-028a，依赖 T079）
+- [ ] T091 [US2] `packages/web/src/pages/templates-page.tsx` 与 `packages/web/src/editor/data-source-binding.tsx`：对 `bindingIssue` 非空的设计显示警告标记并说明可以重新绑定（FR-028a）
+- [ ] T092 [US2] `packages/web/src/features/data-sources/data-sources-page.tsx`：列表页，显示每个数据源的行数与列名（FR-027）；空状态与「新建」入口
+- [ ] T093 [US2] `packages/web/src/features/data-sources/data-source-editor.tsx`：可编辑表格 —— 单元格编辑、增行、删行、粘贴（依赖 T088、T089）
+- [ ] T094 [P] [US2] `packages/web/src/features/data-sources/upload-dialog.tsx`：CSV 上传，名称默认取自来源文件名（去扩展名）且可改（FR-020）；失败时可手工指定编码与分隔符后重试（FR-022、FR-022a）
+- [ ] T095 [US2] 导入进度反馈：`packages/server/src/api/data-sources.ts` 按已解析行数上报，`packages/web/src/features/data-sources/upload-dialog.tsx` 显示进度（宪章 III.0：超 2 秒的操作 MUST 有进度；万行导入的预算是 30 秒）
+- [ ] T096 [P] [US2] `packages/web/src/features/data-sources/destructive-dialogs.tsx`：替换确认（列出会断掉的设计与消失的列名）与删除确认（理由是**表内的行不可恢复**，不列引用者、不因被引用而拦）两个对话框，外加就地改名（FR-021a、FR-028）
+- [ ] T097 [US2] `packages/web/src/app/routes.ts`：`TAB_KINDS` 与 `STATIC_PATHS` 增加 `data-sources`（`/data-sources`）与数据源编辑（`/data-sources/:id`）；`packages/web/tests/routes.test.ts` 同步扩充
+- [ ] T098 [US2] `packages/web/src/app/sidebar.tsx` 与 `packages/web/src/app/workspace.tsx`：接入两个新页面
+- [ ] T099 [P] [US2] `packages/web/src/features/print/selection.ts`：前端侧的选择状态（全选 / 区间 / 勾选）与紧凑表示的互转，纯函数
+- [ ] T100 [US2] `packages/web/src/features/print/row-selection.tsx`：打印对话框中的行选择区，每页 10 行、全选标明行数、区间输入（依赖 T089、T099）
+- [ ] T101 [US2] `packages/web/src/features/print/print-dialog.tsx`：接入行选择；张数显示为「所选行数 × 份数」；**明确写出「未按行检查内容宽度」**（FR-045a）
+- [ ] T102 [US2] `packages/web/src/features/print/preview.tsx`：预览打印顺序上的第一张（依赖 T085）
 
-- [ ] T099 [US2] `packages/web/src/editor/data-source-binding.tsx`、`packages/web/src/editor/preview-values.ts` 与 `packages/web/src/features/data-sources/hooks.ts`：属性栏里选择设计所绑的数据源（可清空）并列出其列名供插入；编辑器对 `${列名}` 代入所绑数据源的**首行值**（FR-009、FR-015）。少了这一步，引用了数据源的设计在画布上永远是空白 —— 而画布正是判断排版的唯一依据
+- [ ] T103 [US2] `packages/web/src/editor/data-source-binding.tsx`、`packages/web/src/editor/preview-values.ts` 与 `packages/web/src/features/data-sources/hooks.ts`：属性栏里选择设计所绑的数据源（可清空）并列出其列名供插入；编辑器对 `${列名}` 代入所绑数据源的**首行值**（FR-009、FR-015）。少了这一步，引用了数据源的设计在画布上永远是空白 —— 而画布正是判断排版的唯一依据
 
 
 **Checkpoint**: US1 与 US2 均可独立验收。一个模板覆盖一整批内容不同的标签已经成立。
@@ -225,26 +229,26 @@ npm workspaces 四包结构，不新增包：
 > 这组测试要压住的是「惰性」本身。断言「结果正确」不足以发现预先渲染 —— 数组版也正确，
 > 只是慢。因此断言的是**渲染发生的时机与次数**。
 
-- [ ] T100 [P] [US3] `packages/server/tests/unit/page-source.test.ts`：构造 `pageSource(job, render)` 时 `render` **调用次数为 0**；`at(0)` 后为 1；`total` 与「行数 × 份数」一致；同一行的多份复用同一次渲染
-- [ ] T101 [P] [US3] 扩充 `packages/server/tests/support/queue-harness.ts` 记录 `renderPage` 的调用序，并在 `packages/server/tests/integration/queue.test.ts` 断言**驱动发出第一页时，渲染调用次数不超过 1**
-- [ ] T102 [P] [US3] 扩充 `packages/server/tests/integration/performance.test.ts`：500 张任务从提交到第一页交付驱动的耗时 < 1 秒（SC-003）。**vitest 超时须显式设置为大于测试自身预算**，否则失败会表现为无断言信息的超时
-- [ ] T103 [P] [US3] `packages/server/tests/integration/partial-failure.test.ts`：大批量中途驱动抛错，`pagesPrinted` 如实记录已发出张数；崩溃导致不可知时为 `null`（AS-3、FR-053 既有语义）
+- [ ] T104 [P] [US3] `packages/server/tests/unit/page-source.test.ts`：构造 `pageSource(job, render)` 时 `render` **调用次数为 0**；`at(0)` 后为 1；`total` 与「行数 × 份数」一致；同一行的多份复用同一次渲染
+- [ ] T105 [P] [US3] 扩充 `packages/server/tests/support/queue-harness.ts` 记录 `renderPage` 的调用序，并在 `packages/server/tests/integration/queue.test.ts` 断言**驱动发出第一页时，渲染调用次数不超过 1**
+- [ ] T106 [P] [US3] 扩充 `packages/server/tests/integration/performance.test.ts`：500 张任务从提交到第一页交付驱动的耗时 < 1 秒（SC-003）。**vitest 超时须显式设置为大于测试自身预算**，否则失败会表现为无断言信息的超时
+- [ ] T107 [P] [US3] `packages/server/tests/integration/partial-failure.test.ts`：大批量中途驱动抛错，`pagesPrinted` 如实记录已发出张数；崩溃导致不可知时为 `null`（AS-3、FR-053 既有语义）
 
-- [ ] T104 [P] [US3] 改写 `packages/server/tests/unit/print-job-overflow.test.ts`：注入条码编码计数器，断言提交 1000 张的任务时**编码次数与行数无关**；设计本身的越界仍被检出（FR-045）
-- [ ] T105 [P] [US3] 更新既有驱动测试的调用形态为 `PageSource`：`packages/server/tests/unit/dry-run-driver.test.ts`、`packages/server/tests/unit/driver-lifecycle.test.ts`（9 处）、`packages/server/tests/integration/zpl-driver.test.ts`（5 处）、`packages/server/tests/integration/niimbot-driver.test.ts`、`packages/server/tests/integration/printers-api.test.ts`
+- [ ] T108 [P] [US3] 改写 `packages/server/tests/unit/print-job-overflow.test.ts`：注入条码编码计数器，断言提交 1000 张的任务时**编码次数与行数无关**；设计本身的越界仍被检出（FR-045）
+- [ ] T109 [P] [US3] 更新既有驱动测试的调用形态为 `PageSource`：`packages/server/tests/unit/dry-run-driver.test.ts`、`packages/server/tests/unit/driver-lifecycle.test.ts`（9 处）、`packages/server/tests/integration/zpl-driver.test.ts`（5 处）、`packages/server/tests/integration/niimbot-driver.test.ts`、`packages/server/tests/integration/printers-api.test.ts`
 
 
 ### Implementation for User Story 3
 
-- [ ] T106 [US3] `packages/server/src/drivers/port.ts`：新增 `PageSource { readonly total: number; at(index: number): BinaryBitmap }`，`PrinterDriver.printPages` 的首参由 `BinaryBitmap[]` 改为 `PageSource`（contracts/driver-port.md）
-- [ ] T107 [US3] `packages/server/src/render/job-pages.ts`：`buildJobPages` 改为 `pageSource(job, render): PageSource`，按下标惰性渲染，**MUST NOT 预先构建数组**（依赖 T106）
-- [ ] T108 [US3] `packages/server/src/queue/print-queue.ts`：改为构造 `PageSource` 后立即交给驱动，第一页渲染完即开始输出（依赖 T107）
-- [ ] T109 [US3] `packages/server/src/domain/overflow.ts` 与 `packages/server/src/api/print-jobs.ts`：**停止逐份展开的 `checkBatch`**，改为只检查设计本身（用编辑器同款的代入值）。这是 FR-045 的落点，也是 SC-003 的前提 —— 现状是 1000 行的任务要在开印前编 1000 次条码，正好抵消流式渲染换来的那一秒
-- [ ] T110 [P] [US3] `packages/server/src/drivers/niimbot/niimbot-driver.ts` 与 `packages/server/src/drivers/niimbot/bitmap-source.ts`：逐页取用，每页发出后上报进度
-- [ ] T111 [P] [US3] `packages/server/src/drivers/zpl/zpl-driver.ts`：同上
-- [ ] T112 [P] [US3] `packages/server/src/drivers/dry-run/dry-run-driver.ts`：同上
-- [ ] T113 [US3] `packages/cli/src/commands/zpl-test.ts:135`：`printPages` 的调用改为 `PageSource`（CLI 是端口的第五个消费方，漏掉它会直接打红 `typecheck` 门禁）
-- [ ] T114 [US3] 在 `docs/design-consensus.md` 或 `tspl-gp3120tu` 分支的 README 记一条待办：搁置中的 TSPL 驱动需跟随本次端口变更（contracts/driver-port.md 已列为受影响的第四个驱动）
+- [ ] T110 [US3] `packages/server/src/drivers/port.ts`：新增 `PageSource { readonly total: number; at(index: number): BinaryBitmap }`，`PrinterDriver.printPages` 的首参由 `BinaryBitmap[]` 改为 `PageSource`（contracts/driver-port.md）
+- [ ] T111 [US3] `packages/server/src/render/job-pages.ts`：`buildJobPages` 改为 `pageSource(job, render): PageSource`，按下标惰性渲染，**MUST NOT 预先构建数组**（依赖 T110）
+- [ ] T112 [US3] `packages/server/src/queue/print-queue.ts`：改为构造 `PageSource` 后立即交给驱动，第一页渲染完即开始输出（依赖 T111）
+- [ ] T113 [US3] `packages/server/src/domain/overflow.ts` 与 `packages/server/src/api/print-jobs.ts`：**停止逐份展开的 `checkBatch`**，改为只检查设计本身（用编辑器同款的代入值）。这是 FR-045 的落点，也是 SC-003 的前提 —— 现状是 1000 行的任务要在开印前编 1000 次条码，正好抵消流式渲染换来的那一秒
+- [ ] T114 [P] [US3] `packages/server/src/drivers/niimbot/niimbot-driver.ts` 与 `packages/server/src/drivers/niimbot/bitmap-source.ts`：逐页取用，每页发出后上报进度
+- [ ] T115 [P] [US3] `packages/server/src/drivers/zpl/zpl-driver.ts`：同上
+- [ ] T116 [P] [US3] `packages/server/src/drivers/dry-run/dry-run-driver.ts`：同上
+- [ ] T117 [US3] `packages/cli/src/commands/zpl-test.ts:135`：`printPages` 的调用改为 `PageSource`（CLI 是端口的第五个消费方，漏掉它会直接打红 `typecheck` 门禁）
+- [ ] T118 [US3] 在 `docs/design-consensus.md` 或 `tspl-gp3120tu` 分支的 README 记一条待办：搁置中的 TSPL 驱动需跟随本次端口变更（contracts/driver-port.md 已列为受影响的第四个驱动）
 
 **Checkpoint**: 三个用户故事均独立可用。
 
@@ -252,14 +256,14 @@ npm workspaces 四包结构，不新增包：
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T115 [P] `packages/web/tests/i18n-completeness.test.ts`：确认 15 个新错误码在两种语言里都有三要素文案，界面新键位无缺失
-- [ ] T116 [P] 覆盖率复核：`packages/shared/src/template/`、`packages/shared/src/csv/`、`packages/server/src/csv/`、`packages/server/src/domain/row-selection.ts`、`packages/server/src/domain/sequence-pool.ts` 的行覆盖 ≥ 80%（宪章原则 II）
-- [ ] T117 [P] `docs/variables-and-data-sources.md`：标注本期实现范围与 Google Sheets 的暂缓状态
-- [ ] T118 [P] `docs/frontend-design-v2.md`：补入数据源两页与打印对话框行选择区的界面约定
-- [ ] T119 [P] `CLAUDE.md`：SPECKIT 段确认指向 003（plan 阶段已更新，此处复核）
-- [ ] T120 **「写了但没接上」复查**：对 `packages/shared/src/template/`、`packages/shared/src/csv/`、`packages/server/src/csv/`、`packages/web/src/features/data-sources/`、`packages/web/src/features/sequence-pools/` 逐个模块确认存在真实调用方 —— 空目录、算了却没用的值、引用不到的组件、只能从预览端点抵达的参数，都算未完成
-- [ ] T121 按 `quickstart.md` 走一遍手工验收路径（变量、数据源、流式、四处破坏性确认）
-- [ ] T122 在 `specs/003-variables-data-sources/quickstart.md` 的「待实测」表中登记 HW-A（1000 张中途拔线，已印张数如实记录且可补打差额）与 HW-B（进度上报与实际出纸同步）的执行结果，须物理打印机
+- [ ] T119 [P] `packages/web/tests/i18n-completeness.test.ts`：确认 14 个新错误码在两种语言里都有三要素文案，界面新键位无缺失
+- [ ] T120 [P] 覆盖率复核：`packages/shared/src/template/`、`packages/shared/src/csv/`、`packages/server/src/csv/`、`packages/server/src/domain/row-selection.ts`、`packages/server/src/domain/sequence-pool.ts` 的行覆盖 ≥ 80%（宪章原则 II）
+- [ ] T121 [P] `docs/variables-and-data-sources.md`：标注本期实现范围与 Google Sheets 的暂缓状态
+- [ ] T122 [P] `docs/frontend-design-v2.md`：补入数据源两页与打印对话框行选择区的界面约定
+- [ ] T123 [P] `CLAUDE.md`：SPECKIT 段确认指向 003（plan 阶段已更新，此处复核）
+- [ ] T124 **「写了但没接上」复查**：对 `packages/shared/src/template/`、`packages/shared/src/csv/`、`packages/server/src/csv/`、`packages/web/src/features/data-sources/`、`packages/web/src/features/sequence-pools/` 逐个模块确认存在真实调用方 —— 空目录、算了却没用的值、引用不到的组件、只能从预览端点抵达的参数，都算未完成
+- [ ] T125 按 `quickstart.md` 走一遍手工验收路径（变量、数据源、流式、四处破坏性确认）
+- [ ] T126 在 `specs/003-variables-data-sources/quickstart.md` 的「待实测」表中登记 HW-A（1000 张中途拔线，已印张数如实记录且可补打差额）与 HW-B（进度上报与实际出纸同步）的执行结果，须物理打印机
 
 ---
 
@@ -277,9 +281,9 @@ npm workspaces 四包结构，不新增包：
 ### User Story Dependencies
 
 - **US1 (P1)**：Phase 2 之后即可开工，不依赖其他故事 —— 这是 MVP
-- **US2 (P2)**：依赖 US1 的 `${}` 求值管线。US1 未完成时可先做 CSV 与数据源的服务端部分（T070–T078 与其测试），它们不碰求值
-- **US3 (P3)**：与 US1/US2 基本无耦合，可并行。**一处例外**：T109 落在 US3（它服务 SC-003），
-  但改的是 US2 引入的提交路径 —— 分头做时应排在 T080 之后
+- **US2 (P2)**：依赖 US1 的 `${}` 求值管线。US1 未完成时可先做 CSV 与数据源的服务端部分（T072–T080 与其测试），它们不碰求值
+- **US3 (P3)**：与 US1/US2 基本无耦合，可并行。**一处例外**：T113 落在 US3（它服务 SC-003），
+  但改的是 US2 引入的提交路径 —— 分头做时应排在 T082 之后
 
 ### Within Each User Story
 
@@ -292,8 +296,8 @@ npm workspaces 四包结构，不新增包：
 - Phase 1 的 T002、T003 可并行
 - Phase 2 的 T004/T005（测试）、T016–T020（术语与 i18n）各自成组并行
 - 每个故事的测试任务几乎全部标 [P]，可一次性铺开
-- US2 的服务端（T070–T083）与前端（T084–T098）在契约确定后可由两人并行
-- US3 的三个驱动（T110、T111、T112）互不相干，可并行
+- US2 的服务端（T072–T085）与前端（T086–T102）在契约确定后可由两人并行
+- US3 的三个驱动（T114、T115、T116）互不相干，可并行
 
 ---
 
@@ -340,9 +344,9 @@ Task: "packages/server/src/db/repositories/sequence-pool-repo.ts"
 - **T042（序号领取改按池 id）**：research R5 指出这使扫描无法再靠 `template_id` 索引收窄。
   T022 的 `job_sequence_claims` 表就是为此而建；若跳过它而沿用 `seq_ranges` JSON，
   任务量增长后每次提交都要全表扫描并解析 JSON
-- **T106（端口契约变更）**：**五个**消费方同步改 —— 四个驱动、CLI（T113），另有 5 个既有
-  驱动测试文件按数组调用（T105）。其中 TSPL 在另一分支上（T114）
-- **T109（停止逐份条码检查）**：容易被当成优化而延后，但它是 SC-003 的前提。既有的
+- **T110（端口契约变更）**：**五个**消费方同步改 —— 四个驱动、CLI（T117），另有 5 个既有
+  驱动测试文件按数组调用（T109）。其中 TSPL 在另一分支上（T118）
+- **T113（停止逐份条码检查）**：容易被当成优化而延后，但它是 SC-003 的前提。既有的
   `checkBatch` 给每一份编一次条码，1000 行就是开印前先编 1000 次 —— 恰好抵消流式渲染
   换来的那一秒。FR-045 论证过取消它，而论证得越充分，越容易被读成「已经安排了」
 
