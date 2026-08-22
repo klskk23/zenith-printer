@@ -47,6 +47,5 @@ export interface ImageAsset {
   filename: string
   mimeType: string
   sizeBytes: number
-  refCount: number
   createdAt: string
 }

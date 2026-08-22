@@ -10,6 +10,17 @@ import { migrateOffsets } from './offset-migration.ts'
 import { claimsFromSeqRanges, rewriteElementContent } from './variable-migration.ts'
 import { backfillThumbnails } from './thumbnail-backfill.ts'
 
+/**
+ * The column that made `delete` wrong.
+ *
+ * `ref_count` was meant to say whether history still needed an image, but
+ * nothing ever incremented it — so it read zero for every row and every delete
+ * removed the file, including ones a job's snapshot still pointed at. The
+ * question is now answered by reading the designs (see `image-references.ts`),
+ * and a column that is always zero would only invite somebody to trust it.
+ */
+const dropImageRefCount = `ALTER TABLE images DROP COLUMN ref_count;`
+
 const initialSchema = `
   CREATE TABLE printers (
     id                        TEXT PRIMARY KEY,
@@ -362,4 +373,5 @@ export const migrations: Migration[] = [
   { id: 10, name: 'drop_variable_fields', up: dropVariableFields, apply: rewriteElementContent },
   { id: 11, name: 'template_thumbnail', up: templateThumbnail, apply: backfillThumbnails },
   { id: 12, name: 'data_source_link', up: dataSourceLink },
+  { id: 13, name: 'drop_image_ref_count', up: dropImageRefCount },
 ]

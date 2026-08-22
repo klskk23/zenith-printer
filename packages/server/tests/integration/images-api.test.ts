@@ -6,7 +6,6 @@ import type { FastifyInstance } from 'fastify'
 import { buildApp } from '../../src/app.ts'
 import { openDatabase } from '../../src/db/index.ts'
 import { FixedClock, SequentialIdGenerator } from '../../src/clock.ts'
-import { ImageRepo } from '../../src/db/repositories/image-repo.ts'
 
 let app: FastifyInstance
 let storageDir: string
@@ -46,6 +45,22 @@ afterEach(async () => {
   rmSync(storageDir, { recursive: true, force: true })
 })
 
+/**
+ * Make a design name this asset — which is what "referenced" now means.
+ *
+ * It used to be `ImageRepo.addReference`, a counter nothing in the application
+ * ever incremented; it read zero for every image, so every delete removed the
+ * file. Pointing a stored design at the asset tests what actually decides.
+ */
+function referenceFromATemplate(assetId: string): void {
+  app.ctx.db
+    .prepare(
+      `INSERT INTO templates (id, name, printer_kind, width_mm, height_mm, dpi, elements, created_at, updated_at)
+       VALUES ('tpl-ref', 't', 'niimbot', 50, 30, 203, ?, '2026-08-21T00:00:00Z', '2026-08-21T00:00:00Z')`,
+    )
+    .run(JSON.stringify([{ id: 'e0', type: 'image', assetId }]))
+}
+
 async function upload(filename = 'logo.png', mimeType = 'image/png', content = PNG_1X1) {
   const { payload, headers } = multipartBody(filename, mimeType, content)
   return app.inject({ method: 'POST', url: '/api/images', payload, headers })
@@ -55,7 +70,7 @@ describe('upload', () => {
   it('stores a PNG and returns its metadata', async () => {
     const res = await upload()
     expect(res.statusCode).toBe(201)
-    expect(res.json()).toMatchObject({ filename: 'logo.png', mimeType: 'image/png', refCount: 0 })
+    expect(res.json()).toMatchObject({ filename: 'logo.png', mimeType: 'image/png' })
   })
 
   it('writes the file to disk rather than into the database', async () => {
@@ -101,7 +116,7 @@ describe('deletion and history', () => {
     // FR-051: a snapshot can duplicate text but not a binary, so history would
     // break if the file actually went away.
     const asset = (await upload()).json()
-    new ImageRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }).addReference(asset.id)
+    referenceFromATemplate(asset.id)
 
     await app.inject({ method: 'DELETE', url: `/api/images/${asset.id}` })
 
@@ -112,7 +127,7 @@ describe('deletion and history', () => {
 
   it('hides a soft-deleted image from the picker', async () => {
     const asset = (await upload()).json()
-    new ImageRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }).addReference(asset.id)
+    referenceFromATemplate(asset.id)
     await app.inject({ method: 'DELETE', url: `/api/images/${asset.id}` })
 
     expect((await app.inject({ method: 'GET', url: '/api/images' })).json().images).toHaveLength(0)

@@ -4,11 +4,17 @@
  * The only entity that is soft-deleted. A job snapshot can duplicate text and
  * numbers, but it cannot duplicate a binary, so deleting an image that history
  * still references would break the record of what was printed (FR-051).
- * Reference counting decides: unreferenced images go for real, referenced ones
- * are marked and kept.
+ * Whether anything references it decides: unreferenced images go for real,
+ * referenced ones are marked and kept.
+ *
+ * That question used to be answered by a `ref_count` column. Nothing ever
+ * incremented it, so it read zero for every row and `delete` removed files that
+ * history still needed. It is gone (migration 13); the answer now comes from
+ * reading the designs, which cannot drift out of step with them.
  */
 import type { Database } from '../index.ts'
 import type { Clock, IdGenerator } from '../../clock.ts'
+import { collectAssetIds } from '../../domain/image-references.ts'
 
 export interface ImageAsset {
   id: string
@@ -16,7 +22,6 @@ export interface ImageAsset {
   mimeType: string
   sizeBytes: number
   storagePath: string
-  refCount: number
   deletedAt: string | null
   createdAt: string
 }
@@ -30,7 +35,6 @@ function toAsset(row: Row): ImageAsset {
     mimeType: String(row.mime_type),
     sizeBytes: Number(row.size_bytes),
     storagePath: String(row.storage_path),
-    refCount: Number(row.ref_count),
     deletedAt: row.deleted_at === null ? null : String(row.deleted_at),
     createdAt: String(row.created_at),
   }
@@ -71,8 +75,8 @@ export class ImageRepo {
     const id = this.#ids.next()
     this.#db
       .prepare(
-        `INSERT INTO images (id, filename, mime_type, size_bytes, storage_path, ref_count, created_at)
-         VALUES (?, ?, ?, ?, ?, 0, ?)`,
+        `INSERT INTO images (id, filename, mime_type, size_bytes, storage_path, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
       .run(id, input.filename, input.mimeType, input.sizeBytes, input.storagePath, this.#clock.now().toISOString())
     const created = this.find(id)
@@ -82,12 +86,33 @@ export class ImageRepo {
     return created
   }
 
-  addReference(id: string): void {
-    this.#db.prepare('UPDATE images SET ref_count = ref_count + 1 WHERE id = ?').run(id)
+  /** Every asset, including the marked ones — what a sweep has to consider. */
+  all(): ImageAsset[] {
+    return this.#db
+      .prepare('SELECT * FROM images ORDER BY created_at')
+      .all()
+      .map((row) => toAsset(row as Row))
   }
 
-  releaseReference(id: string): void {
-    this.#db.prepare('UPDATE images SET ref_count = MAX(0, ref_count - 1) WHERE id = ?').run(id)
+  /**
+   * Every asset id some stored design still names.
+   *
+   * Read from the designs themselves rather than tracked as they change: the
+   * two tables below are the only places an `assetId` can live, and asking them
+   * cannot fall out of step with them. Throws when a row cannot be parsed —
+   * see `collectAssetIds` for why refusing beats guessing.
+   */
+  referencedAssetIds(): Set<string> {
+    const documents = [
+      ...this.#db.prepare('SELECT elements FROM templates').all().map((row) => String((row as Row).elements)),
+      ...this.#db.prepare('SELECT snapshot FROM print_jobs').all().map((row) => String((row as Row).snapshot)),
+    ]
+    return collectAssetIds(documents)
+  }
+
+  /** Drop the row outright. The caller unlinks the file. */
+  hardDelete(id: string): void {
+    this.#db.prepare('DELETE FROM images WHERE id = ?').run(id)
   }
 
   /**
@@ -100,7 +125,7 @@ export class ImageRepo {
       return { removedFromDisk: false }
     }
 
-    if (asset.refCount > 0) {
+    if (this.referencedAssetIds().has(id)) {
       this.#db
         .prepare('UPDATE images SET deleted_at = ? WHERE id = ?')
         .run(this.#clock.now().toISOString(), id)

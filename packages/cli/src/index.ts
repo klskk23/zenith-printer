@@ -22,6 +22,7 @@ import { registerPrintTest } from './commands/print-test.ts'
 import { registerZplTest } from './commands/zpl-test.ts'
 import { registerTemplateIo } from './commands/template-io.ts'
 import { registerDataSourceRefresh } from './commands/data-source-refresh.ts'
+import { registerImagesPrune } from './commands/images-prune.ts'
 
 const program = new Command()
 
@@ -38,6 +39,7 @@ registerRenderTest(program)
 registerKeepalive(program)
 registerTemplateIo(program)
 registerDataSourceRefresh(program)
+registerImagesPrune(program)
 registerPrintTest(program)
 registerZplTest(program)
 

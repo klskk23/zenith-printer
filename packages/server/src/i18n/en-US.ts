@@ -169,6 +169,11 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'The previous job failed, or someone paused it manually',
     next: 'Clear the fault, then press Resume on the queue page',
   },
+  IMAGE_PRUNE_UNREADABLE_DESIGN: {
+    what: 'Cannot prune images: one stored design could not be read',
+    why: 'A template or print record holds content that no longer parses, so which images are still in use cannot be determined',
+    next: 'The whole sweep was cancelled and nothing was deleted. Send the matching server log line to whoever maintains this',
+  },
   DEVICE_ERROR: {
     what: 'The printer refused the operation',
     why: 'It is connected but did not respond as expected; firmware or state may be at fault',

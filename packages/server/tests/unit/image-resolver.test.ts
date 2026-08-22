@@ -26,6 +26,20 @@ function seed(): { id: string; path: string } {
   return { id: asset.id, path }
 }
 
+/**
+ * Make a design name this asset — which is what "referenced" now means.
+ *
+ * It used to be `repo.addReference(id)`, a counter nothing in the application
+ * ever incremented. Pointing a stored design at the asset tests the mechanism
+ * that actually decides.
+ */
+function referenceFromATemplate(assetId: string): void {
+  db.prepare(
+    `INSERT INTO templates (id, name, printer_kind, width_mm, height_mm, dpi, elements, created_at, updated_at)
+     VALUES ('tpl-ref', 't', 'niimbot', 50, 30, 203, ?, '2026-08-21T00:00:00Z', '2026-08-21T00:00:00Z')`,
+  ).run(JSON.stringify([{ id: 'e0', type: 'image', assetId }]))
+}
+
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'zenith-resolve-'))
   db = openDatabase({ location: ':memory:' })
@@ -76,7 +90,7 @@ describe('soft-deleted assets', () => {
     // FR-051: a snapshot cannot duplicate a binary, so the file has to stay
     // reachable after the asset is removed from the picker.
     const { id } = seed()
-    repo.addReference(id)
+    referenceFromATemplate(id)
     repo.delete(id)
     expect(createImageResolver(repo)(id)).toMatch(/^data:image\/png;base64,/)
   })

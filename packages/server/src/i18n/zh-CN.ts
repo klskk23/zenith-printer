@@ -174,6 +174,11 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '上一个任务失败，或有人手动暂停了队列',
     next: '处理完故障后在队列页面点击恢复',
   },
+  IMAGE_PRUNE_UNREADABLE_DESIGN: {
+    what: '无法清理图片：有一份设计读不出来',
+    why: '某个模板或打印记录里存的内容已损坏，因此无法确定哪些图片仍在使用',
+    next: '清理已整体取消，没有删除任何文件。请把服务端日志中的这条记录交给维护人员',
+  },
   DEVICE_ERROR: {
     what: '打印机拒绝了本次操作',
     why: '设备已连接，但未按预期响应；可能是固件不兼容或状态异常',
