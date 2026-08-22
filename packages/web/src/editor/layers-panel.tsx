@@ -53,9 +53,16 @@ export function LayersPanel({ ir, selectedId, onSelect, onChange }: LayersPanelP
                 selected ? 'bg-muted font-medium' : 'hover:bg-muted/60',
               )}
             >
-              <button type="button" className="min-w-0 flex-1 truncate text-left" onClick={() => onSelect(element.id)}>
+              <Button
+                variant="ghost"
+                size="row-inline"
+                // The row it sits in already carries the selected and hover
+                // backgrounds, so this one only needs to be clickable.
+                className="min-w-0 flex-1 truncate hover:bg-transparent"
+                onClick={() => onSelect(element.id)}
+              >
                 {describe(element)}
-              </button>
+              </Button>
               <span className="flex shrink-0 gap-0.5">
                 <Button
                   size="icon-sm"

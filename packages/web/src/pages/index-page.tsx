@@ -35,9 +35,14 @@ function PrinterCard({ printer, pending }: { printer: Printer; pending: number }
   return (
     <Card>
       <CardHeader className="pb-2">
-        <button type="button" className="text-left" onClick={() => open({ kind: 'printers' })}>
+        <Button
+          variant="ghost"
+          size="row-inline"
+          className="text-sm hover:bg-transparent hover:underline"
+          onClick={() => open({ kind: 'printers' })}
+        >
           <CardTitle>{printer.name}</CardTitle>
-        </button>
+        </Button>
         <p className="font-mono text-[11px] text-muted-foreground">
           {printer.kind} · {printer.address}
         </p>
@@ -67,16 +72,19 @@ function PrinterCard({ printer, pending }: { printer: Printer; pending: number }
 function TemplateCard({ template }: { template: Template }): React.JSX.Element {
   const { open } = useWorkspace()
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
+      size="row"
+      // Two stacked lines rather than one, so the row's `items-center` and
+      // horizontal flow are turned off here.
+      className="flex-col items-start gap-0.5 px-3 py-2"
       onClick={() => open({ kind: 'design', templateId: template.id })}
-      className="rounded-md border border-border px-3 py-2 text-left text-xs hover:bg-muted"
     >
       <span className="block font-medium">{template.name}</span>
       <span className="block text-muted-foreground">
         {template.widthMm} × {template.heightMm} mm
       </span>
-    </button>
+    </Button>
   )
 }
 

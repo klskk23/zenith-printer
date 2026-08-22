@@ -10,6 +10,7 @@ import { cn } from '../lib/utils.ts'
 import { Badge } from '../components/ui/badge.tsx'
 import { TAB_KINDS, type TabKind } from './routes.ts'
 import { useWorkspace } from './workspace.tsx'
+import { Button } from '../components/ui/button.tsx'
 
 export interface SidebarProps {
   /** Jobs waiting or printing, across all printers. Hidden when zero. */
@@ -31,11 +32,14 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
           const isActive = activeTab?.kind === kind
           return (
             <li key={kind}>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="row"
                 onClick={() => open(kind === 'design' ? { kind, templateId: null } : { kind })}
                 className={cn(
-                  'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition-colors',
+                  // `justify-between` rather than the size's `justify-start`:
+                  // the queue count sits at the far end of the row.
+                  'justify-between',
                   isActive ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted/60',
                 )}
               >
@@ -43,7 +47,7 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
                 {kind === 'queue' && pendingJobCount > 0 && (
                   <Badge variant="secondary">{pendingJobCount}</Badge>
                 )}
-              </button>
+              </Button>
             </li>
           )
         })}

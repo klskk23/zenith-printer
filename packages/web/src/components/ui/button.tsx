@@ -21,6 +21,22 @@ const buttonVariants = cva(
         // h-8, which made every toolbar it appeared in look a pixel out.
         icon: 'h-9 w-9',
         'icon-sm': 'h-8 w-8',
+        // Small enough to sit inside a tab strip or a list row without setting
+        // the row's height.
+        'icon-xs': 'h-5 w-5',
+        /**
+         * A row in a list or a navigation strip.
+         *
+         * Full width, left-aligned, height set by its content rather than by
+         * the button. Six places had hand-rolled this shape — the sidebar, both
+         * halves of the tab strip, the layer list and two cards on the home
+         * page — each with its own padding and its own focus behaviour. A size
+         * here is cheaper than six near-copies, and it means a row picks up the
+         * focus ring and the disabled handling that every other button has.
+         */
+        row: 'h-auto w-full justify-start px-2.5 py-1.5 text-left text-xs font-normal',
+        /** A row that is only as wide as its text — a tab title, a list entry. */
+        'row-inline': 'h-auto w-auto justify-start p-0 text-xs font-normal'
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },

@@ -25,6 +25,7 @@ import {
 import { useWorkspace } from './workspace.tsx'
 import type { WorkspaceTab } from './workspace-state.ts'
 import { useTemplates } from '../features/templates/hooks.ts'
+import { Button } from '../components/ui/button.tsx'
 
 /**
  * What a tab is called.
@@ -71,7 +72,14 @@ export function TabBar(): React.JSX.Element {
                 isActive ? 'bg-background font-medium' : 'text-muted-foreground hover:bg-background/60',
               )}
             >
-              <button type="button" className="flex items-center gap-1.5" onClick={() => activate(tab.id)}>
+              <Button
+                variant="ghost"
+                size="row-inline"
+                // The tab itself already shows hover; a second background
+                // inside it reads as two overlapping controls.
+                className="gap-1.5 hover:bg-transparent"
+                onClick={() => activate(tab.id)}
+              >
                 {/* Active marker: a dot, never an ×. */}
                 <span
                   aria-hidden
@@ -85,16 +93,17 @@ export function TabBar(): React.JSX.Element {
                     ●
                   </span>
                 )}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
                 aria-label={copy.workspace.close}
                 title={copy.workspace.close}
-                className="rounded px-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                className="shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100"
                 onClick={() => requestClose(tab)}
               >
                 ×
-              </button>
+              </Button>
             </div>
           )
         })}
