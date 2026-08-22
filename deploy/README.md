@@ -103,6 +103,65 @@ bind，一行 `ZENITH_GOOGLE_CREDENTIALS`）。**密钥绝不进镜像**——�
 
 ---
 
+## 三之二、探测打印机失败时
+
+先看日志。**niimbluelib 会把握手阶段的真实原因打到 `console.error`，而它自己吞掉了那个
+异常**——所以原因多半已经在容器日志里，只是没进结构化日志：
+
+```bash
+docker compose logs | grep -iE "Unable to fetch printer info|Dropping invalid buffer|Timeout waiting response"
+```
+
+| 日志里出现 | 含义 |
+|---|---|
+| `Unable to fetch printer info (is it turned on?)` 后面跟着 `Timeout waiting response` | 设备协商上了，但下一个包没回。链路问题，见下表 |
+| `Feature not supported` / `Print error N` | 设备答了并且拒绝了。这才是「关机重启」适用的情况 |
+| `Dropping invalid buffer` | 串口里混进了不属于本次会话的字节——**多半有第二个进程在读写同一个口** |
+
+服务这边现在会在 connect 阶段就重取一次型号信息并把真实原因带出来（超时报「连不上」、
+设备拒绝报「拒绝了本次操作」、型号不认识则直接报出 model id），不会再一律说成
+「打印机拒绝了本次操作」。
+
+### 链路问题按这个顺序查
+
+**1. 有没有第二个进程握着这个口。** 这是最常见的一条，而且容器让它更容易发生：`/dev` 是
+和宿主机共享的，宿主机上跑着的开发服务器、上一个没停干净的容器、或者 ModemManager，都
+能同时打开同一个 tty，然后各自吃掉一半的字节。
+
+```bash
+sudo lsof /dev/ttyACM0        # 或 sudo fuser -v /dev/ttyACM0
+docker ps -a | grep zenith    # 有没有第二个容器
+systemctl status ModemManager
+```
+
+**ModemManager 尤其要留意**：CDC-ACM 设备插上时它会主动打开并发 AT 命令探测，持续若干秒。
+让它别碰这台打印机：
+
+```bash
+lsusb                          # 记下打印机的 idVendor:idProduct
+sudo tee /etc/udev/rules.d/99-zenith-printer.rules <<'RULE'
+SUBSYSTEM=="tty", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="YYYY", ENV{ID_MM_DEVICE_IGNORE}="1"
+RULE
+sudo udevadm control --reload && sudo udevadm trigger
+```
+
+**2. 口里有上一次会话的残留。** 进程被杀在半句话中间时，内核缓冲区里的字节会留到下一次
+打开——niimbluelib 读到后报 `Dropping invalid buffer`，运气不好会连正确的应答一起丢掉。
+拔插一次打印机，或者：
+
+```bash
+docker compose restart && sleep 3   # 让设备安静几秒再探测
+```
+
+**3. 确认容器看得见的是真设备而不是快照。** `privileged` 单给一半的那个坑（见第一节）：
+
+```bash
+docker compose exec zenith-printer sh -c "grep ' /dev ' /proc/self/mountinfo; ls -l /dev/ttyACM0"
+# devtmpfs = 对的；tmpfs = 少了 /dev:/dev 这条挂载
+```
+
+---
+
 ## 四、字体
 
 渲染器按宪章要求关掉了系统字体加载，只读 `fonts/full`，所以那几个文件的**字节**决定了

@@ -57,6 +57,15 @@ export interface NiimbotDriverOptions {
   frameLogger?: PacketFrameLogger
 }
 
+/**
+ * How many times to ask for the printer info before giving up.
+ *
+ * Two, not more: each attempt is up to ten sequential packets at a one-second
+ * timeout apiece, so a dead printer would otherwise keep somebody waiting at
+ * the machine for the better part of a minute.
+ */
+const INFO_FETCH_ATTEMPTS = 2
+
 export class NiimbotDriver implements PrinterDriver {
   readonly kind = 'niimbot' as const
 
@@ -101,6 +110,23 @@ export class NiimbotDriver implements PrinterDriver {
         new Error('connected but the device never completed its handshake'),
       )
     }
+    // A connection with no model metadata is not usable: probe() needs it for
+    // the head width and dpi, and the print task is chosen from it. This is
+    // reachable because niimbluelib's connect() runs initialNegotiate() and
+    // fetchPrinterInfo() inside ONE try/catch whose catch does nothing but
+    // console.error — so a device that negotiates and then fails on the very
+    // next packet (the model id, fetchPrinterInfo's first line) arrives here
+    // looking connected, with connectResult set, no modelId, and the reason
+    // gone. probe() would then report "the printer refused the operation",
+    // which is both wrong and unactionable.
+    //
+    // Redo the fetch. It is the library's own public method, the error reaches
+    // us this time, and a device that was busy on the first attempt usually
+    // answers on the second.
+    if (client.getModelMetadata() === undefined) {
+      await this.#recoverModelMetadata(client)
+    }
+
     // Principle V: record every exchange. This link's bytes are inside
     // niimbluelib, so we subscribe to its packet events instead of wrapping
     // a transport we do not own.
@@ -115,6 +141,57 @@ export class NiimbotDriver implements PrinterDriver {
     }
 
     this.#client = client
+  }
+
+  /**
+   * Fetch the printer info again, and say plainly what went wrong if it fails.
+   *
+   * No delay between attempts: each one is a full round trip that niimbluelib
+   * already bounds with its own one-second packet timeout, so the spacing is
+   * inherent. Adding a timer would also make this untestable without a clock
+   * (constitution: tests MUST be deterministic).
+   */
+  async #recoverModelMetadata(client: NiimbotAbstractClient): Promise<void> {
+    let lastError: unknown
+    for (let attempt = 0; attempt < INFO_FETCH_ATTEMPTS; attempt += 1) {
+      try {
+        await client.fetchPrinterInfo()
+        lastError = undefined
+        break
+      } catch (err) {
+        lastError = err
+      }
+      if (client.getModelMetadata() !== undefined) {
+        return
+      }
+    }
+
+    if (lastError !== undefined) {
+      await client.disconnect().catch(() => undefined)
+      // A device that answered and refused is a different problem from one
+      // that never answered, and the two need different instructions: the
+      // first is worth power-cycling, the second means walk over and look at
+      // it. niimbluelib turns an In_NotSupported or In_PrintError packet into
+      // PrintError, which is exactly the "answered and refused" case.
+      if (lastError instanceof PrintError) {
+        throw new PrinterDeviceError(
+          `the printer refused the model-information request: ${lastError.message}`,
+        )
+      }
+      throw new PrinterUnreachableError(this.#options.address, lastError)
+    }
+
+    if (client.getModelMetadata() === undefined) {
+      // The link is fine and the device is healthy — it named a model this
+      // build has no metadata for. Telling somebody to power-cycle a working
+      // printer would waste their morning, so the message says the model id
+      // instead; that is the number a maintainer needs.
+      const modelId = client.getPrinterInfo()?.modelId
+      await client.disconnect().catch(() => undefined)
+      throw new PrinterDeviceError(
+        `the printer reports model id ${modelId ?? 'unknown'}, which this build has no metadata for`,
+      )
+    }
   }
 
   /** Whether the client actually completed a protocol handshake. */

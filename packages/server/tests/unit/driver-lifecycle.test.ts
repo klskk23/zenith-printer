@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { NiimbotAbstractClient } from '@mmote/niimbluelib'
+import { PrintError, type NiimbotAbstractClient } from '@mmote/niimbluelib'
 import { NiimbotDriver } from '../../src/drivers/niimbot/niimbot-driver.ts'
 import {
   PrinterDeviceError,
@@ -59,8 +59,93 @@ describe('connect', () => {
   })
 
   it('accepts a connection that produced real handshake fields', async () => {
-    const { driver } = makeDriver({ metadata: undefined, printerInfo: { serial: 'H508010165' } })
+    const { driver } = makeDriver({ metadata: B3SP_METADATA, printerInfo: { serial: 'H508010165' } })
     await expect(driver.connect()).resolves.toBeUndefined()
+  })
+
+  it('does not re-fetch when the handshake already produced a model', async () => {
+    // The happy path must not pay for the recovery path. Ten extra round trips
+    // on every connect would be ten extra chances to time out.
+    const { driver, client } = makeDriver({ printerInfo: { connectResult: 3, modelId: 272 } })
+    await driver.connect()
+    expect(client.fetchInfoCount).toBe(0)
+  })
+
+  it('re-fetches the printer info when the handshake left no model', async () => {
+    // The real shape of this failure, measured against niimbluelib: its
+    // connect() runs initialNegotiate() and fetchPrinterInfo() inside one
+    // try/catch whose catch does nothing but console.error. A device that
+    // negotiates and then fails on the very next packet — the model id, the
+    // first line of fetchPrinterInfo — therefore arrives looking connected,
+    // with connectResult set, no modelId, and the reason gone.
+    const { driver, client } = makeDriver({
+      metadata: undefined,
+      printerInfo: { connectResult: 3 },
+      metadataAfterFetch: B3SP_METADATA,
+    })
+    await expect(driver.connect()).resolves.toBeUndefined()
+    expect(client.fetchInfoCount).toBe(1)
+    await expect(driver.probe()).resolves.toMatchObject({ model: 'B3S_P' })
+  })
+
+  it('retries the re-fetch once before giving up', async () => {
+    const { driver, client } = makeDriver({
+      metadata: undefined,
+      printerInfo: { connectResult: 3 },
+      fetchInfoErrors: [new Error('Timeout waiting response (waited for 0x1b)')],
+      metadataAfterFetch: B3SP_METADATA,
+    })
+    await expect(driver.connect()).resolves.toBeUndefined()
+    expect(client.fetchInfoCount).toBe(2)
+  })
+
+  it('calls a device that never answers unreachable, not one that refused', async () => {
+    // The distinction decides what the operator is told. A timeout means go
+    // look at the machine; "the printer refused the operation, power-cycle it"
+    // is the wrong instruction and sends them to reboot a healthy printer.
+    const timeout = new Error('Timeout waiting response (waited for 0x1b)')
+    const { driver } = makeDriver({
+      metadata: undefined,
+      printerInfo: { connectResult: 3 },
+      fetchInfoErrors: [timeout, timeout],
+    })
+    await expect(driver.connect()).rejects.toThrow(PrinterUnreachableError)
+  })
+
+  it('reports a device that answered and refused as a device error', async () => {
+    // niimbluelib turns an In_NotSupported packet into PrintError. That one IS
+    // "the printer refused the operation" — the copy fits, and power-cycling
+    // is reasonable advice.
+    const refused = new PrintError('Feature not supported', 0)
+    const { driver } = makeDriver({
+      metadata: undefined,
+      printerInfo: { connectResult: 3 },
+      fetchInfoErrors: [refused, refused],
+    })
+    await expect(driver.connect()).rejects.toThrow(PrinterDeviceError)
+  })
+
+  it('names the model when the device answers with one this build does not know', async () => {
+    // Distinct from every failure above: the link is fine and the device is
+    // healthy. Telling somebody to power-cycle it would waste their morning.
+    const { driver } = makeDriver({
+      metadata: undefined,
+      printerInfo: { connectResult: 3, modelId: 9999 },
+    })
+    await expect(driver.connect()).rejects.toThrow(/9999/)
+  })
+
+  it('releases the port when the re-fetch fails', async () => {
+    // Constitution ("Resource safety"): every path releases. A held port makes
+    // the next attempt fail differently, which is how one fault becomes two.
+    const timeout = new Error('Timeout waiting response')
+    const { driver, client } = makeDriver({
+      metadata: undefined,
+      printerInfo: { connectResult: 3 },
+      fetchInfoErrors: [timeout, timeout],
+    })
+    await driver.connect().catch(() => undefined)
+    expect(client.disconnectCount).toBeGreaterThan(0)
   })
 
   it('rejects a connection whose printer info came back empty', async () => {
@@ -74,7 +159,15 @@ describe('connect', () => {
   it.each(['connectResult', 'modelId', 'serial'])(
     'treats %s as proof the handshake completed',
     async (field) => {
-      const { driver } = makeDriver({ metadata: undefined, printerInfo: { [field]: 1 } })
+      // Each of these fields means something answered, which is the line
+      // between "nothing on the other end" and "connected but incomplete".
+      // The second case is recoverable; the first is not, and conflating them
+      // sends somebody to check a cable that is fine.
+      const { driver } = makeDriver({
+        metadata: undefined,
+        printerInfo: { [field]: 1 },
+        metadataAfterFetch: B3SP_METADATA,
+      })
       await expect(driver.connect()).resolves.toBeUndefined()
     },
   )
@@ -154,12 +247,18 @@ describe('probe', () => {
     expect((await driver.probe()).supportsConsumableLevel).toBe(true)
   })
 
-  it('fails clearly when the device answered but reports no model metadata', async () => {
-    // The handshake produced printer info, so the link is live — the device
-    // simply did not identify its model. That is a device fault, not an
-    // unreachable printer, and the two must not be conflated.
-    const { driver } = makeDriver({ metadata: undefined, printerInfo: { serial: 'H508010165' } })
+  it('keeps its own guard against a client with no model metadata', async () => {
+    // connect() now refuses to hand back a driver in this state — it re-fetches
+    // and, failing that, says why. So this is defence in depth rather than a
+    // reachable path: probe() is public, and a future reordering must not turn
+    // "no model" into a crash on undefined.
+    const { driver, client } = makeDriver({
+      metadata: undefined,
+      printerInfo: { connectResult: 3 },
+      metadataAfterFetch: B3SP_METADATA,
+    })
     await driver.connect()
+    client.forgetModel()
     await expect(driver.probe()).rejects.toThrow(PrinterDeviceError)
   })
 })

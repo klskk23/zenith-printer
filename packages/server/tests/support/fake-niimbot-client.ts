@@ -16,6 +16,16 @@ export interface FakeClientOptions {
   /** Metadata returned by `getModelMetadata()`; undefined models a probe failure. */
   metadata?: Record<string, unknown>
   printerInfo?: Record<string, unknown>
+  /**
+   * Errors thrown by successive `fetchPrinterInfo()` calls; `undefined` at a
+   * position means that attempt succeeds. Models the real failure this exists
+   * for: niimbluelib's connect() calls fetchPrinterInfo() inside a try/catch
+   * that only console.errors, so a device that negotiated and then failed on
+   * the model-id packet looks connected and has no model.
+   */
+  fetchInfoErrors?: Array<Error | undefined>
+  /** Metadata exposed once `fetchPrinterInfo()` has succeeded. */
+  metadataAfterFetch?: Record<string, unknown>
   heartbeat?: { paperInserted?: boolean; lidClosed?: boolean }
   rfid?: { tagPresent: boolean; allPaper: number; usedPaper: number }
   rfidError?: Error
@@ -34,12 +44,15 @@ export class FakeNiimbotClient extends EventEmitter {
   connectCount = 0
   disconnectCount = 0
   printEndCount = 0
+  fetchInfoCount = 0
 
   readonly #options: FakeClientOptions
+  #metadata: Record<string, unknown> | undefined
 
   constructor(options: FakeClientOptions = {}) {
     super()
     this.#options = options
+    this.#metadata = options.metadata
   }
 
   #record(name: string, ...args: unknown[]): void {
@@ -60,7 +73,20 @@ export class FakeNiimbotClient extends EventEmitter {
   }
 
   getModelMetadata(): Record<string, unknown> | undefined {
-    return this.#options.metadata
+    return this.#metadata
+  }
+
+  async fetchPrinterInfo(): Promise<Record<string, unknown>> {
+    const error = this.#options.fetchInfoErrors?.[this.fetchInfoCount]
+    this.fetchInfoCount += 1
+    this.#record('fetchPrinterInfo')
+    if (error !== undefined) {
+      throw error
+    }
+    if (this.#options.metadataAfterFetch !== undefined) {
+      this.#metadata = this.#options.metadataAfterFetch
+    }
+    return this.#options.printerInfo ?? {}
   }
 
   getPrinterInfo(): Record<string, unknown> | undefined {
@@ -111,6 +137,11 @@ export class FakeNiimbotClient extends EventEmitter {
         }
       },
     }
+  }
+
+  /** Model a client that stops reporting its model, to reach probe()'s guard. */
+  forgetModel(): void {
+    this.#metadata = undefined
   }
 
   /** Order of driver-visible calls, for asserting the print sequence. */
