@@ -56,6 +56,51 @@ export function toggle(selection: Selection, ordinal: number, allOrdinals: reado
   }
 }
 
+/**
+ * Add or remove every row on the page in view.
+ *
+ * A page-wide tick is a convenience, not a second kind of selection: it adds
+ * these ordinals to whatever was already chosen. Replacing the selection
+ * instead would make paging forward and ticking twice a way to lose the first
+ * page without noticing.
+ *
+ * Untick when the page is already wholly selected, which is what makes the same
+ * control able to undo itself.
+ */
+export function togglePage(
+  selection: Selection,
+  pageOrdinals: readonly number[],
+  allOrdinals: readonly number[],
+): Selection {
+  const current =
+    selection.kind === 'all' ? [...allOrdinals] : [...selection.ordinals]
+  const chosen = new Set(current)
+  const wholePageChosen =
+    pageOrdinals.length > 0 && pageOrdinals.every((ordinal) => chosen.has(ordinal))
+
+  if (wholePageChosen) {
+    const onPage = new Set(pageOrdinals)
+    return { kind: 'explicit', ordinals: current.filter((ordinal) => !onPage.has(ordinal)) }
+  }
+  for (const ordinal of pageOrdinals) {
+    chosen.add(ordinal)
+  }
+  // Sorted, so the stored order never suggests a print order. Printing is by
+  // ascending ordinal regardless, and a selection listed in tick order would
+  // invite somebody to assume otherwise.
+  return { kind: 'explicit', ordinals: [...chosen].sort((a, b) => a - b) }
+}
+
+/** Whether every row on the page in view is selected. */
+export function isPageSelected(
+  selection: Selection,
+  pageOrdinals: readonly number[],
+): boolean {
+  return (
+    pageOrdinals.length > 0 && pageOrdinals.every((ordinal) => isSelected(selection, ordinal))
+  )
+}
+
 /** How many rows are selected, given the table's size. */
 export function selectedCount(selection: Selection, total: number): number {
   return selection.kind === 'all' ? total : selection.ordinals.length

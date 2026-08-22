@@ -48,12 +48,20 @@ const KEY = ['data-sources']
  * print dialog fetched a single row to read the table's total, so the row
  * selector opened showing one row of ten.
  */
-const rowsKey = (id: string, page: number, pageSize: number): unknown[] => [
-  'data-source-rows',
-  id,
-  page,
-  pageSize,
-]
+/**
+ * Every input that changes the answer, in the key.
+ *
+ * `order` belongs here for the same reason `page` does: leaving it out makes
+ * ascending and descending share one cache entry, and the list would show the
+ * other direction's rows while claiming to show this one. That has happened in
+ * this codebase before, with a key that was one field short.
+ */
+const rowsKey = (
+  id: string,
+  page: number,
+  pageSize: number,
+  order: 'asc' | 'desc',
+): unknown[] => ['data-source-rows', id, page, pageSize, order]
 
 export function useDataSources() {
   return useQuery({
@@ -64,10 +72,17 @@ export function useDataSources() {
   })
 }
 
-export function useDataSourceRows(id: string | null, page: number, pageSize = 10) {
+export function useDataSourceRows(
+  id: string | null,
+  page: number,
+  pageSize = 10,
+  /** Viewing order only; printing is always by ascending ordinal. */
+  order: 'asc' | 'desc' = 'asc',
+) {
   return useQuery({
-    queryKey: rowsKey(id ?? '', page, pageSize),
-    queryFn: () => request<RowPage>(`/data-sources/${id}/rows?page=${page}&pageSize=${pageSize}`),
+    queryKey: rowsKey(id ?? '', page, pageSize, order),
+    queryFn: () =>
+      request<RowPage>(`/data-sources/${id}/rows?page=${page}&pageSize=${pageSize}&order=${order}`),
     enabled: id !== null,
     refetchInterval: false,
   })

@@ -58,6 +58,13 @@ const idParams = z.object({ id: z.string().min(1) })
 const pageQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(MAX_ROWS).default(10),
+  /**
+   * Which end of the table to page from. A viewing order, nothing more.
+   *
+   * Printing always goes by ascending ordinal — see the print-order rule — so
+   * this changes what is on screen and never what comes out of the printer.
+   */
+  order: z.enum(['asc', 'desc']).default('asc'),
 })
 
 /** Turn an import failure into the error contract's three-part message. */
@@ -159,11 +166,12 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
     async (request) => {
       const repo = sources()
       const source = require(repo, request.params.id)
-      const { page, pageSize } = request.query
+      const { page, pageSize, order } = request.query
       return {
-        rows: repo.page(source.id, page, pageSize),
+        rows: repo.page(source.id, page, pageSize, order === 'desc'),
         page,
         pageSize,
+        order,
         total: source.rowCount,
       }
     },

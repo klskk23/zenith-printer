@@ -378,3 +378,52 @@ describe('reading a whole table at once', () => {
     expect(res.statusCode).toBe(400)
   })
 })
+
+describe('paging from either end', () => {
+  /** A table with `rows` numbered rows, so ordinals are easy to assert on. */
+  const seed = async (rows: number): Promise<string> => {
+    const lines = ['订单号']
+    for (let i = 1; i <= rows; i += 1) {
+      lines.push(`A-${String(i).padStart(3, '0')}`)
+    }
+    return (await uploadText(lines.join('\n'), { name: `表${rows}` })).json().id as string
+  }
+
+  it('defaults to ascending, which is also the print order', async () => {
+    const id = await seed(25)
+    const res = await app.inject({ method: 'GET', url: `/api/data-sources/${id}/rows?page=1&pageSize=10` })
+    expect(res.json().rows.map((r: { ordinal: number }) => r.ordinal)).toEqual([1,2,3,4,5,6,7,8,9,10])
+  })
+
+  it('descending page one is the end of the table, not the start reversed', async () => {
+    // The distinction that makes this worth doing on the server: reversing a
+    // page in the browser would show 10..1, which is not the last ten rows of
+    // a twenty-five row table and is no help at all in finding row 25.
+    const id = await seed(25)
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/data-sources/${id}/rows?page=1&pageSize=10&order=desc`,
+    })
+    expect(res.json().rows.map((r: { ordinal: number }) => r.ordinal)).toEqual([25,24,23,22,21,20,19,18,17,16])
+  })
+
+  it('carries the last page correctly in either direction', async () => {
+    const id = await seed(25)
+    const asc = await app.inject({ method: 'GET', url: `/api/data-sources/${id}/rows?page=3&pageSize=10` })
+    const desc = await app.inject({
+      method: 'GET',
+      url: `/api/data-sources/${id}/rows?page=3&pageSize=10&order=desc`,
+    })
+    expect(asc.json().rows.map((r: { ordinal: number }) => r.ordinal)).toEqual([21,22,23,24,25])
+    expect(desc.json().rows.map((r: { ordinal: number }) => r.ordinal)).toEqual([5,4,3,2,1])
+  })
+
+  it('rejects an order it does not know rather than guessing', async () => {
+    const id = await seed(3)
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/data-sources/${id}/rows?page=1&pageSize=10&order=sideways`,
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})

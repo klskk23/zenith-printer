@@ -25,6 +25,8 @@ import {
   TableRow,
 } from '../../components/ui/table.tsx'
 import { copy } from '../../i18n/index.ts'
+import { Pagination } from '../../components/ui/pagination.tsx'
+import { ToggleGroup, ToggleGroupItem } from '../../components/ui/toggle-group.tsx'
 import { useDataSourceRows, useDataSources } from '../data-sources/hooks.ts'
 import {
   ordinalColumn,
@@ -33,11 +35,13 @@ import {
   valueColumns,
 } from '../data-sources/columns.tsx'
 import {
+  isPageSelected,
   isSelected,
   labelTotal,
   parseRange,
   selectedCount,
   toggle,
+  togglePage,
   type Selection,
 } from './selection.ts'
 
@@ -58,7 +62,14 @@ export function RowSelectionPanel({
 }: RowSelectionPanelProps): React.JSX.Element {
   const sources = useDataSources()
   const [page, setPage] = useState(1)
-  const rows = useDataSourceRows(dataSourceId, page, PAGE_SIZE)
+  /**
+   * Which end of the table to list from. A viewing order and nothing else —
+   * printing is always by ascending ordinal, which the note below says out
+   * loud because a "descending" toggle is otherwise easy to read as "print
+   * backwards".
+   */
+  const [order, setOrder] = useState<'asc' | 'desc'>('asc')
+  const rows = useDataSourceRows(dataSourceId, page, PAGE_SIZE, order)
   const [rangeText, setRangeText] = useState('')
   const [rangeInvalid, setRangeInvalid] = useState(false)
 
@@ -72,6 +83,7 @@ export function RowSelectionPanel({
   const chosen = selectedCount(selection, total)
 
   const data = rows.data?.rows ?? []
+  const pageOrdinals = useMemo(() => data.map((row) => row.ordinal), [data])
   const columns = useMemo(
     () => [
       selectionColumn({
@@ -115,9 +127,44 @@ export function RowSelectionPanel({
               that quietly means "this page". */}
           {copy.rowSelection.selectAll(total)}
         </Button>
+        {/* Adds to what is already chosen rather than replacing it: paging
+            forward and ticking twice must not lose the first page. */}
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={pageOrdinals.length === 0}
+          onClick={() => onChange(togglePage(selection, pageOrdinals, allOrdinals))}
+          data-select-page
+        >
+          {isPageSelected(selection, pageOrdinals)
+            ? copy.rowSelection.pageDeselect
+            : copy.rowSelection.pageSelect}
+        </Button>
         <Button variant="ghost" size="sm" onClick={() => onChange({ kind: 'explicit', ordinals: [] })}>
           {copy.rowSelection.clear}
         </Button>
+
+        <ToggleGroup
+          type="single"
+          value={order}
+          aria-label={copy.rowSelection.orderLabel}
+          onValueChange={(value) => {
+            if (value === 'asc' || value === 'desc') {
+              setOrder(value)
+              // Back to the first page: page three of one direction is a
+              // different set of rows from page three of the other, and
+              // staying put would look like the rows had changed.
+              setPage(1)
+            }
+          }}
+        >
+          <ToggleGroupItem value="asc" aria-label={copy.rowSelection.orderAsc}>
+            {copy.rowSelection.orderAsc}
+          </ToggleGroupItem>
+          <ToggleGroupItem value="desc" aria-label={copy.rowSelection.orderDesc}>
+            {copy.rowSelection.orderDesc}
+          </ToggleGroupItem>
+        </ToggleGroup>
 
         <div className="flex items-end gap-1">
           <Input
@@ -177,15 +224,28 @@ export function RowSelectionPanel({
         </TableBody>
       </Table>
 
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-          {copy.dataSources.prev}
-        </Button>
-        <span className="text-xs text-muted-foreground">{copy.dataSources.page(page, pageCount)}</span>
-        <Button variant="ghost" size="sm" disabled={page >= pageCount} onClick={() => setPage(page + 1)}>
-          {copy.dataSources.next}
-        </Button>
-      </div>
+      <Pagination
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
+        labels={{
+          previous: copy.rowSelection.previousPage,
+          next: copy.rowSelection.nextPage,
+          page: copy.rowSelection.pageNumber,
+        }}
+      />
+
+      {/*
+        Said next to the control that could be misread. "Descending" is about
+        this list; the labels come out in ascending row order either way, which
+        is what makes a reprint line up and what lets somebody check the stack
+        against the spreadsheet.
+      */}
+      {order === 'desc' && (
+        <p className="text-[11px] text-muted-foreground" data-order-note>
+          {copy.rowSelection.orderNote}
+        </p>
+      )}
 
       {/*
         Said out loud rather than left implied. Content width is not measured

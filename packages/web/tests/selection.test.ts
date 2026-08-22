@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   EMPTY,
+  isPageSelected,
   isSelected,
   labelTotal,
   parseRange,
   selectedCount,
   toRowSelection,
   toggle,
+  togglePage,
+  type Selection,
 } from '../src/features/print/selection.ts'
 
 const table = (n: number): number[] => Array.from({ length: n }, (_unused, i) => i + 1)
@@ -98,5 +101,71 @@ describe('labelTotal', () => {
 
   it('uses the whole table for select-all', () => {
     expect(labelTotal({ kind: 'all' }, 200, 2)).toBe(400)
+  })
+})
+
+describe('ticking a whole page', () => {
+  const all = Array.from({ length: 25 }, (_unused, i) => i + 1)
+  const pageOne = [1, 2, 3, 4, 5]
+  const pageTwo = [6, 7, 8, 9, 10]
+
+  it('adds the page to an empty selection', () => {
+    expect(togglePage(EMPTY, pageOne, all)).toEqual({ kind: 'explicit', ordinals: pageOne })
+  })
+
+  it('adds to what was already chosen rather than replacing it', () => {
+    // Otherwise paging forward and ticking twice loses the first page, and the
+    // count at the top is the only thing that would have said so.
+    const afterFirst = togglePage(EMPTY, pageOne, all)
+    expect(togglePage(afterFirst, pageTwo, all)).toEqual({
+      kind: 'explicit',
+      ordinals: [...pageOne, ...pageTwo],
+    })
+  })
+
+  it('unticks a page that is already wholly chosen', () => {
+    const both = togglePage(togglePage(EMPTY, pageOne, all), pageTwo, all)
+    expect(togglePage(both, pageOne, all)).toEqual({ kind: 'explicit', ordinals: pageTwo })
+  })
+
+  it('ticks the rest when the page is only partly chosen', () => {
+    const partial: Selection = { kind: 'explicit', ordinals: [1, 3] }
+    expect(togglePage(partial, pageOne, all)).toEqual({ kind: 'explicit', ordinals: pageOne })
+  })
+
+  it('turns "everything" explicit rather than clearing it', () => {
+    // Same rule as toggling one row: unticking a page out of "all" must leave
+    // the other twenty rows chosen.
+    const result = togglePage({ kind: 'all' }, pageOne, all)
+    expect(result).toEqual({ kind: 'explicit', ordinals: all.filter((n) => n > 5) })
+  })
+
+  it('keeps the stored ordinals sorted', () => {
+    // The stored order must never look like a print order; printing is by
+    // ascending ordinal whatever was ticked first.
+    const result = togglePage({ kind: 'explicit', ordinals: [9, 2] }, [5], all)
+    expect(result).toEqual({ kind: 'explicit', ordinals: [2, 5, 9] })
+  })
+
+  it('does nothing for a page with no rows', () => {
+    expect(togglePage(EMPTY, [], all)).toEqual(EMPTY)
+  })
+})
+
+describe('whether the page in view is wholly selected', () => {
+  it('is true when every row on it is chosen', () => {
+    expect(isPageSelected({ kind: 'explicit', ordinals: [1, 2, 3] }, [1, 2, 3])).toBe(true)
+  })
+
+  it('is false when one is missing', () => {
+    expect(isPageSelected({ kind: 'explicit', ordinals: [1, 3] }, [1, 2, 3])).toBe(false)
+  })
+
+  it('is true under "everything"', () => {
+    expect(isPageSelected({ kind: 'all' }, [7, 8])).toBe(true)
+  })
+
+  it('is false for an empty page, which is not "all of nothing"', () => {
+    expect(isPageSelected({ kind: 'all' }, [])).toBe(false)
   })
 })

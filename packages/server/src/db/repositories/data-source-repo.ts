@@ -225,10 +225,23 @@ export class DataSourceRepo {
     }
   }
 
-  page(sourceId: string, page: number, pageSize: number): DataSourceRow[] {
+  /**
+   * One page of rows, ordered by position in the table.
+   *
+   * `desc` is a *viewing* order and nothing else. Printing always goes by
+   * ascending ordinal whatever was selected or however it was listed, so that
+   * a reprint lines up and the labels come out in the order somebody can check
+   * them against the spreadsheet.
+   *
+   * The direction has to be applied here rather than by reversing a page in
+   * the browser: page one descending is the *last* ten rows of the table, not
+   * the first ten upside down.
+   */
+  page(sourceId: string, page: number, pageSize: number, desc = false): DataSourceRow[] {
     return this.#db
       .prepare(
-        'SELECT ordinal, values_json FROM data_source_rows WHERE source_id = ? ORDER BY ordinal LIMIT ? OFFSET ?',
+        `SELECT ordinal, values_json FROM data_source_rows WHERE source_id = ?
+          ORDER BY ordinal ${desc ? 'DESC' : 'ASC'} LIMIT ? OFFSET ?`,
       )
       .all(sourceId, pageSize, (page - 1) * pageSize)
       .map((row) => this.#toRow(row as Row))
