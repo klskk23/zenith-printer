@@ -79,11 +79,6 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'It breaks the rules of the chosen barcode symbology, or falls outside the printable area',
     next: 'Correct the field content, then resubmit',
   },
-  TEMPLATE_PRINTER_MISMATCH: {
-    what: 'Template and printer do not match',
-    why: 'The template was designed for a different class of printer; canvas size and printable width are incompatible',
-    next: 'Pick a matching printer, or create a template for this model',
-  },
   TEMPLATE_VERSION_CONFLICT: {
     what: 'This template was changed somewhere else',
     why: 'Someone saved a newer version while you were editing',

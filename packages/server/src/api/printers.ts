@@ -246,7 +246,7 @@ export async function registerPrinterRoutes(app: FastifyInstance): Promise<void>
       // behind existing work instead of interleaving with it, and the offset
       // being corrected is applied to it exactly as to any other label — which
       // is what makes "print it again to check" mean anything.
-      const content = resolveContent(null, ir, profile)
+      const content = resolveContent(null, ir, profile, printer.capabilities)
       const { job } = new JobRepo(ctx()).createOrGet({
         idempotencyKey: randomUUID(),
         printerId: printer.id,

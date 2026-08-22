@@ -106,6 +106,31 @@ export function maxLabelWidthMm(capabilities: ProbedCapabilities): number {
 }
 
 /**
+ * The design at the resolution of the printer it is going to.
+ *
+ * A label design is millimetres and content. The dot grid it lands on belongs
+ * to the printer, so the dpi carried by a stored template — or by the editor,
+ * which uses whatever this browser prefers — is a *preview* value and must not
+ * survive into the render.
+ *
+ * It used to. A template saved against a 203 dpi head and sent to a 300 dpi one
+ * was rasterised at 203 and printed about two thirds of its intended size, and
+ * the only way out was to open the design and save it again. Nothing about the
+ * label had changed; only the machine had.
+ *
+ * One thing does move with the dpi, deliberately: a barcode's module width is
+ * stored in *dots*, so the same barcode is physically narrower on a finer head.
+ * The alternative — holding its millimetres and letting the module fall on a
+ * fractional dot — gives uneven bars that a scanner may refuse, and a barcode
+ * that cannot be read is worse than one that is smaller than intended. It can
+ * only ever shrink, so it cannot overflow the label; `checkLabel` runs against
+ * this dpi and would say so if it could.
+ */
+export function atPrinterDpi<T extends { dpi: number }>(ir: T, capabilities: ProbedCapabilities): T {
+  return ir.dpi === capabilities.dpi ? ir : { ...ir, dpi: capabilities.dpi }
+}
+
+/**
  * Thinnest visible stroke, in millimetres (FR-008).
  * At 203 dpi this is 0.125mm; anything below it is anti-aliased to grey and
  * then removed by thresholding, so the label silently loses the line.

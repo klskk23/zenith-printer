@@ -11,7 +11,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { evaluateIr, labelIrSchema, type LabelIR } from '@zenith/shared'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { maxLabelWidthMm } from '../domain/printer.ts'
+import { atPrinterDpi, maxLabelWidthMm } from '../domain/printer.ts'
 import { PrinterRepo } from '../db/repositories/printer-repo.ts'
 import { renderLabel } from '../render/pipeline.ts'
 import { loadFontConfig } from '../render/fonts.ts'
@@ -85,7 +85,10 @@ export async function registerPreviewRoutes(app: FastifyInstance): Promise<void>
       throw ApiError.unprocessable('VALIDATION_FAILED', { printerId: printer.id })
     }
 
-    const ir = previewIr(app, request.body)
+    // The same rule as printing: the design is millimetres, the dot grid is
+    // the printer's. A preview rendered at the design's own dpi would be a
+    // preview of something the printer is not going to produce.
+    const ir = atPrinterDpi(previewIr(app, request.body), capabilities)
     const maxWidth = maxLabelWidthMm(capabilities)
     if (ir.widthMm > maxWidth + 1e-6) {
       throw ApiError.unprocessable('FIELD_VALIDATION_FAILED', {

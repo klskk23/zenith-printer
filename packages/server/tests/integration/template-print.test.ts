@@ -24,7 +24,7 @@ const TEMPLATE = {
   ],
 }
 
-function seedPrinter(kind: 'niimbot' | 'zpl' = 'niimbot'): string {
+function seedPrinter(kind: 'niimbot' | 'zpl' = 'niimbot', capabilities: { dpi?: number } = {}): string {
   const repo = new PrinterRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
   const printer = repo.create({
     name: kind,
@@ -34,8 +34,12 @@ function seedPrinter(kind: 'niimbot' | 'zpl' = 'niimbot'): string {
     ...(kind === 'niimbot' ? { printTaskName: 'B1' } : {}),
   })
   repo.saveCapabilities(printer.id, {
-    dpi: 203,
-    printheadPixels: kind === 'niimbot' ? 576 : 832,
+    dpi: capabilities.dpi ?? 203,
+    // Scaled with the resolution: a head is a physical width, so doubling the
+    // dpi doubles the dots across it rather than halving the paper.
+    printheadPixels: Math.round(
+      (kind === 'niimbot' ? 576 : 832) * ((capabilities.dpi ?? 203) / 203),
+    ),
     densityMin: 1,
     densityMax: 5,
     densityDefault: 3,
@@ -114,14 +118,34 @@ describe('printing a design with variables', () => {
     expect(res.json().details.reference).toBe('partNo')
   })
 
-  it('refuses a design built for another printer kind', async () => {
-    // FR-032: a 72mm niimbot design has no meaning on a 104mm ZPL head.
+  it('prints a design drawn for one printer kind on another', async () => {
+    // The design is millimetres and content; both drivers are handed a
+    // rasterised bitmap, so there is no kind for it to clash with. This used
+    // to be a 422 and the only way past it was to open the design and save it
+    // again under the other kind — re-saving a file to change nothing about it
+    // (FR-031).
     const zplPrinter = seedPrinter('zpl')
     const template = await createTemplate({ variables: await variables() })
     const res = await submit({ printerId: zplPrinter, templateId: template.id, copies: 1 })
 
-    expect(res.statusCode).toBe(422)
-    expect(res.json().code).toBe('TEMPLATE_PRINTER_MISMATCH')
+    expect(res.statusCode).toBe(202)
+  })
+
+  it('rasterises at the printer resolution, not the one the design was saved with', async () => {
+    // The template is stored at 203 dpi. Printed on a 300 dpi head it must
+    // come out the same physical size, which means the dot grid changes and
+    // the millimetres do not.
+    const printerId = seedPrinter('niimbot', { dpi: 300 })
+    const template = await createTemplate({ variables: await variables() })
+    const res = await submit({ printerId, templateId: template.id, copies: 1 })
+
+    expect(res.statusCode).toBe(202)
+    const row = app.ctx.db.prepare('SELECT snapshot FROM print_jobs').get() as { snapshot: string }
+    const snapshot = JSON.parse(row.snapshot)
+    expect(snapshot.dpi).toBe(300)
+    expect(snapshot.ir.dpi).toBe(300)
+    // The millimetres are the design and do not move with the machine.
+    expect(snapshot.widthMm).toBe(50)
   })
 
   it('returns 404 for a template that does not exist', async () => {

@@ -32,17 +32,28 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
   const profiles = (): ProfileRepo => new ProfileRepo(ctx())
   const printers = (): PrinterRepo => new PrinterRepo(ctx())
 
-  /** Widest canvas any printer of this kind can image (FR-005, FR-032). */
-  const widthLimitFor = (kind: string): number | null => {
+  /**
+   * Widest canvas *any* probed printer can image (FR-005).
+   *
+   * Across every kind, not just the one the design was drawn against: the kind
+   * no longer decides where a design may be printed, so narrowing the limit to
+   * it would refuse to save a design that the wide printer in the next room
+   * prints perfectly well.
+   *
+   * Still only a sanity check against a canvas no machine here could ever
+   * image. Printing checks the label against the printer it is actually going
+   * to, which is the check that matters.
+   */
+  const widthLimit = (): number | null => {
     const widths = printers()
       .list()
-      .filter((p) => p.kind === kind && p.capabilities !== null)
+      .filter((p) => p.capabilities !== null)
       .map((p) => maxLabelWidthMm(p.capabilities!))
     return widths.length === 0 ? null : Math.max(...widths)
   }
 
-  const assertFits = (input: { printerKind: string; widthMm: number }): void => {
-    const limit = widthLimitFor(input.printerKind)
+  const assertFits = (input: { widthMm: number }): void => {
+    const limit = widthLimit()
     if (limit !== null && input.widthMm > limit + 1e-6) {
       throw ApiError.unprocessable('FIELD_VALIDATION_FAILED', {
         widthMm: input.widthMm,

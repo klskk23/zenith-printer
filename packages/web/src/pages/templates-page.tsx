@@ -89,8 +89,16 @@ export function TemplatesPage(): React.JSX.Element {
               ) : (
                 <CardTitle>{template.name}</CardTitle>
               )}
-              <p className="text-[11px] text-muted-foreground">
-                {template.widthMm} × {template.heightMm} mm · {template.dpi} dpi · {template.printerKind}
+              {/*
+                Millimetres only. The dpi and the printer kind used to be shown
+                here as though they said where this design could be printed;
+                neither does any more — the dot grid comes from whichever
+                printer it is sent to, and both drivers take a bitmap. Leaving
+                them on the card is what led people to re-save a design that
+                was never wrong.
+              */}
+              <p className="text-[11px] text-muted-foreground" data-label-size>
+                {template.widthMm} × {template.heightMm} mm
               </p>
             </CardHeader>
             <CardContent className="space-y-2">

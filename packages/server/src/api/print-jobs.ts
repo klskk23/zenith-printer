@@ -27,7 +27,6 @@ import {
   assertReferencesResolvable,
   columnPlaceholders,
   selectRows,
-  assertTemplateMatchesPrinter,
   buildSnapshot,
   designValues,
   resolveContent,
@@ -67,7 +66,7 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       const template =
         input.templateId === undefined ? null : (templates().find(input.templateId) ?? null)
       const profile = input.profileId === undefined ? null : (profiles().find(input.profileId) ?? null)
-      const content = resolveContent(template, input.ir, profile)
+      const content = resolveContent(template, input.ir, profile, printer.capabilities)
 
       const values = designValues(template)
       return { warnings: checkLabel(content.ir, values, 0) }
@@ -97,16 +96,17 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       if (input.templateId !== undefined && template === null) {
         throw ApiError.notFound({ templateId: input.templateId })
       }
-      if (template !== null) {
-        assertTemplateMatchesPrinter(template, printer)
-      }
+      // No printer-kind gate any more. Both drivers are handed a rasterised
+      // bitmap, so a design has no kind of its own to clash with; what decides
+      // whether it can be printed is whether it fits the head, checked below
+      // against this printer rather than against whatever it was drawn on.
 
       const profile = input.profileId === undefined ? null : (profiles().find(input.profileId) ?? null)
       if (input.profileId !== undefined && profile === null) {
         throw ApiError.notFound({ profileId: input.profileId })
       }
 
-      const content = resolveContent(template, input.ir, profile)
+      const content = resolveContent(template, input.ir, profile, printer.capabilities)
 
       // Everything below runs before a single label is burned. Cheap
       // structural checks first, the sequence claim last, so a rejection never

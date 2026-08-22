@@ -213,7 +213,6 @@
 | `422` | `INSUFFICIENT_CONSUMABLE` | 余量 42 < 请求 80，返回两个数字（FR-015） |
 | `422` | `SEQUENCE_OVERFLOW` | 区间上界超出位数可表示范围（FR-046） |
 | `422` | `FIELD_VALIDATION_FAILED` | 字段值不合码制或越界（FR-040） |
-| `422` | `TEMPLATE_PRINTER_MISMATCH` | 模板类别与打印机不符（FR-032） |
 | `503` | `PRINTER_UNREACHABLE` | 设备关机/离线。**立即失败，不重试**（FR-047） |
 
 序号区间在**入队时于单事务内锁定**（FR-049），响应即回显，供用户核对。
@@ -281,5 +280,5 @@
 9. 两者都不提供 → `400`；同时提供 → `202`，打印 `ir` 的内容，任务仍归属该模板
 9a. 同时提供且模板含序号字段 → 序号自该模板续领，不跳回起点
 10. 仅提供 `ir` 且省略 `profileId` → 成功，快照中的参数取自打印机 `densityDefault`
-11. 模板 `printerKind` 与目标打印机不符 → `422 TEMPLATE_PRINTER_MISMATCH`
+11. ~~模板 `printerKind` 与目标打印机不符~~ → **已移除**（003 修订 FR-032）：类别不再阻止打印，宽度按目标打印机检查 → `422 FIELD_VALIDATION_FAILED`
 12. 取消 `queued` 任务后，其序号区间可被下一个任务复用（不永久跳号）

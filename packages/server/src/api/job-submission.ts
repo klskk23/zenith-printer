@@ -20,7 +20,12 @@ import {
 } from '@zenith/shared'
 import type { Database } from '../db/index.ts'
 import type { Clock, IdGenerator } from '../clock.ts'
-import { maxLabelWidthMm, type Printer } from '../domain/printer.ts'
+import {
+  atPrinterDpi,
+  maxLabelWidthMm,
+  type Printer,
+  type ProbedCapabilities,
+} from '../domain/printer.ts'
 import type { Profile } from '../domain/profile.ts'
 import type { Template } from '../domain/template.ts'
 import {
@@ -148,16 +153,6 @@ export function assertFitsPrinter(ir: LabelIR, printer: Printer): void {
   }
 }
 
-/** A design for one printer kind has no meaning on another (FR-032). */
-export function assertTemplateMatchesPrinter(template: Template, printer: Printer): void {
-  if (template.printerKind !== printer.kind) {
-    throw ApiError.unprocessable('TEMPLATE_PRINTER_MISMATCH', {
-      templateKind: template.printerKind,
-      printerKind: printer.kind,
-    })
-  }
-}
-
 /**
  * Build the self-contained record of what is about to be printed.
  * Copied rather than referenced, so later edits and deletions cannot rewrite
@@ -259,8 +254,9 @@ export function resolveContent(
   template: Template | null,
   adHocIr: unknown,
   profile: Profile | null,
+  capabilities: ProbedCapabilities | null = null,
 ): ResolvedContent {
-  const ir =
+  const parsed =
     adHocIr !== undefined
       ? labelIrSchema.parse(adHocIr)
       : labelIrSchema.parse({
@@ -269,6 +265,10 @@ export function resolveContent(
           dpi: template?.dpi,
           elements: template?.elements,
         })
+  // The design is millimetres; the dot grid is the printer's. Without this a
+  // template drawn against one head prints at the wrong size on another and
+  // has to be opened and saved again to be usable (FR-031).
+  const ir = capabilities === null ? parsed : atPrinterDpi(parsed, capabilities)
   return { ir, template, profile }
 }
 

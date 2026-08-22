@@ -89,11 +89,6 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '内容不满足所选条码码制的规则，或超出了标签可打印范围',
     next: '按提示修改字段内容后重新提交',
   },
-  TEMPLATE_PRINTER_MISMATCH: {
-    what: '模板与所选打印机不匹配',
-    why: '模板是为另一类打印机设计的，画布尺寸与可打印范围不兼容',
-    next: '选择匹配的打印机，或为该机型另建模板',
-  },
   QUEUE_PAUSED: {
     what: '该打印机的队列已暂停',
     why: '上一个任务失败，或有人手动暂停了队列',

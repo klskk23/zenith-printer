@@ -138,6 +138,26 @@ describe('renaming a template', () => {
   })
 })
 
+describe('what the card says about the label', () => {
+  it('gives the size in millimetres, which is what the design is', async () => {
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    expect(document.querySelector('[data-label-size]')?.textContent).toBe('50 × 30 mm')
+  })
+
+  it('does not claim a resolution or a printer kind, neither of which constrains it', async () => {
+    // Both used to be printed here as though they said where the design could
+    // go. The dot grid comes from whichever printer it is sent to, and both
+    // drivers take a bitmap — showing them is what led people to re-save a
+    // design that was never wrong.
+    render(wrap(<TemplatesPage />))
+    await screen.findByText('面单')
+    const line = document.querySelector('[data-label-size]')?.textContent ?? ''
+    expect(line).not.toContain('dpi')
+    expect(line).not.toContain('niimbot')
+  })
+})
+
 describe('what the card says about the data source', () => {
   it('does not count variable fields, which no longer exist', async () => {
     render(wrap(<TemplatesPage />))
