@@ -268,6 +268,11 @@ export const copy = {
       }
       return `没有取到新数据：${why[reason] ?? reason}。表格内容保持不变，仍可用它打印`
     },
+    unlink: '解除链接',
+    unlinkTitle: '解除链接',
+    unlinkConfirm: '解除后不能再从 Google 刷新，来源信息也无法恢复。当前的行会全部保留，改由本机维护——也就是说，你接管这张表。',
+    unlinkGo: '解除并接管',
+    readOnlyNotice: '这张表的内容来自 Google，在本机只读。要改内容请回 Google 那边；想在本机接管它，先解除链接。',
     refresh: '刷新',
     refreshing: '刷新中…',
     refreshTitle: '从 Google 重新取一遍这张表的内容',

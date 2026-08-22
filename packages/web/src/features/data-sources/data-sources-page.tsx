@@ -14,7 +14,8 @@ import { UploadDialog } from './upload-dialog.tsx'
 import { LinkGoogleDialog } from './link-google-dialog.tsx'
 import { RefreshButton } from './refresh-button.tsx'
 import { useDataSources,
-  useGoogleStatus, useDeleteDataSource, useRenameDataSource, type DataSource } from './hooks.ts'
+  useGoogleStatus,
+  useUnlinkDataSource, useDeleteDataSource, useRenameDataSource, type DataSource } from './hooks.ts'
 
 export interface DataSourcesPageProps {
   onOpen?: (id: string) => void
@@ -28,6 +29,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
   const [uploading, setUploading] = useState(false)
   const [linking, setLinking] = useState(false)
   const google = useGoogleStatus()
+  const unlink = useUnlinkDataSource()
   const [replacing, setReplacing] = useState<DataSource | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
@@ -142,9 +144,28 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
               >
                 {copy.dataSources.rename}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setReplacing(source)}>
-                {copy.dataSources.replace}
-              </Button>
+              {/* Replacing is an edit, and a linked table's contents are not
+                  ours to edit — the next refresh would undo it silently. */}
+              {source.sourceKind === 'local' && (
+                <Button variant="ghost" size="sm" onClick={() => setReplacing(source)}>
+                  {copy.dataSources.replace}
+                </Button>
+              )}
+              {source.sourceKind === 'google-sheets' && (
+                <ConfirmButton
+                  variant="ghost"
+                  size="sm"
+                  title={copy.dataSources.unlinkTitle}
+                  // Says what it costs and what it keeps. A confirmation that
+                  // only asks "are you sure" tells nobody anything.
+                  description={copy.dataSources.unlinkConfirm}
+                  cancelLabel={copy.common.cancel}
+                  confirmLabel={copy.dataSources.unlinkGo}
+                  onConfirm={() => unlink.mutate(source.id)}
+                >
+                  {copy.dataSources.unlink}
+                </ConfirmButton>
+              )}
               <ConfirmButton
                 variant="ghost"
                 size="sm"

@@ -272,6 +272,11 @@ export const copy: Copy = {
       }
       return `Nothing new was fetched: ${why[reason] ?? reason}. The table is unchanged and can still be printed`
     },
+    unlink: 'Unlink',
+    unlinkTitle: 'Unlink from Google',
+    unlinkConfirm: 'Afterwards it can no longer be refreshed from Google, and the origin cannot be restored. Every row is kept and becomes maintained here — you take the table over.',
+    unlinkGo: 'Unlink and take over',
+    readOnlyNotice: 'This table comes from Google and is read-only here. Change its contents in Google; to take it over on this machine, unlink it first.',
     refresh: 'Refresh',
     refreshing: 'Refreshing…',
     refreshTitle: 'Fetch this table from Google again',

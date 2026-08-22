@@ -239,3 +239,12 @@ export function useRefreshDataSource() {
     },
   })
 }
+
+export function useUnlinkDataSource() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<DataSource>(`/data-sources/${id}/unlink`, { method: 'POST', body: { confirmed: true } }),
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  })
+}

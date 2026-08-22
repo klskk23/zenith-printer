@@ -255,6 +255,44 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
    */
   const refreshing = new Set<string>()
 
+  /**
+   * Refuse to change the contents of a table that is a copy of somebody
+   * else's.
+   *
+   * An edit here survives exactly until the next refresh replaces the table,
+   * and then vanishes with nothing said. The browser disables the controls;
+   * this is what makes it true, because the service has no authentication and
+   * the endpoint is reachable directly.
+   */
+  const assertWritable = (source: DataSource): void => {
+    if (source.sourceKind !== 'local') {
+      throw ApiError.unprocessable('DATA_SOURCE_READ_ONLY', { dataSourceId: source.id })
+    }
+  }
+
+  typed.post(
+    '/api/data-sources/:id/unlink',
+    { schema: { params: idParams, body: z.object({ confirmed: z.boolean().optional() }).default({}) } },
+    async (request) => {
+      const repo = sources()
+      const source = require(repo, request.params.id)
+      if (source.link === null) {
+        throw ApiError.unprocessable('DATA_SOURCE_NOT_LINKED', { dataSourceId: source.id })
+      }
+      if (request.body.confirmed !== true) {
+        // Its own code and its own wording. A shared confirmation message once
+        // told somebody unlinking a table that the operation would consume
+        // label stock; a confirmation has to describe its own consequence.
+        throw ApiError.unprocessable('DATA_SOURCE_UNLINK_NOT_CONFIRMED', {
+          dataSourceName: source.name,
+          rowCount: source.rowCount,
+        })
+      }
+      repo.unlink(source.id)
+      return serialiseSource(require(repo, source.id))
+    },
+  )
+
   typed.post(
     '/api/data-sources/:id/refresh',
     {
@@ -360,6 +398,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
     async (request, reply) => {
       const repo = sources()
       const source = require(repo, request.params.id)
+      assertWritable(source)
       const upload = await readUpload(request as never)
 
       let table
@@ -394,6 +433,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
     async (request) => {
       const repo = sources()
       const source = require(repo, request.params.id)
+      assertWritable(source)
 
       try {
         for (const upsert of request.body.upserts) {

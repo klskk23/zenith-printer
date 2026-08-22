@@ -82,6 +82,7 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
   }, [])
 
   const source = sources.data?.find((candidate) => candidate.id === dataSourceId)
+  const readOnly = source?.sourceKind === 'google-sheets'
   const columnNames = useMemo(() => source?.columns ?? [], [source?.columns])
 
   const columns = useMemo(
@@ -286,8 +287,11 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
         </div>
       </div>
 
+      {/* A linked table's rows are a copy of somebody else's. Editing here
+          survives exactly until the next refresh and then vanishes with
+          nothing said, so the grid does not offer it at all. */}
       <p className="text-[11px] text-muted-foreground" data-paste-hint>
-        {copy.dataSources.gridHint}
+        {readOnly ? copy.dataSources.readOnlyNotice : copy.dataSources.gridHint}
       </p>
 
       {patch.isError && <Alert variant="destructive">{copy.dataSources.patchFailed}</Alert>}
@@ -295,8 +299,10 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
       <DataSheetGrid<GridRow>
         ref={grid}
         value={value}
-        onChange={onChange}
+        onChange={readOnly ? undefined : onChange}
         columns={columns}
+        lockRows={readOnly}
+        disableContextMenu={readOnly}
         height={height}
         // A pasted block running past the end appends rows rather than being
         // clipped; this is what those rows start as.
@@ -307,7 +313,7 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
         // The library's own bar is an unstyled button and an English label at
         // the foot of the page; this one is built from the same primitives as
         // everything around it.
-        addRowsComponent={AddRowsBar}
+        {...(readOnly ? {} : { addRowsComponent: AddRowsBar })}
         // The only way to delete a row, so it cannot stay English on white.
         contextMenuComponent={GridContextMenu}
       />

@@ -143,18 +143,18 @@ npm workspaces 四包结构，不新增包。Google 的真实实现落在新目�
 
 ### 测试
 
-- [ ] T050 [P] [US3] 编写 `packages/server/tests/integration/linked-read-only.test.ts`：链接的数据源上 `PATCH .../rows` 与 `POST .../replace` 均 `422 DATA_SOURCE_READ_ONLY`；**改名不受限制**
-- [ ] T051 [P] [US3] 编写 `packages/server/tests/integration/data-source-unlink.test.ts`：未带 `confirmed` → `422 DATA_SOURCE_UNLINK_NOT_CONFIRMED`；确认后行全部保留、来源字段清空、`sourceKind` 变 `local`；非链接数据源 `422 DATA_SOURCE_NOT_LINKED`
-- [ ] T052 [P] [US3] 在 T051 中补：解绑之后 `PATCH .../rows` 与 `POST .../replace` **恢复可用**（测执行路径，而非只测拦截路径）
-- [ ] T053 [P] [US3] 编写 `packages/web/tests/linked-source-read-only.dom.test.tsx`：链接的数据源编辑页为只读且说明原因；「替换」不可用；本地数据源不受影响
-- [ ] T054 [P] [US3] 在同一文件补：解绑确认框**说明后果**（此后不再能刷新、行由本地维护），而非只问「确定吗」
+- [X] T050 [P] [US3] 编写 `packages/server/tests/integration/linked-read-only.test.ts`：链接的数据源上 `PATCH .../rows` 与 `POST .../replace` 均 `422 DATA_SOURCE_READ_ONLY`；**改名不受限制**
+- [X] T051 [P] [US3] 编写 `packages/server/tests/integration/data-source-unlink.test.ts`：未带 `confirmed` → `422 DATA_SOURCE_UNLINK_NOT_CONFIRMED`；确认后行全部保留、来源字段清空、`sourceKind` 变 `local`；非链接数据源 `422 DATA_SOURCE_NOT_LINKED`
+- [X] T052 [P] [US3] 在 T051 中补：解绑之后 `PATCH .../rows` 与 `POST .../replace` **恢复可用**（测执行路径，而非只测拦截路径）
+- [X] T053 [P] [US3] 编写 `packages/web/tests/linked-source-read-only.dom.test.tsx`：链接的数据源编辑页为只读且说明原因；「替换」不可用；本地数据源不受影响
+- [X] T054 [P] [US3] 在同一文件补：解绑确认框**说明后果**（此后不再能刷新、行由本地维护），而非只问「确定吗」
 
 ### 实现
 
-- [ ] T055 [US3] 在 `packages/server/src/api/data-sources.ts` 给 `PATCH .../rows` 与 `POST .../replace` 加入只读兜底，使 T050 变绿
-- [ ] T056 [US3] 在 `packages/server/src/api/data-sources.ts` 实现 `POST /api/data-sources/:id/unlink`，使 T051、T052 变绿
-- [ ] T057 [P] [US3] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 与 `types.ts` 加入 `DATA_SOURCE_READ_ONLY`、`DATA_SOURCE_UNLINK_NOT_CONFIRMED` 的文案（**独立文案，不复用通用确认码**）
-- [ ] T058 [US3] 在 `packages/web/src/features/data-sources/data-source-editor.tsx` 依 `sourceKind` 进入只读态并说明来自 Google，使 T053 变绿
+- [X] T055 [US3] 在 `packages/server/src/api/data-sources.ts` 给 `PATCH .../rows` 与 `POST .../replace` 加入只读兜底，使 T050 变绿
+- [X] T056 [US3] 在 `packages/server/src/api/data-sources.ts` 实现 `POST /api/data-sources/:id/unlink`，使 T051、T052 变绿
+- [X] T057 [P] [US3] 在 `packages/server/src/i18n/{zh-CN,en-US}.ts` 与 `types.ts` 加入 `DATA_SOURCE_READ_ONLY`、`DATA_SOURCE_UNLINK_NOT_CONFIRMED` 的文案（**独立文案，不复用通用确认码**）
+- [X] T058 [US3] 在 `packages/web/src/features/data-sources/data-source-editor.tsx` 依 `sourceKind` 进入只读态并说明来自 Google，使 T053 变绿
 - [ ] T059 [US3] 在 `packages/web/src/features/data-sources/data-sources-page.tsx` 隐藏链接数据源的「替换」，加入「解除链接」及其确认框，使 T054 变绿
 
 **检查点**：链接的表不会被本地改动无声抹掉；想接管的人有一条出路。

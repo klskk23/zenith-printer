@@ -84,6 +84,16 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'Someone saved a newer version while you were editing',
     next: 'Reload the template and reapply your changes — your current edits are still on screen',
   },
+  DATA_SOURCE_READ_ONLY: {
+    what: 'This data source is read-only here',
+    why: 'Its rows come from a Google Sheet. An edit made here would be overwritten wholesale by the next refresh, with nothing said about it',
+    next: 'Edit it in Google; to take the table over on this machine, unlink it first',
+  },
+  DATA_SOURCE_UNLINK_NOT_CONFIRMED: {
+    what: 'Unlinking needs to be confirmed',
+    why: 'Afterwards it can no longer be refreshed from Google and the origin cannot be restored. Every row is kept and becomes maintained here',
+    next: 'Confirm that you want to take this table over, then submit again',
+  },
   DATA_SOURCE_NOT_LINKED: {
     what: 'This data source is not linked to a spreadsheet',
     why: 'Its rows are maintained here rather than fetched from Google, so there is nothing to refresh',

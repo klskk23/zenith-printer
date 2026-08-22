@@ -89,6 +89,16 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '内容不满足所选条码码制的规则，或超出了标签可打印范围',
     next: '按提示修改字段内容后重新提交',
   },
+  DATA_SOURCE_READ_ONLY: {
+    what: '这个数据源在本机只读',
+    why: '它的内容来自 Google 表格。在这里改动会在下一次刷新时被整表覆盖，而且不会有任何提示',
+    next: '回 Google 表格里改；若想在本机接管这张表，先解除链接',
+  },
+  DATA_SOURCE_UNLINK_NOT_CONFIRMED: {
+    what: '解除链接需要确认',
+    why: '解除之后不能再从 Google 刷新，来源信息也无法恢复；当前的行会全部保留，改由本机维护',
+    next: '确认要接管这张表，再重新提交',
+  },
   DATA_SOURCE_NOT_LINKED: {
     what: '这个数据源没有链接任何表格',
     why: '它的内容由本机维护，不是从 Google 表格取来的，因此无从刷新',
