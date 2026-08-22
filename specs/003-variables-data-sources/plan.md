@@ -12,8 +12,8 @@
 
 技术路径上有三处是本功能的重心，其余都是它们的衍生：
 
-1. **一个解析器，两处使用**。`${}` 的解析放在 `@zenith/shared`，编辑器画布与打印渲染
-   共用同一次解析——这是既有的「一个渲染器」原则的延续（编辑器注入 `irToSvg` 产出的
+1. **一个解析器，两处使用**。`${}` 的解析放在 `@zenith/shared`（单层命名空间，无路径、
+   无引号段），编辑器画布与打印渲染共用同一次解析——这是既有的「一个渲染器」原则的延续（编辑器注入 `irToSvg` 产出的
    SVG，而不是自己再画一遍）。
 2. **序号池的当前值仍由历史推导**，只是多一条 `floor` 使重置可行。今天没有计数器表，
    号码的唯一凭据是任务记录；引入第二份状态会带来「两个数字不一致时哪个是真的」，而
@@ -31,7 +31,8 @@ Tailwind + shadcn/ui、`@resvg/resvg-js`、`bwip-js`。
 **不新增** CSV 解析库与编码库：类型推断与规格相悖，编码能力 Node 自带（见 research R2/R4）。
 
 **Storage**: SQLite（`node:sqlite`）。新增 `data_sources`、`data_source_rows`、
-`sequence_pools` 三张表；`templates.variable_fields` 与 `variable_fields` 表删除。
+`sequence_pools`、`job_sequence_claims` 四张表；`templates` 增加 `variables` 与
+`data_source_id` 两列；`variable_fields` 表与 `print_jobs.seq_ranges` 列删除。
 
 **Testing**: Vitest，沿用既有三个项目 —— `default`（纯 Node）、`web`（happy-dom）、
 `hardware`（隔离）。不新增测试项目。
@@ -71,7 +72,7 @@ Tailwind + shadcn/ui、`@resvg/resvg-js`、`bwip-js`。
 | **II 界面渲染测试** | **每个可导航页面 MUST 有渲染断言** | **新增页面：数据源列表、数据源编辑。两者各需一条挂载断言** | ✅ 见下表 |
 | II | 纯逻辑 MUST 抽离直接测试 | 解析、探测、展开、粘贴切分均不依赖组件 | ✅ |
 | II | 组件测试断言行为而非样式类名 | 沿用既有做法（`data-inspector` 之类的锚点） | ✅ |
-| III.0 术语统一 | 同一概念一个词 | 「变量 / 数据源 / 序号池 / 行选择」四个词贯穿 UI、API、日志、文档 | ✅ |
+| III.0 术语统一 | 同一概念一个词 | 「变量 / 数据源 / 序号池 / 行选择」四个词贯穿 UI、API、日志、文档；变量与列共用「变量」一词，因为引用语法已不区分 | ✅ |
 | III.0 错误三要素 | 什么/为什么/下一步 | 导入失败（编码、表头、重复列、超行数）各有三要素文案 | ✅ |
 | III.0 超 2 秒有进度 | 万行导入、千张打印 | 导入与打印均需进度反馈 | ✅ |
 | III.0 消耗耗材需确认 | 打印、序号池重置、替换数据源、删除数据源 | 四处均要求显式确认 | ✅ |
@@ -125,7 +126,7 @@ packages/
 │   │   ├── sequence-pool.ts  # 新增（取代 variable-field.ts）
 │   │   └── print-job.ts      # 快照增加 rows
 │   ├── db/
-│   │   ├── migrations/       # 新增迁移：建三表、删可变字段
+│   │   ├── migrations/       # 新增迁移：建四表、删可变字段
 │   │   └── repositories/     # data-source-repo、sequence-pool-repo
 │   ├── csv/                  # 新增：解析、编码探测、分隔符探测
 │   ├── api/

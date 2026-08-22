@@ -53,11 +53,11 @@ npm workspaces 四包结构，不新增包：
 
 ### 文法解析器（先测后写）
 
-- [ ] T004 [P] 文法契约测试 `packages/shared/tests/template-parse.test.ts`：逐条覆盖 `contracts/variable-grammar.md` 的 11 条边界用例（`版本 ${major}.${minor}`、`批号 ${lot}.{已校验}`、`$${sku}`、`$$${sku}`、`${ sku }`、`${}`、`${sk`、`${a.b.c}`、`${订单表."单价.含税"}`、`${收件 人}`、`价格 $100`）。先跑，必须全红
+- [ ] T004 [P] 文法契约测试 `packages/shared/tests/template-parse.test.ts`：逐条覆盖 `contracts/variable-grammar.md` 的 13 条边界用例（`版本 ${major}.${minor}`、`批号 ${lot}.{已校验}`、`$${sku}`、`$$${sku}`、`${ sku }`、`${}`、`${ }`、`${sk`、`${单价.含税}`、`${a.b.c}`、`${收件 人}`、`${说"明"}`、`价格 $100`）。先跑，必须全红
 - [ ] T005 [P] 求值测试 `packages/shared/tests/template-evaluate.test.ts`：可解析代入其值；`unterminated` 原样输出且**不进入未解析列表**；已闭合但名称不存在 → 原样输出并计入未解析列表；**断言求值函数在任何输入下都不抛异常**（FR-016）
-- [ ] T006 实现扫描器 `packages/shared/src/template/parse.ts`：`parse(content): Segment[]`，`Segment` 联合含 `literal` / `ref{name}` / `ref{source,column}` / `unterminated`；`.` 只在路径首次出现处分段；引号段用于含点号的列名
-- [ ] T007 实现求值 `packages/shared/src/template/evaluate.ts`：`evaluate(content, lookup): { text: string; unresolved: Reference[] }` 与 `collectReferences(ir): Reference[]`（供提交前校验与数据源引用扫描共用）
-- [ ] T008 变量定义 schema `packages/shared/src/template/variables.ts`：`{ name, kind: 'constant', value }` 与 `{ name, kind: 'sequence', poolId }` 的 zod 联合；名称校验按 FR-009a（不含 `.`、`}`、`"`，首尾空白去除，非空）
+- [ ] T006 实现扫描器 `packages/shared/src/template/parse.ts`：`parse(content): Segment[]`，`Segment` 联合含 `literal` / `ref{name}` / `unterminated`。**单层命名空间**：花括号内除 `}` 外一律是名称的一部分，无路径分隔、无引号段
+- [ ] T007 实现求值 `packages/shared/src/template/evaluate.ts`：`evaluate(content, lookup): { text: string; unresolved: string[] }` 与 `collectReferences(ir): string[]`（供提交前校验与列引用扫描共用）；另出 `detectNameCollisions(variables, columns): string[]`，常量/自增与列重名时列出名称（FR-009b）
+- [ ] T008 变量定义 schema `packages/shared/src/template/variables.ts`：`{ name, kind: 'constant', value }` 与 `{ name, kind: 'sequence', poolId }` 的 zod 联合；名称校验按 FR-009a（不含 `}`，首尾空白去除，非空）
 - [ ] T009 序号格式化迁移 `packages/shared/src/template/sequence.ts`：把 `formatSequence` 与 `SequenceOverflowError` 从 `packages/shared/src/ir/resolve-variables.ts` 搬来（行为不变）
 - [ ] T010 在 `packages/shared/src/index.ts` 导出 `./template/parse.ts`、`./template/evaluate.ts`、`./template/variables.ts`、`./template/sequence.ts`
 
@@ -79,9 +79,9 @@ npm workspaces 四包结构，不新增包：
 
 ### 迁移（先测后写）
 
-- [ ] T021 扩充 `packages/server/tests/unit/migrations.test.ts`：断言迁移 7–10 之后 —— 三张新表与 `job_sequence_claims` 存在且索引齐备；`templates.variables` 列存在；`variable_fields` 表不存在；`print_jobs.seq_ranges` 列不存在；**打印机、打印参数与偏移校正值逐字段保留**（FR-052）
+- [ ] T021 扩充 `packages/server/tests/unit/migrations.test.ts`：断言迁移 7–10 之后 —— 三张新表与 `job_sequence_claims` 存在且索引齐备；`templates.variables` 与 `templates.data_source_id` 两列存在；`variable_fields` 表不存在；`print_jobs.seq_ranges` 列不存在；**打印机、打印参数与偏移校正值逐字段保留**（FR-052）
 - [ ] T022 迁移 7 于 `packages/server/src/db/migrations/index.ts`：建 `data_sources`、`data_source_rows`（主键 `(source_id, ordinal)`、外键 ON DELETE CASCADE）、`sequence_pools`、`job_sequence_claims(job_id, pool_id, start, end, step, digits)` 及 `job_sequence_claims(pool_id)` 索引
-- [ ] T023 迁移 8 于 `packages/server/src/db/migrations/index.ts`：`ALTER TABLE templates ADD COLUMN variables TEXT NOT NULL DEFAULT '[]'`
+- [ ] T023 迁移 8 于 `packages/server/src/db/migrations/index.ts`：`templates` 增加 `variables TEXT NOT NULL DEFAULT '[]'` 与 `data_source_id TEXT NULL REFERENCES data_sources(id)` 两列
 - [ ] T024 迁移 9 于 `packages/server/src/db/migrations/variable-migration.ts`（走 `apply` 钩子）：把既有 `print_jobs.seq_ranges` 的内容搬进 `job_sequence_claims`，随后 `DROP COLUMN seq_ranges`、`DROP TABLE variable_fields`
 - [ ] T025 迁移 10 于 `packages/server/src/db/migrations/variable-migration.ts`：既有模板元素内容中的 `{ $var: x }` 改写为 `${x}`，其余内容里字面的 `${` 转义为 `$${`（Assumptions 已声明此为必需的一次性改写）
 
@@ -126,13 +126,13 @@ npm workspaces 四包结构，不新增包：
 - [ ] T041 [P] [US1] `packages/server/src/db/repositories/sequence-pool-repo.ts`：CRUD + `highestConsumed(poolId)`（查 `job_sequence_claims`，按池 id 索引）
 - [ ] T042 [US1] 重写 `packages/server/src/domain/sequence-allocator.ts`：领取写入 `job_sequence_claims`，`#highestConsumed` 改按 `pool_id` 查询；`suggest` / `allocate` / `release` / `conflictsWithHistory` 的签名由「字段」改为「池」（依赖 T040、T041）
 - [ ] T043 [US1] `packages/server/src/api/sequence-pools.ts`：实现 `contracts/rest-api.md` 的五个端点（列表、建立、修改、重置、删除），响应含 `floor`，并在 `packages/server/src/app.ts` 注册
-- [ ] T044 [P] [US1] `packages/server/src/db/repositories/template-repo.ts`：读写 `variables` 列（JSON），用 T008 的 schema 校验
-- [ ] T045 [US1] `packages/server/src/api/templates.ts`：模板的建立/更新/读取带上 `variables`
+- [ ] T044 [P] [US1] `packages/server/src/db/repositories/template-repo.ts`：读写 `variables`（JSON）与 `data_source_id` 两列，用 T008 的 schema 校验
+- [ ] T045 [US1] `packages/server/src/api/templates.ts`：模板的建立/更新/读取带上 `variables` 与 `dataSourceId`
 - [ ] T046 [US1] `packages/server/src/api/job-submission.ts`：提交前用 `collectReferences` 校验每个引用可解析，否则 `422 VARIABLE_NOT_DEFINED`；把设计的 `variables` 解析为求值表（依赖 T042）
 - [ ] T047 [US1] `packages/server/src/render/job-pages.ts`：`valuesForCopy` 由 `job_sequence_claims` 与常量定义合成；`hasPerCopyContent` 按是否存在序号声明判定
 - [ ] T048 [US1] `packages/server/src/api/preview.ts`：移除 `variableValues`，改为用设计的变量定义求值（`rowOrdinal` 留待 US2）
 - [ ] T049 [P] [US1] `packages/web/src/api/types.ts` 与 `packages/web/src/api/client.ts`：序号池端点的类型与调用；移除 print-form 相关类型
-- [ ] T050 [US1] `packages/web/src/editor/variables-panel.tsx`（新建，取代已删的 `variable-field-panel.tsx`）：常量的增删改；自增变量选择或新建序号池；名称按 FR-009a 校验
+- [ ] T050 [US1] `packages/web/src/editor/variables-panel.tsx`（新建，取代已删的 `variable-field-panel.tsx`）：常量的增删改；自增变量选择或新建序号池；名称按 FR-009a 校验；与所绑数据源的列重名时就地提示（FR-009b）
 - [ ] T051 [US1] `packages/web/src/editor/preview-values.ts`：改为调用 `@zenith/shared` 的 `evaluate`，返回代入后的 IR 与未解析引用列表；**任何输入都不抛异常**（依赖 T007）
 - [ ] T052 [US1] `packages/web/src/editor/inspector.tsx`：接入变量面板，元素内容输入框改为普通模板串输入（不再有「绑定/未绑定」的概念）
 - [ ] T053 [P] [US1] `packages/web/src/features/sequence-pools/hooks.ts`：序号池的 react-query 读写
@@ -146,10 +146,10 @@ npm workspaces 四包结构，不新增包：
 
 ## Phase 4: User Story 2 - 从表格批量打印 (Priority: P2)
 
-**Goal**: 表格数据源（CSV 上传、剪贴板粘贴、站内编辑）；设计里写 `${源.列}`；
+**Goal**: 表格数据源（CSV 上传、剪贴板粘贴、站内编辑）；设计绑定一个数据源、内容写 `${列名}`；
 打印时勾选行，每行一张。
 
-**Independent Test**: 上传一张 20 行的 CSV，在设计里引用两列，勾选第 5–12 行打印；
+**Independent Test**: 上传一张 20 行的 CSV，把设计绑定到它并引用其中两列，勾选第 5–12 行打印；
 确认印出 8 张，内容与对应行一致，顺序与表格一致。
 
 **Dependency**: 依赖 US1 的引用语法与求值管线；不依赖 US3。
@@ -162,9 +162,9 @@ npm workspaces 四包结构，不新增包：
 - [ ] T057 [P] [US2] `packages/shared/tests/csv-delimited.test.ts`：RFC 4180 引号规则（`""` 转义、引号内含分隔符与换行）、`\r\n` 与 `\n` 两种行尾、末行无换行
 - [ ] T058 [P] [US2] `packages/server/tests/unit/csv-import.test.ts`：分隔符在 `,`/`;`/`\t` 间按表头行计数探测；GBK 夹具解码出正确中文；无表头拒绝；重复列名拒绝并指出列名；空白列名拒绝；超 10,000 行拒绝并给出行数与上限；`007` 逐字保留；数据行列数与表头不一致时的处理
 - [ ] T059 [P] [US2] `packages/server/tests/unit/row-selection.test.ts`：`{all:true}` 在提交时展开为全部 ordinal；`ranges` 与 `ids` 合并去重；**结果始终按 ordinal 升序，与勾选先后无关**（AS-9、FR-037）；空选择产出空数组
-- [ ] T060 [P] [US2] `packages/server/tests/unit/template-refs.test.ts`：从模板内容里扫出被引用的数据源名与列名；引用了两个不同数据源时如实报告两个（供 FR-029 判定）
+- [ ] T060 [P] [US2] `packages/server/tests/unit/template-refs.test.ts`：从模板内容里扫出被引用的**列名**；按 `dataSourceId` 找出引用某数据源的全部设计（供删除与替换的影响面提示使用）
 - [ ] T061 [P] [US2] `packages/server/tests/integration/data-sources-api.test.ts`：上传建立 / 分页读行 / `PATCH` 增改删 / 删除；名称重复 → `409 DATA_SOURCE_NAME_TAKEN`；删除时仍被引用 → `409 DATA_SOURCE_IN_USE` 且列出设计；替换导致旧列消失 → `409 DATA_SOURCE_COLUMNS_REMOVED` 且列出 `removedColumns` 与 `affectedTemplates`，带 `confirm=true` 后 `200`（AS-4a、FR-021a）；`PATCH` 引入表中没有的列 → `422 DATA_SOURCE_UNKNOWN_COLUMN`
-- [ ] T062 [P] [US2] `packages/server/tests/integration/data-source-print.test.ts`：区间 `5-12` → 印 8 张且内容与对应行逐字一致；份数 2 → 每行连续两张、**含序号在内完全相同**（AS-10、FR-036）；未选行 → `422 NO_ROWS_SELECTED`；两个数据源 → `422 MULTIPLE_DATA_SOURCES`；行数×份数 > 1000 → `422 BATCH_TOO_LARGE` 且**在打印任何东西之前**拒绝
+- [ ] T062 [P] [US2] `packages/server/tests/integration/data-source-print.test.ts`：区间 `5-12` → 印 8 张且内容与对应行逐字一致；份数 2 → 每行连续两张、**含序号在内完全相同**（AS-10、FR-036）；未选行 → `422 NO_ROWS_SELECTED`；常量与所绑数据源的列重名 → `422 VARIABLE_NAME_COLLIDES` 且指出名称（FR-009b）；行数×份数 > 1000 → `422 BATCH_TOO_LARGE` 且**在打印任何东西之前**拒绝
 - [ ] T063 [P] [US2] `packages/server/tests/integration/snapshot-frozen.test.ts`：任务提交后修改数据源（改值、删行），该任务的历史内容与补打结果均不变（AS-12、FR-039、FR-040、SC-005）
 - [ ] T064 [P] [US2] `packages/server/tests/integration/selection-refusals.test.ts`：勾选 `5-12` 后删除第 7 行再提交 → `422 ROW_SELECTION_STALE` 且 `details.missingOrdinals` 含 7，而 `{all:true}` 在同样情形下照常提交（FR-033a）；条码引用的列在所选行中有空值 → `422 BARCODE_EMPTY_VALUE` 且指出列名与行号，**并注入计数器断言该校验一次条码都没编**（划清 FR-045b 与 FR-045 的边界）
 - [ ] T065 [P] [US2] `packages/server/tests/integration/csv-import-performance.test.ts`：10,000 行 CSV 从收到请求到可用于打印 < 30 秒（SC-002-pre）。这条测的是写入策略而非机器速度 —— 逐行 `INSERT` 会稳定超时，单事务批量写入不会
@@ -182,10 +182,10 @@ npm workspaces 四包结构，不新增包：
 - [ ] T074 [US2] `packages/server/src/csv/import.ts`：编码 → 分隔符 → 切分 → 表头校验 → 行数校验的完整导入管线，**一切皆文本、不做任何类型推断**（FR-024）（依赖 T070、T072、T073）
 - [ ] T075 [US2] `packages/server/src/db/repositories/data-source-repo.ts`：建立/替换/分页读行/增改删行/删除；`row_count` 冗余字段随写更新（research R7）
 - [ ] T076 [P] [US2] `packages/server/src/domain/row-selection.ts`：`{all} | {ranges, ids}` 的展开，结果按 ordinal 升序去重（research R9）
-- [ ] T077 [P] [US2] `packages/server/src/domain/template-refs.ts`：扫描模板内容中的数据源引用，供删除/替换的影响面提示与 FR-029 判定使用（依赖 T007 的 `collectReferences`）
+- [ ] T077 [P] [US2] `packages/server/src/domain/template-refs.ts`：按 `data_source_id` 查出引用某数据源的设计（一次索引查询，不再扫描内容字符串），并用 `collectReferences` 取出它们引用的列名，供删除与替换的影响面提示使用（依赖 T007）
 - [ ] T078 [US2] `packages/server/src/api/data-sources.ts`：六个端点（列表、读行、建立、替换、编辑、删除），multipart 沿用 `@fastify/multipart` 的既有用法；并在 `packages/server/src/app.ts` 注册（依赖 T074–T077）
 - [ ] T079 [US2] `packages/server/src/domain/print-job.ts`：`printJobInputSchema` 增加可选 `rowSelection`；`ContentSnapshot` 落实 `rows` 与 `copiesPerRow`；`MAX_COPIES` 之外新增 `MAX_LABELS_PER_JOB = 1000`
-- [ ] T080 [US2] `packages/server/src/api/job-submission.ts`：展开行选择 → 抄入快照 → 校验张数上限、零行、多数据源；**上限校验先于任何渲染与领号**（FR-043）（依赖 T076、T077、T079）
+- [ ] T080 [US2] `packages/server/src/api/job-submission.ts`：展开行选择 → 抄入快照 → 校验张数上限、零行、名称重名（FR-009b）；**上限校验先于任何渲染与领号**（FR-043）。「多数据源」无需校验——绑定是模板上的单个字段，写不出第二个（依赖 T076、T077、T079）
 - [ ] T081 [US2] `packages/server/src/domain/barcode-refs.ts`：找出被条码/二维码引用的列，在所选行中**逐列比较字符串**查空值（不编码）；`packages/server/src/api/job-submission.ts` 接入该校验与行选择过期校验（FR-033a、FR-045b）
 - [ ] T082 [US2] `packages/server/src/render/job-pages.ts`：`row = snapshot.rows[floor(index / copiesPerRow)]`，与序号值合并后求值（data-model 的 `irForCopy`）
 - [ ] T083 [US2] `packages/server/src/api/preview.ts`：新增可选 `rowOrdinal`，缺省取打印顺序上的第一行（FR-041）
@@ -205,7 +205,7 @@ npm workspaces 四包结构，不新增包：
 - [ ] T097 [US2] `packages/web/src/features/print/print-dialog.tsx`：接入行选择；张数显示为「所选行数 × 份数」；**明确写出「未按行检查内容宽度」**（FR-045a）
 - [ ] T098 [US2] `packages/web/src/features/print/preview.tsx`：预览打印顺序上的第一张（依赖 T083）
 
-- [ ] T099 [US2] `packages/web/src/editor/preview-values.ts` 与 `packages/web/src/features/data-sources/hooks.ts`：编辑器对 `${源.列}` 代入该数据源的**首行值**（FR-015）。少了这一步，引用了数据源的设计在画布上永远是空白 —— 而画布正是判断排版的唯一依据
+- [ ] T099 [US2] `packages/web/src/editor/data-source-binding.tsx`、`packages/web/src/editor/preview-values.ts` 与 `packages/web/src/features/data-sources/hooks.ts`：属性栏里选择设计所绑的数据源（可清空）并列出其列名供插入；编辑器对 `${列名}` 代入所绑数据源的**首行值**（FR-009、FR-015）。少了这一步，引用了数据源的设计在画布上永远是空白 —— 而画布正是判断排版的唯一依据
 
 
 **Checkpoint**: US1 与 US2 均可独立验收。一个模板覆盖一整批内容不同的标签已经成立。

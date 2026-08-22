@@ -9,7 +9,7 @@
 | 字段 | 类型 | 约束 |
 |---|---|---|
 | `id` | TEXT | 主键 |
-| `name` | TEXT | **唯一**，建立后不可更改（FR-019）。是 `${名称.列}` 的第一段 |
+| `name` | TEXT | **唯一**。本期建立后不可更改（FR-019），但已不再是引用语法的一部分 |
 | `columns` | TEXT (JSON) | 列名数组，顺序即表格列序 |
 | `rowCount` | INTEGER | 冗余存储，避免列表页对万行表做 `COUNT(*)` |
 | `createdAt` / `updatedAt` | TEXT | ISO 8601 |
@@ -89,7 +89,8 @@
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `variables` | TEXT (JSON) | 具名变量的定义数组 |
+| `variables` | TEXT (JSON) | 具名变量的定义数组（仅常量与自增） |
+| `dataSourceId` | TEXT NULL | 所绑数据源。**一个设计最多一个**（FR-029）——这里是那个「一」的落点 |
 
 单个变量定义：
 
@@ -98,8 +99,13 @@
 { "name": "serial", "kind": "sequence", "poolId": "pool-1" }
 ```
 
-数据源列**不在此列**——它没有命名层，内容里直接写 `${源.列}`（FR-009 / research 的
-分支 3a）。
+数据源列**不在 `variables` 里**——它不需要声明，内容里直接写 `${列名}`，求值时到
+`dataSourceId` 指向的表里找（FR-009）。
+
+`dataSourceId` 让「最多一个数据源」成为结构上不可违反的事实，而不是一条要在提交时
+校验的规则：字段只有一个，就写不出第二个。删除数据源的影响面扫描（FR-028）也随之
+从「扫描所有模板的内容字符串」变成一次 `WHERE data_source_id = ?`，既快又不会因为
+某个常量恰好与数据源同名而误报。
 
 ### PrintJob（打印任务）
 
@@ -130,7 +136,7 @@ values = { ...row, ...seq }
 | # | 内容 | 破坏性 |
 |---|---|---|
 | 7 | 建 `data_sources`、`data_source_rows`、`sequence_pools`、`job_sequence_claims` | 否 |
-| 8 | `templates` 增加 `variables` 列 | 否 |
+| 8 | `templates` 增加 `variables` 与 `data_source_id` 两列 | 否 |
 | 9 | 既有 `print_jobs.seq_ranges` 搬进 `job_sequence_claims`，随后删除该列与 `variable_fields` 表 | **是**（当前无生产数据，FR-051） |
 | 10 | 既有模板元素内容中的 `{ $var: x }` 改写为 `${x}`；字面 `${` 转义为 `$${` | **是** |
 
@@ -150,7 +156,7 @@ Constant ──────┘
 
 DataSource ──< DataSourceRow
      ▲
-     └── 被 Template.elements 的内容按名字引用（${源.列}），无外键
+     └──< Template.dataSourceId （绑定；列名由内容里的 ${列名} 引用，无外键）
 
 Template ──< PrintJob（既有）
 PrintJob.snapshot.rows ── 行值的副本，提交时冻结，此后不再依赖 DataSource

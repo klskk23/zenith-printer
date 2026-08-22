@@ -112,8 +112,9 @@
 
 - 设计引用了数据源却未给 `rowSelection`，或选中 0 行 → `422 NO_ROWS_SELECTED`
 - `所选行数 × copies > 1000` → `422 BATCH_TOO_LARGE`，`details` 含 `requested` 与 `maxLabels`
-- 设计引用了两个数据源 → `422 MULTIPLE_DATA_SOURCES`
 - 内容中有无法解析的引用 → `422 VARIABLE_NOT_DEFINED`，`details.reference` 指出是哪一个
+- 常量/自增与所绑数据源的某一列重名 → `422 VARIABLE_NAME_COLLIDES`，`details.name`
+  指出是哪个名称（FR-009b）
 - 所选行序号已不存在 → `422 ROW_SELECTION_STALE`，`details.missingOrdinals` 列出缺失的
   序号（FR-033a）。`{ "all": true }` 不会触发此错误
 - 被条码或二维码引用的列在所选行中有空值 → `422 BARCODE_EMPTY_VALUE`，
@@ -145,8 +146,8 @@
 | `DATA_SOURCE_UNKNOWN_COLUMN` | 422 | 编辑/粘贴引入表中没有的列 |
 | `NO_ROWS_SELECTED` | 422 | 一行都没选 |
 | `BATCH_TOO_LARGE` | 422 | 超过单任务 1000 张 |
-| `MULTIPLE_DATA_SOURCES` | 422 | 一个设计引用了多个数据源 |
 | `VARIABLE_NOT_DEFINED` | 422 | 引用无法解析 |
+| `VARIABLE_NAME_COLLIDES` | 422 | 常量/自增与所绑数据源的列重名 |
 | `SEQUENCE_POOL_IN_USE` | 409 | 删除序号池时仍被引用 |
 | `ROW_SELECTION_STALE` | 422 | 所选行序号已不存在 |
 | `BARCODE_EMPTY_VALUE` | 422 | 条码/二维码引用的列在所选行中为空 |
