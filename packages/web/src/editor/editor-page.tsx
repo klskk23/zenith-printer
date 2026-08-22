@@ -751,6 +751,16 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                       dataSourceId={dataSourceId}
                       onChange={setDataSourceId}
                       bindingIssue={template?.bindingIssue ?? null}
+                      // Appends to the selected element rather than typing at
+                      // a cursor: the panel does not own the content field, and
+                      // a column name typed from memory is a reference that
+                      // silently resolves to nothing.
+                      onInsertReference={
+                        selected !== null && 'content' in selected
+                          ? (reference) =>
+                              updateElement({ ...selected, content: selected.content + reference })
+                          : undefined
+                      }
                     />
                     <VariablesPanel
                       variables={variables}

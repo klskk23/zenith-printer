@@ -100,7 +100,7 @@ describe('reset', () => {
       payload: { floor: 1 },
     })
     expect(res.statusCode).toBe(422)
-    expect(res.json().code).toBe('CONFIRMATION_REQUIRED')
+    expect(res.json().code).toBe('SEQUENCE_RESET_NOT_CONFIRMED')
   })
 
   it('moves numbering when confirmed, and says where it landed', async () => {

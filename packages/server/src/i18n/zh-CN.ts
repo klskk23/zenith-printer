@@ -214,6 +214,16 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '条码内容不能为空，这一行会在打印中途失败',
     next: '补上这些单元格的值，或取消勾选这些行',
   },
+  SEQUENCE_RESET_NOT_CONFIRMED: {
+    what: '重置序号池需要确认',
+    why: '重置到已经印出去的号码会与旧标签重号，而两个同号的箱子事后分不出彼此',
+    next: '确认后继续；已发放的号段仍会留在任务记录里',
+  },
+  DATA_SOURCE_DELETE_NOT_CONFIRMED: {
+    what: '删除数据源需要确认',
+    why: '表里的行会被删掉，无法恢复',
+    next: '确认后继续；引用它的设计不会被删，但会显示警告，重新绑到另一张同形状的表即可复原',
+  },
 }
 
 export const ZH_CN: LocaleBundle = { device: DEVICE_ERROR_COPY, app: APP_ERROR_COPY }

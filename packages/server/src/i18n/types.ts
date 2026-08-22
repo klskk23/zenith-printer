@@ -54,6 +54,11 @@ export const APP_ERROR_CODES = [
   'SEQUENCE_POOL_IN_USE',
   'ROW_SELECTION_STALE',
   'BARCODE_EMPTY_VALUE',
+  // Confirmation is per-operation, not one shared code: the three-part message
+  // has to say what *this* action does. Reusing the print confirmation told
+  // somebody resetting a counter that it would consume paper.
+  'SEQUENCE_RESET_NOT_CONFIRMED',
+  'DATA_SOURCE_DELETE_NOT_CONFIRMED',
 ] as const
 
 export type AppErrorCode = (typeof APP_ERROR_CODES)[number]

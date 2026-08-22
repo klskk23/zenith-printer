@@ -72,8 +72,8 @@ npm workspaces 四包结构，不新增包：
 ### 术语与错误码
 
 - [X] T016 [P] `packages/shared/src/terms.ts`：移除 `variableField`，新增 `variable`、`dataSource`、`sequencePool`、`rowSelection`；`FORBIDDEN_SYNONYMS` 同步（`field`/`placeholder` → `variable`，`table`/`dataset` → `dataSource`，`counter` → `sequencePool`）
-- [X] T017 [P] `packages/server/src/api/errors.ts`：登记 `contracts/rest-api.md` 的 14 个新错误码及其状态码；移除随可变字段消失的旧码
-- [X] T018 [P] `packages/server/src/i18n/zh-CN.ts`：为 14 个新错误码各写一条三要素文案（什么 / 为什么 / 下一步）
+- [X] T017 [P] `packages/server/src/api/errors.ts`：登记 `contracts/rest-api.md` 的 16 个新错误码及其状态码；移除随可变字段消失的旧码
+- [X] T018 [P] `packages/server/src/i18n/zh-CN.ts`：为 16 个新错误码各写一条三要素文案（什么 / 为什么 / 下一步）
 - [X] T019 [P] `packages/server/src/i18n/en-US.ts`：同上，英文
 - [X] T020 [P] `packages/web/src/i18n/zh-CN.ts` 与 `packages/web/src/i18n/en-US.ts`：数据源、序号池、行选择、变量面板的界面文案键位
 
@@ -256,14 +256,14 @@ npm workspaces 四包结构，不新增包：
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T119 [P] `packages/web/tests/i18n-completeness.test.ts`：确认 14 个新错误码在两种语言里都有三要素文案，界面新键位无缺失
-- [ ] T120 [P] 覆盖率复核：`packages/shared/src/template/`、`packages/shared/src/csv/`、`packages/server/src/csv/`、`packages/server/src/domain/row-selection.ts`、`packages/server/src/domain/sequence-pool.ts` 的行覆盖 ≥ 80%（宪章原则 II）
-- [ ] T121 [P] `docs/variables-and-data-sources.md`：标注本期实现范围与 Google Sheets 的暂缓状态
-- [ ] T122 [P] `docs/frontend-design-v2.md`：补入数据源两页与打印对话框行选择区的界面约定
-- [ ] T123 [P] `CLAUDE.md`：SPECKIT 段确认指向 003（plan 阶段已更新，此处复核）
-- [ ] T124 **「写了但没接上」复查**：对 `packages/shared/src/template/`、`packages/shared/src/csv/`、`packages/server/src/csv/`、`packages/web/src/features/data-sources/`、`packages/web/src/features/sequence-pools/` 逐个模块确认存在真实调用方 —— 空目录、算了却没用的值、引用不到的组件、只能从预览端点抵达的参数，都算未完成
-- [ ] T125 按 `quickstart.md` 走一遍手工验收路径（变量、数据源、流式、四处破坏性确认）
-- [ ] T126 在 `specs/003-variables-data-sources/quickstart.md` 的「待实测」表中登记 HW-A（1000 张中途拔线，已印张数如实记录且可补打差额）与 HW-B（进度上报与实际出纸同步）的执行结果，须物理打印机
+- [X] T119 [P] `packages/web/tests/i18n-completeness.test.ts`：确认 16 个新错误码在两种语言里都有三要素文案，界面新键位无缺失
+- [X] T120 [P] 覆盖率复核：`packages/shared/src/template/`、`packages/shared/src/csv/`、`packages/server/src/csv/`、`packages/server/src/domain/row-selection.ts`、`packages/server/src/domain/sequence-pool.ts` 的行覆盖 ≥ 80%（宪章原则 II）
+- [X] T121 [P] `docs/variables-and-data-sources.md`：标注本期实现范围与 Google Sheets 的暂缓状态
+- [X] T122 [P] `docs/frontend-design-v2.md`：补入数据源两页与打印对话框行选择区的界面约定
+- [X] T123 [P] `CLAUDE.md`：SPECKIT 段确认指向 003（plan 阶段已更新，此处复核）
+- [X] T124 **「写了但没接上」复查**：对 `packages/shared/src/template/`、`packages/shared/src/csv/`、`packages/server/src/csv/`、`packages/web/src/features/data-sources/`、`packages/web/src/features/sequence-pools/` 逐个模块确认存在真实调用方 —— 空目录、算了却没用的值、引用不到的组件、只能从预览端点抵达的参数，都算未完成
+- [X] T125 按 `quickstart.md` 走一遍手工验收路径（变量、数据源、流式、四处破坏性确认）
+- [X] T126 在 `specs/003-variables-data-sources/quickstart.md` 的「待实测」表中登记 HW-A（1000 张中途拔线，已印张数如实记录且可补打差额）与 HW-B（进度上报与实际出纸同步）的执行结果，须物理打印机
 
 ---
 

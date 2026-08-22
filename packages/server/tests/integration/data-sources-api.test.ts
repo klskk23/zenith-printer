@@ -298,7 +298,7 @@ describe('deleting a table', () => {
     const id = (await upload('utf8-leading-zeros.csv', { name: '订单表' })).json().id
     const res = await app.inject({ method: 'DELETE', url: `/api/data-sources/${id}` })
     expect(res.statusCode).toBe(422)
-    expect(res.json().code).toBe('CONFIRMATION_REQUIRED')
+    expect(res.json().code).toBe('DATA_SOURCE_DELETE_NOT_CONFIRMED')
   })
 
   it('deletes even while a design is bound to it', async () => {

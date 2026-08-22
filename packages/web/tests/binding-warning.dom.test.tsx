@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TemplatesPage } from '../src/pages/templates-page.tsx'
 import { WorkspaceProvider } from '../src/app/workspace.tsx'
@@ -100,5 +100,45 @@ describe('the design properties panel', () => {
   it('says nothing when there is no issue', () => {
     render(wrap(<DataSourceBinding dataSourceId={null} onChange={() => undefined} bindingIssue={null} />))
     expect(document.querySelector('[data-binding-issue]')).toBeNull()
+  })
+})
+
+describe('inserting a column reference', () => {
+  /**
+   * The column buttons were wired to a callback nobody passed, so clicking one
+   * did nothing — the "written but never wired" shape, and invisible from the
+   * outside because the button still highlighted.
+   */
+  it('hands back the reference for the column that was clicked', async () => {
+    const inserted: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          json: () =>
+            Promise.resolve({
+              dataSources: [
+                { id: 'ds-1', name: '订单表', columns: ['订单号', '收件人'], rowCount: 1, createdAt: 'T', updatedAt: 'T' },
+              ],
+            }),
+        } as unknown as Response),
+      ),
+    )
+
+    render(
+      wrap(
+        <DataSourceBinding
+          dataSourceId="ds-1"
+          onChange={() => undefined}
+          onInsertReference={(reference) => inserted.push(reference)}
+        />,
+      ),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: '收件人' }))
+    expect(inserted).toEqual(['${收件人}'])
   })
 })

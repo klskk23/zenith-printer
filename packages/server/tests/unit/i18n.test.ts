@@ -71,6 +71,32 @@ describe('application errors', () => {
     }
   })
 
+  it('covers the codes this feature added', () => {
+    // The loop below already checks every registered code. This names the new
+    // ones so that removing one from the registry — which would make the loop
+    // pass by having less to check — fails here instead.
+    for (const code of [
+      'CSV_NO_HEADER',
+      'CSV_DUPLICATE_COLUMN',
+      'CSV_TOO_MANY_ROWS',
+      'CSV_DECODE_FAILED',
+      'DATA_SOURCE_NAME_TAKEN',
+      'DATA_SOURCE_COLUMNS_REMOVED',
+      'DATA_SOURCE_UNKNOWN_COLUMN',
+      'NO_ROWS_SELECTED',
+      'BATCH_TOO_LARGE',
+      'VARIABLE_NOT_DEFINED',
+      'VARIABLE_NAME_COLLIDES',
+      'SEQUENCE_POOL_IN_USE',
+      'ROW_SELECTION_STALE',
+      'BARCODE_EMPTY_VALUE',
+      'SEQUENCE_RESET_NOT_CONFIRMED',
+      'DATA_SOURCE_DELETE_NOT_CONFIRMED',
+    ] as const) {
+      expect(APP_ERROR_CODES, code).toContain(code)
+    }
+  })
+
   it('answers all three parts in both languages', () => {
     for (const locale of LOCALES) {
       for (const code of APP_ERROR_CODES) {

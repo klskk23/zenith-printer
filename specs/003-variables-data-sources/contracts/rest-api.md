@@ -67,7 +67,10 @@
 
 ### `DELETE /api/data-sources/:id`
 
-- 未带 `confirm=true` → `422 CONFIRMATION_REQUIRED`（表内的行不可恢复）
+- 未带 `confirm=true` → `422 DATA_SOURCE_DELETE_NOT_CONFIRMED`（表内的行不可恢复）
+
+  确认是**按操作分开的码**，不共用打印的那个：三要素必须说清*这个*动作会做什么。
+  共用的结果是重置计数器时被告知「会消耗纸张」——实现期跑手工验收才发现。
 - 带 `confirm=true` → `204`，**即使有设计正在引用它**
 
 不设引用拦截（FR-028）：列引用是裸名，把设计重新绑到另一张同形状的表即可全部复原。
@@ -105,7 +108,7 @@
 { "floor": 1, "confirm": true }
 ```
 
-- 未带 `confirm` → `422 CONFIRMATION_REQUIRED`
+- 未带 `confirm` → `422 SEQUENCE_RESET_NOT_CONFIRMED`
 - 带 `confirm` → `200`，返回新的 `current`
 
 重置可能导致与已印出标签重号，属于宪章 III.0 的「不可撤销操作」。
@@ -174,6 +177,8 @@
 | `SEQUENCE_POOL_IN_USE` | 409 | 删除序号池时仍被引用 |
 | `ROW_SELECTION_STALE` | 422 | 所选行序号已不存在 |
 | `BARCODE_EMPTY_VALUE` | 422 | 条码/二维码引用的列在所选行中为空 |
+| `SEQUENCE_RESET_NOT_CONFIRMED` | 422 | 重置序号池未带 `confirm` |
+| `DATA_SOURCE_DELETE_NOT_CONFIRMED` | 422 | 删除数据源未带 `confirm` |
 
-以上 14 个码 MUST 在两种语言的错误映射中给出**三要素**文案（发生了什么 / 可能的原因 /
+以上 16 个码 MUST 在两种语言的错误映射中给出**三要素**文案（发生了什么 / 可能的原因 /
 下一步做什么）。既有的 `i18n-completeness` 测试会强制这一点。

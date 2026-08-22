@@ -255,7 +255,7 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
         // Confirmed for the rows it destroys, which cannot be recovered — not
         // for who is using it. A design left dangling is recoverable: rebind it
         // to another table of the same shape and every reference resolves again.
-        throw ApiError.unprocessable('CONFIRMATION_REQUIRED', {
+        throw ApiError.unprocessable('DATA_SOURCE_DELETE_NOT_CONFIRMED', {
           dataSourceId: source.id,
           rowCount: source.rowCount,
           affectedTemplates: templatesUsingDataSource(app.ctx.db, source.id),

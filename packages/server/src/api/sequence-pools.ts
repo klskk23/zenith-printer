@@ -86,7 +86,7 @@ export function registerSequencePoolRoutes(app: FastifyInstance): void {
       const repo = pools()
       view(repo, request.params.id)
       if (request.body.confirm !== true) {
-        throw ApiError.unprocessable('CONFIRMATION_REQUIRED', { poolId: request.params.id })
+        throw ApiError.unprocessable('SEQUENCE_RESET_NOT_CONFIRMED', { poolId: request.params.id })
       }
       repo.setFloor(request.params.id, request.body.floor)
       return view(repo, request.params.id)

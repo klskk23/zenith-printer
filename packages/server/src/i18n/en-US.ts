@@ -204,6 +204,16 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'Barcode content cannot be empty; those rows would fail mid-batch',
     next: 'Fill in those cells, or untick those rows',
   },
+  SEQUENCE_RESET_NOT_CONFIRMED: {
+    what: 'Resetting a sequence pool needs confirmation',
+    why: 'Restarting below a number already printed reissues it, and two boxes with the same serial cannot be told apart afterwards',
+    next: 'Confirm to continue; spans already issued stay on record',
+  },
+  DATA_SOURCE_DELETE_NOT_CONFIRMED: {
+    what: 'Deleting a data source needs confirmation',
+    why: 'The rows in this table are deleted and cannot be recovered',
+    next: 'Confirm to continue; designs using it are not deleted but will show a warning until rebound to another table of the same shape',
+  },
 }
 
 export const EN_US: LocaleBundle = { device: DEVICE, app: APP }

@@ -26,7 +26,6 @@ export interface UploadDialogProps {
   /** Set to replace an existing table rather than create a new one. */
   replace?: DataSource
   onClose: () => void
-  onUploaded?: (source: DataSource) => void
 }
 
 interface ApiFailure {
@@ -37,7 +36,7 @@ interface ApiFailure {
   details?: { removedColumns?: string[]; affectedTemplates?: Array<{ name: string }> }
 }
 
-export function UploadDialog({ replace, onClose, onUploaded }: UploadDialogProps): React.JSX.Element {
+export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX.Element {
   const upload = useUploadDataSource()
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState(replace?.name ?? '')
@@ -60,10 +59,7 @@ export function UploadDialog({ replace, onClose, onUploaded }: UploadDialogProps
         ...(replace === undefined ? {} : { replaceId: replace.id, confirm }),
       },
       {
-        onSuccess: (source) => {
-          onUploaded?.(source)
-          onClose()
-        },
+        onSuccess: () => onClose(),
         onError: (err) => setFailure(err as ApiFailure),
       },
     )
