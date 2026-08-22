@@ -95,3 +95,46 @@ export function useDeleteTemplate() {
 export function thumbnailUrl(template: Pick<Template, 'id' | 'version'>): string {
   return `/api/templates/${template.id}/thumbnail?v=${template.version}`
 }
+
+export interface ImportWarning {
+  code: string
+  templateName: string
+  detail: Record<string, unknown>
+  /**
+   * Worded by the server, shown verbatim.
+   *
+   * The same rule the error bodies follow: rewording it here would give one
+   * fault two descriptions, and the command line shows the same sentence.
+   */
+  message: string
+}
+
+export interface ImportResult {
+  imported: Array<{ id: string; name: string }>
+  warnings: ImportWarning[]
+}
+
+/** The file for some designs, or for all of them when `ids` is empty. */
+export async function fetchExport(ids: readonly string[]): Promise<unknown> {
+  const query = ids.length === 0 ? '' : `?ids=${ids.join(',')}`
+  return request<unknown>(`/templates/export${query}`)
+}
+
+export function useImportTemplates() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { file: unknown; onConflict?: 'overwrite' | 'copy' }) =>
+      request<ImportResult>('/templates/import', {
+        method: 'POST',
+        body: input.onConflict === undefined
+          ? { file: input.file }
+          : { file: input.file, onConflict: input.onConflict },
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: KEY })
+      // Importing can create pools and bind tables, so those lists move too.
+      void client.invalidateQueries({ queryKey: ['sequence-pools'] })
+      void client.invalidateQueries({ queryKey: ['data-sources'] })
+    },
+  })
+}

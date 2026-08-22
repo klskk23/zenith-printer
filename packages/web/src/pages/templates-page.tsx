@@ -19,6 +19,7 @@ import {
 } from '../features/templates/hooks.ts'
 import { useDataSources } from '../features/data-sources/hooks.ts'
 import { ThumbnailFrame } from '../features/templates/thumbnail-frame.tsx'
+import { ImportTemplatesButton, exportTemplates } from '../features/templates/template-io.tsx'
 import { useWorkspace } from '../app/workspace.tsx'
 
 function matches(template: Template, query: string): boolean {
@@ -54,12 +55,23 @@ export function TemplatesPage(): React.JSX.Element {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">{copy.workspace.tabs.templates}</h2>
-        <Input
-          className="max-w-56"
-          value={query}
-          placeholder={copy.templates.searchPlaceholder}
-          onChange={(event) => setQuery(event.target.value)}
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            className="max-w-56"
+            value={query}
+            placeholder={copy.templates.searchPlaceholder}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={(templates.data ?? []).length === 0}
+            onClick={() => void exportTemplates([], 'zenith-templates.json')}
+          >
+            {copy.templates.exportAll}
+          </Button>
+          <ImportTemplatesButton />
+        </div>
       </div>
 
       {templates.isPending && <p className="text-xs text-muted-foreground">{copy.common.loading}</p>}
@@ -151,6 +163,13 @@ export function TemplatesPage(): React.JSX.Element {
                   }}
                 >
                   {copy.templates.rename}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void exportTemplates([template.id], `${template.name}.json`)}
+                >
+                  {copy.templates.export}
                 </Button>
                 <ConfirmButton
                   size="sm"

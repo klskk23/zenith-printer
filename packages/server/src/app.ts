@@ -24,6 +24,7 @@ import { registerPrinterRoutes } from './api/printers.ts'
 import { registerPrintJobRoutes } from './api/print-jobs.ts'
 import { registerPreviewRoutes } from './api/preview.ts'
 import { registerImageRoutes } from './api/images.ts'
+import { registerTemplateIoRoutes } from './api/template-io.ts'
 import { registerTemplateRoutes } from './api/templates.ts'
 import { registerSequencePoolRoutes } from './api/sequence-pools.ts'
 import { registerDataSourceRoutes } from './api/data-sources.ts'
@@ -143,6 +144,9 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
   void app.register(registerPreviewRoutes)
   void app.register((instance) =>
     registerImageRoutes(instance, { storageDir: deps.imageStorageDir ?? 'uploads' }),
+  )
+  void app.register((instance) =>
+    registerTemplateIoRoutes(instance, { storageDir: deps.imageStorageDir ?? 'uploads' }),
   )
 
   return app

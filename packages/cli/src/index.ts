@@ -20,6 +20,7 @@ import { registerRenderTest } from './commands/render-test.ts'
 import { registerKeepalive } from './commands/keepalive.ts'
 import { registerPrintTest } from './commands/print-test.ts'
 import { registerZplTest } from './commands/zpl-test.ts'
+import { registerTemplateIo } from './commands/template-io.ts'
 
 const program = new Command()
 
@@ -34,6 +35,7 @@ registerSetShutdown(program)
 registerRfid(program)
 registerRenderTest(program)
 registerKeepalive(program)
+registerTemplateIo(program)
 registerPrintTest(program)
 registerZplTest(program)
 

@@ -87,8 +87,13 @@ export class TemplateRepo {
     return row === undefined ? undefined : this.#toTemplate(row as Row)
   }
 
-  create(input: TemplateInput): Template {
-    const id = this.#ids.next()
+  /**
+   * `withId` is for imports, which carry the id the design had where it came
+   * from. Keeping it is what lets the same file be re-imported as a restore
+   * rather than as an ever-growing pile of copies.
+   */
+  create(input: TemplateInput, withId?: string): Template {
+    const id = withId ?? this.#ids.next()
     const now = this.#clock.now().toISOString()
 
     this.#db.exec('BEGIN')

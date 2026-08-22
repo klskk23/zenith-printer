@@ -176,6 +176,47 @@
 `variableValues` 替换为 `rowOrdinal`（可选）：预览指定序号的行；缺省为打印顺序上的
 第一行（FR-041）。
 
+### 模板导入导出（新增）
+
+`GET /api/templates/export[?ids=a,b]` —— 返回交换文件（JSON）。省略 `ids` 即全部。
+
+```jsonc
+{
+  "kind": "zenith.templates",      // 不是本程序的文件时，报错能说人话
+  "formatVersion": 1,              // 高于本机 → 拒绝
+  "templates": [ /* elements 里 image 的 assetId 是内容哈希，不是本机 id */ ],
+  "pools":       { "<poolId>": { "name", "digits", "step", "floor" } },
+  "dataSources": { "<id>":     { "name", "columns" } },
+  "assets":      { "<sha256>": { "mimeType", "filename", "base64" } }
+}
+```
+
+三类外部引用各自的处理，理由不同：
+
+- **图片**随文件走字节，按内容哈希索引。引用是引用一个对方从未见过的文件，而缺图是这里
+  唯一完全静默的失败——渲染器跳过该元素，纸上和界面上都不会有任何提示。
+- **序号池**只带定义，**绝不带计数器**。带了会让两台机器都以为自己拥有那段号，印出重复
+  序列号，而这要等实物标签摆在一起才看得见（FR-006）。
+- **数据源**只带身份与形状，**绝不带行**。行是业务数据；发错文件不应该同时是漏客户名单。
+
+`POST /api/templates/import`，请求体 `{ file, onConflict?: 'overwrite' | 'copy' }`。
+
+**只拒绝「本机表示不了」**：坏 JSON / 非本程序格式 → `422 TEMPLATE_FILE_INVALID`；
+格式版本更高 → `422 TEMPLATE_FILE_TOO_NEW`；元素类型不认识 → `422 TEMPLATE_FILE_INVALID`。
+**引用解析不了一律导入并提示**：数据源不存在、列对不上、宽度超过本机所有打印机。
+
+文件里有本机已存在的 id 且未给 `onConflict` → `409 TEMPLATE_ALREADY_EXISTS`，`details.templates`
+列出撞上的设计。覆盖不可逆（没有版本历史），所以由调用方决定，不替他决定。
+
+返回 `{ imported: [{id,name}], warnings: [{code, templateName, detail, message}] }`。
+`message` 由**服务端**按 `Accept-Language` 措辞，Web 与 CLI 原样显示——同一件事只有一套说法。
+
+匹配阶梯：序号池 id → 名称（命中即提示）→ 按定义新建；数据源 id → 名称（命中即提示，
+列不符另发一条）→ 悬空（由既有 `bindingIssue` 长期呈现）。导入即保存，因此同样重绘缩略图。
+
+CLI：`template-export` / `template-import`，走 REST（`--server`），所以导入决策只有一份实现。
+**有警告不算失败**，退出码仍为 0；`--fail-on-warning` 让调用方自己决定（退出码 4）。
+
 ### `GET /api/templates/:id/thumbnail`（新增）
 
 返回该设计的库内缩略图，`image/png`。没有则 `404`。

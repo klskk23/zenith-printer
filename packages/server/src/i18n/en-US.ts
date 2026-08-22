@@ -84,6 +84,21 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'Someone saved a newer version while you were editing',
     next: 'Reload the template and reapply your changes — your current edits are still on screen',
   },
+  TEMPLATE_FILE_INVALID: {
+    what: 'This is not a template file this program can read',
+    why: 'The file is not in the format this program exports, or its contents are damaged',
+    next: 'Check that you picked a .json file produced by Templates → Export, and try again',
+  },
+  TEMPLATE_FILE_TOO_NEW: {
+    what: 'This file comes from a newer version of the program',
+    why: 'Its format version is higher than this machine can read, so part of its meaning would be lost',
+    next: 'Upgrade this machine, or ask for an export from the version you are running',
+  },
+  TEMPLATE_ALREADY_EXISTS: {
+    what: 'The file contains designs that are already on this machine',
+    why: 'This design was imported before, or this file is its backup',
+    next: 'Choose to overwrite the existing designs, or keep them and save copies',
+  },
   QUEUE_PAUSED: {
     what: "This printer's queue is paused",
     why: 'The previous job failed, or someone paused it manually',

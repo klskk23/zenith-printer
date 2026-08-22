@@ -89,6 +89,21 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '内容不满足所选条码码制的规则，或超出了标签可打印范围',
     next: '按提示修改字段内容后重新提交',
   },
+  TEMPLATE_FILE_INVALID: {
+    what: '这不是一个可以导入的模板文件',
+    why: '文件不是本程序导出的格式，或者内容已损坏',
+    next: '确认选的是从「模板库 - 导出」得到的 .json 文件，再试一次',
+  },
+  TEMPLATE_FILE_TOO_NEW: {
+    what: '这个文件来自更新版本的程序',
+    why: '文件的格式版本高于本机能读懂的版本，读进来会漏掉一部分含义',
+    next: '升级本机的程序后再导入，或者请对方用当前版本重新导出',
+  },
+  TEMPLATE_ALREADY_EXISTS: {
+    what: '文件里有本机已存在的模板',
+    why: '同一个设计导入过，或者这是它的备份',
+    next: '选择覆盖现有模板，或者作为副本另存一份',
+  },
   QUEUE_PAUSED: {
     what: '该打印机的队列已暂停',
     why: '上一个任务失败，或有人手动暂停了队列',

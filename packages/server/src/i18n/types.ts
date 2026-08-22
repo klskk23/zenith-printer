@@ -51,6 +51,9 @@ export const APP_ERROR_CODES = [
   'VARIABLE_NOT_DEFINED',
   'VARIABLE_NAME_COLLIDES',
   'SEQUENCE_POOL_IN_USE',
+  'TEMPLATE_FILE_INVALID',
+  'TEMPLATE_FILE_TOO_NEW',
+  'TEMPLATE_ALREADY_EXISTS',
   'ROW_SELECTION_STALE',
   'BARCODE_EMPTY_VALUE',
   // Confirmation is per-operation, not one shared code: the three-part message
