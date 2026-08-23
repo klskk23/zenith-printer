@@ -103,6 +103,25 @@ check-subset-tools: ## Verify fonttools is available for regenerating the web su
 	  printf '                   then: .venv/bin/python scripts/subset-fonts.py\n\n'; \
 	  exit 1; }
 
+.PHONY: ci-toolchain
+ci-toolchain: ## Bring a CI runner's npm up to what the lockfile needs
+	@# Named for CI and nothing else: it installs globally, which is fine on a
+	@# runner that is thrown away and rude on somebody's laptop.
+	@#
+	@# `actions/setup-node` installs whatever npm the Node release bundles, and
+	@# Node 26 currently bundles npm 11. package.json carries an `allowScripts`
+	@# block that only npm 12 honours; under 11 the install scripts of three BLE
+	@# packages run, and node-gyp then wants a compiler the runner has no reason
+	@# to have. This lives here rather than in each workflow so the two cannot
+	@# drift — losing it once already cost a red pipeline.
+	@if [ "$$(npm -v | cut -d. -f1)" -lt $(NPM_MAJOR_MIN) ]; then \
+	  printf '\033[36m[ci]\033[0m npm %s does not honour allowScripts; installing npm %s\n' \
+	    "$$(npm -v)" '$(NPM_MAJOR_MIN)'; \
+	  npm install -g 'npm@^$(NPM_MAJOR_MIN)'; \
+	else \
+	  printf '\033[32m[ci]\033[0m npm %s is new enough\n' "$$(npm -v)"; \
+	fi
+
 .PHONY: doctor
 doctor: check-node ## Report on every tool and asset the build can use
 	@printf '\n--- optional tools ---\n'

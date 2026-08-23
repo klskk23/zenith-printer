@@ -19,6 +19,12 @@ jobs:
           node-version: '26'
           cache: npm
 
+      # setup-node installs whatever npm the Node release bundles, and Node 26
+      # currently bundles npm 11 — which does not honour package.json's
+      # `allowScripts`. See the Makefile target for what goes wrong.
+      - name: npm 12
+        run: make ci-toolchain
+
       - name: Install dependencies
         run: make deps
 

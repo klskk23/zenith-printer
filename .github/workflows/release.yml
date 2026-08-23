@@ -54,6 +54,7 @@ jobs:
         with:
           node-version: '26'
           cache: npm
+      - run: make ci-toolchain
       - run: make deps
       - run: make fonts
       - run: make check
