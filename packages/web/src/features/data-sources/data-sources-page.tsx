@@ -131,8 +131,15 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
               </p>
             )}
             <div className="flex flex-wrap gap-2">
+              {/* A linked table opens into a grid nothing can be typed into,
+                  so calling this "edit" promised something the next screen
+                  refused — and the only way to find that out was to click it.
+                  The button still goes to the same place; it just says what
+                  will be possible when it gets there. */}
               <Button variant="outline" size="sm" onClick={() => onOpen?.(source.id)}>
-                {copy.dataSources.open}
+                {source.sourceKind === 'google-sheets'
+                  ? copy.dataSources.view
+                  : copy.dataSources.open}
               </Button>
               <RefreshButton source={source} />
               <Button

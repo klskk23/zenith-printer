@@ -319,6 +319,7 @@ export const copy = {
     rowCount: (n: number): string => `${n} 行`,
     columnList: (names: string[]): string => names.join('、'),
     open: '编辑',
+    view: '查看',
     replace: '替换',
     delete: '删除',
     encoding: '字符编码',

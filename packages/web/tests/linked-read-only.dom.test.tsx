@@ -91,6 +91,24 @@ describe('the list page', () => {
     expect(within(card as HTMLElement).getByRole('button', { name: '替换' })).toBeDefined()
   })
 
+  it('offers a linked table for viewing, not for editing', async () => {
+    // The button used to say 编辑 for both kinds. For a linked table it opens a
+    // grid nothing can be typed into — the label promised something the page
+    // then refused, and the only way to find out was to click it.
+    render(wrap(<DataSourcesPage />))
+    await screen.findByText('本月出货')
+
+    const card = screen.getByText('本月出货').closest('[class*="rounded"]')!
+    expect(within(card as HTMLElement).getByRole('button', { name: '查看' })).toBeDefined()
+    expect(within(card as HTMLElement).queryByRole('button', { name: '编辑' })).toBeNull()
+  })
+
+  it('still offers a local table for editing', async () => {
+    render(wrap(<DataSourcesPage />))
+    const card = (await screen.findByText('本地表')).closest('[class*="rounded"]')!
+    expect(within(card as HTMLElement).getByRole('button', { name: '编辑' })).toBeDefined()
+  })
+
   it('offers to unlink, and says what that costs', async () => {
     render(wrap(<DataSourcesPage />))
     await screen.findByText('本月出货')
@@ -149,5 +167,31 @@ describe('the editor', () => {
 
     expect(screen.getByRole('button', { name: '加行' })).toBeDefined()
     expect(screen.queryByText(/在本机只读/)).toBeNull()
+  })
+
+  it('does not show edit controls that can never do anything', async () => {
+    // The same complaint as the button label, one screen further in: a
+    // read-only grid can never become dirty, so undo, redo, discard and save
+    // sat there permanently greyed out. A control that can never work is not a
+    // disabled control, it is a wrong one.
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    await screen.findByText('本月出货')
+
+    for (const name of ['撤销', '重做', '取消修改', '保存']) {
+      expect(screen.queryByRole('button', { name })).toBeNull()
+    }
+  })
+
+  it('keeps what a linked table does support', async () => {
+    // Refreshing is the whole point of a linked table.
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    await screen.findByText('本月出货')
+    expect(screen.getByRole('button', { name: /刷新/ })).toBeDefined()
+  })
+
+  it('still shows them for a local table', async () => {
+    render(wrap(<DataSourceEditor dataSourceId="ds-2" tabId="tab-2" />))
+    expect(await screen.findByRole('button', { name: '保存' })).toBeDefined()
+    expect(screen.getByRole('button', { name: '撤销' })).toBeDefined()
   })
 })

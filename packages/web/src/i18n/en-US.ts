@@ -322,6 +322,7 @@ export const copy: Copy = {
     rowCount: (n: number): string => `${n} rows`,
     columnList: (names: string[]): string => names.join(', '),
     open: 'Edit',
+    view: 'View',
     replace: 'Replace',
     delete: 'Delete',
     encoding: 'Character encoding',

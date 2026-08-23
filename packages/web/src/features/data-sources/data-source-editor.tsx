@@ -227,59 +227,70 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Icon buttons, the same shape as the designer's: the two pages
+          {/* Hidden outright for a linked table rather than left disabled: its
+              grid can never become dirty, so undo, redo, discard and save
+              would sit greyed out forever, and a control that can never work
+              is not a disabled control but a wrong one.
+
+              Icon buttons, the same shape as the designer's: the two pages
               have the same undo and it should not look like two different
               features. Buttons as well as the shortcut — an editor whose only
               undo is a key combination has no undo for anyone who does not
               know it. */}
-          <div className="flex items-center gap-1">
-            <Button
-              size="icon"
+          {!readOnly && (
+            <>
+              <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="outline"
+                disabled={!history.canUndo}
+                aria-label={copy.dataSources.undo}
+                title={copy.dataSources.undoTitle}
+                onClick={() => step('undo')}
+              >
+                <Undo2 className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                disabled={!history.canRedo}
+                aria-label={copy.dataSources.redo}
+                title={copy.dataSources.redoTitle}
+                onClick={() => step('redo')}
+              >
+                <Redo2 className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <Separator orientation="vertical" className="h-9" />
+
+            {/* Discarding cannot be undone — the draft is the only copy — so it
+                asks first, and only while there is something to lose. */}
+            <ConfirmButton
               variant="outline"
-              disabled={!history.canUndo}
-              aria-label={copy.dataSources.undo}
-              title={copy.dataSources.undoTitle}
-              onClick={() => step('undo')}
+              size="sm"
+              disabled={!dirty || patch.isPending}
+              title={copy.common.confirmTitle}
+              description={copy.dataSources.discardConfirm}
+              cancelLabel={copy.common.cancel}
+              confirmLabel={copy.dataSources.discard}
+              onConfirm={discard}
             >
-              <Undo2 className="h-4 w-4" />
-            </Button>
+              {copy.dataSources.discard}
+            </ConfirmButton>
             <Button
-              size="icon"
-              variant="outline"
-              disabled={!history.canRedo}
-              aria-label={copy.dataSources.redo}
-              title={copy.dataSources.redoTitle}
-              onClick={() => step('redo')}
+              size="sm"
+              disabled={!dirty || patch.isPending}
+              title={copy.dataSources.saveTitle}
+              onClick={save}
             >
-              <Redo2 className="h-4 w-4" />
-            </Button>
-          </div>
+              {patch.isPending ? copy.dataSources.saving : copy.common.save}
+              </Button>
+            </>
+          )}
 
-          <Separator orientation="vertical" className="h-9" />
 
-          {/* Discarding cannot be undone — the draft is the only copy — so it
-              asks first, and only while there is something to lose. */}
-          <ConfirmButton
-            variant="outline"
-            size="sm"
-            disabled={!dirty || patch.isPending}
-            title={copy.common.confirmTitle}
-            description={copy.dataSources.discardConfirm}
-            cancelLabel={copy.common.cancel}
-            confirmLabel={copy.dataSources.discard}
-            onConfirm={discard}
-          >
-            {copy.dataSources.discard}
-          </ConfirmButton>
-          <Button
-            size="sm"
-            disabled={!dirty || patch.isPending}
-            title={copy.dataSources.saveTitle}
-            onClick={save}
-          >
-            {patch.isPending ? copy.dataSources.saving : copy.common.save}
-          </Button>
-
+          {/* Refreshing is the whole point of a linked table, so it stays. */}
           <RefreshButton source={source} />
           <span className="text-xs text-muted-foreground">
             {copy.dataSources.rowCount(value.length)}
