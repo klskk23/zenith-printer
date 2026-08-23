@@ -323,6 +323,7 @@ export const copy: Copy = {
     columnList: (names: string[]): string => names.join(', '),
     open: 'Edit',
     view: 'View',
+    openInGoogle: 'Open in Google Sheets',
     replace: 'Replace',
     delete: 'Delete',
     encoding: 'Character encoding',

@@ -320,6 +320,7 @@ export const copy = {
     columnList: (names: string[]): string => names.join('、'),
     open: '编辑',
     view: '查看',
+    openInGoogle: '在 Google 中打开',
     replace: '替换',
     delete: '删除',
     encoding: '字符编码',

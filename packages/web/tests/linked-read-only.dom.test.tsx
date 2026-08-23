@@ -109,6 +109,30 @@ describe('the list page', () => {
     expect(within(card as HTMLElement).getByRole('button', { name: '编辑' })).toBeDefined()
   })
 
+  it('links straight to the spreadsheet it came from', async () => {
+    // Checking the source of a number means going to Google, and copying the
+    // id out of a refresh dialog to build the address by hand is not a thing
+    // anybody should do twice.
+    render(wrap(<DataSourcesPage />))
+    await screen.findByText('本月出货')
+
+    const card = screen.getByText('本月出货').closest('[class*="rounded"]')!
+    const link = within(card as HTMLElement).getByRole('link', { name: '在 Google 中打开' })
+    // gid=0 is the first worksheet — and 0 is falsy, which is how it goes
+    // missing and lands everybody on whichever tab Google opens by default.
+    expect(link.getAttribute('href')).toBe(
+      'https://docs.google.com/spreadsheets/d/sheet-1/edit#gid=0',
+    )
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toContain('noopener')
+  })
+
+  it('has no such link for a local table', async () => {
+    render(wrap(<DataSourcesPage />))
+    const card = (await screen.findByText('本地表')).closest('[class*="rounded"]')!
+    expect(within(card as HTMLElement).queryByRole('link')).toBeNull()
+  })
+
   it('offers to unlink, and says what that costs', async () => {
     render(wrap(<DataSourcesPage />))
     await screen.findByText('本月出货')

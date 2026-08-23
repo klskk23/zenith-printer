@@ -4,6 +4,7 @@
  * Shows what a design needs to know to pick one: how many rows it has and what
  * its columns are called, since the column names are what get referenced.
  */
+import { ExternalLink } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '../../components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card.tsx'
@@ -13,6 +14,7 @@ import { copy } from '../../i18n/index.ts'
 import { UploadDialog } from './upload-dialog.tsx'
 import { LinkGoogleDialog } from './link-google-dialog.tsx'
 import { RefreshButton } from './refresh-button.tsx'
+import { spreadsheetUrl } from './sheet-url.ts'
 import { PoolsPanel } from '../sequence-pools/pools-panel.tsx'
 import { useDataSources,
   useGoogleStatus,
@@ -20,6 +22,33 @@ import { useDataSources,
 
 export interface DataSourcesPageProps {
   onOpen?: (id: string) => void
+}
+
+/**
+ * A way out to the sheet the rows actually came from.
+ *
+ * Checking a number against its source is the commonest reason to leave this
+ * page, and the alternative was copying the spreadsheet id out of a dialog and
+ * assembling the address by hand.
+ *
+ * An anchor rather than a button with an onClick: opening in a new tab, copying
+ * the address and middle-clicking are all things people do to a link, and none
+ * of them work on a button. `noopener` because the page it opens has no
+ * business getting a handle on this one.
+ */
+function OpenInGoogle({ source }: { source: DataSource }): React.JSX.Element | null {
+  const url = spreadsheetUrl(source)
+  if (url === undefined) {
+    return null
+  }
+  return (
+    <Button variant="ghost" size="sm" asChild>
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        <ExternalLink className="h-3.5 w-3.5" />
+        {copy.dataSources.openInGoogle}
+      </a>
+    </Button>
+  )
 }
 
 export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Element {
@@ -142,6 +171,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
                   : copy.dataSources.open}
               </Button>
               <RefreshButton source={source} />
+              <OpenInGoogle source={source} />
               <Button
                 variant="ghost"
                 size="sm"
