@@ -1,8 +1,11 @@
+# Every push and pull request: the gate the constitution requires green before
+# anything merges (typecheck, lint, tests, coverage), plus a build of the
+# deployment image so a broken Dockerfile is found here rather than at a tag.
 name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -19,15 +22,13 @@ jobs:
       - name: Install dependencies
         run: make deps
 
-      # scripts/fetch-fonts.sh copies from these packages' install paths.
-      - name: System fonts
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk fonts-dejavu-core
-
-      # Rendering determinism requires the pinned font files
-      # (Constitution: loadSystemFonts must stay false). `make fonts` copies
-      # them from the system and verifies them from inside fonts/full — the
-      # manifest lists bare filenames, so checking it from the repository root
-      # reports "FAILED open or read" for every file and, before this, did.
+      # Rendering determinism (constitution): the renderer runs with system
+      # font loading disabled and reads fonts/full only, so these exact bytes
+      # decide what a printer puts on paper. No apt install here on purpose —
+      # Ubuntu's font packages are not the builds the manifest pins, so
+      # scripts/fetch-fonts.sh would fall back to downloading the pinned Debian
+      # packages anyway. Letting it do that from the start is one code path
+      # instead of two, and the same one on every machine.
       - name: Fetch and verify fonts
         run: make fonts
 

@@ -19,8 +19,11 @@ STAMPS     = $(BUILD_DIR)/stamps
 VERSION      := $(shell node -p "require('./package.json').version" 2>/dev/null || echo 0.0.0)
 # One image name in one place: the compose file reads it from the same
 # variable, so `make image` and `docker compose up` cannot disagree.
+# Local builds keep the short name; releases carry the registry prefix, which
+# is where deploy/docker-compose.yml pulls from by default.
 IMAGE        ?= zenith-printer
 IMAGE_TAG    ?= $(VERSION)
+REGISTRY     ?= ghcr.io/klskk23
 
 NODE_MAJOR_MIN := 26
 NPM_MAJOR_MIN  := 12

@@ -1,0 +1,111 @@
+# Turn a vX.Y.Z tag into an image on GitHub Container Registry.
+#
+# Only a tag releases. Day-to-day checking is ci.yml's job; this exists so that
+# `docker pull ghcr.io/<owner>/zenith-printer:vX.Y.Z` gets exactly the tree that
+# tag names.
+#
+# Built for amd64 only. Adding arm64 is `platforms: linux/amd64,linux/arm64`
+# plus docker/setup-qemu-action — but the build runs `npm ci` and a vite build,
+# and under emulation that turns a four-minute release into most of an hour. Do
+# it when there is an arm64 machine to install on, not before.
+name: Release
+
+on:
+  push:
+    tags:
+      # vX.Y.Z exactly. v1.2 and v1.2.3-rc1 do not release; the version has to
+      # be the one in package.json, and that file holds three numbers.
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  # Fails in seconds, before anything spends four minutes building.
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag must match package.json
+        run: |
+          # The tag is the release name; package.json is where the version
+          # actually lives — the Makefile and the image tag both read it. If the
+          # two disagree, somebody tagged without bumping, and the release would
+          # publish 0.1.0 under a v0.2.0 name.
+          version="$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json ($version)"
+            echo "next: npm version ${GITHUB_REF_NAME#v} --no-git-tag-version, commit, then re-tag"
+            exit 1
+          fi
+          echo "version $version matches tag $GITHUB_REF_NAME"
+
+  # A tag that does not pass the gate is not a release.
+  quality-gate:
+    runs-on: ubuntu-latest
+    needs: preflight
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+      - run: make deps
+      - run: make fonts
+      - run: make check
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: quality-gate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # Provided by Actions; `packages: write` above is what makes it able
+          # to push. No secret to rotate and nothing to store.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Built into the local daemon first, NOT pushed yet: an image that builds
+      # and does not serve is the failure worth catching before it has a public
+      # tag somebody can pull.
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          load: true
+          push: false
+          tags: |
+            ${{ env.IMAGE }}:${{ github.ref_name }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Starts it on a scratch volume, calls the API, renders a label with the
+      # bundled CJK fonts, restarts it and calls it again.
+      - name: Smoke it
+        run: bash deploy/smoke.sh ${{ env.IMAGE }}:${{ github.ref_name }}
+
+      - name: Push
+        run: |
+          docker push "$IMAGE:$GITHUB_REF_NAME"
+          docker push "$IMAGE:latest"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Released \`$GITHUB_REF_NAME\`"
+            echo
+            echo '```bash'
+            echo "docker pull $IMAGE:$GITHUB_REF_NAME"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

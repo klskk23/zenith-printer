@@ -18,7 +18,10 @@ name: zenith-printer
 
 services:
   zenith-printer:
-    image: ${ZENITH_IMAGE:-zenith-printer}:${ZENITH_VERSION:-latest}
+    # Published by .github/workflows/release.yml on every vX.Y.Z tag, so a
+    # fresh machine needs `docker compose up -d` and nothing else. Override
+    # ZENITH_IMAGE to run something you built locally.
+    image: ${ZENITH_IMAGE:-ghcr.io/klskk23/zenith-printer}:${ZENITH_VERSION:-latest}
     # So `docker compose up --build` works straight from a checkout. The
     # context is the repository root because the image builds the whole
     # workspace, not just this directory.

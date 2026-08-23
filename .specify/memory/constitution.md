@@ -1,32 +1,27 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.3.0 → 1.4.0
-Bump rationale: MINOR —— 新增一条部署形态约束，未移除或重定义任何原则。既有的
-「单进程部署」不变，本次只是明确那一个进程住在哪里。
+Version change: 1.4.0 → 1.5.0
+Bump rationale: MINOR —— 为原则 IV 新增一条例外，未移除或重定义任何原则。中文仍是文档的
+默认语言；例外只覆盖仓库门面那一个文件。
 
-Modified principles: 无
+Modified principles:
+- IV. 语言与本地化规范 —— 新增「公开仓库门面」例外
 
-Added sections:
-- 技术约束与质量门槛 → 其他约束新增「部署形态」
-
+Added sections: 无
 Removed sections: 无
 
-修订动因（2026-08-22）：
-此前的部署路径是 Debian 包加 systemd unit，`Depends: nodejs (>= 26)`。它要求每台目标
-机器先配好 NodeSource 源——Debian 自带的是 20/22——而 `apt install nodejs` 装到的并不是
-它。依赖不满足时 dpkg 会拒绝安装，这一步是对的；但代价是每多一台机器就多一次外部源的
-配置，且那台机器上的 Node 版本此后不再受本项目控制。
+修订动因（2026-08-23）：
+仓库推上了 GitHub。根目录 `README.md` 是陌生人看到的第一样东西，也常常是唯一一样；用中文
+写会把不读中文的人挡在「这是什么」之外，而那正是它唯一的职责。
 
-另一条路是把 Node 运行时打进包里做成自包含。那消除了外部依赖，代价是 Node 的安全更新
-从 apt 的责任变成本项目的责任——出一次 CVE 就得重新打包发布。
-
-容器同时避开两者：镜像自带运行时，而运行时的更新是换一次基础镜像，不是本项目维护一份
-Node 分发。这条决定连同它的安全代价（privileged 实际等同宿主机 root）记在下面。
+例外划得很窄：**只有根 `README.md` 一个文件**，且它 MUST 在开头链接到中文版
+（`docs/README_zh.md`）。规格、计划、任务、设计共识、部署文档、提交信息、PR 描述——一律
+不变，仍然中文。原则 IV 的理由（中文降低团队沟通与决策成本）说的是团队内部沟通，而门面
+文件的读者按定义不在团队内。
 
 Templates requiring updates:
-- .specify/templates/ —— 无部署相关引用，无需同步 ✅
-- docs/design-consensus.md I. 运行时与部署 —— 已同步 ✅
+- .specify/templates/ —— 无语言相关引用，无需同步 ✅
 -->
 
 # Zenith Printer Constitution
@@ -133,6 +128,11 @@ Web 界面、REST API、运维 CLI 与文档必须表现为同一个产品，而
   代码评审意见、与 AI 助手的对话 —— **MUST** 使用中文。
 - 面向机器与开发者的代码产物 —— 标识符、类型名、文件名、代码注释、日志消息、错误消息模板、
   测试用例名称、提交信息的 type/scope 前缀 —— **MUST** 使用英文。
+- 公开仓库门面例外：根目录 `README.md` **MUST** 使用英文，并 **MUST** 在开头链接到中文版
+  `docs/README_zh.md`。仅此一个文件——`docs/`、`specs/`、`deploy/` 下的文档，以及提交信息、
+  议题与 PR 描述，一律仍 **MUST** 使用中文。理由：它是陌生人看到的第一样、也常常是唯一一样
+  东西，而本原则的立论（中文降低团队沟通成本）针对的是团队内部沟通，门面文件的读者按定义
+  不在团队内。
 - 唯一例外：I18N 本地化资源文件（如 `locales/zh-CN.json`）中的翻译文案 **MUST** 使用其目标
   语言；此类文件中的键名（key）仍 **MUST** 使用英文。
 - 面向最终用户的可见文案 **MUST** 通过 I18N 层输出，**MUST NOT** 在代码中硬编码非英文字符串。
@@ -252,4 +252,4 @@ Web 界面、REST API、运维 CLI 与文档必须表现为同一个产品，而
 - 运行时开发指引参见 `CLAUDE.md` 与当前功能的 `specs/<###-feature-name>/plan.md`。
 - 架构决策依据参见 `docs/design-consensus.md`；与之冲突的实现 **MUST** 先修订该文档。
 
-**Version**: 1.4.0 | **Ratified**: 2026-08-20 | **Last Amended**: 2026-08-22
+**Version**: 1.5.0 | **Ratified**: 2026-08-20 | **Last Amended**: 2026-08-23

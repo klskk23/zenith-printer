@@ -354,56 +354,54 @@ docker compose exec zenith-printer sh -c "grep ' /dev ' /proc/self/mountinfo; ls
 
 ---
 
-## 五、发布流水线（GitLab CI）
+## 五、发布流水线（GitHub Actions）
 
-`.gitlab-ci.yml`。**只有推送 `vX.Y.Z` 标签才会触发**，其他任何 push 和 MR 都不起流水线
-——日常检查是 GitHub workflow 的活，这条线只负责把一个标签变成 `/opt/www/zenith-printer`
-下一个能 `docker load` 的镜像，以及旁边那份跑它的 compose 文件。
+两条工作流，都在 `.github/workflows/`。
+
+`ci.yml`——每次 push 到 main 和每个 PR：质量门禁（typecheck、lint、测试、覆盖率），随后
+构建一次部署镜像并冒烟。Dockerfile 坏了在这里发现，而不是等到打标签。
+
+`release.yml`——**只有推送 `vX.Y.Z` 标签才会跑**：
 
 ```
-preflight  →  verify  →  build-image  →  publish
- (秒级)      (全量测试)   (构建 + 冒烟)    (/opt/www)
+preflight  →  quality-gate  →  publish
+ (秒级)        (全量测试)      (构建 → 冒烟 → 推 ghcr)
 ```
 
-运行器是 **docker executor**，tag `nkg-debian`，配置见 `deploy/ci/gitlab-runner.toml`。
-两条 volume 缺一不可：`/opt/www/zenith-printer`（否则产物无处可去）和
-`/var/run/docker.sock`（否则根本构建不出镜像）。`preflight` 两条都查，缺了直接点名。
-
-> **socket 挂载是一次实打实的授权**：能碰到它的 job 就能起特权容器，也就等于这台宿主机
-> 的 root。这里可以接受，只因为这个 runner 只服务这一个项目，而这个项目的部署形态本来
-> 就是同一台机器上的特权容器——没有多给任何东西。共享 runner 是另一回事，应当换 rootless
-> daemon 或 dind。
-
-### preflight 为什么不装工具链
-
-它存在的意义是**几秒内失败**，所以版本号是用 sed 从 `package.json` 里读的，而不是先装
-Node 再 `node -p`。它查三件事：`/opt/www` 挂没挂上且可写、docker socket 在不在，以及——
-
-**标签必须和 `package.json` 对得上。** 版本号只有一处，标签只是这次发布的名字。对不上
-意味着有人打标签时忘了改版本。
+`preflight` 只做一件事：**标签必须和 `package.json` 对得上**。版本号只有一处，标签只是
+这次发布的名字；对不上意味着有人打标签时忘了改版本，那会让 `v0.2.0` 这个发布推出一个
+`0.1.0` 的镜像。它几秒内失败，不占用后面四分钟的构建。
 
 ```bash
 npm version 0.2.0 --no-git-tag-version
 git commit -am "chore: 0.2.0"
-git tag v0.2.0 && git push origin v0.2.0
+git tag v0.2.0 && git push origin v0.2.0 && git push github v0.2.0
 ```
 
-### publish 放什么
+### 镜像发到 ghcr
 
-| 文件 | 说明 |
-|---|---|
-| `zenith-printer_vX.Y.Z.tar.gz` | `docker save | gzip`，目标机 `docker load <` 即可 |
-| `zenith-printer_latest.tar.gz` | 相对符号链接 |
-| `docker-compose.yml` | 跑它的那份文件。镜像不配 compose 是半个答案，而人们错的正是这一半 |
-| `SHA256SUMS` | 每次重新生成，只收真实文件 |
+```
+ghcr.io/klskk23/zenith-printer:v0.2.0
+ghcr.io/klskk23/zenith-printer:latest
+```
 
-**同一个版本不会被悄悄覆盖。** 目标文件已存在就直接失败：一个版本号应当只对应一个镜像，
-覆盖之后磁盘上没有任何东西能说明别人装的是哪一个。要重发就显式 `FORCE_PUBLISH=1`。
+推送用的是 Actions 自带的 `GITHUB_TOKEN`（工作流里声明 `packages: write`），**没有需要
+保管或轮换的密钥**。
 
-### 每个 job 都自己装环境
+`deploy/docker-compose.yml` 默认就指向这个地址，所以一台新机器只要有 compose 文件，
+`docker compose up -d` 就能跑起来，不需要先构建。想跑本地构建的镜像就覆盖 `ZENITH_IMAGE`。
 
-`deploy/ci/setup.sh`，约一分钟，换来一个没人需要手工维护的构建环境。真嫌慢，
-`deploy/ci/Dockerfile` 把同样的环境烤成镜像，改一行 `image:` 即可。
+### 先构建、冒烟，最后才推
+
+镜像先 `load` 进本地 daemon 而不是直接 push：起一个一次性实例、调接口、**用随镜像的字体
+渲一张中文标签**、重启再调一次。构建得出来但服务不起来，这种失败要在它拿到一个别人能 pull
+的公开标签之前发现。
+
+### 只出 amd64
+
+加 arm64 是 `platforms: linux/amd64,linux/arm64` 外加 `setup-qemu-action` 一行的事，但
+镜像构建里有 `npm ci` 和一次 vite 构建，在模拟下会把四分钟的发布拖成大半个小时。等真有
+一台 arm64 机器要装的时候再加，不必提前。
 
 ---
 
