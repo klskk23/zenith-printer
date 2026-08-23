@@ -35,6 +35,13 @@ docs
 .specify
 .claude
 
-# The full fonts are copied in explicitly, verified, at a known point in the
-# Dockerfile — not swept in with the rest of the tree.
+# The full fonts are fetched and checksum-verified inside the image, at a known
+# point in the Dockerfile — not swept in with the rest of the tree.
 fonts/.cache
+
+# Generated in the image from the verified full fonts. Excluded so that a
+# machine which has already run the subsetter cannot slip its own copy into the
+# build context: the image would then depend on whose laptop built it, and the
+# clean-checkout path would stay untested. This is exactly how the image came
+# to build locally and nowhere else.
+fonts/subset

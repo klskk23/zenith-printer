@@ -40,9 +40,13 @@ FROM node:26.3-trixie-slim AS builder
 # system copy when it already hashes to the manifest and downloads the pinned
 # package when it does not. On trixie that means the three 20MB Noto files come
 # from apt and only DejaVu is fetched.
+# python3-fonttools and python3-brotli generate the editor's web fonts. From
+# Debian rather than pip: pinned by the base image, no build toolchain, no
+# network beyond apt.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates curl dpkg-dev fonts-noto-cjk fonts-dejavu-core \
+      python3 python3-fonttools python3-brotli \
  && rm -rf /var/lib/apt/lists/*
 
 # npm 12 explicitly: package.json carries an `allowScripts` block that only
@@ -71,12 +75,26 @@ COPY . .
 RUN bash scripts/fetch-fonts.sh \
  && cd fonts/full && sha256sum -c ../MANIFEST.sha256 --quiet
 
-# The editor loads the GB2312 subsets over HTTP; vite copies them out of
-# packages/web/public, which reaches them through this symlink. Without it the
-# build still succeeds and the bundle carries no fonts at all.
-RUN mkdir -p packages/web/public/fonts \
- && ln -sfn ../../../../fonts/subset packages/web/public/fonts/subset \
- && npm run build --workspace @zenith/web \
+# The editor's web fonts, generated here rather than copied in.
+#
+# fonts/subset is gitignored, so a clean checkout does not have it — and
+# .dockerignore drops it from the build context on purpose, so a machine that
+# happens to have run the subsetter cannot make its own copy end up in the
+# image. Both together mean this always builds the same way: from fonts/full,
+# which was just checksum-verified.
+#
+# (Skipping this is how the image built for months on the author's laptop and
+# nowhere else: vite followed the symlink into a directory that existed only
+# there, and CI died in copyDir with no mention of fonts.)
+RUN python3 scripts/subset-fonts.py \
+ && test -n "$(ls -A fonts/subset)" \
+ && mkdir -p packages/web/public/fonts \
+ && ln -sfn ../../../../fonts/subset packages/web/public/fonts/subset
+
+# vite copies packages/web/public into the bundle, reaching the subsets through
+# that symlink. Asserted afterwards because a broken link does not fail the
+# build, it just produces a bundle with no fonts in it.
+RUN npm run build --workspace @zenith/web \
  && test -d packages/web/dist/fonts/subset
 
 # A second, production-only tree. The web workspace is asked for by name and

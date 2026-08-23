@@ -16,6 +16,11 @@ on:
       # vX.Y.Z exactly. v1.2 and v1.2.3-rc1 do not release; the version has to
       # be the one in package.json, and that file holds three numbers.
       - 'v[0-9]+.[0-9]+.[0-9]+'
+  # Run it by hand, from any ref, without pushing a tag. The version still comes
+  # from package.json, so a manual run and a tag run publish the same name for
+  # the same tree — a "Run workflow" button that could invent a version would be
+  # a second source of truth.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -25,24 +30,31 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  # Fails in seconds, before anything spends four minutes building.
+  # Fails in seconds, before anything spends four minutes building. Also the one
+  # place the released version is decided, so every job below agrees on it.
   preflight:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - name: The tag must match package.json
+      - id: resolve
+        name: Decide what is being released
         run: |
-          # The tag is the release name; package.json is where the version
-          # actually lives — the Makefile and the image tag both read it. If the
-          # two disagree, somebody tagged without bumping, and the release would
+          # package.json is where the version actually lives — the Makefile and
+          # the image tag both read it. A tag is only a name for it, so when the
+          # two disagree somebody tagged without bumping and the release would
           # publish 0.1.0 under a v0.2.0 name.
-          version="$(node -p "require('./package.json').version")"
-          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+          version="v$(node -p "require('./package.json').version")"
+
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
             echo "::error::tag $GITHUB_REF_NAME does not match package.json ($version)"
             echo "next: npm version ${GITHUB_REF_NAME#v} --no-git-tag-version, commit, then re-tag"
             exit 1
           fi
-          echo "version $version matches tag $GITHUB_REF_NAME"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "releasing $version from $GITHUB_REF_NAME ($GITHUB_EVENT_NAME)"
 
   # A tag that does not pass the gate is not a release.
   quality-gate:
@@ -61,7 +73,9 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-    needs: quality-gate
+    needs: [preflight, quality-gate]
+    env:
+      VERSION: ${{ needs.preflight.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -86,7 +100,7 @@ jobs:
           load: true
           push: false
           tags: |
-            ${{ env.IMAGE }}:${{ github.ref_name }}
+            ${{ env.IMAGE }}:${{ needs.preflight.outputs.version }}
             ${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -94,19 +108,19 @@ jobs:
       # Starts it on a scratch volume, calls the API, renders a label with the
       # bundled CJK fonts, restarts it and calls it again.
       - name: Smoke it
-        run: bash deploy/smoke.sh ${{ env.IMAGE }}:${{ github.ref_name }}
+        run: bash deploy/smoke.sh "$IMAGE:$VERSION"
 
       - name: Push
         run: |
-          docker push "$IMAGE:$GITHUB_REF_NAME"
+          docker push "$IMAGE:$VERSION"
           docker push "$IMAGE:latest"
 
       - name: Summary
         run: |
           {
-            echo "### Released \`$GITHUB_REF_NAME\`"
+            echo "### Released \`$VERSION\`"
             echo
             echo '```bash'
-            echo "docker pull $IMAGE:$GITHUB_REF_NAME"
+            echo "docker pull $IMAGE:$VERSION"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
