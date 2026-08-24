@@ -105,6 +105,29 @@ export function TabBar(): React.JSX.Element {
                 'group flex shrink-0 items-center gap-2 border-r border-border px-3 py-1.5 text-xs',
                 isActive ? 'bg-background font-medium' : 'text-muted-foreground hover:bg-background/60',
               )}
+              // Middle-click closes, as it does in a browser. Through
+              // `requestClose`, never `close`: this is easier to do by accident
+              // than finding an × that only appears on hover, so it must not be
+              // the fast way to lose an afternoon's work.
+              //
+              // `auxclick` rather than `click`, which browsers fire only for
+              // the primary button; and button 1 specifically, because
+              // `auxclick` also fires for the right button and taking the tab
+              // away from under a context menu is not what anyone meant.
+              onAuxClick={(event) => {
+                if (event.button !== 1) {
+                  return
+                }
+                event.preventDefault()
+                requestClose(tab)
+              }}
+              // Middle-press starts autoscroll otherwise, leaving the page
+              // under a scroll cursor after the tab is already gone.
+              onMouseDown={(event) => {
+                if (event.button === 1) {
+                  event.preventDefault()
+                }
+              }}
             >
               <Button
                 variant="ghost"
