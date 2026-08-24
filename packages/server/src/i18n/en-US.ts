@@ -174,6 +174,16 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'A template or print record holds content that no longer parses, so which images are still in use cannot be determined',
     next: 'The whole sweep was cancelled and nothing was deleted. Send the matching server log line to whoever maintains this',
   },
+  PRINTER_KIND_MISMATCH: {
+    what: 'That printer is a different kind from the one this job used',
+    why: 'A label is bound to a printer kind when it is designed, so another kind would not produce the same label',
+    next: 'Pick a printer of the same kind, or redraw the design for the other kind and print it fresh',
+  },
+  PROFILE_PRINTER_MISMATCH: {
+    what: 'Those settings belong to a different printer',
+    why: 'Density and label type mean something only against a particular print head, so settings are kept per printer',
+    next: "Pick settings that belong to the chosen printer, or switch back to the printer they were saved for",
+  },
   DEVICE_ERROR: {
     what: 'The printer refused the operation',
     why: 'It is connected but did not respond as expected; firmware or state may be at fault',

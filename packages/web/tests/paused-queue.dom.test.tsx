@@ -126,7 +126,12 @@ describe('reprinting a failed job', () => {
     const dialog = document.querySelector('[role="dialog"]')!
     const input = dialog.querySelector('input')!
     fireEvent.change(input, { target: { value: '37' } })
-    fireEvent.click([...dialog.querySelectorAll('button')].find((b) => b.textContent?.includes('打印'))!)
+    // By the confirm button's exact wording. "the first button whose text
+    // contains 打印" used to work and stopped when the dialog grew a printer
+    // and a settings select — one of whose placeholders also contains it.
+    fireEvent.click(
+      [...dialog.querySelectorAll('button')].find((b) => /^打印 \d+ 张$/.test(b.textContent ?? ''))!,
+    )
 
     await waitFor(() =>
       expect(calls.some((c) => c.method === 'POST' && c.url.includes('/reprint'))).toBe(true),

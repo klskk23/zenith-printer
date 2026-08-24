@@ -631,6 +631,10 @@ export const copy: Copy = {
       } as Record<string, string>,
     },
     reprint: {
+      printer: 'Printer',
+      profile: 'Print settings',
+      profileDefault: 'As the original run',
+      noProfiles: 'This printer has no saved settings',
       action: 'Reprint',
       heading: 'Reprint this job',
       unknownCount:

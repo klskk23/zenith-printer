@@ -30,6 +30,7 @@ import {
   buildSnapshot,
   designValues,
   resolveContent,
+  reprintSnapshot,
 } from './job-submission.ts'
 
 const idParams = z.object({ id: z.string().min(1) })
@@ -243,7 +244,17 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
     {
       schema: {
         params: idParams,
-        body: z.object({ copies: z.number().int().min(1).max(100) }),
+        body: z.object({
+          copies: z.number().int().min(1).max(100),
+          /**
+           * Where to send it, and how dark. Both default to what the original
+           * used, which is what a plain "print that again" means; naming
+           * either is the reason somebody opened the dialog — the first
+           * machine jammed, or the labels came out too light.
+           */
+          printerId: z.string().min(1).optional(),
+          profileId: z.string().min(1).optional(),
+        }),
         headers: z.object({ 'idempotency-key': z.string().min(1).optional() }).loose(),
       },
     },
@@ -253,12 +264,44 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       if (original === undefined) {
         throw ApiError.notFound({ jobId: request.params.id })
       }
-      if (original.printerId === null) {
+      // A named printer replaces the original — including when the original was
+      // deleted, which used to make the job unreprintable for good.
+      const wantedPrinterId = request.body.printerId ?? original.printerId
+      if (wantedPrinterId === null) {
         throw ApiError.unprocessable('VALIDATION_FAILED', { jobId: original.id })
       }
-      const printer = printers().find(original.printerId)
+      const printer = printers().find(wantedPrinterId)
       if (printer === undefined) {
-        throw ApiError.notFound({ printerId: original.printerId })
+        throw ApiError.notFound({ printerId: wantedPrinterId })
+      }
+      if (printer.capabilities === null) {
+        // Nothing downstream knows the head width or the dpi until it has been
+        // probed, so there is no size to print at.
+        throw ApiError.unprocessable('VALIDATION_FAILED', { printerId: printer.id })
+      }
+      if (printer.kind !== original.snapshot.printerKind) {
+        // A design is bound to a printer kind when it is drawn. Reprinting a
+        // NIIMBOT label on a ZPL machine is a new decision rather than a repeat
+        // of an old one, and what came out would not be what is being
+        // reprinted.
+        throw ApiError.unprocessable('PRINTER_KIND_MISMATCH', {
+          printerId: printer.id,
+          kind: printer.kind,
+          expected: original.snapshot.printerKind,
+        })
+      }
+
+      const profileId = request.body.profileId ?? original.profileId
+      const profile = profileId === null || profileId === undefined ? null : profiles().find(profileId)
+      if (profileId !== null && profileId !== undefined && profile === undefined) {
+        throw ApiError.notFound({ profileId })
+      }
+      if (profile !== undefined && profile !== null && profile.printerId !== printer.id) {
+        // Density and label type mean something only against a particular head.
+        throw ApiError.unprocessable('PROFILE_PRINTER_MISMATCH', {
+          profileId: profile.id,
+          printerId: printer.id,
+        })
       }
       if (printer.queueState === 'paused') {
         // The failure that produced this job paused the queue. Resuming is a
@@ -272,12 +315,12 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         idempotencyKey: String(idempotencyKey),
         printerId: printer.id,
         templateId: original.templateId,
-        profileId: original.profileId,
+        profileId: profile?.id ?? null,
         requestedCopies: request.body.copies,
         // Sequence numbers are deliberately not carried over: a reprint of a
         // spoiled batch reuses the original span, which is recorded on the
         // snapshot it reprints from.
-        snapshot: original.snapshot,
+        snapshot: reprintSnapshot(original.snapshot, printer, profile ?? null),
       })
 
       if (created) {

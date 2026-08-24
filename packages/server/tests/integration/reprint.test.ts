@@ -184,3 +184,193 @@ describe('reprinting', () => {
     expect(res.statusCode).toBe(400)
   })
 })
+
+/** A second printer of the same kind, at a different head resolution. */
+function seedSecondPrinter(
+  id = 'prn-2',
+  kind = 'niimbot',
+  dpi = 300,
+  offsetX = 7,
+): void {
+  app.ctx.db
+    .prepare(
+      `INSERT INTO printers (id, name, kind, transport, address, dpi, printhead_pixels,
+         density_min, density_max, density_default, paper_types, print_direction,
+         supports_consumable_level, model, queue_state, offset_x_dots, offset_y_dots, created_at)
+       VALUES (?,?,?,'serial','/dev/ttyACM1',?,576,1,5,4,'[1]','top',1,'B1','running',?,0,'2026-08-21T00:00:00Z')`,
+    )
+    .run(id, `printer-${id}`, kind, dpi, offsetX)
+}
+
+function seedProfile(id: string, printerId: string, density: number): void {
+  app.ctx.db
+    .prepare(
+      `INSERT INTO profiles (id, printer_id, name, density, label_type, created_at)
+       VALUES (?,?,?,?,2,'2026-08-21T00:00:00Z')`,
+    )
+    .run(id, printerId, `profile-${id}`, density)
+}
+
+const snapshotOf = (jobId: string): Record<string, never> =>
+  JSON.parse(
+    String(
+      (app.ctx.db.prepare('SELECT snapshot FROM print_jobs WHERE id = ?').get(jobId) as {
+        snapshot: string
+      }).snapshot,
+    ),
+  )
+
+const newestJob = (): string =>
+  String(
+    (app.ctx.db
+      .prepare("SELECT id FROM print_jobs WHERE id <> 'job-1' ORDER BY rowid DESC LIMIT 1")
+      .get() as { id: string }).id,
+  )
+
+describe('choosing a different printer', () => {
+  it('sends the reprint to the printer that was asked for', async () => {
+    // The first machine may be busy, out of stock, or the one that jammed.
+    await seedFailedJob(60)
+    seedSecondPrinter()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs/job-1/reprint',
+      payload: { copies: 5, printerId: 'prn-2' },
+    })
+    expect(res.statusCode).toBe(202)
+
+    const row = app.ctx.db
+      .prepare('SELECT printer_id FROM print_jobs WHERE id = ?')
+      .get(newestJob()) as { printer_id: string }
+    expect(row.printer_id).toBe('prn-2')
+  })
+
+  it('re-grids the design for the new head instead of printing it at the old size', async () => {
+    // The snapshot was baked at 203 dpi. Sending those dots to a 300 dpi head
+    // would print the label two-thirds the size it should be — the design is
+    // millimetres, and the dot grid belongs to whichever printer is running it.
+    await seedFailedJob(60)
+    seedSecondPrinter('prn-2', 'niimbot', 300)
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs/job-1/reprint',
+      payload: { copies: 1, printerId: 'prn-2' },
+    })
+
+    const snapshot = snapshotOf(newestJob()) as unknown as {
+      dpi: number
+      ir: { dpi: number }
+      printerName: string
+      offsetXDots: number
+    }
+    expect(snapshot.dpi).toBe(300)
+    expect(snapshot.ir.dpi).toBe(300)
+    // And the record says which machine actually ran it.
+    expect(snapshot.printerName).toBe('printer-prn-2')
+    // Position correction is the new printer's; the old one's was measured
+    // against paper that is no longer under this head.
+    expect(snapshot.offsetXDots).toBe(7)
+  })
+
+  it('keeps what the reprint is a copy of', async () => {
+    // Rebuilding the snapshot must not lose the parts that make it a record:
+    // which design it was, and the constants it was printed with.
+    await seedFailedJob(60)
+    seedSecondPrinter()
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs/job-1/reprint',
+      payload: { copies: 1, printerId: 'prn-2' },
+    })
+
+    const snapshot = snapshotOf(newestJob()) as unknown as { templateName: string }
+    expect(snapshot.templateName).toBe('shipping')
+  })
+
+  it('refuses a printer of a different kind', async () => {
+    // A design is bound to a printer kind when it is drawn. Reprinting a
+    // NIIMBOT label on a ZPL machine is a new decision, not a repeat of an old
+    // one, and the label it produced would not be the label being reprinted.
+    await seedFailedJob(60)
+    seedSecondPrinter('prn-zpl', 'zpl', 203)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs/job-1/reprint',
+      payload: { copies: 1, printerId: 'prn-zpl' },
+    })
+    expect(res.statusCode).toBe(422)
+    expect(res.json().code).toBe('PRINTER_KIND_MISMATCH')
+  })
+
+  it('404s for a printer that does not exist', async () => {
+    await seedFailedJob(60)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs/job-1/reprint',
+      payload: { copies: 1, printerId: 'nope' },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('still uses the original printer when none is named', async () => {
+    await seedFailedJob(60)
+    seedSecondPrinter()
+
+    await app.inject({ method: 'POST', url: '/api/print-jobs/job-1/reprint', payload: { copies: 1 } })
+    const row = app.ctx.db
+      .prepare('SELECT printer_id FROM print_jobs WHERE id = ?')
+      .get(newestJob()) as { printer_id: string }
+    expect(row.printer_id).toBe('prn-1')
+  })
+})
+
+describe('choosing different print parameters', () => {
+  it('prints with the profile that was asked for', async () => {
+    // The commonest reason to reprint from history: it came out too light.
+    await seedFailedJob(60)
+    seedProfile('pro-9', 'prn-1', 5)
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs/job-1/reprint',
+      payload: { copies: 1, profileId: 'pro-9' },
+    })
+
+    const snapshot = snapshotOf(newestJob()) as unknown as {
+      profile: { density: number; labelType: number; name: string }
+    }
+    expect(snapshot.profile.density).toBe(5)
+    expect(snapshot.profile.labelType).toBe(2)
+    expect(snapshot.profile.name).toBe('profile-pro-9')
+  })
+
+  it('refuses a profile belonging to another printer', async () => {
+    // Profiles are per printer — density and label type mean something only
+    // against a particular head. Silently accepting one from elsewhere would
+    // print at settings nobody chose for this machine.
+    await seedFailedJob(60)
+    seedSecondPrinter()
+    seedProfile('pro-other', 'prn-2', 5)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs/job-1/reprint',
+      payload: { copies: 1, profileId: 'pro-other' },
+    })
+    expect(res.statusCode).toBe(422)
+    expect(res.json().code).toBe('PROFILE_PRINTER_MISMATCH')
+  })
+
+  it('keeps the original settings when none are named', async () => {
+    // Today's behaviour, and the default: a reprint reproduces what came out.
+    await seedFailedJob(60)
+    await app.inject({ method: 'POST', url: '/api/print-jobs/job-1/reprint', payload: { copies: 1 } })
+
+    const snapshot = snapshotOf(newestJob()) as unknown as { profile: { density: number } }
+    expect(snapshot.profile.density).toBe(3)
+  })
+})

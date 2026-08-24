@@ -11,7 +11,13 @@ export interface PrintJob {
   pagesPrinted: number | null
   failureCode: string | null
   failureMessage: string | null
-  snapshot: { templateName: string | null; widthMm: number; heightMm: number }
+  snapshot: {
+    templateName: string | null
+    widthMm: number
+    heightMm: number
+    /** Which family of printer ran it — a reprint may only go to the same one. */
+    printerKind: 'niimbot' | 'zpl'
+  }
   /**
    * What was clipped on this run, recorded at submission.
    *

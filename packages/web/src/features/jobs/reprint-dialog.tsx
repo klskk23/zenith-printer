@@ -1,11 +1,16 @@
 /**
- * Reprinting a failed job.
+ * Reprinting a job.
  *
  * The count is asked for rather than assumed. A job that failed after 60 of 100
  * needs 40; one interrupted by a restart needs however many the operator counts
  * on the bench, because the number printed at the moment of a crash is
  * genuinely unknowable. Defaulting to the original count would reprint labels
  * that are already on the roll.
+ *
+ * The printer and the settings are asked for too, and both default to the
+ * original — a plain "print that again" has to keep meaning exactly that. The
+ * reason to change either is the other half of why people reprint: that machine
+ * jammed, or those came out too light.
  */
 import { useState } from 'react'
 import { ApiRequestError, request } from '../../api/client.ts'
@@ -22,6 +27,15 @@ import {
 } from '../../components/ui/dialog.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select.tsx'
+import { usePrinters } from '../printers/hooks.ts'
+import { useProfiles } from '../profiles/hooks.ts'
 import type { PrintJob } from './hooks.ts'
 
 export interface ReprintDialogProps {
@@ -45,11 +59,33 @@ export function ReprintDialog({ job, open, onOpenChange, onDone }: ReprintDialog
   const [error, setError] = useState<ApiRequestError | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Null means "as it was". Kept distinct from the original's id so that the
+  // request carries nothing at all when nothing was chosen — the server then
+  // reuses the original, which is what a reprint means by default.
+  const [printerId, setPrinterId] = useState<string | null>(null)
+  const [profileId, setProfileId] = useState<string | null>(null)
+
+  // Only the same kind. A design is bound to a printer kind when it is drawn,
+  // and the server refuses the rest — offering them would be an invitation to
+  // an error message.
+  const printers = (usePrinters().data ?? []).filter(
+    (printer) => printer.kind === job.snapshot.printerKind && printer.capabilities !== null,
+  )
+  const chosenPrinter = printerId ?? job.printerId
+  const profiles = useProfiles(chosenPrinter).data ?? []
+
   const submit = async (): Promise<void> => {
     setBusy(true)
     setError(null)
     try {
-      await request(`/print-jobs/${job.id}/reprint`, { method: 'POST', body: { copies } })
+      await request(`/print-jobs/${job.id}/reprint`, {
+        method: 'POST',
+        body: {
+          copies,
+          ...(printerId === null ? {} : { printerId }),
+          ...(profileId === null ? {} : { profileId }),
+        },
+      })
       onOpenChange(false)
       onDone()
     } catch (err) {
@@ -71,6 +107,58 @@ export function ReprintDialog({ job, open, onOpenChange, onDone }: ReprintDialog
               : copy.jobs.reprint.knownCount(job.pagesPrinted!, job.requestedCopies)}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="space-y-1">
+          <Label htmlFor="reprint-printer">{copy.jobs.reprint.printer}</Label>
+          <Select
+            value={chosenPrinter ?? undefined}
+            onValueChange={(value) => {
+              setPrinterId(value)
+              // Settings belong to a printer — density and label type mean
+              // something only against a particular head, and the server
+              // refuses a mismatch. Carrying the old choice across would turn
+              // a printer change into an error message.
+              setProfileId(null)
+            }}
+          >
+            <SelectTrigger id="reprint-printer" aria-label={copy.jobs.reprint.printer}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {printers.map((printer) => (
+                <SelectItem key={printer.id} value={printer.id}>
+                  {printer.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="reprint-profile">{copy.jobs.reprint.profile}</Label>
+          <Select
+            value={profileId ?? ''}
+            disabled={profiles.length === 0}
+            onValueChange={(value) => setProfileId(value)}
+          >
+            <SelectTrigger id="reprint-profile" aria-label={copy.jobs.reprint.profile}>
+              <SelectValue
+                placeholder={
+                  profiles.length === 0
+                    ? copy.jobs.reprint.noProfiles
+                    : copy.jobs.reprint.profileDefault
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {profiles.map((profile) => (
+                <SelectItem key={profile.id} value={profile.id}>
+                  {profile.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="space-y-1">
           <Label>{copy.print.copies}</Label>

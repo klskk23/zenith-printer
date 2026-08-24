@@ -195,6 +195,56 @@ export function buildSnapshot(
   }
 }
 
+/**
+ * The snapshot a reprint should carry when the machine or the settings change.
+ *
+ * Built from the original rather than from the template, for the same reason
+ * the original was: the design may have been edited or deleted since, and a
+ * reprint has to reproduce what came out (FR-050). What is replaced is only
+ * what belongs to the run — which head, how dark, what correction — and the dot
+ * grid, because the design is millimetres and the grid belongs to whichever
+ * printer is about to run it. Sending a 203 dpi bitmap to a 300 dpi head would
+ * print the label two-thirds of its size.
+ *
+ * Everything else is spread through untouched: the rows, the constants, the
+ * name of the design. Rebuilding those from scratch is how a record stops being
+ * a record.
+ */
+export function reprintSnapshot(
+  original: ContentSnapshot,
+  printer: Printer,
+  profile: Profile | null,
+): ContentSnapshot {
+  const capabilities = printer.capabilities
+  if (capabilities === null) {
+    throw ApiError.unprocessable('VALIDATION_FAILED', { printerId: printer.id })
+  }
+
+  const { ir } = resolveContent(null, original.ir, profile, capabilities)
+
+  return {
+    ...original,
+    printerName: printer.name,
+    printerModel: capabilities.model,
+    printerKind: printer.kind,
+    widthMm: ir.widthMm,
+    heightMm: ir.heightMm,
+    dpi: ir.dpi,
+    ir,
+    profile: {
+      name: profile?.name ?? null,
+      density: profile?.density ?? capabilities.densityDefault,
+      labelType: profile?.labelType ?? capabilities.paperTypes[0] ?? 1,
+      halftone: profile?.halftone ?? 'none',
+      threshold: profile?.threshold ?? DEFAULT_THRESHOLD,
+    },
+    // The old printer's correction was measured against paper that is no
+    // longer under this head.
+    offsetXDots: printer.offsetXDots,
+    offsetYDots: printer.offsetYDots,
+  }
+}
+
 export interface AllocateOptions {
   db: Database
   clock: Clock

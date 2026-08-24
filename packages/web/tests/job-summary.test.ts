@@ -18,7 +18,7 @@ function job(over: Partial<PrintJob> = {}): PrintJob {
     pagesPrinted: 10,
     failureCode: null,
     failureMessage: null,
-    snapshot: { templateName: 'shipping', widthMm: 50, heightMm: 30 },
+    snapshot: { printerKind: 'niimbot' as const, templateName: 'shipping', widthMm: 50, heightMm: 30 },
     createdAt: '2026-08-21T09:00:00.000Z',
     startedAt: '2026-08-21T10:00:00.000Z',
     finishedAt: '2026-08-21T11:00:00.000Z',
@@ -90,11 +90,11 @@ describe('hasTemplate', () => {
    * a name goes reads as missing data, not as "there was never one".
    */
   it('is false for a one-off design', () => {
-    expect(hasTemplate(job({ snapshot: { templateName: null, widthMm: 50, heightMm: 30 } }))).toBe(false)
+    expect(hasTemplate(job({ snapshot: { printerKind: 'niimbot' as const, templateName: null, widthMm: 50, heightMm: 30 } }))).toBe(false)
   })
 
   it('treats an empty name as absent', () => {
-    expect(hasTemplate(job({ snapshot: { templateName: '', widthMm: 50, heightMm: 30 } }))).toBe(false)
+    expect(hasTemplate(job({ snapshot: { printerKind: 'niimbot' as const, templateName: '', widthMm: 50, heightMm: 30 } }))).toBe(false)
   })
 })
 

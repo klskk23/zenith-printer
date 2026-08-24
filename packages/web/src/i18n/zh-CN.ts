@@ -625,6 +625,10 @@ export const copy = {
       } as Record<string, string>,
     },
     reprint: {
+      printer: '打印机',
+      profile: '打印参数',
+      profileDefault: '沿用原任务',
+      noProfiles: '这台打印机还没有保存的参数',
       action: '补打',
       heading: '补打这个任务',
       unknownCount: '这次打印的实际份数无法确认。请清点已打出的标签，填入还需要补打的数量。',
