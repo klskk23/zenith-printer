@@ -79,7 +79,6 @@ export async function naturalSizeOf(file: File): Promise<{ width: number; height
 export interface ImagePruneResult {
   outcome: 'planned' | 'removed'
   removed: number
-  strayFilesRemoved: number
   keptReferenced: number
   keptTooNew: number
   bytesFreed: number

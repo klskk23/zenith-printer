@@ -2,10 +2,10 @@
  * Sweep uploaded images nothing points at any more.
  *
  * Pasting a picture into a design uploads it there and then, so every discarded
- * paste, abandoned draft and deleted template leaves a file behind. Nothing in
- * the interface ever mentions those files, which is exactly why they accumulate
- * — and why this belongs in cron rather than in a page somebody has to
- * remember to visit.
+ * paste, abandoned draft and deleted template leaves a row behind — carrying the
+ * picture with it, since the bytes moved into the rows. Nothing in the interface
+ * ever mentions them, which is exactly why they accumulate, and why this belongs
+ * in cron rather than in a page somebody has to remember to visit.
  *
  * Over REST rather than the database file, like `data-source-refresh`. What
  * counts as "still in use" is then decided in one place and cannot drift from
@@ -20,9 +20,7 @@ import { ExitCode, emit, run, type CliError, type ExitCodeValue } from '../outpu
 interface PruneResult {
   outcome: 'planned' | 'removed'
   removed: number
-  strayFilesRemoved: number
   candidates: Array<{ id: string; sizeBytes: number }>
-  strayFiles: number
   keptReferenced: number
   keptTooNew: number
   bytesFreed: number
@@ -76,7 +74,6 @@ function summarise(result: PruneResult): string {
   const verb = result.outcome === 'removed' ? 'removed' : 'would remove'
   return [
     `${verb} ${result.candidates.length} image(s), ${mb(result.bytesFreed)}`,
-    result.strayFiles > 0 ? `${verb} ${result.strayFiles} file(s) with no database row` : '',
     `kept ${result.keptReferenced} still in use, ${result.keptTooNew} newer than ${result.minAgeHours}h`,
     result.outcome === 'planned' ? 'nothing was deleted; pass --delete to do it' : '',
   ]

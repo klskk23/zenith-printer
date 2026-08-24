@@ -43,11 +43,13 @@ function sheetsFrom(log: (message: string) => void) {
 }
 
 async function main(): Promise<void> {
-  const db = openDatabase({ location: DB_PATH })
+  // The uploads directory is only wanted by the one migration that moves the
+  // old files into the rows (15). Nothing reads it afterwards, and a fresh
+  // install never has one.
+  const db = openDatabase({ location: DB_PATH, imageStorageDir: UPLOAD_DIR })
   const problems: string[] = []
   const app = buildApp({
     db,
-    imageStorageDir: UPLOAD_DIR,
     logLevel: (process.env.LOG_LEVEL as 'info') ?? 'info',
     ...(() => {
       const sheets = sheetsFrom((message) => problems.push(message))

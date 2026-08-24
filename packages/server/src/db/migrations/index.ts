@@ -10,6 +10,7 @@ import { migrateOffsets } from './offset-migration.ts'
 import { claimsFromSeqRanges, rewriteElementContent } from './variable-migration.ts'
 import { backfillThumbnails } from './thumbnail-backfill.ts'
 import { relativiseImagePaths } from './image-path-migration.ts'
+import { imagesIntoRows } from './image-blob-migration.ts'
 
 /**
  * The column that made `delete` wrong.
@@ -376,4 +377,15 @@ export const migrations: Migration[] = [
   { id: 12, name: 'data_source_link', up: dataSourceLink },
   { id: 13, name: 'drop_image_ref_count', up: dropImageRefCount },
   { id: 14, name: 'relative_image_paths', up: '', apply: relativiseImagePaths },
+  {
+    id: 15,
+    name: 'images_into_rows',
+    // Added before the move and dropped after it, in one transaction: a
+    // half-migrated table with both columns is a state nothing knows how to
+    // read.
+    up: 'ALTER TABLE images ADD COLUMN bytes BLOB;',
+    // Drops storage_path once the bytes are in — inside `apply`, because `up`
+    // runs first and the column is still needed to find the files.
+    apply: imagesIntoRows,
+  },
 ]

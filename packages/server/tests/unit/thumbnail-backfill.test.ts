@@ -29,6 +29,11 @@ const TEXT = {
 
 function seed(elements: unknown[]): { repo: TemplateRepo; id: string; db: ReturnType<typeof openDatabase> } {
   const db = openDatabase({ location: ':memory:' })
+  // This runs as migration 11, which is before 15 moved image bytes into the
+  // rows — so at that point images are still files and `storage_path` is still
+  // there. Put it back, or the test asks the function to run against a schema
+  // it never meets.
+  db.exec("ALTER TABLE images ADD COLUMN storage_path TEXT NOT NULL DEFAULT ''")
   const repo = new TemplateRepo({
     db,
     clock: new FixedClock('2026-08-22T00:00:00Z'),

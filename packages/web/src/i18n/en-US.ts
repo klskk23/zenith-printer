@@ -517,7 +517,6 @@ export const copy: Copy = {
     pruneConfirmAction: 'Delete',
     pruneNothing: 'There was nothing to remove.',
     pruneDone: (count: number, size: string): string => `Removed ${count} image(s), freeing ${size}.`,
-    pruneStrays: (count: number): string => `Also removed ${count} file(s) with no database row.`,
     pruneKept: (referenced: number, tooNew: number): string =>
       `Kept ${referenced} still in use and ${tooNew} uploaded less than 24 hours ago.`,
     localOnlyHint:

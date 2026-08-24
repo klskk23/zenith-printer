@@ -11,8 +11,6 @@
  * missing its table is still the design somebody meant to send.
  */
 import { createHash } from 'node:crypto'
-import { extname, join } from 'node:path'
-import { readFileSync, writeFileSync } from 'node:fs'
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -54,22 +52,9 @@ const importBody = z.object({
   onConflict: z.enum(['overwrite', 'copy']).optional(),
 })
 
-export interface TemplateIoOptions {
-  /** Where uploaded images live; imported ones are written beside them. */
-  storageDir: string
-}
-
-export async function registerTemplateIoRoutes(
-  app: FastifyInstance,
-  options: TemplateIoOptions,
-): Promise<void> {
+export async function registerTemplateIoRoutes(app: FastifyInstance): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>()
-  const ctx = () => ({
-    db: app.ctx.db,
-    clock: app.ctx.clock,
-    ids: app.ctx.ids,
-    storageDir: app.ctx.imageStorageDir,
-  })
+  const ctx = () => ({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
   const fonts = loadFontConfig(fontsRoot)
 
   const buildExport = (ids: readonly string[] | null): ExportFile => {
@@ -114,10 +99,10 @@ export async function registerTemplateIoRoutes(
           // what it looks like here, too.
           continue
         }
-        let bytes: Buffer
-        try {
-          bytes = readFileSync(asset.storagePath)
-        } catch {
+        const bytes = images.bytes(asset.id)
+        if (bytes === undefined) {
+          // The row is there but carries no picture — migration 15 keeps those
+          // rather than pretend the label never had one. Nothing to embed.
           continue
         }
         const hash = createHash('sha256').update(bytes).digest('hex')
@@ -204,15 +189,12 @@ export async function registerTemplateIoRoutes(
       return existing
     }
     const bytes = Buffer.from(asset.base64, 'base64')
-    const extension = extname(asset.filename) || (asset.mimeType === 'image/png' ? '.png' : '.jpg')
     const created = images.create({
       filename: asset.filename,
       mimeType: asset.mimeType,
       sizeBytes: bytes.length,
     })
-    const fileName = `${created.id}${extension}`
-    writeFileSync(join(options.storageDir, fileName), bytes)
-    images.attachFile(created.id, fileName)
+    images.attachBytes(created.id, bytes)
     localHashes.set(hash, created.id)
     return created.id
   }
@@ -252,7 +234,10 @@ export async function registerTemplateIoRoutes(
     const localHashes = new Map<string, string>()
     for (const asset of images.list()) {
       try {
-        localHashes.set(createHash('sha256').update(readFileSync(asset.storagePath)).digest('hex'), asset.id)
+        const local = images.bytes(asset.id)
+        if (local !== undefined) {
+          localHashes.set(createHash('sha256').update(local).digest('hex'), asset.id)
+        }
       } catch {
         // A row whose file is gone. Skip it; a fresh copy will be written.
       }
@@ -387,7 +372,7 @@ export async function registerTemplateIoRoutes(
             elements: saved.elements,
           },
           fonts,
-          resolveImage: createImageResolver(images),
+          resolveImage: createImageResolver(images.lookup()),
         }),
       )
       imported.push({ id: saved.id, name: saved.name })

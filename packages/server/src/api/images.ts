@@ -1,11 +1,11 @@
 /**
  * Image upload and retrieval (FR-009).
  *
- * Files live on disk with only metadata in the database: a 2MB logo inside a
- * SQLite row would bloat every query that touches the table.
+ * The bytes live in the row (migration 15). The original arrangement kept them
+ * on disk to stop a 2MB logo riding along on every query that touched the
+ * table — that concern is real and is answered by naming columns rather than by
+ * a second store: see ImageRepo, where nothing selects `*`.
  */
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { extname, join } from 'node:path'
 import { z } from 'zod'
 import multipart from '@fastify/multipart'
 import type { FastifyInstance } from 'fastify'
@@ -41,20 +41,11 @@ const pruneBody = z.object({
   minAgeHours: z.number().finite().min(0).max(24 * 365).default(DEFAULT_MIN_AGE_HOURS),
 })
 
-export interface ImageRoutesOptions {
-  /** Directory holding uploaded files. */
-  storageDir: string
-}
-
-export async function registerImageRoutes(
-  app: FastifyInstance,
-  options: ImageRoutesOptions,
-): Promise<void> {
-  mkdirSync(options.storageDir, { recursive: true })
+export async function registerImageRoutes(app: FastifyInstance): Promise<void> {
   await app.register(multipart, { limits: { fileSize: MAX_BYTES, files: 1 } })
 
   const typed = app.withTypeProvider<ZodTypeProvider>()
-  const repo = (): ImageRepo => new ImageRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids, storageDir: options.storageDir })
+  const repo = (): ImageRepo => new ImageRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
 
   typed.get('/api/images', async () => ({ images: repo().list() }))
 
@@ -77,25 +68,27 @@ export async function registerImageRoutes(
     }
 
     const store = repo()
-    const extension = extname(file.filename) || (file.mimetype === 'image/png' ? '.png' : '.jpg')
-    // Insert first so the id names the file; an orphan row is easier to reason
-    // about than an orphan file.
+    // Insert first, then the bytes: the id is minted by the insert, and nothing
+    // before it knows which row the picture belongs to.
     const asset = store.create({
       filename: file.filename,
       mimeType: file.mimetype,
       sizeBytes: buffer.length,
     })
-    const fileName = `${asset.id}${extension}`
-    writeFileSync(join(options.storageDir, fileName), buffer)
-    store.attachFile(asset.id, fileName)
+    store.attachBytes(asset.id, buffer)
 
-    // Re-read so the response carries the resolved path rather than the empty
-    // one `create` returned a moment ago.
-    return reply.status(HttpStatus.Created).send(store.find(asset.id))
+    return reply.status(HttpStatus.Created).send(asset)
   })
 
   /**
-   * Sweep uploaded images nothing points at any more (and files with no row).
+   * Sweep uploaded images nothing points at any more.
+   *
+   * Still needed with the bytes in the rows, and needed more than before:
+   * pasting a picture uploads it immediately, so every discarded paste leaves a
+   * row — and that row now carries the picture, so an abandoned 4MB paste grows
+   * the database rather than sitting in a directory. What the move did retire
+   * is the other half of the old sweep, which had to go looking for files with
+   * no row at all.
    *
    * Reports by default; `confirm` performs it. The report is the same
    * calculation as the removal, so what it lists is what would go.
@@ -119,31 +112,11 @@ export async function registerImageRoutes(
     const images = store.all()
     const plan = planImageCleanup(images, referenced, app.ctx.clock.now(), minAgeHours * 60 * 60 * 1000)
 
-    // Files the uploads directory holds and the database does not — what a
-    // crash between writing the file and recording it leaves behind. Compared
-    // against every row including the marked ones, so history's files are not
-    // mistaken for strays.
-    const known = new Set(images.map((image) => image.storagePath))
-    const cutoff = app.ctx.clock.now().getTime() - minAgeHours * 60 * 60 * 1000
-    const strays = readdirSync(options.storageDir)
-      .map((name) => join(options.storageDir, name))
-      .filter((path) => !known.has(path))
-      .filter((path) => {
-        try {
-          const stat = statSync(path)
-          return stat.isFile() && stat.mtimeMs <= cutoff
-        } catch {
-          return false
-        }
-      })
-
     if (!confirm) {
       return {
         outcome: 'planned' as const,
         removed: 0,
-        strayFilesRemoved: 0,
         candidates: plan.remove.map((image) => ({ id: image.id, sizeBytes: image.sizeBytes })),
-        strayFiles: strays.length,
         keptReferenced: plan.keptReferenced,
         keptTooNew: plan.keptTooNew,
         bytesFreed: plan.bytesFreed,
@@ -151,22 +124,19 @@ export async function registerImageRoutes(
       }
     }
 
+    // One store, so one delete. There is no second place for a file to be left
+    // behind, and no scan of the filesystem to find the ones that were.
     for (const image of plan.remove) {
       store.hardDelete(image.id)
-      rmSync(image.storagePath, { force: true })
-    }
-    for (const path of strays) {
-      rmSync(path, { force: true })
     }
 
-    // Principle V: a maintenance action that deletes files says so in the log,
+    // Principle V: a maintenance action that destroys data says so in the log,
     // with enough to answer "what went, and when" months later.
     app.log.info(
       {
         event: 'images_pruned',
         removed: plan.remove.length,
         removedIds: plan.remove.map((image) => image.id),
-        strayFilesRemoved: strays.length,
         bytesFreed: plan.bytesFreed,
         keptReferenced: plan.keptReferenced,
         keptTooNew: plan.keptTooNew,
@@ -178,9 +148,7 @@ export async function registerImageRoutes(
     return {
       outcome: 'removed' as const,
       removed: plan.remove.length,
-      strayFilesRemoved: strays.length,
       candidates: plan.remove.map((image) => ({ id: image.id, sizeBytes: image.sizeBytes })),
-      strayFiles: strays.length,
       keptReferenced: plan.keptReferenced,
       keptTooNew: plan.keptTooNew,
       bytesFreed: plan.bytesFreed,
@@ -190,11 +158,13 @@ export async function registerImageRoutes(
 
   typed.get('/api/images/:id/content', { schema: { params: idParams } }, async (request, reply) => {
     // Soft-deleted assets still serve, so job history keeps rendering (FR-051).
-    const asset = repo().find(request.params.id)
-    if (asset === undefined) {
+    const store = repo()
+    const asset = store.find(request.params.id)
+    const bytes = asset === undefined ? undefined : store.bytes(asset.id)
+    if (asset === undefined || bytes === undefined) {
       throw ApiError.notFound({ imageId: request.params.id })
     }
-    return reply.type(asset.mimeType).send(readFileSync(asset.storagePath))
+    return reply.type(asset.mimeType).send(bytes)
   })
 
   typed.delete('/api/images/:id', { schema: { params: idParams } }, async (request, reply) => {
@@ -204,10 +174,9 @@ export async function registerImageRoutes(
       throw ApiError.notFound({ imageId: request.params.id })
     }
 
-    const { removedFromDisk } = store.delete(asset.id)
-    if (removedFromDisk) {
-      rmSync(asset.storagePath, { force: true })
-    }
+    // The row carries the bytes, so removing it removes them. Nothing else to
+    // unlink, and nothing left over if this crashes half-way.
+    store.delete(asset.id)
     return reply.status(HttpStatus.NoContent).send()
   })
 }

@@ -23,7 +23,6 @@ function image(over: Partial<StoredImage> = {}): StoredImage {
   return {
     id: 'img-1',
     sizeBytes: 1000,
-    storagePath: '/data/uploads/img-1.png',
     createdAt: new Date(NOW.getTime() - 48 * HOUR).toISOString(),
     deletedAt: null,
     ...over,

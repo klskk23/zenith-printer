@@ -64,13 +64,10 @@ export function ImagePruneCard(): React.JSX.Element {
       {result !== undefined && !prune.isPending && (
         <div className="space-y-0.5 text-[11px]" data-prune-result>
           <p className={result.removed > 0 ? 'text-foreground' : 'text-muted-foreground'}>
-            {result.removed === 0 && result.strayFilesRemoved === 0
+            {result.removed === 0
               ? copy.settings.pruneNothing
               : copy.settings.pruneDone(result.removed, humanSize(result.bytesFreed))}
           </p>
-          {result.strayFilesRemoved > 0 && (
-            <p className="text-muted-foreground">{copy.settings.pruneStrays(result.strayFilesRemoved)}</p>
-          )}
           {/* What survived, so "it deleted nothing" reads as an answer rather
               than as a failure. */}
           <p className="text-muted-foreground">

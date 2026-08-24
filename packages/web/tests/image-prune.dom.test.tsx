@@ -23,9 +23,7 @@ const posted: Array<{ url: string; body: unknown }> = []
 let response: Record<string, unknown> = {
   outcome: 'removed',
   removed: 7,
-  strayFilesRemoved: 0,
   candidates: [],
-  strayFiles: 0,
   keptReferenced: 3,
   keptTooNew: 2,
   bytesFreed: 52_428,

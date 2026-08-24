@@ -33,12 +33,7 @@ const printerParams = z.object({ printerId: z.string().min(1) })
 
 export async function registerTemplateRoutes(app: FastifyInstance): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>()
-  const ctx = () => ({
-    db: app.ctx.db,
-    clock: app.ctx.clock,
-    ids: app.ctx.ids,
-    storageDir: app.ctx.imageStorageDir,
-  })
+  const ctx = () => ({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
   const templates = (): TemplateRepo => new TemplateRepo(ctx())
   const profiles = (): ProfileRepo => new ProfileRepo(ctx())
   const printers = (): PrinterRepo => new PrinterRepo(ctx())
@@ -95,7 +90,7 @@ export async function registerTemplateRoutes(app: FastifyInstance): Promise<void
    */
   const withThumbnail = (template: Template): Template => {
     const store = templates()
-    const resolveImage = createImageResolver(new ImageRepo(ctx()))
+    const resolveImage = createImageResolver(new ImageRepo(ctx()).lookup())
     const png = renderThumbnail({
       ir: {
         widthMm: template.widthMm,

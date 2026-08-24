@@ -7,7 +7,6 @@
 export interface StoredImage {
   id: string
   sizeBytes: number
-  storagePath: string
   createdAt: string
   /** Set when the image was deleted while history still needed it (FR-051). */
   deletedAt: string | null

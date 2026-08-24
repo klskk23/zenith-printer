@@ -144,14 +144,15 @@ COPY --from=builder /build/packages/web/dist   ./packages/web/dist
 COPY --from=builder /build/fonts/full          ./fonts/full
 COPY --from=builder /build/fonts/MANIFEST.sha256 ./fonts/MANIFEST.sha256
 
-# Both default under /data, which is where the compose file mounts a volume.
+# The database is under /data, which is where the compose file mounts a
+# directory. Images live inside it too (migration 15), so there is nothing else
+# to point anywhere.
 # Left as environment rather than baked into the code so a different layout is
 # a compose edit, not a rebuild.
 ENV NODE_ENV=production \
     ZENITH_HOST=0.0.0.0 \
     ZENITH_PORT=3000 \
     ZENITH_DB=/data/zenith.db \
-    ZENITH_UPLOADS=/data/uploads \
     LOG_LEVEL=info
 
 # Runs as root, and that is the point of this deployment: the container is

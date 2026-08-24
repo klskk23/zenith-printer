@@ -13,6 +13,7 @@
  */
 import { labelIrSchema } from '@zenith/shared'
 import type { Database } from '../index.ts'
+import { readFileSync } from 'node:fs'
 import { createImageResolver } from '../../render/image-resolver.ts'
 import { loadFontConfig } from '../../render/fonts.ts'
 import { renderThumbnail } from '../../render/thumbnail.ts'
@@ -40,15 +41,23 @@ export function backfillThumbnails(
   // are snake_case in the table and camelCase on the type; handing the row
   // straight over would leave `storagePath` undefined, and the resolver would
   // quietly skip every image rather than say anything.
+  // Reads the file, because this migration runs before 15 moved the bytes into
+  // the rows — at this point `storage_path` is still the absolute path the
+  // upload wrote to.
   const findAsset = db.prepare('SELECT mime_type, storage_path FROM images WHERE id = ?')
   const resolveImage = createImageResolver({
     find: (assetId) => {
       const row = findAsset.get(assetId) as
         | { mime_type: string; storage_path: string }
         | undefined
-      return row === undefined
-        ? undefined
-        : { mimeType: row.mime_type, storagePath: row.storage_path }
+      if (row === undefined) {
+        return undefined
+      }
+      try {
+        return { mimeType: row.mime_type, bytes: readFileSync(row.storage_path) }
+      } catch {
+        return undefined
+      }
     },
   })
   const update = db.prepare('UPDATE templates SET thumbnail = ? WHERE id = ?')

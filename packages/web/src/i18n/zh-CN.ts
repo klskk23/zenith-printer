@@ -510,7 +510,6 @@ export const copy = {
     pruneConfirmAction: '删除',
     pruneNothing: '没有可清理的图片。',
     pruneDone: (count: number, size: string): string => `已删除 ${count} 张图片，释放 ${size}。`,
-    pruneStrays: (count: number): string => `另清理了 ${count} 个没有数据库记录的文件。`,
     pruneKept: (referenced: number, tooNew: number): string =>
       `保留 ${referenced} 张仍被引用的图片，以及 ${tooNew} 张上传不足 24 小时的图片。`,
     localOnlyHint: '换一个浏览器会回到默认值——系统没有账号，无法记住是谁。',
