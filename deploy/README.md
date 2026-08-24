@@ -403,11 +403,33 @@ ghcr.io/klskk23/zenith-printer:latest
 渲一张中文标签**、重启再调一次。构建得出来但服务不起来，这种失败要在它拿到一个别人能 pull
 的公开标签之前发现。
 
-### 只出 amd64
+### amd64 和 arm64 都出
 
-加 arm64 是 `platforms: linux/amd64,linux/arm64` 外加 `setup-qemu-action` 一行的事，但
-镜像构建里有 `npm ci` 和一次 vite 构建，在模拟下会把四分钟的发布拖成大半个小时。等真有
-一台 arm64 机器要装的时候再加，不必提前。
+两个架构各在**自己架构的托管 runner 上原生构建**（`ubuntu-latest` 和 `ubuntu-24.04-arm`），
+不用 QEMU：镜像构建里有 `npm ci` 和一次 vite 构建，模拟下会把四分钟的发布拖成大半个小时。
+GitHub 的 arm64 runner 对公开仓库免费。
+
+每一条腿都在自己的硬件上构建 → 冒烟 → **按 digest 推送、不带任何 tag**，最后由 `manifest`
+job 把两个 digest 拼成一个 manifest list。所以：
+
+```bash
+docker pull ghcr.io/klskk23/zenith-printer:v0.2.0   # 两种机器上都拉到对的那个
+```
+
+不给每条腿单独打 `:v0.2.0-arm64` 这类 tag，是为了不留下让人误拉的东西——只有 manifest list
+是打算被人叫出名字的。
+
+两处保险：矩阵 `fail-fast: true`（少一条腿拼出来的 manifest 会悄悄把 amd64 镜像发给所有
+arm64 机器）；拼完之后断言两个架构都在里面。
+
+> **arm64 那条腿的第一次运行值得盯一下。** 本地用 QEMU 模拟验证过两次，两次都是模拟器
+> 自己段错误（`qemu: uncaught target signal 11`，一次在 dpkg 配置 sympy 时，一次在
+> esbuild 里），所以这条路径**没有在本地被证实过**——这不是 arm64 的反证，只是说明它只能
+> 在真机上验。已知的前提都对得上：基础镜像有 arm64v8，sharp / resvg / serialport 三个原生
+> 模块在 lockfile 里都有 arm64 构建。
+
+CI 里 `image` job 也是双架构。放在那里而不是只放发布时，是因为它要抓的那类失败——某个依赖
+没有 arm64 构建、基础镜像挪了位置——应该在引入它的那次改动上暴露，而不是三周后打标签时。
 
 ---
 

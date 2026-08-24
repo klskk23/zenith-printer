@@ -40,14 +40,21 @@ FROM node:26.3-trixie-slim AS builder
 # system copy when it already hashes to the manifest and downloads the pinned
 # package when it does not. On trixie that means the three 20MB Noto files come
 # from apt and only DejaVu is fetched.
-# python3-fonttools and python3-brotli generate the editor's web fonts. From
-# Debian rather than pip: pinned by the base image, no build toolchain, no
-# network beyond apt.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates curl dpkg-dev fonts-noto-cjk fonts-dejavu-core \
-      python3 python3-fonttools python3-brotli \
+      python3 python3-pip \
  && rm -rf /var/lib/apt/lists/*
+
+# fontTools and brotli generate the editor's web fonts. From pip rather than
+# Debian's python3-fonttools, which Depends on sympy — and therefore on scipy,
+# numpy and lxml — pulling 60MB and three minutes of configure into a builder
+# stage that needs `subset` and nothing else.
+#
+# `--break-system-packages` because Debian marks its interpreter externally
+# managed (PEP 668). This is a throwaway builder stage with no other Python in
+# it, which is exactly the case that flag is for.
+RUN pip install --no-cache-dir --break-system-packages fonttools brotli
 
 # npm 12 explicitly: package.json carries an `allowScripts` block that only
 # npm 12 honours. Under npm 11 the install scripts of three BLE packages —

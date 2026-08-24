@@ -12,6 +12,8 @@ container on your LAN — no cloud, no account, no reverse proxy.
 - **Two printer families.** NIIMBOT over USB serial, Honeywell/ZPL over TCP 9100.
 - **Deterministic rendering.** Fonts ship inside the image and system fonts are
   switched off, so one template prints identically on every machine.
+- **amd64 and arm64.** One tag serves both — a Pi on the bench and a server in
+  the rack pull the same name.
 
 ## Quick start
 

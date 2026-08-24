@@ -44,8 +44,23 @@ jobs:
       - name: Coverage (>= 80% on core logic)
         run: make coverage
 
+  # Both architectures, each on a runner of its own. Not with QEMU: emulating a
+  # `npm ci` and a vite build turns four minutes into most of an hour, and
+  # GitHub's arm64 runners are free for public repositories.
+  #
+  # Here rather than only at release time, because the failure this catches —
+  # a dependency with no arm64 build, a base image that moved — should surface
+  # on the change that caused it, not on the tag three weeks later.
   image:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     needs: quality-gate
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +72,7 @@ jobs:
         run: docker build -f deploy/Dockerfile -t zenith-printer:ci .
 
       # Starts it on a scratch volume, calls the API, renders a label with the
-      # bundled CJK fonts, restarts it and calls it again.
+      # bundled CJK fonts, restarts it and calls it again — on this
+      # architecture, which is the only way arm64 is genuinely covered.
       - name: Smoke it
         run: bash deploy/smoke.sh zenith-printer:ci
