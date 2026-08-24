@@ -54,7 +54,7 @@ export async function registerImageRoutes(
   await app.register(multipart, { limits: { fileSize: MAX_BYTES, files: 1 } })
 
   const typed = app.withTypeProvider<ZodTypeProvider>()
-  const repo = (): ImageRepo => new ImageRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+  const repo = (): ImageRepo => new ImageRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids, storageDir: options.storageDir })
 
   typed.get('/api/images', async () => ({ images: repo().list() }))
 
@@ -84,13 +84,14 @@ export async function registerImageRoutes(
       filename: file.filename,
       mimeType: file.mimetype,
       sizeBytes: buffer.length,
-      storagePath: '',
     })
-    const storagePath = join(options.storageDir, `${asset.id}${extension}`)
-    writeFileSync(storagePath, buffer)
-    app.ctx.db.prepare('UPDATE images SET storage_path = ? WHERE id = ?').run(storagePath, asset.id)
+    const fileName = `${asset.id}${extension}`
+    writeFileSync(join(options.storageDir, fileName), buffer)
+    store.attachFile(asset.id, fileName)
 
-    return reply.status(HttpStatus.Created).send({ ...asset, storagePath })
+    // Re-read so the response carries the resolved path rather than the empty
+    // one `create` returned a moment ago.
+    return reply.status(HttpStatus.Created).send(store.find(asset.id))
   })
 
   /**

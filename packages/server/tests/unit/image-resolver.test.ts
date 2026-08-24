@@ -18,11 +18,10 @@ function seed(): { id: string; path: string } {
     filename: 'logo.png',
     mimeType: 'image/png',
     sizeBytes: CONTENT.length,
-    storagePath: '',
   })
+  repo.attachFile(asset.id, `${asset.id}.png`)
   const path = join(dir, `${asset.id}.png`)
   writeFileSync(path, CONTENT)
-  db.prepare('UPDATE images SET storage_path = ? WHERE id = ?').run(path, asset.id)
   return { id: asset.id, path }
 }
 
@@ -45,6 +44,7 @@ beforeEach(() => {
   db = openDatabase({ location: ':memory:' })
   repo = new ImageRepo({
     db,
+    storageDir: dir,
     clock: new FixedClock('2026-08-21T00:00:00Z'),
     ids: new SequentialIdGenerator('img'),
   })
@@ -64,10 +64,9 @@ describe('data URIs', () => {
   })
 
   it(`uses the asset's recorded mime type`, () => {
-    const asset = repo.create({ filename: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 3, storagePath: '' })
-    const path = join(dir, 'a.jpg')
-    writeFileSync(path, CONTENT)
-    db.prepare('UPDATE images SET storage_path = ? WHERE id = ?').run(path, asset.id)
+    const asset = repo.create({ filename: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 3 })
+    repo.attachFile(asset.id, 'a.jpg')
+    writeFileSync(join(dir, 'a.jpg'), CONTENT)
     expect(createImageResolver(repo)(asset.id)).toMatch(/^data:image\/jpeg;base64,/)
   })
 })

@@ -33,7 +33,12 @@ const printerParams = z.object({ printerId: z.string().min(1) })
 
 export async function registerTemplateRoutes(app: FastifyInstance): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>()
-  const ctx = () => ({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+  const ctx = () => ({
+    db: app.ctx.db,
+    clock: app.ctx.clock,
+    ids: app.ctx.ids,
+    storageDir: app.ctx.imageStorageDir,
+  })
   const templates = (): TemplateRepo => new TemplateRepo(ctx())
   const profiles = (): ProfileRepo => new ProfileRepo(ctx())
   const printers = (): PrinterRepo => new PrinterRepo(ctx())

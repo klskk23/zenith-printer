@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, existsSync, rmSync } from 'node:fs'
+import { cpSync, mkdtempSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
@@ -135,5 +135,39 @@ describe('deletion and history', () => {
 
   it('returns 404 when deleting an unknown image', async () => {
     expect((await app.inject({ method: 'DELETE', url: '/api/images/nope' })).statusCode).toBe(404)
+  })
+})
+
+describe('moving the data directory to another machine', () => {
+  it('still serves the picture from wherever the files ended up', async () => {
+    // The whole point, end to end. `storage_path` used to hold the absolute
+    // path a file had at upload time, so copying data/ to a server where
+    // uploads live somewhere else — or into the container, where they always
+    // live at /data/uploads — left every row pointing at nothing. Templates
+    // intact, ids matching, and not one picture rendering.
+    const asset = (await upload()).json()
+    const original = (await app.inject({ method: 'GET', url: `/api/images/${asset.id}/content` }))
+      .rawPayload
+
+    // The move: same database, same rows, files under a different path.
+    const elsewhere = mkdtempSync(join(tmpdir(), 'zenith-moved-'))
+    cpSync(storageDir, elsewhere, { recursive: true })
+    const moved = buildApp({
+      db: app.ctx.db,
+      imageStorageDir: elsewhere,
+      clock: app.ctx.clock,
+      idGenerator: app.ctx.ids,
+      logLevel: 'error',
+    })
+    await moved.ready()
+
+    try {
+      const res = await moved.inject({ method: 'GET', url: `/api/images/${asset.id}/content` })
+      expect(res.statusCode).toBe(200)
+      expect(res.rawPayload.equals(original)).toBe(true)
+    } finally {
+      await moved.close()
+      rmSync(elsewhere, { recursive: true, force: true })
+    }
   })
 })

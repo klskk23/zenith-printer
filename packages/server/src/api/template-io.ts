@@ -64,7 +64,12 @@ export async function registerTemplateIoRoutes(
   options: TemplateIoOptions,
 ): Promise<void> {
   const typed = app.withTypeProvider<ZodTypeProvider>()
-  const ctx = () => ({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+  const ctx = () => ({
+    db: app.ctx.db,
+    clock: app.ctx.clock,
+    ids: app.ctx.ids,
+    storageDir: app.ctx.imageStorageDir,
+  })
   const fonts = loadFontConfig(fontsRoot)
 
   const buildExport = (ids: readonly string[] | null): ExportFile => {
@@ -204,11 +209,10 @@ export async function registerTemplateIoRoutes(
       filename: asset.filename,
       mimeType: asset.mimeType,
       sizeBytes: bytes.length,
-      storagePath: '',
     })
-    const storagePath = join(options.storageDir, `${created.id}${extension}`)
-    writeFileSync(storagePath, bytes)
-    app.ctx.db.prepare('UPDATE images SET storage_path = ? WHERE id = ?').run(storagePath, created.id)
+    const fileName = `${created.id}${extension}`
+    writeFileSync(join(options.storageDir, fileName), bytes)
+    images.attachFile(created.id, fileName)
     localHashes.set(hash, created.id)
     return created.id
   }

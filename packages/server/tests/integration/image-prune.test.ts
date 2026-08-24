@@ -12,7 +12,7 @@
  * survive.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
@@ -156,15 +156,42 @@ describe('what survives', () => {
 })
 
 describe('files with no row at all', () => {
+  /**
+   * Write a stray file and say how old it is.
+   *
+   * The age is stamped rather than left to the filesystem. A row's age comes
+   * from the injected clock and a file's from its mtime, and in production
+   * those are the same clock — but in a test they are not, so leaving the mtime
+   * to real time makes the outcome depend on what today's date happens to be.
+   * This test passed for a day and failed the next morning for exactly that
+   * reason, which is what the constitution's "no real clocks" rule is about.
+   */
+  function strayAged(name: string, ageMs: number): string {
+    const path = join(storageDir, name)
+    writeFileSync(path, PNG_1X1)
+    const seconds = (clock.now().getTime() - ageMs) / 1000
+    utimesSync(path, seconds, seconds)
+    return path
+  }
+
   it('sweeps a file the uploads directory holds and the database does not', async () => {
     // What a crash between writing the file and recording it leaves behind.
-    const stray = join(storageDir, 'stray.png')
-    writeFileSync(stray, PNG_1X1)
-    clock.advance(48 * HOUR)
+    const stray = strayAged('stray.png', 48 * HOUR)
 
     const res = await prune({ confirm: true })
     expect(res.json()).toMatchObject({ strayFilesRemoved: 1 })
     expect(existsSync(stray)).toBe(false)
+  })
+
+  it('leaves a stray file that is still inside the grace period', async () => {
+    // The same reason rows have one: a file written two minutes ago may be an
+    // upload whose row is about to be committed, or one somebody is still
+    // looking at in an unsaved design.
+    const fresh = strayAged('fresh.png', 2 * HOUR)
+
+    const res = await prune({ confirm: true })
+    expect(res.json()).toMatchObject({ strayFilesRemoved: 0 })
+    expect(existsSync(fresh)).toBe(true)
   })
 
   it('leaves a file that belongs to a row alone', async () => {

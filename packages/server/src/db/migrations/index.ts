@@ -9,6 +9,7 @@ import type { Migration } from '../index.ts'
 import { migrateOffsets } from './offset-migration.ts'
 import { claimsFromSeqRanges, rewriteElementContent } from './variable-migration.ts'
 import { backfillThumbnails } from './thumbnail-backfill.ts'
+import { relativiseImagePaths } from './image-path-migration.ts'
 
 /**
  * The column that made `delete` wrong.
@@ -374,4 +375,5 @@ export const migrations: Migration[] = [
   { id: 11, name: 'template_thumbnail', up: templateThumbnail, apply: backfillThumbnails },
   { id: 12, name: 'data_source_link', up: dataSourceLink },
   { id: 13, name: 'drop_image_ref_count', up: dropImageRefCount },
+  { id: 14, name: 'relative_image_paths', up: '', apply: relativiseImagePaths },
 ]
