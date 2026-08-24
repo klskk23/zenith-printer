@@ -39,6 +39,7 @@ export const copy = {
       history: '打印历史',
       settings: '设置',
       'data-sources': '数据源',
+      'api-docs': '接口调试',
       'data-source': '数据源',
     },
     dataSourceTab: (name: string): string => `数据源-${name}`,
@@ -54,6 +55,13 @@ export const copy = {
     softLimitWarning: (count: number): string =>
       `已打开 ${count} 个设计与模板标签页。继续开启可能影响编辑流畅度，但不会被阻止。`,
     disconnectedBanner: '与打印服务的连接已断开。编辑不会中断，但保存和打印会失败。',
+  },
+
+  apiDocs: {
+    heading: '接口调试',
+    explain: '下面这份说明由服务端从校验用的 schema 直接生成，因此不会和真实接受的请求走散。原始文档：',
+    liveWarning: '这里的「Try it out」调用的是正在运行的这台服务：提交打印会真的出标签、真的耗纸。本服务没有鉴权，所以这些接口本来就对局域网内任何人开放，这里只是让它们变得可见。',
+    loading: '正在加载接口控制台…',
   },
 
   index: {

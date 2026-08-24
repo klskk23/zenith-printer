@@ -15,6 +15,16 @@ export default defineConfig({
         },
       },
       {
+        // Resolve the way the browser build does, not the way Node does.
+        //
+        // Packages can ship different entry points per condition, and picking
+        // the Node one in a DOM test means the suite exercises code the
+        // browser will never load. swagger-ui-react is the case in point: its
+        // browser entry expects the host application's React, while its Node
+        // entry bundles a copy of its own — rendering that one under React 19
+        // fails with "a React Element from an older version of React", a fault
+        // that exists only in the test.
+        resolve: { conditions: ['browser', 'import', 'module', 'default'] },
         test: {
           name: 'web',
           // Components need a DOM. Kept as its own project so the logic suite
@@ -22,6 +32,13 @@ export default defineConfig({
           // is actually asked, which nothing did until a blank screen shipped.
           include: ['packages/web/tests/**/*.dom.test.tsx'],
           environment: 'happy-dom',
+          server: {
+            // Dependencies are externalised by default, which means Node
+            // resolves them and Vite's conditions above never apply. Inlining
+            // this one puts it back through Vite, so the test loads the same
+            // React-less bundle the browser will.
+            deps: { inline: ['swagger-ui-react'] },
+          },
         },
       },
       {

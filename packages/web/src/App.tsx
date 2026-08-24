@@ -25,6 +25,7 @@ import { TemplatesPage } from './pages/templates-page.tsx'
 import { QueuePage } from './pages/queue-page.tsx'
 import { HistoryPage } from './pages/history-page.tsx'
 import { SettingsPage } from './pages/settings-page.tsx'
+import { ApiDocsPage } from './pages/api-docs-page.tsx'
 import { DataSourcesPage } from './features/data-sources/data-sources-page.tsx'
 import { DataSourceEditor } from './features/data-sources/data-source-editor.tsx'
 import { PreferencesProvider } from './features/preferences/context.tsx'
@@ -53,6 +54,8 @@ function TabContent({ tab }: { tab: WorkspaceTab }): React.JSX.Element {
       return <PrintersPage />
     case 'queue':
       return <QueuePage />
+    case 'api-docs':
+      return <ApiDocsPage />
     case 'history':
       return <HistoryPage />
     case 'settings':

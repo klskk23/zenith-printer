@@ -7,6 +7,7 @@
   "dependencies": {
     "@fastify/multipart": "^9.2.1",
     "@fastify/static": "^10.1.3",
+    "@fastify/swagger": "^9.8.1",
     "@mmote/niimbluelib": "0.0.1-alpha.43-node",
     "@resvg/resvg-js": "^2.6.2",
     "@zenith/shared": "*",

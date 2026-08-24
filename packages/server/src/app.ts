@@ -30,6 +30,7 @@ import { registerGoogleRoutes } from './api/google.ts'
 import { registerTemplateRoutes } from './api/templates.ts'
 import { registerSequencePoolRoutes } from './api/sequence-pools.ts'
 import { registerDataSourceRoutes } from './api/data-sources.ts'
+import { registerOpenApi } from './api/openapi.ts'
 import { createQueue } from './queue/manager.ts'
 import type { PrintQueue } from './queue/print-queue.ts'
 
@@ -162,6 +163,11 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
 
   // Routes are registered eagerly; Fastify resolves the returned promise
   // through `app.after()` when the caller awaits `ready()`.
+  // On the root instance and before the routes, so `onRoute` fires for all of
+  // them. Registering it as a plugin of its own would encapsulate it, and the
+  // document would describe nothing but itself.
+  registerOpenApi(app)
+
   void app.register(registerPrinterRoutes)
   void app.register(registerPrintJobRoutes)
   void app.register(registerTemplateRoutes)

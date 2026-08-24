@@ -24,6 +24,9 @@ export const TAB_KINDS = [
   'printers',
   'queue',
   'history',
+  // Developer-facing, so it sits below the day-to-day entries and above
+  // settings — which is still the thing people visit once.
+  'api-docs',
   'settings',
   // Never in the sidebar: the editor needs a table to open, and an entry that
   // opened an empty one would be a dead end. Reached from the list instead.
@@ -47,6 +50,9 @@ const SINGLETON_KINDS = new Set<TabKind>([
   'printers',
   'queue',
   'history',
+  // Developer-facing, so it sits below the day-to-day entries and above
+  // settings — which is still the thing people visit once.
+  'api-docs',
   'settings',
   'data-sources',
 ])
@@ -61,6 +67,7 @@ const STATIC_PATHS: Record<Exclude<TabKind, 'design' | 'data-source'>, string> =
   printers: '/printers',
   queue: '/queue',
   history: '/history',
+  'api-docs': '/api-docs',
   settings: '/settings',
   'data-sources': '/data-sources',
 }
