@@ -18,12 +18,15 @@ import { Alert } from '../../components/ui/alert.tsx'
 import { Card, CardContent } from '../../components/ui/card.tsx'
 import { useJobs, type PrintJob } from './hooks.ts'
 
+/** Jobs that are over, one way or another — the ones there is a point reprinting. */
+const FINISHED: ReadonlySet<PrintJob['status']> = new Set(['completed', 'failed', 'cancelled'])
+
 function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
   const { preferences } = usePreferences()
   const unknown = job.pagesPrinted === null
 
   return (
-    <Card>
+    <Card data-history-row={job.id}>
       <CardContent className="space-y-1 p-3 text-xs">
         <div className="flex items-center justify-between gap-2">
           {/* Stated, not blank: "no template" is a fact about this job, and a
@@ -33,9 +36,11 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
           </span>
           <span className="flex items-center gap-2">
             <span className="text-muted-foreground">{copy.jobs.status[job.status]}</span>
-            {job.status === 'failed' && (
-              // History is where a failed job ends up; without this the advice
-              // to "count and reprint" had nowhere to be acted on.
+            {FINISHED.has(job.status) && (
+              // Offered on anything that finished, not only on failures. The
+              // action grew out of "count the labels and reprint the
+              // shortfall", but the commoner reason is duller: the same batch
+              // is wanted again next week.
               <ReprintEntry job={job} />
             )}
           </span>
@@ -104,7 +109,9 @@ function ReprintEntry({ job }: { job: PrintJob }): React.JSX.Element {
   return (
     <>
       <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        {copy.jobs.reprint.action}
+        {/* Two different words for two different things: a shortfall is made
+            up, a finished batch is run again. */}
+        {job.status === 'completed' ? copy.jobs.reprint.againAction : copy.jobs.reprint.action}
       </Button>
       <ReprintDialog job={job} open={open} onOpenChange={setOpen} onDone={() => undefined} />
     </>

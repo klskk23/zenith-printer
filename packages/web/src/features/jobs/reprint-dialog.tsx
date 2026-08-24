@@ -45,8 +45,21 @@ export interface ReprintDialogProps {
   onDone: () => void
 }
 
-/** What is left to print, when that is knowable. */
-function shortfall(job: PrintJob): number | null {
+/**
+ * How many to offer, and why.
+ *
+ *   - A job that finished wants the whole batch again. Its shortfall is zero,
+ *     and the failure-shaped default would offer one label where there were a
+ *     hundred.
+ *   - A job that failed part-way wants the difference: 60 of 100 printed leaves
+ *     40, and defaulting to 100 reprints labels already on the roll.
+ *   - A job interrupted by a restart has no knowable count at all; the operator
+ *     counts what came out and says so.
+ */
+function suggestedCount(job: PrintJob): number | null {
+  if (job.status === 'completed') {
+    return job.requestedCopies
+  }
   if (job.pagesPrinted === null) {
     return null
   }
@@ -54,7 +67,7 @@ function shortfall(job: PrintJob): number | null {
 }
 
 export function ReprintDialog({ job, open, onOpenChange, onDone }: ReprintDialogProps): React.JSX.Element {
-  const suggested = shortfall(job)
+  const suggested = suggestedCount(job)
   const [copies, setCopies] = useState(suggested ?? 1)
   const [error, setError] = useState<ApiRequestError | null>(null)
   const [busy, setBusy] = useState(false)
@@ -65,12 +78,11 @@ export function ReprintDialog({ job, open, onOpenChange, onDone }: ReprintDialog
   const [printerId, setPrinterId] = useState<string | null>(null)
   const [profileId, setProfileId] = useState<string | null>(null)
 
-  // Only the same kind. A design is bound to a printer kind when it is drawn,
-  // and the server refuses the rest — offering them would be an invitation to
-  // an error message.
-  const printers = (usePrinters().data ?? []).filter(
-    (printer) => printer.kind === job.snapshot.printerKind && printer.capabilities !== null,
-  )
+  // Every probed printer, of either kind. Both drivers are handed a bitmap, so
+  // a design has no kind of its own to clash with; filtering by kind would hide
+  // a machine that prints the label perfectly well. Unprobed ones are left out
+  // because nothing knows their head width until they have answered.
+  const printers = (usePrinters().data ?? []).filter((printer) => printer.capabilities !== null)
   const chosenPrinter = printerId ?? job.printerId
   const profiles = useProfiles(chosenPrinter).data ?? []
 
@@ -101,10 +113,12 @@ export function ReprintDialog({ job, open, onOpenChange, onDone }: ReprintDialog
         <DialogHeader>
           <DialogTitle>{copy.jobs.reprint.heading}</DialogTitle>
           <DialogDescription>
-            {suggested === null
-              ? // The count is unknowable, so the operator supplies it.
-                copy.jobs.reprint.unknownCount
-              : copy.jobs.reprint.knownCount(job.pagesPrinted!, job.requestedCopies)}
+            {job.status === 'completed'
+              ? copy.jobs.reprint.completedCount(job.requestedCopies)
+              : suggested === null
+                ? // The count is unknowable, so the operator supplies it.
+                  copy.jobs.reprint.unknownCount
+                : copy.jobs.reprint.knownCount(job.pagesPrinted!, job.requestedCopies)}
           </DialogDescription>
         </DialogHeader>
 

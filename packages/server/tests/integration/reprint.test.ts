@@ -41,10 +41,14 @@ async function seedFailedJob(pagesPrinted: number | null): Promise<string> {
     printerName: 'B3S_P',
     printerModel: 'B3S_P',
     printerKind: 'niimbot',
-    widthMm: 50,
+    // 40mm, not 50: the seeded head is 384 dots at 203 dpi, which covers
+    // 48mm. The original job is inserted straight into the table, so it never
+    // went through the check a real submission makes — and a fixture that
+    // could not have been printed is a poor thing to reprint.
+    widthMm: 40,
     heightMm: 30,
     dpi: 203,
-    ir: { widthMm: 50, heightMm: 30, dpi: 203, elements: [] },
+    ir: { widthMm: 40, heightMm: 30, dpi: 203, elements: [] },
     profile: { name: 'stock', density: 3, labelType: 1 },
     offsetXDots: 0,
     offsetYDots: 0,
@@ -290,10 +294,11 @@ describe('choosing a different printer', () => {
     expect(snapshot.templateName).toBe('shipping')
   })
 
-  it('refuses a printer of a different kind', async () => {
-    // A design is bound to a printer kind when it is drawn. Reprinting a
-    // NIIMBOT label on a ZPL machine is a new decision, not a repeat of an old
-    // one, and the label it produced would not be the label being reprinted.
+  it('accepts a printer of another kind', async () => {
+    // Both drivers are handed a bitmap, so a design has no kind of its own to
+    // clash with — that gate was removed deliberately (see the commit that
+    // decoupled templates from printers, and the FR-032 amendment). What
+    // decides is whether the label fits the head, which is checked below.
     await seedFailedJob(60)
     seedSecondPrinter('prn-zpl', 'zpl', 203)
 
@@ -302,8 +307,24 @@ describe('choosing a different printer', () => {
       url: '/api/print-jobs/job-1/reprint',
       payload: { copies: 1, printerId: 'prn-zpl' },
     })
+    expect(res.statusCode).toBe(202)
+  })
+
+  it('refuses a printer whose head is narrower than the label', async () => {
+    // The constraint that is real. 50mm at 203dpi needs 400 dots; this head has
+    // 384. Submitting a normal job already checks this — the reprint path did
+    // not, so it would have queued a job the printer cannot produce.
+    await seedFailedJob(60)
+    seedSecondPrinter('prn-narrow', 'niimbot', 203)
+    app.ctx.db.prepare('UPDATE printers SET printhead_pixels = 200 WHERE id = ?').run('prn-narrow')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs/job-1/reprint',
+      payload: { copies: 1, printerId: 'prn-narrow' },
+    })
     expect(res.statusCode).toBe(422)
-    expect(res.json().code).toBe('PRINTER_KIND_MISMATCH')
+    expect(res.json().details.maxLabelWidthMm).toBeLessThan(50)
   })
 
   it('404s for a printer that does not exist', async () => {

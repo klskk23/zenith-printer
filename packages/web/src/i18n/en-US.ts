@@ -636,6 +636,8 @@ export const copy: Copy = {
       profileDefault: 'As the original run',
       noProfiles: 'This printer has no saved settings',
       action: 'Reprint',
+      againAction: 'Print again',
+      completedCount: (total: number): string => `${total} label(s) printed, all of them fine. The same count again by default; change it if you need to.`,
       heading: 'Reprint this job',
       unknownCount:
         'How many were printed cannot be confirmed. Count the labels produced and enter how many are still needed.',

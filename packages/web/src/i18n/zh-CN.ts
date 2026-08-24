@@ -630,6 +630,8 @@ export const copy = {
       profileDefault: '沿用原任务',
       noProfiles: '这台打印机还没有保存的参数',
       action: '补打',
+      againAction: '重新打印',
+      completedCount: (total: number): string => `这次打印了 ${total} 张，全部成功。默认按同样的份数再打一遍，可自行调整。`,
       heading: '补打这个任务',
       unknownCount: '这次打印的实际份数无法确认。请清点已打出的标签，填入还需要补打的数量。',
       knownCount: (printed: number, total: number) => `已打出 ${printed} 张，原计划 ${total} 张。默认补打差额，可自行调整。`,

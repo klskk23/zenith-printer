@@ -279,18 +279,6 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         // probed, so there is no size to print at.
         throw ApiError.unprocessable('VALIDATION_FAILED', { printerId: printer.id })
       }
-      if (printer.kind !== original.snapshot.printerKind) {
-        // A design is bound to a printer kind when it is drawn. Reprinting a
-        // NIIMBOT label on a ZPL machine is a new decision rather than a repeat
-        // of an old one, and what came out would not be what is being
-        // reprinted.
-        throw ApiError.unprocessable('PRINTER_KIND_MISMATCH', {
-          printerId: printer.id,
-          kind: printer.kind,
-          expected: original.snapshot.printerKind,
-        })
-      }
-
       const profileId = request.body.profileId ?? original.profileId
       const profile = profileId === null || profileId === undefined ? null : profiles().find(profileId)
       if (profileId !== null && profileId !== undefined && profile === undefined) {
@@ -310,6 +298,14 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         throw ApiError.conflict('QUEUE_PAUSED', { printerId: printer.id })
       }
 
+      // Kind is deliberately NOT checked. Both drivers are handed a bitmap, so
+      // a design has no kind of its own to clash with; that gate was removed
+      // when templates were decoupled from printers, and the FR-032 amendment
+      // records why. What decides is whether the label fits the head — the same
+      // check a normal submission makes, and one the reprint path was missing.
+      const snapshot = reprintSnapshot(original.snapshot, printer, profile ?? null)
+      assertFitsPrinter(snapshot.ir, printer)
+
       const idempotencyKey = request.headers['idempotency-key'] ?? randomUUID()
       const { job, created } = store.createOrGet({
         idempotencyKey: String(idempotencyKey),
@@ -320,7 +316,7 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         // Sequence numbers are deliberately not carried over: a reprint of a
         // spoiled batch reuses the original span, which is recorded on the
         // snapshot it reprints from.
-        snapshot: reprintSnapshot(original.snapshot, printer, profile ?? null),
+        snapshot,
       })
 
       if (created) {

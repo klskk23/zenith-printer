@@ -179,11 +179,6 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '某个模板或打印记录里存的内容已损坏，因此无法确定哪些图片仍在使用',
     next: '清理已整体取消，没有删除任何文件。请把服务端日志中的这条记录交给维护人员',
   },
-  PRINTER_KIND_MISMATCH: {
-    what: '这台打印机与原任务的机型不同',
-    why: '标签在设计时就绑定了打印机类型，换一类机器打出来的不是同一张标签',
-    next: '选一台同类型的打印机；确实要换一类，请在设计页重新出图后再打印',
-  },
   PROFILE_PRINTER_MISMATCH: {
     what: '这组打印参数不属于所选的打印机',
     why: '浓度和纸张类型只对特定的打印头有意义，参数是按打印机分别保存的',

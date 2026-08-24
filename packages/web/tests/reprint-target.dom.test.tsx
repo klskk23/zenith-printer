@@ -117,13 +117,15 @@ describe('the printer', () => {
     expect(selectedText(screen.getByRole('combobox', { name: '打印机' }))).toContain('仓库 B3S')
   })
 
-  it('does not offer a printer of another kind', async () => {
-    // The server refuses it; offering it would be an invitation to an error.
-    // A design is bound to a printer kind when it is drawn.
+  it('offers a printer of another kind too', async () => {
+    // Both drivers are handed a bitmap, so a design has no kind of its own to
+    // clash with. Filtering these out would hide a machine that can print the
+    // label perfectly well — the gate was removed from the submit path on
+    // purpose and must not creep back in here.
     open()
     const trigger = await printerSelect()
     fireEvent.keyDown(trigger, { key: 'Enter' })
-    expect(screen.queryByRole('option', { name: /霍尼韦尔/ })).toBeNull()
+    expect(await screen.findByRole('option', { name: /霍尼韦尔/ })).toBeDefined()
   })
 })
 
