@@ -37,6 +37,7 @@ import type { PrintQueue } from './queue/print-queue.ts'
 export interface AppDependencies {
   db: Database
   /** Directory for uploaded images. */
+  imageStorageDir?: string
   /** Set false in tests that exercise routes without running jobs. */
   enableQueue?: boolean
   clock?: Clock
@@ -56,6 +57,14 @@ export interface AppContext {
   db: Database
   clock: Clock
   ids: IdGenerator
+  /**
+   * Where uploaded images live on THIS machine.
+   *
+   * On the context rather than only on the two route registrations, because
+   * `images.storage_path` holds a filename and every reader has to put the
+   * directory back — see ImageRepo.
+   */
+  imageStorageDir: string
   /** Null when no Google credentials are configured. */
   sheets: { port: SheetsPort; clientEmail: string } | null
   /** Undefined when the caller opted out, e.g. focused route tests. */
@@ -79,8 +88,13 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
 
+  // One place, so a route and a repository cannot disagree about where the
+  // files are.
+  const imageStorageDir = deps.imageStorageDir ?? 'uploads'
+
   app.decorate('ctx', {
     db: deps.db,
+    imageStorageDir,
     clock: deps.clock ?? systemClock,
     ids: deps.idGenerator ?? uuidGenerator,
     sheets: deps.sheets ?? null,
@@ -161,8 +175,12 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
   void app.register(registerDataSourceRoutes)
   void app.register(registerPreviewRoutes)
   void app.register(registerGoogleRoutes)
-  void app.register(registerImageRoutes)
-  void app.register(registerTemplateIoRoutes)
+  void app.register((instance) =>
+    registerImageRoutes(instance, { storageDir: imageStorageDir }),
+  )
+  void app.register((instance) =>
+    registerTemplateIoRoutes(instance, { storageDir: imageStorageDir }),
+  )
 
   return app
 }

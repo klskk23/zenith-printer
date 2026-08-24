@@ -100,7 +100,12 @@ export async function registerPreviewRoutes(app: FastifyInstance): Promise<void>
     // rendering. Without this the logo shows in the editor and silently
     // disappears from the printed label.
     const resolveImage = createImageResolver(
-      new ImageRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }).lookup(),
+      new ImageRepo({
+        db: app.ctx.db,
+        clock: app.ctx.clock,
+        ids: app.ctx.ids,
+        storageDir: app.ctx.imageStorageDir,
+      }),
     )
 
     const result = renderLabel({

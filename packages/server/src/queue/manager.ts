@@ -39,7 +39,12 @@ export function createQueue(app: FastifyInstance): PrintQueue {
   const repos = () => ({
     jobs: new JobRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }),
     printers: new PrinterRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }),
-    images: new ImageRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }),
+    images: new ImageRepo({
+      db: app.ctx.db,
+      clock: app.ctx.clock,
+      ids: app.ctx.ids,
+      storageDir: app.ctx.imageStorageDir,
+    }),
   })
 
   const { jobs, printers, images } = repos()
@@ -69,7 +74,7 @@ export function createQueue(app: FastifyInstance): PrintQueue {
       const result = renderLabel({
         ir,
         fonts,
-        svgOptions: { resolveImage: createImageResolver(images.lookup()) },
+        svgOptions: { resolveImage: createImageResolver(images) },
         offsetXDots: options.offsetXDots,
         offsetYDots: options.offsetYDots,
         halftone: options.halftone,

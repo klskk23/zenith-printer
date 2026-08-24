@@ -12,18 +12,16 @@
  * history still needed. It is gone (migration 13); the answer now comes from
  * reading the designs, which cannot drift out of step with them.
  *
- * The bytes live in the row (migration 15). They used to be files on disk with
- * a path in the row, and every difficulty that caused was the same difficulty:
- * keeping two things in step. A path meant nothing on another machine; files
- * turned up with no row and rows with no file, so a sweep had to look for both;
- * and a backup was complete only if somebody remembered the second directory.
- * One store, and none of that is askable.
- *
- * The cost, which the original split was avoiding, is that a multi-megabyte
- * logo now rides along on any query that says `SELECT *`. So nothing here does:
- * every read names its columns, and the bytes are fetched only by the one
- * method whose job that is.
+ * `storage_path` holds a **filename**, and the directory comes from the
+ * deployment. It used to hold the absolute path the file had when it was
+ * uploaded, which made the database unmovable: copy the data directory to
+ * another server — or into the container, where uploads always live at
+ * /data/uploads — and every row pointed somewhere that did not exist. The
+ * templates were intact, the ids still matched, and not one picture rendered.
+ * Where the files live is a property of the machine, and a machine cannot be
+ * recorded inside a file that gets copied off it (migration 14).
  */
+import { basename, join } from 'node:path'
 import type { Database } from '../index.ts'
 import type { Clock, IdGenerator } from '../../clock.ts'
 import { collectAssetIds } from '../../domain/image-references.ts'
@@ -33,21 +31,22 @@ export interface ImageAsset {
   filename: string
   mimeType: string
   sizeBytes: number
+  storagePath: string
   deletedAt: string | null
   createdAt: string
 }
 
 type Row = Record<string, unknown>
 
-/** Everything except the bytes — see the class comment for why that matters. */
-const COLUMNS = 'id, filename, mime_type, size_bytes, deleted_at, created_at'
-
-function toAsset(row: Row): ImageAsset {
+function toAsset(row: Row, resolve: (stored: string) => string): ImageAsset {
   return {
     id: String(row.id),
     filename: String(row.filename),
     mimeType: String(row.mime_type),
     sizeBytes: Number(row.size_bytes),
+    // Absolute, because everything downstream reads a file. What the column
+    // holds is a filename; see the class comment.
+    storagePath: resolve(String(row.storage_path)),
     deletedAt: row.deleted_at === null ? null : String(row.deleted_at),
     createdAt: String(row.created_at),
   }
@@ -57,31 +56,47 @@ export interface ImageRepoDeps {
   db: Database
   clock: Clock
   ids: IdGenerator
+  /** Where this deployment keeps uploaded files. */
+  storageDir: string
 }
 
 export class ImageRepo {
   readonly #db: Database
   readonly #clock: Clock
   readonly #ids: IdGenerator
+  readonly #storageDir: string
 
   constructor(deps: ImageRepoDeps) {
     this.#db = deps.db
     this.#clock = deps.clock
     this.#ids = deps.ids
+    this.#storageDir = deps.storageDir
+  }
+
+  /**
+   * Stored filename to a path on this machine.
+   *
+   * `basename` rather than a straight join: a database restored from a backup
+   * taken before migration 14 still holds somebody else's absolute path, and
+   * joining that onto the storage directory would produce nonsense. Only the
+   * last segment was ever the file.
+   */
+  #resolve(stored: string): string {
+    return join(this.#storageDir, basename(stored))
   }
 
   /** Live assets only; soft-deleted ones stay resolvable but are not listed. */
   list(): ImageAsset[] {
     return this.#db
-      .prepare(`SELECT ${COLUMNS} FROM images WHERE deleted_at IS NULL ORDER BY created_at DESC`)
+      .prepare('SELECT * FROM images WHERE deleted_at IS NULL ORDER BY created_at DESC')
       .all()
-      .map((row) => toAsset(row as Row))
+      .map((row) => toAsset(row as Row, (p) => this.#resolve(p)))
   }
 
   /** Includes soft-deleted assets, so history can still render (FR-051). */
   find(id: string): ImageAsset | undefined {
-    const row = this.#db.prepare(`SELECT ${COLUMNS} FROM images WHERE id = ?`).get(id)
-    return row === undefined ? undefined : toAsset(row as Row)
+    const row = this.#db.prepare('SELECT * FROM images WHERE id = ?').get(id)
+    return row === undefined ? undefined : toAsset(row as Row, (p) => this.#resolve(p))
   }
 
   /**
@@ -95,8 +110,8 @@ export class ImageRepo {
     const id = this.#ids.next()
     this.#db
       .prepare(
-        `INSERT INTO images (id, filename, mime_type, size_bytes, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO images (id, filename, mime_type, size_bytes, storage_path, created_at)
+         VALUES (?, ?, ?, ?, '', ?)`,
       )
       .run(id, input.filename, input.mimeType, input.sizeBytes, this.#clock.now().toISOString())
     const created = this.find(id)
@@ -107,61 +122,22 @@ export class ImageRepo {
   }
 
   /**
-   * Store the picture itself.
+   * Name the file this asset's bytes were written to.
    *
-   * Separate from `create` because the id is minted by the insert and nothing
-   * before it knows what to call the row. Two statements rather than one large
-   * insert also keeps the bytes out of the path that reports a duplicate name.
+   * Takes a filename, never a path. The SQL lives here rather than at the two
+   * upload sites so that the one rule about this column — it holds a name, not
+   * a location — has one place to be broken and one place to be checked.
    */
-  attachBytes(id: string, bytes: Uint8Array): void {
-    this.#db.prepare('UPDATE images SET bytes = ? WHERE id = ?').run(bytes, id)
-  }
-
-  /**
-   * The picture, or undefined when the row has none.
-   *
-   * `undefined` is a real state: migration 15 keeps rows whose file had already
-   * gone, because dropping them would turn "this picture is missing" into "this
-   * label never had one".
-   */
-  bytes(id: string): Buffer | undefined {
-    const row = this.#db.prepare('SELECT bytes FROM images WHERE id = ?').get(id) as
-      | { bytes: Uint8Array | null }
-      | undefined
-    // Null when the row carries no picture, undefined when there is no row.
-    // Both mean the same thing to every caller: nothing to draw.
-    const bytes = row?.bytes
-    return bytes === null || bytes === undefined ? undefined : Buffer.from(bytes)
+  attachFile(id: string, fileName: string): void {
+    this.#db.prepare('UPDATE images SET storage_path = ? WHERE id = ?').run(basename(fileName), id)
   }
 
   /** Every asset, including the marked ones — what a sweep has to consider. */
   all(): ImageAsset[] {
     return this.#db
-      .prepare(`SELECT ${COLUMNS} FROM images ORDER BY created_at`)
+      .prepare('SELECT * FROM images ORDER BY created_at')
       .all()
-      .map((row) => toAsset(row as Row))
-  }
-
-  /**
-   * A lookup for the renderer: mime type and bytes, in one statement.
-   *
-   * Separate from `find` so the light read stays light. The renderer is the
-   * only caller that wants the picture itself, and it caches — a job renders
-   * once per copy, and re-reading a logo a hundred times would be pure waste.
-   */
-  lookup(): { find(assetId: string): { mimeType: string; bytes: Uint8Array } | undefined } {
-    const statement = this.#db.prepare('SELECT mime_type, bytes FROM images WHERE id = ?')
-    return {
-      find: (assetId) => {
-        const row = statement.get(assetId) as
-          | { mime_type: string; bytes: Uint8Array | null }
-          | undefined
-        const bytes = row?.bytes
-        return bytes === null || bytes === undefined
-          ? undefined
-          : { mimeType: String(row!.mime_type), bytes }
-      },
-    }
+      .map((row) => toAsset(row as Row, (p) => this.#resolve(p)))
   }
 
   /**

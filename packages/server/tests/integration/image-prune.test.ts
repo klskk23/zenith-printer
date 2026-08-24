@@ -2,10 +2,9 @@
  * Sweeping uploaded images nothing points at any more.
  *
  * Pasting a picture uploads it there and then, so every discarded paste, every
- * abandoned draft and every deleted template leaves a row behind. Without a
- * sweep the database only grows — and since the bytes moved into the rows
- * (migration 15) an abandoned 4MB paste grows *it*, rather than sitting in a
- * directory where at least `du` could find it.
+ * abandoned draft and every deleted template leaves a file behind. Without a
+ * sweep the uploads directory only grows, and nothing in the interface ever
+ * mentions it.
  *
  * The dangerous direction is the other one, and these tests are mostly about
  * that: an image still named by a template, by a job's record of what it
@@ -13,7 +12,7 @@
  * survive.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
@@ -50,6 +49,7 @@ beforeEach(async () => {
   clock = new FixedClock('2026-08-23T00:00:00Z')
   app = buildApp({
     db: openDatabase({ location: ':memory:' }),
+    imageStorageDir: storageDir,
     clock,
     idGenerator: new SequentialIdGenerator('img'),
     logLevel: 'error',
@@ -62,11 +62,7 @@ afterEach(async () => {
   rmSync(storageDir, { recursive: true, force: true })
 })
 
-/** Whether the row is still there — which is now the same as the picture. */
-const stillThere = (id: string): boolean =>
-  app.ctx.db.prepare('SELECT 1 FROM images WHERE id = ?').get(id) !== undefined
-
-async function upload(): Promise<{ id: string }> {
+async function upload(): Promise<{ id: string; storagePath: string }> {
   const { payload, headers } = multipart(PNG_1X1)
   return (await app.inject({ method: 'POST', url: '/api/images', payload, headers })).json()
 }
@@ -103,7 +99,7 @@ describe('reporting before removing', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json()).toMatchObject({ outcome: 'planned', removed: 0 })
     expect(res.json().candidates).toHaveLength(1)
-    expect(stillThere(asset.id)).toBe(true)
+    expect(existsSync(asset.storagePath)).toBe(true)
   })
 
   it('removes only when asked in so many words', async () => {
@@ -112,7 +108,7 @@ describe('reporting before removing', () => {
 
     const res = await prune({ confirm: true })
     expect(res.json()).toMatchObject({ outcome: 'removed', removed: 1 })
-    expect(stillThere(asset.id)).toBe(false)
+    expect(existsSync(asset.storagePath)).toBe(false)
     expect((await app.inject({ method: 'GET', url: '/api/images' })).json().images).toHaveLength(0)
   })
 })
@@ -124,7 +120,7 @@ describe('what survives', () => {
     clock.advance(48 * HOUR)
 
     expect((await prune({ confirm: true })).json()).toMatchObject({ removed: 0, keptReferenced: 1 })
-    expect(stillThere(asset.id)).toBe(true)
+    expect(existsSync(asset.storagePath)).toBe(true)
   })
 
   it("keeps an image a job's record still names, with no template left", async () => {
@@ -136,7 +132,7 @@ describe('what survives', () => {
     clock.advance(48 * HOUR)
 
     expect((await prune({ confirm: true })).json()).toMatchObject({ removed: 0, keptReferenced: 1 })
-    expect(stillThere(asset.id)).toBe(true)
+    expect(existsSync(asset.storagePath)).toBe(true)
   })
 
   it('keeps a freshly pasted image that nothing names yet', async () => {
@@ -147,7 +143,7 @@ describe('what survives', () => {
     clock.advance(2 * HOUR)
 
     expect((await prune({ confirm: true })).json()).toMatchObject({ removed: 0, keptTooNew: 1 })
-    expect(stillThere(asset.id)).toBe(true)
+    expect(existsSync(asset.storagePath)).toBe(true)
   })
 
   it('lets the grace period be set for a one-off sweep', async () => {
@@ -155,7 +151,56 @@ describe('what survives', () => {
     clock.advance(2 * HOUR)
 
     expect((await prune({ confirm: true, minAgeHours: 1 })).json()).toMatchObject({ removed: 1 })
-    expect(stillThere(asset.id)).toBe(false)
+    expect(existsSync(asset.storagePath)).toBe(false)
+  })
+})
+
+describe('files with no row at all', () => {
+  /**
+   * Write a stray file and say how old it is.
+   *
+   * The age is stamped rather than left to the filesystem. A row's age comes
+   * from the injected clock and a file's from its mtime, and in production
+   * those are the same clock — but in a test they are not, so leaving the mtime
+   * to real time makes the outcome depend on what today's date happens to be.
+   * This test passed for a day and failed the next morning for exactly that
+   * reason, which is what the constitution's "no real clocks" rule is about.
+   */
+  function strayAged(name: string, ageMs: number): string {
+    const path = join(storageDir, name)
+    writeFileSync(path, PNG_1X1)
+    const seconds = (clock.now().getTime() - ageMs) / 1000
+    utimesSync(path, seconds, seconds)
+    return path
+  }
+
+  it('sweeps a file the uploads directory holds and the database does not', async () => {
+    // What a crash between writing the file and recording it leaves behind.
+    const stray = strayAged('stray.png', 48 * HOUR)
+
+    const res = await prune({ confirm: true })
+    expect(res.json()).toMatchObject({ strayFilesRemoved: 1 })
+    expect(existsSync(stray)).toBe(false)
+  })
+
+  it('leaves a stray file that is still inside the grace period', async () => {
+    // The same reason rows have one: a file written two minutes ago may be an
+    // upload whose row is about to be committed, or one somebody is still
+    // looking at in an unsaved design.
+    const fresh = strayAged('fresh.png', 2 * HOUR)
+
+    const res = await prune({ confirm: true })
+    expect(res.json()).toMatchObject({ strayFilesRemoved: 0 })
+    expect(existsSync(fresh)).toBe(true)
+  })
+
+  it('leaves a file that belongs to a row alone', async () => {
+    const asset = await upload()
+    templateNaming(asset.id)
+    clock.advance(48 * HOUR)
+
+    await prune({ confirm: true })
+    expect(readdirSync(storageDir)).toHaveLength(1)
   })
 })
 
@@ -173,7 +218,7 @@ describe('refusing rather than guessing', () => {
     clock.advance(48 * HOUR)
 
     expect((await prune({ confirm: true })).statusCode).toBe(422)
-    expect(stillThere(asset.id)).toBe(true)
+    expect(existsSync(asset.storagePath)).toBe(true)
   })
 })
 
@@ -186,6 +231,7 @@ describe('deleting one image by hand', () => {
     jobNaming(asset.id)
 
     expect((await app.inject({ method: 'DELETE', url: `/api/images/${asset.id}` })).statusCode).toBe(204)
+    expect(existsSync(asset.storagePath)).toBe(true)
     expect((await app.inject({ method: 'GET', url: `/api/images/${asset.id}/content` })).statusCode).toBe(200)
     // Marked, so it is out of the picker without being out of history.
     expect((await app.inject({ method: 'GET', url: '/api/images' })).json().images).toHaveLength(0)
@@ -194,6 +240,6 @@ describe('deleting one image by hand', () => {
   it('removes the file when nothing points at it', async () => {
     const asset = await upload()
     expect((await app.inject({ method: 'DELETE', url: `/api/images/${asset.id}` })).statusCode).toBe(204)
-    expect(stillThere(asset.id)).toBe(false)
+    expect(existsSync(asset.storagePath)).toBe(false)
   })
 })

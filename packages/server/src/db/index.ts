@@ -21,37 +21,16 @@ export interface Migration {
    * report what they discarded. Kept optional so the common case stays a
    * plain string.
    */
-  apply?: (
-    db: Database,
-    log: (event: Record<string, unknown>) => void,
-    context: MigrationContext,
-  ) => void
+  apply?: (db: Database, log: (event: Record<string, unknown>) => void) => void
 }
 
 export type Database = DatabaseSync
-
-/**
- * What a migration needs from outside the database.
- *
- * Only one thing so far, and only one migration wants it: moving uploaded
- * images into the rows means finding the files first, and where they live is a
- * property of the deployment rather than of the schema.
- */
-export interface MigrationContext {
-  /** Where uploads used to be kept. Undefined when there are none to move. */
-  imageStorageDir?: string
-}
 
 export interface OpenDatabaseOptions {
   /** File path, or ':memory:' for tests. */
   location: string
   /** Notified with the backup path when one is taken, so it can be logged. */
   onBackup?: (path: string | null) => void
-  /**
-   * Where uploaded images used to live, for the one migration that moves them
-   * into the database. Nothing reads it afterwards.
-   */
-  imageStorageDir?: string
 }
 
 /**
@@ -74,9 +53,7 @@ export function openDatabase(options: OpenDatabaseOptions): Database {
     }
   }
 
-  runMigrations(db, migrations, {
-    ...(options.imageStorageDir === undefined ? {} : { imageStorageDir: options.imageStorageDir }),
-  })
+  runMigrations(db)
   return db
 }
 
@@ -112,11 +89,7 @@ export function setMigrationEventSink(sink: MigrationEventSink | undefined): voi
   onMigrationEvent = sink
 }
 
-export function runMigrations(
-  db: Database,
-  list: Migration[] = migrations,
-  context: MigrationContext = {},
-): void {
+export function runMigrations(db: Database, list: Migration[] = migrations): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id INTEGER PRIMARY KEY,
@@ -139,7 +112,7 @@ export function runMigrations(
     db.exec('BEGIN')
     try {
       db.exec(migration.up)
-      migration.apply?.(db, onMigrationEvent ?? (() => undefined), context)
+      migration.apply?.(db, onMigrationEvent ?? (() => undefined))
       record.run(migration.id, migration.name, new Date(0).toISOString())
       db.exec('COMMIT')
     } catch (err) {

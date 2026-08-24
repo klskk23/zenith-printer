@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { openDatabase, type Database } from '../../src/db/index.ts'
 import { ImageRepo } from '../../src/db/repositories/image-repo.ts'
 import { FixedClock, SequentialIdGenerator } from '../../src/clock.ts'
@@ -6,17 +9,20 @@ import { createImageResolver } from '../../src/render/image-resolver.ts'
 
 let db: Database
 let repo: ImageRepo
+let dir: string
 
 const CONTENT = Buffer.from('fake-png-bytes')
 
-function seed(): { id: string } {
+function seed(): { id: string; path: string } {
   const asset = repo.create({
     filename: 'logo.png',
     mimeType: 'image/png',
     sizeBytes: CONTENT.length,
   })
-  repo.attachBytes(asset.id, CONTENT)
-  return { id: asset.id }
+  repo.attachFile(asset.id, `${asset.id}.png`)
+  const path = join(dir, `${asset.id}.png`)
+  writeFileSync(path, CONTENT)
+  return { id: asset.id, path }
 }
 
 /**
@@ -34,16 +40,18 @@ function referenceFromATemplate(assetId: string): void {
 }
 
 beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), 'zenith-resolve-'))
   db = openDatabase({ location: ':memory:' })
   repo = new ImageRepo({
     db,
+    storageDir: dir,
     clock: new FixedClock('2026-08-21T00:00:00Z'),
     ids: new SequentialIdGenerator('img'),
   })
 })
 
 afterEach(() => {
-  db.close()
+  rmSync(dir, { recursive: true, force: true })
 })
 
 describe('data URIs', () => {
@@ -51,59 +59,55 @@ describe('data URIs', () => {
     // resvg has no HTTP client. A relative href is skipped silently, which
     // means the logo shows in the editor and vanishes from the printed label.
     const { id } = seed()
-    const uri = createImageResolver(repo.lookup())(id)
+    const uri = createImageResolver(repo)(id)
     expect(uri).toBe(`data:image/png;base64,${CONTENT.toString('base64')}`)
   })
 
   it(`uses the asset's recorded mime type`, () => {
     const asset = repo.create({ filename: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 3 })
-    repo.attachBytes(asset.id, CONTENT)
-    expect(createImageResolver(repo.lookup())(asset.id)).toMatch(/^data:image\/jpeg;base64,/)
+    repo.attachFile(asset.id, 'a.jpg')
+    writeFileSync(join(dir, 'a.jpg'), CONTENT)
+    expect(createImageResolver(repo)(asset.id)).toMatch(/^data:image\/jpeg;base64,/)
   })
 })
 
 describe('missing assets', () => {
   it('returns undefined for an unknown id', () => {
-    expect(createImageResolver(repo.lookup())('nope')).toBeUndefined()
+    expect(createImageResolver(repo)('nope')).toBeUndefined()
   })
 
-  it('skips the element when the row carries no picture', () => {
-    // Reachable: migration 15 kept rows whose file had already gone rather than
-    // drop them, because "this picture is missing" and "this label never had
-    // one" are different things. One missing logo must not block every other
-    // label from printing.
-    const { id } = seed()
-    db.prepare('UPDATE images SET bytes = NULL WHERE id = ?').run(id)
-    expect(createImageResolver(repo.lookup())(id)).toBeUndefined()
+  it('skips the element when the row exists but the file is gone', () => {
+    // One missing logo must not block every other label from printing.
+    const { id, path } = seed()
+    unlinkSync(path)
+    expect(createImageResolver(repo)(id)).toBeUndefined()
   })
 })
 
 describe('soft-deleted assets', () => {
   it('still resolves, so job history keeps rendering', () => {
-    // FR-051: a snapshot cannot duplicate a binary, so the bytes have to stay
+    // FR-051: a snapshot cannot duplicate a binary, so the file has to stay
     // reachable after the asset is removed from the picker.
     const { id } = seed()
     referenceFromATemplate(id)
     repo.delete(id)
-    expect(createImageResolver(repo.lookup())(id)).toMatch(/^data:image\/png;base64,/)
+    expect(createImageResolver(repo)(id)).toMatch(/^data:image\/png;base64,/)
   })
 })
 
 describe('caching', () => {
   it('reads each asset once, however many copies are rendered', () => {
     // A hundred-copy job renders a hundred times; re-reading and re-encoding
-    // the same logo each time is pure waste. Proved by taking the bytes away
-    // and asking again — a resolver that went back to the table would now
-    // return nothing.
-    const { id } = seed()
-    const resolve = createImageResolver(repo.lookup())
+    // the same logo each time is pure waste.
+    const { id, path } = seed()
+    const resolve = createImageResolver(repo)
     const first = resolve(id)
-    db.prepare('UPDATE images SET bytes = NULL WHERE id = ?').run(id)
+    unlinkSync(path)
     expect(resolve(id)).toBe(first)
   })
 
   it('caches a negative result too', () => {
-    const resolve = createImageResolver(repo.lookup())
+    const resolve = createImageResolver(repo)
     expect(resolve('nope')).toBeUndefined()
     expect(resolve('nope')).toBeUndefined()
   })

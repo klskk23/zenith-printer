@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, existsSync, readdirSync, rmSync } from 'node:fs'
+import { cpSync, mkdtempSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
@@ -32,6 +32,7 @@ beforeEach(async () => {
   storageDir = mkdtempSync(join(tmpdir(), 'zenith-img-'))
   app = buildApp({
     db: openDatabase({ location: ':memory:' }),
+    imageStorageDir: storageDir,
     clock: new FixedClock('2026-08-21T00:00:00Z'),
     idGenerator: new SequentialIdGenerator('img'),
     logLevel: 'error',
@@ -72,17 +73,10 @@ describe('upload', () => {
     expect(res.json()).toMatchObject({ filename: 'logo.png', mimeType: 'image/png' })
   })
 
-  it('puts the picture in the row, not on the disk', async () => {
-    // Reversed by migration 15. The concern that put files on disk — a
-    // multi-megabyte logo riding along on every query of the table — is
-    // answered by naming columns instead, which is what ImageRepo now does.
+  it('writes the file to disk rather than into the database', async () => {
+    // A multi-megabyte logo inside a row would slow every query on the table.
     const asset = (await upload()).json()
-    const row = app.ctx.db.prepare('SELECT bytes FROM images WHERE id = ?').get(asset.id) as {
-      bytes: Uint8Array
-    }
-    expect(Buffer.from(row.bytes).equals(PNG_1X1)).toBe(true)
-    expect(existsSync(storageDir)).toBe(true)
-    expect(readdirSync(storageDir)).toHaveLength(0)
+    expect(existsSync(asset.storagePath)).toBe(true)
   })
 
   it('rejects an unsupported format', async () => {
@@ -126,6 +120,7 @@ describe('deletion and history', () => {
 
     await app.inject({ method: 'DELETE', url: `/api/images/${asset.id}` })
 
+    expect(existsSync(asset.storagePath)).toBe(true)
     const res = await app.inject({ method: 'GET', url: `/api/images/${asset.id}/content` })
     expect(res.statusCode).toBe(200)
   })
@@ -140,5 +135,39 @@ describe('deletion and history', () => {
 
   it('returns 404 when deleting an unknown image', async () => {
     expect((await app.inject({ method: 'DELETE', url: '/api/images/nope' })).statusCode).toBe(404)
+  })
+})
+
+describe('moving the data directory to another machine', () => {
+  it('still serves the picture from wherever the files ended up', async () => {
+    // The whole point, end to end. `storage_path` used to hold the absolute
+    // path a file had at upload time, so copying data/ to a server where
+    // uploads live somewhere else — or into the container, where they always
+    // live at /data/uploads — left every row pointing at nothing. Templates
+    // intact, ids matching, and not one picture rendering.
+    const asset = (await upload()).json()
+    const original = (await app.inject({ method: 'GET', url: `/api/images/${asset.id}/content` }))
+      .rawPayload
+
+    // The move: same database, same rows, files under a different path.
+    const elsewhere = mkdtempSync(join(tmpdir(), 'zenith-moved-'))
+    cpSync(storageDir, elsewhere, { recursive: true })
+    const moved = buildApp({
+      db: app.ctx.db,
+      imageStorageDir: elsewhere,
+      clock: app.ctx.clock,
+      idGenerator: app.ctx.ids,
+      logLevel: 'error',
+    })
+    await moved.ready()
+
+    try {
+      const res = await moved.inject({ method: 'GET', url: `/api/images/${asset.id}/content` })
+      expect(res.statusCode).toBe(200)
+      expect(res.rawPayload.equals(original)).toBe(true)
+    } finally {
+      await moved.close()
+      rmSync(elsewhere, { recursive: true, force: true })
+    }
   })
 })

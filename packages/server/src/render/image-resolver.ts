@@ -8,6 +8,8 @@
  *
  * So the server inlines the bytes as a data URI before rendering.
  */
+import { readFileSync } from 'node:fs'
+
 
 export type ImageResolver = (assetId: string) => string | undefined
 
@@ -19,16 +21,16 @@ export type ImageResolver = (assetId: string) => string | undefined
  * without inventing them.
  */
 export interface AssetLookup {
-  /** Only the two things a data URI is built from, so a caller can supply a
+  /** Only the two fields a data URI is built from, so a caller can supply a
    *  row it read itself without matching the whole repository type. */
-  find(assetId: string): { mimeType: string; bytes: Uint8Array } | undefined
+  find(assetId: string): { mimeType: string; storagePath: string } | undefined
 }
 
 /**
  * Build a resolver backed by the asset store.
  * Soft-deleted assets still resolve, so job history keeps rendering (FR-051).
- * An asset with no bytes yields undefined and the element is skipped rather
- * than failing the whole label.
+ * A missing file yields undefined and the element is skipped rather than
+ * failing the whole label.
  */
 export function createImageResolver(repo: AssetLookup): ImageResolver {
   const cache = new Map<string, string | undefined>()
@@ -39,14 +41,18 @@ export function createImageResolver(repo: AssetLookup): ImageResolver {
       return cached
     }
 
-    // The row can exist with no bytes — migration 15 kept the ones whose file
-    // had already gone. Skip the element; refusing the whole render would make
-    // one missing logo block every label.
+    let dataUri: string | undefined
     const asset = repo.find(assetId)
-    const dataUri =
-      asset === undefined
-        ? undefined
-        : `data:${asset.mimeType};base64,${Buffer.from(asset.bytes).toString('base64')}`
+    if (asset !== undefined) {
+      try {
+        const bytes = readFileSync(asset.storagePath)
+        dataUri = `data:${asset.mimeType};base64,${bytes.toString('base64')}`
+      } catch {
+        // The row exists but the file is gone. Skip the element; refusing the
+        // whole render would make one missing logo block every label.
+        dataUri = undefined
+      }
+    }
 
     // A job renders once per copy, so the same logo is otherwise re-read and
     // re-encoded a hundred times.
