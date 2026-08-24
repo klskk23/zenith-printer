@@ -200,12 +200,26 @@ jobs:
             --tag "$IMAGE:latest" \
             $(printf "$IMAGE@sha256:%s " *)
 
+      # Not a grep. `--format '{{json .Manifest}}'` pretty-prints, so the text is
+      # `"architecture": "amd64"` — a space after the colon, on a line of its
+      # own. The first version of this step grepped for `"architecture":"amd64"`
+      # and so could never match: v0.1.1 published a perfectly good manifest list
+      # and still failed here.
+      #
+      # jq, and comparing the whole set at once rather than asking twice, so a
+      # third platform turning up is a failure too. The `unknown` entries are the
+      # provenance attestations buildx attaches to each leg — not platforms, and
+      # they must not be counted as one.
       - name: Check both architectures are in it
         run: |
-          docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' \
-            | grep -q '"architecture":"amd64"'
-          docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' \
-            | grep -q '"architecture":"arm64"'
+          set -euo pipefail
+          archs="$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' \
+            | jq -r '[.manifests[].platform | select(.os != "unknown") | .architecture] | unique | join(",")')"
+          if [ "$archs" != "amd64,arm64" ]; then
+            echo "::error::manifest list holds [$archs], expected amd64,arm64"
+            exit 1
+          fi
+          echo "$IMAGE:$VERSION -> $archs"
           docker buildx imagetools inspect "$IMAGE:$VERSION"
 
       - name: Summary
