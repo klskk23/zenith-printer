@@ -14,22 +14,10 @@
  * network with curl. A description makes them *discoverable*, which is the
  * point — it grants nothing that was being withheld.
  */
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import fastifySwagger from '@fastify/swagger'
 import { jsonSchemaTransform } from 'fastify-type-provider-zod'
 import type { FastifyInstance } from 'fastify'
-import { repoRoot } from '../paths.ts'
-
-/** Read rather than typed in, so the document cannot claim 0.1.0 forever. */
-function packageVersion(): string {
-  try {
-    const raw = readFileSync(join(repoRoot, 'package.json'), 'utf8')
-    return String((JSON.parse(raw) as { version?: string }).version ?? '0.0.0')
-  } catch {
-    return '0.0.0'
-  }
-}
+import { packageVersion } from '../version.ts'
 
 /**
  * Called directly on the root instance, NOT through `app.register`.

@@ -13,6 +13,7 @@
  * most consequential open assumption can only be settled from here.
  */
 import { Command } from 'commander'
+import { packageVersion } from '@zenith/server/src/version.ts'
 import { registerSetShutdown } from './commands/set-shutdown.ts'
 import { registerProbe } from './commands/probe.ts'
 import { registerRfid } from './commands/rfid.ts'
@@ -29,7 +30,9 @@ const program = new Command()
 program
   .name('zenith')
   .description('Zenith Printer operations and hardware verification CLI')
-  .version('0.1.1')
+  // Read, not typed in: a literal here reported 0.1.0 for the whole of the
+  // 0.1.1 release. package.json is the one place the version lives.
+  .version(packageVersion())
   .option('--json', 'emit machine-readable JSON instead of human-readable text', false)
 
 registerProbe(program)
