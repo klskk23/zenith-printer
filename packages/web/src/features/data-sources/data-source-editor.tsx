@@ -209,11 +209,16 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
 
   return (
     <div
-      className="flex h-full flex-col gap-2"
+      className="flex h-full flex-col gap-2 focus:outline-none"
       data-data-source-editor
       onKeyDown={onKeyDown}
       // Needed for the key handler: without it the container never receives a
       // keydown, and the grid's own focus traps are the only focusable things.
+      //
+      // And no focus ring with it: Tab never lands here, so the ring is not
+      // navigation feedback — it is a box that appears around the page the
+      // first time somebody presses a key, which is what it did in the
+      // designer when Delete was pressed.
       tabIndex={-1}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">

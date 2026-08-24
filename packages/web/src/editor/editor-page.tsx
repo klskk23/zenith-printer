@@ -515,7 +515,18 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
   })
 
   return (
-    <div className="flex h-full flex-col" onKeyDown={onKeyDown} tabIndex={-1}>
+    // `tabIndex={-1}` so the shortcuts below have somewhere to be heard, and
+    // `focus:outline-none` because that focus is not navigation. Clicking the
+    // canvas focuses this container — it is the nearest focusable ancestor —
+    // and the first keystroke afterwards flips the browser into keyboard
+    // modality, at which point :focus-visible starts matching a full-page
+    // element and draws a box around the whole designer. Pressing Delete looked
+    // like it was outlining the screen.
+    <div
+      className="flex h-full flex-col focus:outline-none"
+      onKeyDown={onKeyDown}
+      tabIndex={-1}
+    >
       {/*
         Top bar, in two groups: what this design *is* on the left — which
         template, and saving it — and everything about printing on the right.
