@@ -25,6 +25,9 @@ const OPENAPI_URL = '/api/openapi.json'
 const SwaggerUI = lazy(async () => {
   // The stylesheet ships with the package and is only wanted on this page.
   await import('swagger-ui-react/swagger-ui.css')
+  // Corrections to it, in the same chunk so they are never paid for by
+  // somebody who does not open this page. See the file for what and why.
+  await import('./api-docs.css')
   return import('swagger-ui-react')
 })
 

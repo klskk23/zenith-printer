@@ -1,0 +1,43 @@
+/*
+ * Corrections to Swagger UI's own stylesheet, loaded with it and only on this
+ * page.
+ *
+ * Swagger UI 5.32 renders the "copy path to clipboard" button as
+ * `<button><svg/></button>` while its stylesheet still paints the same
+ * clipboard on that button as a background image. Both are white and the
+ * inline one carries `translate(2, -1)`, so they land a couple of pixels apart
+ * and the icon reads as a ghost of itself.
+ *
+ * The inline icon has a second consequence. The button is a flex item, and a
+ * flex item's `min-width: auto` will not let it shrink below its content —
+ * which was zero while the button was empty and is now the width of an svg. So
+ * it pushes out of the 24px box it lives in and over the expand arrow beside
+ * it, and the box, which collapses to width 0 when the row is not hovered,
+ * stops hiding anything at all.
+ *
+ * Every rule below beats the vendor's on specificity rather than on load
+ * order: these arrive in a lazily imported chunk, and betting on the order
+ * stylesheets are injected in there is not worth the two extra characters.
+ */
+
+/*
+ * `:has(> svg)` is the whole point of the scoping, not decoration. The day
+ * Swagger UI stops rendering the inline icon this rule stops matching, the
+ * background image comes back, and the button still has an icon — rather than
+ * this file quietly turning it into a blank grey square.
+ */
+.swagger-ui .opblock-summary .copy-to-clipboard button:has(> svg) {
+  background-image: none;
+}
+
+.swagger-ui .opblock-summary .view-line-link.copy-to-clipboard {
+  /* Width 0 is how the row hides this until it is hovered. It only ever
+     worked because the button had nothing inside it. */
+  overflow: hidden;
+}
+
+.swagger-ui .opblock-summary .copy-to-clipboard button {
+  /* Let it be as narrow as its box says, instead of as wide as its icon. */
+  min-width: 0;
+  padding: 0;
+}
