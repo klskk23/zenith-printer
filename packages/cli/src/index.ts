@@ -29,7 +29,7 @@ const program = new Command()
 program
   .name('zenith')
   .description('Zenith Printer operations and hardware verification CLI')
-  .version('0.1.0')
+  .version('0.1.1')
   .option('--json', 'emit machine-readable JSON instead of human-readable text', false)
 
 registerProbe(program)
