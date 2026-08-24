@@ -37,6 +37,33 @@ const idParams = z.object({ id: z.string().min(1) })
 const listQuery = z.object({
   printerId: z.string().min(1).optional(),
   status: z.enum(['queued', 'printing', 'completed', 'failed', 'cancelled']).optional(),
+  /**
+   * Only jobs that are over — what the history page shows.
+   *
+   * `stringbool` rather than `coerce.boolean`, which would read the string
+   * "false" as true, every query string being strings.
+   */
+  finished: z.stringbool().optional(),
+  /**
+   * At most this many, taken from the most recent end.
+   *
+   * Absent means all of them, and that has to stay the default: the queue page
+   * reads this same endpoint, and a truncating default would hide queued work
+   * from the one screen that exists to show it.
+   */
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+})
+
+/**
+ * How much history to keep. Zero empties it.
+ *
+ * No plan-then-confirm round trip like the image sweep has: the caller already
+ * knows the total from the list endpoint, so it can say "this deletes 372"
+ * before asking. The confirmation itself is not optional — deleting history is
+ * irreversible, and the constitution requires an explicit yes for that (III.0).
+ */
+const prunePayload = z.object({
+  keep: z.number().int().min(0).max(10_000),
 })
 
 export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void> {
@@ -214,9 +241,15 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
     },
   )
 
-  typed.get('/api/print-jobs', { schema: { querystring: listQuery } }, async (request) => ({
-    jobs: jobs().list(request.query),
-  }))
+  typed.get('/api/print-jobs', { schema: { querystring: listQuery } }, async (request) => {
+    const store = jobs()
+    return {
+      jobs: store.list(request.query),
+      // Ignores `limit`, deliberately: it is what lets the page offer "show
+      // all 372" while holding ten.
+      total: store.count({ ...request.query, limit: undefined }),
+    }
+  })
 
   typed.get('/api/print-jobs/:id', { schema: { params: idParams } }, async (request) => {
     const job = jobs().find(request.params.id)
@@ -333,6 +366,26 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       })
     },
   )
+
+  /**
+   * Throw away all but the most recent `keep` finished jobs.
+   *
+   * The first thing in the product that deletes a print_jobs row. What makes
+   * that safe is migration 15: the sequence claims recorded against those jobs
+   * stay behind, so the numbering cannot roll back onto serials that are
+   * already on labels.
+   */
+  typed.post('/api/print-jobs/prune', { schema: { body: prunePayload } }, async (request) => {
+    const result = jobs().pruneFinished(request.body.keep)
+
+    // Principle V: a maintenance action that deletes records says so where a
+    // person can find it months later.
+    app.log.info(
+      { event: 'print_history_pruned', deleted: result.deleted, kept: result.kept, keep: request.body.keep },
+      'pruned print history',
+    )
+    return result
+  })
 
   typed.delete('/api/print-jobs/:id', { schema: { params: idParams } }, async (request, reply) => {
     const store = jobs()

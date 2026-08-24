@@ -358,6 +358,57 @@ const dataSourceLink = `
   ALTER TABLE data_sources ADD COLUMN last_refreshed_at TEXT;
 `
 
+/**
+ * Sequence claims outlive the job that made them.
+ *
+ * `job_id` was `REFERENCES print_jobs(id) ON DELETE CASCADE`, and that was
+ * harmless for exactly as long as nothing ever deleted a job. Nothing did —
+ * cancelling marks a row, it does not remove it — so with foreign keys on, the
+ * cascade never fired once. History pruning deletes rows, and the cascade would
+ * have taken with it the only record of which serials went onto labels. A
+ * pool's current value is derived from those rows and is not stored anywhere
+ * else (domain/sequence-pool.ts), so the counter would have rolled quietly
+ * backwards and the next batch would have repeated numbers already in a box.
+ *
+ * The reference goes rather than becoming ON DELETE SET NULL: a claim whose job
+ * is gone still has to name a job id, because (job_id, pool_id) is what makes a
+ * job's claim on one pool unique.
+ *
+ * The pool reference keeps its cascade. Deleting a pool deletes the numbering
+ * scheme itself, and claims against a scheme that no longer exists are not
+ * evidence of anything.
+ *
+ * **The rowids are carried across explicitly.** `sequence_pools.floor_watermark`
+ * holds a rowid from this table: claims at or below it predate the last reset
+ * and stop counting. A plain `INSERT ... SELECT` renumbers from 1, and since
+ * releasing a cancelled job's claim leaves gaps, the new numbers would be
+ * *lower* than the old ones — dropping post-reset claims below the watermark
+ * and rolling the counter back. The same fault this migration exists to
+ * prevent, reintroduced by the fix for it.
+ */
+const claimsOutliveJobs = `
+  CREATE TABLE job_sequence_claims_new (
+    job_id        TEXT NOT NULL,
+    pool_id       TEXT NOT NULL REFERENCES sequence_pools(id) ON DELETE CASCADE,
+    variable_name TEXT NOT NULL,
+    start_value   INTEGER NOT NULL,
+    end_value     INTEGER NOT NULL,
+    step          INTEGER NOT NULL,
+    digits        INTEGER NOT NULL,
+    PRIMARY KEY (job_id, pool_id)
+  );
+
+  INSERT INTO job_sequence_claims_new
+    (rowid, job_id, pool_id, variable_name, start_value, end_value, step, digits)
+  SELECT rowid, job_id, pool_id, variable_name, start_value, end_value, step, digits
+  FROM job_sequence_claims;
+
+  DROP TABLE job_sequence_claims;
+  ALTER TABLE job_sequence_claims_new RENAME TO job_sequence_claims;
+
+  CREATE INDEX idx_job_sequence_claims_pool ON job_sequence_claims (pool_id, end_value);
+`
+
 export const migrations: Migration[] = [
   { id: 1, name: 'initial_schema', up: initialSchema },
   { id: 2, name: 'template_version', up: templateVersion },
@@ -376,4 +427,5 @@ export const migrations: Migration[] = [
   { id: 12, name: 'data_source_link', up: dataSourceLink },
   { id: 13, name: 'drop_image_ref_count', up: dropImageRefCount },
   { id: 14, name: 'relative_image_paths', up: '', apply: relativiseImagePaths },
+  { id: 15, name: 'claims_outlive_jobs', up: claimsOutliveJobs },
 ]

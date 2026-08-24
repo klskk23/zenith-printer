@@ -11,12 +11,40 @@
 import { useState } from 'react'
 import { copy } from '../../i18n/index.ts'
 import { usePreferences } from '../preferences/context.tsx'
-import { formatInstant, hasTemplate, isFinished, jobInstant } from './job-summary.ts'
+import { formatInstant, hasTemplate, jobInstant } from './job-summary.ts'
 import { Button } from '../../components/ui/button.tsx'
 import { ReprintDialog } from './reprint-dialog.tsx'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Card, CardContent } from '../../components/ui/card.tsx'
-import { useJobs, type PrintJob } from './hooks.ts'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../components/ui/alert-dialog.tsx'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select.tsx'
+import { useHistoryPrune, useJobHistory, type PrintJob } from './hooks.ts'
+
+/**
+ * How many rows a visit fetches.
+ *
+ * The list used to arrive whole and get sliced here, which meant carrying every
+ * job snapshot ever recorded — each one a full label IR — to draw five rows.
+ */
+const PAGE_SIZE = 10
+
+/** Offered retention. Ten is a page; keeping ten would be closer to wiping it. */
+const KEEP_OPTIONS = [50, 100, 200] as const
 
 /** Jobs that are over, one way or another — the ones there is a point reprinting. */
 const FINISHED: ReadonlySet<PrintJob['status']> = new Set(['completed', 'failed', 'cancelled'])
@@ -74,25 +102,33 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
 }
 
 export function JobHistory({ printerId }: { printerId: string | null }): React.JSX.Element {
-  const jobs = useJobs(printerId)
   const [expanded, setExpanded] = useState(false)
+  const history = useJobHistory(printerId, expanded ? null : PAGE_SIZE)
 
-  // Newest first: history is read backwards from what just happened.
-  const finished = (jobs.data ?? []).filter(isFinished).reverse()
-  const shown = expanded ? finished : finished.slice(0, 5)
+  /**
+   * How many there are, which is not how many are in hand.
+   *
+   * Read from the server so that "show all 372" can say 372 while holding ten.
+   * Counting the rows would have made the offer describe itself.
+   */
+  const total = history.data?.total ?? 0
+  // Newest first: history is read backwards from what just happened. The
+  // endpoint returns oldest-first, as it always has.
+  const shown = [...(history.data?.jobs ?? [])].reverse()
 
   return (
     <div className="space-y-2">
       {/* The page supplies the heading; a second one here read as a repeat. */}
-      {finished.length > 5 && (
-        <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-1">
+        {total > PAGE_SIZE && (
           <Button size="sm" variant="ghost" onClick={() => setExpanded(!expanded)}>
-            {expanded ? copy.history.collapse : copy.history.expand(finished.length)}
+            {expanded ? copy.history.collapse : copy.history.expand(total)}
           </Button>
-        </div>
-      )}
+        )}
+        {total > 0 && <HistoryPrune total={total} />}
+      </div>
 
-      {finished.length === 0 && <p className="text-xs text-muted-foreground">{copy.history.empty}</p>}
+      {total === 0 && <p className="text-xs text-muted-foreground">{copy.history.empty}</p>}
 
       <div className="space-y-2">
         {shown.map((job) => (
@@ -100,6 +136,75 @@ export function JobHistory({ printerId }: { printerId: string | null }): React.J
         ))}
       </div>
     </div>
+  )
+}
+
+/**
+ * Throwing away all but the most recent N.
+ *
+ * Confirmed, because it deletes records for everyone and there is no undo
+ * (III.0). No plan-then-delete round trip: the list already knows the total, so
+ * the dialog can state the consequence exactly before anything is sent.
+ *
+ * It says out loud that the serial numbers survive. That is the fear this
+ * action ought to provoke — a counter derived from history, and history being
+ * deleted — and the answer is a schema decision (migration 15) that no operator
+ * could be expected to know about.
+ */
+function HistoryPrune({ total }: { total: number }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const [keep, setKeep] = useState<number>(100)
+  const prune = useHistoryPrune()
+
+  const deleted = Math.max(0, total - keep)
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+        {copy.history.prune}
+      </Button>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent data-history-prune>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{copy.history.pruneTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{copy.history.pruneIrreversible}</AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span>{copy.history.pruneKeepLabel}</span>
+            <Select value={String(keep)} onValueChange={(value) => setKeep(Number(value))}>
+              <SelectTrigger className="h-8 w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {KEEP_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span>{copy.history.pruneKeepUnit}</span>
+          </div>
+
+          <p className="text-xs">
+            {deleted === 0 ? copy.history.pruneNothing : copy.history.pruneEffect(deleted, total - deleted)}
+          </p>
+          <p className="text-[11px] text-muted-foreground">{copy.history.pruneSequencesKept}</p>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>{copy.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={prune.isPending || deleted === 0}
+              onClick={() => prune.mutate(keep, { onSuccess: () => setOpen(false) })}
+            >
+              {prune.isPending ? copy.history.pruneRunning : copy.history.pruneAction}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 

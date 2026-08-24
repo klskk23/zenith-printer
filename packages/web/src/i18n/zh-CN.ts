@@ -653,6 +653,17 @@ export const copy = {
     adHoc: '未保存的标签',
     expand: (total: number): string => `查看全部 ${total} 条`,
     collapse: '收起',
+    prune: '清理…',
+    pruneTitle: '清理打印历史？',
+    pruneKeepLabel: '只保留最近',
+    pruneKeepUnit: '条',
+    pruneEffect: (deleted: number, kept: number): string => `将删除 ${deleted} 条，保留 ${kept} 条。`,
+    pruneNothing: '当前记录还没有超出这个条数，不会删除任何东西。',
+    pruneIrreversible: '删掉的记录无法恢复，这些批次也不能再重新打印。',
+    pruneSequencesKept: '已经用掉的流水号会被保住，下一批不会重号。',
+    pruneAction: '清理',
+    pruneRunning: '正在清理…',
+    pruneDone: (deleted: number): string => `已删除 ${deleted} 条历史记录。`,
   },
 
   images: {

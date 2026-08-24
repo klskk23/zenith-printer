@@ -36,6 +36,27 @@ const JOBS = [
     snapshot: { templateName: null, widthMm: 50, heightMm: 30 } },
 ]
 
+const FINISHED = new Set(['completed', 'failed', 'cancelled'])
+
+/**
+ * The fake answers the query the way the server does.
+ *
+ * History narrows to finished jobs on the server now, rather than fetching
+ * everything and filtering in the browser. A stub that ignored the query would
+ * let "history does not show what is still queued" pass while the page asked
+ * for the wrong thing — the assertion would be about the stub, not the page.
+ */
+function jobsFor(url: string): { jobs: typeof JOBS; total: number } {
+  const query = new URL(url, 'http://test').searchParams
+  const matching = query.get('finished') === 'true' ? JOBS.filter((job) => FINISHED.has(job.status)) : JOBS
+  const limit = query.get('limit')
+  return {
+    // `total` ignores the limit: it is how many there are, not how many were sent.
+    total: matching.length,
+    jobs: limit === null ? matching : matching.slice(-Number(limit)),
+  }
+}
+
 function wrap(ui: React.ReactNode): React.JSX.Element {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false } } })
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>
@@ -46,7 +67,7 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/')
   vi.stubGlobal('fetch', vi.fn((input: string) => {
     const url = String(input)
-    const body = url.includes('/print-jobs') ? { jobs: JOBS }
+    const body = url.includes('/print-jobs') ? jobsFor(url)
       : url.includes('/printers') ? { printers: [PRINTER] }
       : url.includes('/templates') ? { templates: [] }
       : {}

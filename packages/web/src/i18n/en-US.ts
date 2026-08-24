@@ -661,6 +661,18 @@ export const copy: Copy = {
     adHoc: 'Unsaved label',
     expand: (total: number): string => `Show all ${total}`,
     collapse: 'Show fewer',
+    prune: 'Clear out…',
+    pruneTitle: 'Clear out print history?',
+    pruneKeepLabel: 'Keep the most recent',
+    pruneKeepUnit: 'records',
+    pruneEffect: (deleted: number, kept: number): string =>
+      `Deletes ${deleted}, keeps ${kept}.`,
+    pruneNothing: 'There is less history than that, so nothing would be deleted.',
+    pruneIrreversible: 'Deleted records cannot be recovered, and those batches can no longer be reprinted.',
+    pruneSequencesKept: 'Serial numbers already used are kept, so the next batch will not repeat one.',
+    pruneAction: 'Clear out',
+    pruneRunning: 'Clearing…',
+    pruneDone: (deleted: number): string => `Deleted ${deleted} records.`,
   },
 
   images: {

@@ -73,6 +73,18 @@ function toJob(row: Row, claims: SequenceClaim[] = []): PrintJob {
   }
 }
 
+/** Statuses that are over, one way or another — what history is made of. */
+const FINISHED_STATUSES = ['completed', 'failed', 'cancelled'] as const
+
+export interface JobListFilter {
+  printerId?: string
+  status?: JobStatus
+  /** Only jobs that are over: what the history page asks for. */
+  finished?: boolean
+  /** At most this many, taken from the most recent end. */
+  limit?: number
+}
+
 export interface CreateJobInput {
   idempotencyKey: string
   printerId: string
@@ -114,7 +126,7 @@ export class JobRepo {
     return row === undefined ? undefined : this.#withClaims(row as Row)
   }
 
-  list(filter: { printerId?: string; status?: JobStatus } = {}): PrintJob[] {
+  #narrow(filter: JobListFilter): { where: string; params: unknown[] } {
     const clauses: string[] = []
     const params: unknown[] = []
     if (filter.printerId !== undefined) {
@@ -125,11 +137,74 @@ export class JobRepo {
       clauses.push('status = ?')
       params.push(filter.status)
     }
-    const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
+    if (filter.finished === true) {
+      clauses.push(`status IN (${FINISHED_STATUSES.map(() => '?').join(',')})`)
+      params.push(...FINISHED_STATUSES)
+    }
+    return { where: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '', params }
+  }
+
+  /**
+   * Jobs matching the filter, oldest first.
+   *
+   * `limit` takes the most *recent* N and hands them back in the same
+   * oldest-first order as an unlimited call. Truncating from the front would
+   * have returned the oldest ten, which is the opposite of what history is
+   * for; flipping the order instead would have quietly reversed every caller.
+   */
+  list(filter: JobListFilter = {}): PrintJob[] {
+    const { where, params } = this.#narrow(filter)
+    if (filter.limit === undefined) {
+      return this.#db
+        .prepare(`SELECT * FROM print_jobs ${where} ORDER BY created_at, id`)
+        .all(...(params as never[]))
+        .map((row) => this.#withClaims(row as Row))
+    }
     return this.#db
-      .prepare(`SELECT * FROM print_jobs ${where} ORDER BY created_at, id`)
-      .all(...(params as never[]))
+      .prepare(`SELECT * FROM print_jobs ${where} ORDER BY created_at DESC, id DESC LIMIT ?`)
+      .all(...([...params, filter.limit] as never[]))
+      .reverse()
       .map((row) => this.#withClaims(row as Row))
+  }
+
+  /**
+   * How many match, ignoring `limit`.
+   *
+   * What makes "show all 372" able to say 372 when only ten were fetched.
+   */
+  count(filter: JobListFilter = {}): number {
+    const { where, params } = this.#narrow(filter)
+    const row = this.#db
+      .prepare(`SELECT COUNT(*) AS total FROM print_jobs ${where}`)
+      .get(...(params as never[]))
+    return Number(row?.total ?? 0)
+  }
+
+  /**
+   * Delete all but the most recent `keep` finished jobs.
+   *
+   * Queued and printing jobs are never candidates at any `keep`: the runner
+   * holds their ids, and deleting the row under a job in flight would strand
+   * it and lose the count of what came out of the printer.
+   *
+   * The rows the sequence pools derive their numbering from are *not* deleted
+   * with them — see migration 15. That is load-bearing, not incidental.
+   */
+  pruneFinished(keep: number): { deleted: number; kept: number } {
+    const placeholders = FINISHED_STATUSES.map(() => '?').join(',')
+    const result = this.#db
+      .prepare(
+        `DELETE FROM print_jobs
+         WHERE status IN (${placeholders})
+           AND id NOT IN (
+             SELECT id FROM print_jobs
+             WHERE status IN (${placeholders})
+             ORDER BY created_at DESC, id DESC
+             LIMIT ?
+           )`,
+      )
+      .run(...([...FINISHED_STATUSES, ...FINISHED_STATUSES, keep] as never[]))
+    return { deleted: Number(result.changes), kept: this.count({ finished: true }) }
   }
 
   /**
