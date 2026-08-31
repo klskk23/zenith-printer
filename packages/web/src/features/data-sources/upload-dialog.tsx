@@ -74,7 +74,7 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
 
         <div className="space-y-3">
           <Label className="block space-y-1">
-            <span className="text-[11px] text-muted-foreground">CSV</span>
+            <span className="text-2xs text-muted-foreground">CSV</span>
             <input
               type="file"
               accept=".csv,text/csv"
@@ -93,14 +93,14 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
 
           {replace === undefined && (
             <Label className="block space-y-1">
-              <span className="text-[11px] text-muted-foreground">{copy.dataSources.name}</span>
+              <span className="text-2xs text-muted-foreground">{copy.dataSources.name}</span>
               <Input value={name} onChange={(event) => setName(event.target.value)} />
             </Label>
           )}
 
           <div className="flex gap-2">
             <Label className="flex-1 space-y-1">
-              <span className="text-[11px] text-muted-foreground">{copy.dataSources.encoding}</span>
+              <span className="text-2xs text-muted-foreground">{copy.dataSources.encoding}</span>
               <Select
                 value={encoding === '' ? NONE : encoding}
                 onValueChange={(value) => setEncoding(value === NONE ? '' : value)}
@@ -117,7 +117,7 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
               </Select>
             </Label>
             <Label className="flex-1 space-y-1">
-              <span className="text-[11px] text-muted-foreground">{copy.dataSources.delimiter}</span>
+              <span className="text-2xs text-muted-foreground">{copy.dataSources.delimiter}</span>
               <Select
                 value={delimiter === '' ? NONE : delimiter}
                 onValueChange={(value) => setDelimiter(value === NONE ? '' : value)}
@@ -134,7 +134,7 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
               </Select>
             </Label>
           </div>
-          <p className="text-[11px] text-muted-foreground">{copy.dataSources.retryHint}</p>
+          <p className="text-2xs text-muted-foreground">{copy.dataSources.retryHint}</p>
 
           {upload.isPending && (
             <div className="space-y-1" data-upload-progress>
@@ -144,7 +144,7 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
                 is knowing it is still working, not knowing how far along.
               */}
               <Progress />
-              <p className="text-[11px] text-muted-foreground">{copy.dataSources.uploading}</p>
+              <p className="text-2xs text-muted-foreground">{copy.dataSources.uploading}</p>
             </div>
           )}
 

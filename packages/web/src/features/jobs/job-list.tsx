@@ -74,7 +74,7 @@ function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
             <p className="truncate text-sm font-medium">
               {hasTemplate(job) ? job.snapshot.templateName : copy.jobs.adHoc}
             </p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               {formatInstant(jobInstant(job), locale)} · {copy.jobs.copies(job.requestedCopies)}
             </p>
           </div>

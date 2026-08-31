@@ -77,7 +77,7 @@ export function RowSelectionPanel({
     <div className="space-y-2" data-row-selection>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium">{copy.rowSelection.heading}</span>
-        <span className="text-[11px] text-muted-foreground" data-selected-summary>
+        <span className="text-2xs text-muted-foreground" data-selected-summary>
           {chosen === 0
             ? copy.rowSelection.none
             : copy.rowSelection.selected(chosen, labelTotal(selection, total, copies))}
@@ -151,7 +151,7 @@ export function RowSelectionPanel({
       />
 
       {rangeInvalid && (
-        <p className="text-[11px] text-destructive" data-range-invalid>
+        <p className="text-2xs text-destructive" data-range-invalid>
           {copy.rowSelection.rangeInvalid}
         </p>
       )}
@@ -163,7 +163,7 @@ export function RowSelectionPanel({
         against the spreadsheet.
       */}
       {order === 'desc' && (
-        <p className="text-[11px] text-muted-foreground" data-order-note>
+        <p className="text-2xs text-muted-foreground" data-order-note>
           {copy.rowSelection.orderNote}
         </p>
       )}
@@ -172,7 +172,7 @@ export function RowSelectionPanel({
         Said out loud rather than left implied. Content width is not measured
         per row, so silence here would be read as "checked, and fine" (FR-045a).
       */}
-      <Alert className="py-1.5 text-[11px]">{copy.rowSelection.widthNotChecked}</Alert>
+      <Alert className="py-1.5 text-2xs">{copy.rowSelection.widthNotChecked}</Alert>
     </div>
   )
 }

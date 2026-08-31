@@ -109,8 +109,8 @@ export function VariablesPanel({
       {rowCount > 0 && dataSourceId !== null && (
         <section className="space-y-2 rounded-md border border-dashed border-border p-2" data-preview-row>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-medium">{copy.variables.tempHeading}</span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-2xs font-medium">{copy.variables.tempHeading}</span>
+            <span className="text-2xs text-muted-foreground">
               {copy.variables.tempRowInForce(previewOrdinal, rowCount)}
             </span>
           </div>
@@ -128,7 +128,7 @@ export function VariablesPanel({
             canvas showing right now" should not require finding it.
           */}
           {columns.length > 0 && (
-            <dl className="space-y-0.5 text-[11px]">
+            <dl className="space-y-0.5 text-2xs">
               {columns.map((column) => {
                 const value = previewValues[column] ?? ''
                 return (
@@ -146,12 +146,12 @@ export function VariablesPanel({
             </dl>
           )}
 
-          <p className="text-[11px] text-muted-foreground">{copy.variables.tempHint}</p>
+          <p className="text-2xs text-muted-foreground">{copy.variables.tempHint}</p>
         </section>
       )}
 
       {variables.length === 0 && (
-        <p className="text-[11px] text-muted-foreground">{copy.variables.empty}</p>
+        <p className="text-2xs text-muted-foreground">{copy.variables.empty}</p>
       )}
 
       {variables.map((variable, index) => {
@@ -183,7 +183,7 @@ export function VariablesPanel({
 
             {variable.kind === 'constant' ? (
               <Label className="block space-y-1">
-                <span className="text-[11px] text-muted-foreground">{copy.variables.value}</span>
+                <span className="text-2xs text-muted-foreground">{copy.variables.value}</span>
                 <Input
                   value={variable.value}
                   onChange={(event) => patch(index, { value: event.target.value })}
@@ -191,7 +191,7 @@ export function VariablesPanel({
               </Label>
             ) : (
               <Label className="block space-y-1">
-                <span className="text-[11px] text-muted-foreground">{copy.variables.pool}</span>
+                <span className="text-2xs text-muted-foreground">{copy.variables.pool}</span>
                 <Select
                   value={variable.poolId}
                   onValueChange={(value) => patch(index, { poolId: value })}
@@ -210,7 +210,7 @@ export function VariablesPanel({
               </Label>
             )}
 
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               {copy.variables.referenceHint(variable.name)}
             </p>
 
@@ -218,7 +218,7 @@ export function VariablesPanel({
               // Refused rather than resolved by precedence: a precedence rule
               // would let somebody change what an existing label prints by
               // adding a column, with no way to know what they shadowed.
-              <p className="text-[11px] text-destructive">{copy.variables.collides(variable.name)}</p>
+              <p className="text-2xs text-destructive">{copy.variables.collides(variable.name)}</p>
             )}
           </div>
         )
@@ -237,7 +237,7 @@ export function VariablesPanel({
       </div>
 
       {unresolved.length > 0 && (
-        <p className="text-[11px] text-destructive" data-unresolved>
+        <p className="text-2xs text-destructive" data-unresolved>
           {copy.variables.unresolved(unresolved.join('、'))}
         </p>
       )}

@@ -50,7 +50,43 @@
   --color-info: oklch(54.6% 0.245 262.881);
   --color-success: oklch(59.6% 0.145 163.225);
 
+  /*
+   * The type scale, with a step for the density this application actually
+   * works at.
+   *
+   * `text-[11px]` appeared **94 times** — an arbitrary value below Tailwind's
+   * smallest step, which put the densest text in the product outside the
+   * system: it could only be changed in 94 places, and nothing tied it to
+   * anything. Named here, it moves in one line.
+   *
+   * The values also go up a little. 11px was below what a shop floor should be
+   * asked to read, and this is a screen people use standing up. Not the full
+   * step each (11→12→14→16, the obvious version): 16px body text in a tool
+   * this dense pushes every panel out of shape, and one column has already
+   * been off the side of the window once.
+   */
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: calc(1 / 0.75);
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(1.125 / 0.8125);
+
+  /*
+   * One radius, and a scale derived from it — shadcn's convention.
+   *
+   * `--radius` was live but only for bare `rounded`: `rounded-sm/md/lg` read
+   * Tailwind's own `--radius-*`, so 27 of the application's 40 rounded corners
+   * ignored the token that was supposed to govern them. The arithmetic below
+   * reproduces today's values exactly (4/6/8px), so nothing moves — it just
+   * means the one number now decides all of them.
+   *
+   * Note that defining `--radius` at all is what makes bare `rounded` 8px
+   * here; in stock Tailwind it is 4px.
+   */
   --radius: 0.5rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 /*

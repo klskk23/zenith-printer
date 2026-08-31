@@ -35,7 +35,7 @@ export function DataSourceBinding({
   return (
     <div className="space-y-2" data-data-source-binding>
       <Label className="block space-y-1">
-        <span className="text-[11px] text-muted-foreground">{copy.dataSources.heading}</span>
+        <span className="text-2xs text-muted-foreground">{copy.dataSources.heading}</span>
         <Select
           value={dataSourceId ?? NONE}
           onValueChange={(value) => onChange(value === NONE ? null : value)}
@@ -55,7 +55,7 @@ export function DataSourceBinding({
       </Label>
 
       {bindingIssue !== null && bindingIssue !== undefined && (
-        <Alert variant="destructive" className="py-1.5 text-[11px]" data-binding-issue>
+        <Alert variant="destructive" className="py-1.5 text-2xs" data-binding-issue>
           <p>
             {bindingIssue.kind === 'sourceMissing'
               ? copy.dataSources.bindingMissing
@@ -77,7 +77,7 @@ export function DataSourceBinding({
       {bound?.sourceKind === 'google-sheets' && (
         <div className="space-y-1">
           <RefreshButton source={bound} />
-          <p className="text-[11px] text-muted-foreground" data-binding-freshness>
+          <p className="text-2xs text-muted-foreground" data-binding-freshness>
             {bound.lastRefreshedAt === undefined
               ? copy.dataSources.neverRefreshed
               : copy.dataSources.lastRefreshed(new Date(bound.lastRefreshedAt).toLocaleString())}
@@ -87,7 +87,7 @@ export function DataSourceBinding({
 
       {bound !== undefined && (
         <div className="space-y-1">
-          <p className="text-[11px] text-muted-foreground">{copy.dataSources.columns}</p>
+          <p className="text-2xs text-muted-foreground">{copy.dataSources.columns}</p>
           <div className="flex flex-wrap gap-1">
             {bound.columns.map((column) => (
               <Button

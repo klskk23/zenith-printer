@@ -696,7 +696,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
             <section className="space-y-1.5">
               <h3 className="text-xs font-semibold">{copy.editor.canvas}</h3>
               <div className="space-y-1">
-                <Label className="text-[11px]">{copy.editor.canvasWidth}</Label>
+                <Label className="text-2xs">{copy.editor.canvasWidth}</Label>
                 <Input
                   type="number"
                   step={0.5}
@@ -705,7 +705,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-[11px]">{copy.editor.canvasHeight}</Label>
+                <Label className="text-2xs">{copy.editor.canvasHeight}</Label>
                 <Input
                   type="number"
                   step={0.5}
@@ -713,7 +713,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                   onChange={(e) => setIr({ ...ir, heightMm: Math.max(1, Number(e.target.value) || 1) })}
                 />
               </div>
-              <p className="text-[11px] text-muted-foreground">{ir.dpi} dpi</p>
+              <p className="text-2xs text-muted-foreground">{ir.dpi} dpi</p>
             </section>
 
             <Separator />

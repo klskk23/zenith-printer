@@ -306,7 +306,7 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
       {/* A linked table's rows are a copy of somebody else's. Editing here
           survives exactly until the next refresh and then vanishes with
           nothing said, so the grid does not offer it at all. */}
-      <p className="text-[11px] text-muted-foreground" data-paste-hint>
+      <p className="text-2xs text-muted-foreground" data-paste-hint>
         {readOnly ? copy.dataSources.readOnlyNotice : copy.dataSources.gridHint}
       </p>
 

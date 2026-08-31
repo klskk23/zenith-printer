@@ -36,7 +36,7 @@ export function ApiDocsPage(): React.JSX.Element {
     <div className="space-y-3" data-testid="api-docs">
       <div className="space-y-1">
         <h2 className="text-sm font-semibold">{copy.apiDocs.heading}</h2>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-2xs text-muted-foreground">
           {copy.apiDocs.explain}{' '}
           <a className="underline" href={OPENAPI_URL} target="_blank" rel="noopener noreferrer">
             {OPENAPI_URL}

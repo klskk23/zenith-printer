@@ -149,7 +149,7 @@ export function CanvasViewport({ marginNote, ...props }: ViewportProps): React.J
 
       {/* Zoom sits at the foot of the column, out of the way of the work. */}
       <div className="flex shrink-0 items-center gap-2 border-t border-border px-4 py-1.5">
-        <Label htmlFor="canvas-zoom" className="text-[11px]">
+        <Label htmlFor="canvas-zoom" className="text-2xs">
           {copy.editor.zoom.label}
         </Label>
         <Input
@@ -167,12 +167,12 @@ export function CanvasViewport({ marginNote, ...props }: ViewportProps): React.J
             }
           }}
         />
-        <span className="text-[11px] text-muted-foreground">%</span>
-        <span className="ml-2 text-[11px] text-muted-foreground">{copy.editor.zoom.hint}</span>
+        <span className="text-2xs text-muted-foreground">%</span>
+        <span className="ml-2 text-2xs text-muted-foreground">{copy.editor.zoom.hint}</span>
         {/* FR-065: with no profile there are no margins to draw, and saying so
             beats a canvas that merely looks like it has none. */}
         {marginNote !== undefined && (
-          <span className="ml-auto truncate text-[11px] text-muted-foreground">{marginNote}</span>
+          <span className="ml-auto truncate text-2xs text-muted-foreground">{marginNote}</span>
         )}
       </div>
     </div>

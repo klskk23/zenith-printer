@@ -128,7 +128,7 @@ function DotsInput({
           }
         }}
       />
-      <p className="text-[11px] text-muted-foreground">{copy.editor.units.dotsSuffix(value, mm)}</p>
+      <p className="text-2xs text-muted-foreground">{copy.editor.units.dotsSuffix(value, mm)}</p>
     </div>
   )
 }
@@ -183,7 +183,7 @@ function ModuleWidthField({
           }}
         />
       </Field>
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-2xs text-muted-foreground">
         {copy.editor.moduleWidthHint(element.moduleWidthDots, moduleMm)}
       </p>
       {/*
@@ -194,12 +194,12 @@ function ModuleWidthField({
         made smaller" came to be reported as a bug.
       */}
       {element.moduleWidthDots <= MIN_MODULE_WIDTH_DOTS && (
-        <p className="text-[11px] text-muted-foreground">{copy.editor.atMinModuleWidth}</p>
+        <p className="text-2xs text-muted-foreground">{copy.editor.atMinModuleWidth}</p>
       )}
       {variable && (
         // The module count depends on the content, and the content is not known
         // until print time — so the width shown here is an estimate.
-        <p className="text-[11px] text-muted-foreground">{copy.editor.variableWidthHint}</p>
+        <p className="text-2xs text-muted-foreground">{copy.editor.variableWidthHint}</p>
       )}
     </div>
   )
@@ -350,7 +350,7 @@ export function Inspector({ ir, element, values, onChange, onDelete }: Inspector
             />
             {copy.editor.fields.inverted}
           </Label>
-          <p className="text-[11px] text-muted-foreground">{copy.editor.fields.invertedHint}</p>
+          <p className="text-2xs text-muted-foreground">{copy.editor.fields.invertedHint}</p>
         </div>
       )}
 
@@ -513,7 +513,7 @@ export function Inspector({ ir, element, values, onChange, onDelete }: Inspector
           </Label>
       )}
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-2xs text-muted-foreground">
         {`${mmToDots(element.xMm, ir.dpi)}, ${mmToDots(element.yMm, ir.dpi)} dot`}
       </p>
     </div>

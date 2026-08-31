@@ -190,10 +190,10 @@ export function SettingsPage(): React.JSX.Element {
         <Button variant="outline" disabled={!dirty} onClick={() => setDraft(preferences)}>
           {copy.common.cancel}
         </Button>
-        {dirty && <span className="text-[11px] text-muted-foreground">{copy.settings.unsaved}</span>}
+        {dirty && <span className="text-2xs text-muted-foreground">{copy.settings.unsaved}</span>}
       </div>
 
-      <p className="text-[11px] text-muted-foreground">{copy.settings.localOnlyHint}</p>
+      <p className="text-2xs text-muted-foreground">{copy.settings.localOnlyHint}</p>
 
       {/* Kept below the local preferences and boxed, because it is the one
           thing on this page that reaches past this browser. */}

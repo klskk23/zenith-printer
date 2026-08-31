@@ -129,7 +129,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                 onChange={(e) => setDraft({ ...editing, density: Number(e.target.value) || 1 })}
               />
               {capabilities !== null && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-2xs text-muted-foreground">
                   {copy.profiles.densityHint(capabilities.densityMin, capabilities.densityMax)}
                 </p>
               )}
@@ -156,7 +156,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                 })
               }
             />
-            <p className="text-[11px] text-muted-foreground">{copy.profiles.thresholdHint}</p>
+            <p className="text-2xs text-muted-foreground">{copy.profiles.thresholdHint}</p>
           </div>
 
           {/*
@@ -181,7 +181,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-muted-foreground">{copy.profiles.halftoneHint}</p>
+            <p className="text-2xs text-muted-foreground">{copy.profiles.halftoneHint}</p>
           </div>
 
           {/* Stock dimensions. Choosing this profile sets the canvas to them,
@@ -214,7 +214,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             <div className="grid grid-cols-4 gap-1.5">
               {MARGIN_KEYS.map((key) => (
                 <div key={key} className="space-y-1">
-                  <Label className="text-[11px]">{copy.profiles[MARGIN_LABELS[key]]}</Label>
+                  <Label className="text-2xs">{copy.profiles[MARGIN_LABELS[key]]}</Label>
                   <Input
                     type="number"
                     step={0.5}
@@ -239,7 +239,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
               {copy.profiles.marginLinked}
             </Button>
             {/* Said explicitly, because a shaded region normally means "no". */}
-            <p className="text-[11px] text-muted-foreground">{copy.profiles.marginHint}</p>
+            <p className="text-2xs text-muted-foreground">{copy.profiles.marginHint}</p>
           </div>
 
           {/*
@@ -256,7 +256,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             />
             {copy.profiles.isDefault}
           </Label>
-          <p className="text-[11px] text-muted-foreground">{copy.profiles.isDefaultHint}</p>
+          <p className="text-2xs text-muted-foreground">{copy.profiles.isDefaultHint}</p>
 
           <div className="flex gap-2">
             <Button

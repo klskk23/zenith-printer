@@ -116,7 +116,7 @@ export function Preview({
               <RowPreview key={ordinal} ordinal={ordinal} body={bodyFor(ordinal)} />
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-2xs text-muted-foreground">
             {copy.preview.ofRows(onPage.length, rowOrdinals.length)}
           </p>
           {pageCount > 1 && (
@@ -152,9 +152,9 @@ export function Preview({
         </Alert>
       )}
       {copies > 1 && (
-        <p className="text-[11px] text-muted-foreground">{copy.preview.firstOfMany(copies)}</p>
+        <p className="text-2xs text-muted-foreground">{copy.preview.firstOfMany(copies)}</p>
       )}
-      <p className="text-[11px] text-muted-foreground">{copy.preview.hint}</p>
+      <p className="text-2xs text-muted-foreground">{copy.preview.hint}</p>
     </div>
   )
 }
@@ -173,13 +173,13 @@ function RowPreview({ ordinal, body }: { ordinal: number; body: string | null })
   return (
     <figure className="space-y-1" data-row-preview={ordinal}>
       {failed ? (
-        <p className="text-[11px] text-muted-foreground">{copy.preview.failed}</p>
+        <p className="text-2xs text-muted-foreground">{copy.preview.failed}</p>
       ) : (
         url !== null && (
           <img src={url} alt={label} className="w-full border border-border bg-white" />
         )
       )}
-      <figcaption className="flex items-center gap-1 text-[11px] text-muted-foreground">
+      <figcaption className="flex items-center gap-1 text-2xs text-muted-foreground">
         <span>{label}</span>
         {/* Said per row: which row overflows is the whole reason to be here. */}
         {clipped && <span className="text-warning">{copy.preview.rowClipped}</span>}

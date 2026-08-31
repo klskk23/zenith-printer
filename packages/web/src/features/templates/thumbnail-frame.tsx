@@ -67,7 +67,7 @@ export function ThumbnailFrame({
           data-thumbnail
         />
       ) : (
-        <p className="px-2 text-center text-[11px] text-muted-foreground" data-no-thumbnail>
+        <p className="px-2 text-center text-2xs text-muted-foreground" data-no-thumbnail>
           {copy.templates.thumbnailMissing}
         </p>
       )}

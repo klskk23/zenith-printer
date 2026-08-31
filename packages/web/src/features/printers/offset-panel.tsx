@@ -116,7 +116,7 @@ export function OffsetPanel({ printer }: { printer: Printer }): React.JSX.Elemen
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {DIRECTIONS.map((key) => (
           <div key={key} className="space-y-1">
-            <Label className="text-[11px]">{copy.offset[DIRECTION_LABELS[key]]}</Label>
+            <Label className="text-2xs">{copy.offset[DIRECTION_LABELS[key]]}</Label>
             <Input
               type="number"
               min={0}
@@ -132,7 +132,7 @@ export function OffsetPanel({ printer }: { printer: Printer }): React.JSX.Elemen
         ))}
       </div>
 
-      <p className="text-[11px] text-muted-foreground">{copy.offset.hint}</p>
+      <p className="text-2xs text-muted-foreground">{copy.offset.hint}</p>
 
       {(profiles.data?.length ?? 0) === 0 && (
         // Refused rather than guessed: a calibration page at the printhead's
@@ -162,7 +162,7 @@ export function OffsetPanel({ printer }: { printer: Printer }): React.JSX.Elemen
           way to know it took. The copy for it existed and was never rendered.
         */}
         {save.isSuccess && !save.isPending && (
-          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1 text-2xs text-muted-foreground">
             <Check className="h-3 w-3" />
             {copy.offset.saved}
           </span>

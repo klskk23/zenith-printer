@@ -89,16 +89,16 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
         </div>
       </div>
 
-      <p className="text-[11px] text-muted-foreground">{copy.dataSources.explain}</p>
+      <p className="text-2xs text-muted-foreground">{copy.dataSources.explain}</p>
       {/* Says which address to share with, so the answer is on the page rather
           than only inside a failure message. */}
       {google.data?.configured === true && google.data.clientEmail !== null && (
-        <p className="text-[11px] text-muted-foreground" data-google-robot>
+        <p className="text-2xs text-muted-foreground" data-google-robot>
           {copy.dataSources.googleShareWith(google.data.clientEmail)}
         </p>
       )}
       {google.data?.configured === false && (
-        <p className="text-[11px] text-muted-foreground">{copy.dataSources.googleNotConfigured}</p>
+        <p className="text-2xs text-muted-foreground">{copy.dataSources.googleNotConfigured}</p>
       )}
 
       <LinkGoogleDialog open={linking} onOpenChange={setLinking} />
@@ -141,14 +141,14 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               {copy.dataSources.columns}: {copy.dataSources.columnList(source.columns)}
             </p>
             {/* Where it came from and how fresh it is. Staleness is invisible
                 unless it is written down, and printing yesterday's rows is not
                 something anybody notices until the labels are in hand. */}
             {source.sourceKind === 'google-sheets' && (
-              <p className="text-[11px] text-muted-foreground" data-source-origin>
+              <p className="text-2xs text-muted-foreground" data-source-origin>
                 {copy.dataSources.fromGoogle(
                   source.spreadsheetTitle ?? '',
                   source.worksheetTitle ?? '',
@@ -220,7 +220,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
               </ConfirmButton>
             </div>
             {renamingId === source.id && (
-              <p className="text-[11px] text-muted-foreground">{copy.dataSources.renameHint}</p>
+              <p className="text-2xs text-muted-foreground">{copy.dataSources.renameHint}</p>
             )}
           </CardContent>
         </Card>

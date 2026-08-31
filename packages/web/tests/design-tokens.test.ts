@@ -70,6 +70,38 @@ describe('colour', () => {
   })
 })
 
+describe('the type scale', () => {
+  const css = readFileSync(join(SRC, 'index.css'), 'utf8')
+
+  it('has a name for the density this application works at', () => {
+    // `text-[11px]` was written 94 times: an arbitrary value below Tailwind's
+    // smallest step, so the densest text in the product sat outside the system
+    // and could only be changed 94 times over.
+    expect(css).toMatch(/--text-2xs:/)
+  })
+
+  it('is never written as an arbitrary size', () => {
+    const arbitrary = sourceFiles(SRC).flatMap((file) => {
+      const matches = code(file).match(/\btext-\[[0-9.]+(px|rem|em)\]/g) ?? []
+      return matches.map((match) => `${file.slice(SRC.length + 1)}: ${match}`)
+    })
+    expect(arbitrary).toEqual([])
+  })
+})
+
+describe('the radius scale', () => {
+  const css = readFileSync(join(SRC, 'index.css'), 'utf8')
+
+  it('derives every step from the one number', () => {
+    // `--radius` used to govern bare `rounded` and nothing else: `rounded-sm`,
+    // `-md` and `-lg` read Tailwind's own values, so 27 of 40 rounded corners
+    // ignored the token meant to decide them.
+    for (const step of ['sm', 'md', 'lg']) {
+      expect(css).toMatch(new RegExp(`--radius-${step}:[^;]*var\\(--radius\\)`))
+    }
+  })
+})
+
 describe('the token set', () => {
   const css = readFileSync(join(SRC, 'index.css'), 'utf8')
 

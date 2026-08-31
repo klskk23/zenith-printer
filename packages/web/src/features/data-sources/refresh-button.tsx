@@ -133,7 +133,7 @@ export function RefreshButton({
 function RefreshNotice({ outcome }: { outcome: RefreshOutcome }): React.JSX.Element | null {
   if (outcome.outcome === 'applied') {
     return (
-      <p className="mt-1 text-[11px] text-muted-foreground" data-refresh-applied>
+      <p className="mt-1 text-2xs text-muted-foreground" data-refresh-applied>
         {copy.dataSources.refreshApplied(outcome.rowsBefore, outcome.rowsAfter)}
         {outcome.columnsAdded.length > 0
           ? ` · ${copy.dataSources.refreshAddedColumns(outcome.columnsAdded)}`

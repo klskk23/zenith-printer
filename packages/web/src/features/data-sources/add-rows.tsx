@@ -42,7 +42,7 @@ export function AddRowsBar({ addRows }: AddRowsBarProps): React.JSX.Element {
           }
         }}
       />
-      <span className="text-[11px] text-muted-foreground">{copy.dataSources.addRowsUnit}</span>
+      <span className="text-2xs text-muted-foreground">{copy.dataSources.addRowsUnit}</span>
     </div>
   )
 }

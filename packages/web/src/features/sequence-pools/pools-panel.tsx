@@ -34,10 +34,10 @@ export function PoolsPanel(): React.JSX.Element {
         <CardTitle>{copy.pools.heading}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-[11px] text-muted-foreground">{copy.pools.explain}</p>
+        <p className="text-2xs text-muted-foreground">{copy.pools.explain}</p>
 
         {pools.data?.length === 0 && (
-          <p className="text-[11px] text-muted-foreground">{copy.pools.empty}</p>
+          <p className="text-2xs text-muted-foreground">{copy.pools.empty}</p>
         )}
 
         {pools.data?.map((pool) => (
@@ -51,7 +51,7 @@ export function PoolsPanel(): React.JSX.Element {
 
             <div className="flex items-end gap-2">
               <Label className="flex-1 space-y-1">
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-2xs text-muted-foreground">
                   {copy.pools.resetTo(String(pool.floor).padStart(pool.digits, '0'))}
                 </span>
                 <Input
@@ -93,18 +93,18 @@ export function PoolsPanel(): React.JSX.Element {
             </div>
 
             {deletePool.isError && (
-              <p className="text-[11px] text-destructive">{copy.pools.deleteRefused}</p>
+              <p className="text-2xs text-destructive">{copy.pools.deleteRefused}</p>
             )}
           </div>
         ))}
 
         <div className="flex items-end gap-2 border-t border-border pt-2">
           <Label className="flex-1 space-y-1">
-            <span className="text-[11px] text-muted-foreground">{copy.pools.name}</span>
+            <span className="text-2xs text-muted-foreground">{copy.pools.name}</span>
             <Input value={name} onChange={(event) => setName(event.target.value)} />
           </Label>
           <Label className="w-24 space-y-1">
-            <span className="text-[11px] text-muted-foreground">{copy.pools.digits}</span>
+            <span className="text-2xs text-muted-foreground">{copy.pools.digits}</span>
             <Input
               type="number"
               min={1}

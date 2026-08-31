@@ -85,7 +85,7 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
           </span>
         </div>
 
-        <p className="font-mono text-[11px] text-muted-foreground">
+        <p className="font-mono text-2xs text-muted-foreground">
           {job.snapshot.widthMm}×{job.snapshot.heightMm}mm · {job.id.slice(0, 8)}
           {(job.overflowWarnings?.length ?? 0) > 0 && (
             // Recorded at submission, because the design may have changed since.
@@ -95,7 +95,7 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
           )}
         </p>
 
-        {unknown && <Alert variant="warning" className="text-[11px]">{copy.jobs.countManually}</Alert>}
+        {unknown && <Alert variant="warning" className="text-2xs">{copy.jobs.countManually}</Alert>}
       </CardContent>
     </Card>
   )
@@ -191,7 +191,7 @@ function HistoryPrune({ total }: { total: number }): React.JSX.Element {
           <p className="text-xs">
             {deleted === 0 ? copy.history.pruneNothing : copy.history.pruneEffect(deleted, total - deleted)}
           </p>
-          <p className="text-[11px] text-muted-foreground">{copy.history.pruneSequencesKept}</p>
+          <p className="text-2xs text-muted-foreground">{copy.history.pruneSequencesKept}</p>
 
           <AlertDialogFooter>
             <AlertDialogCancel>{copy.common.cancel}</AlertDialogCancel>

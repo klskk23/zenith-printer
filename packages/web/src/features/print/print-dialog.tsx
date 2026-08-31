@@ -262,7 +262,7 @@ export function PrintDialog({
                   }}
                 />
                 {selectionCleared && (
-                  <p className="text-[11px] text-muted-foreground" data-selection-cleared>
+                  <p className="text-2xs text-muted-foreground" data-selection-cleared>
                     {copy.dataSources.refreshClearedSelection}
                   </p>
                 )}

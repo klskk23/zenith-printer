@@ -119,7 +119,7 @@ export function TemplatesPage(): React.JSX.Element {
                   bitmap. Leaving them on the card is what led people to
                   re-save a design that was never wrong.
                 */}
-                <p className="text-[11px] text-muted-foreground" data-label-size>
+                <p className="text-2xs text-muted-foreground" data-label-size>
                   {template.widthMm} × {template.heightMm} mm
                 </p>
               </div>
@@ -131,7 +131,7 @@ export function TemplatesPage(): React.JSX.Element {
                 a glance, now that there are no variable fields to count. Bound
                 by id, so the name is looked up fresh every render.
               */}
-              <p className="text-[11px] text-muted-foreground" data-bound-source>
+              <p className="text-2xs text-muted-foreground" data-bound-source>
                 {template.dataSourceId === null
                   ? copy.templates.boundSourceNone
                   : copy.templates.boundSource(boundName(template) ?? template.dataSourceId)}
@@ -143,7 +143,7 @@ export function TemplatesPage(): React.JSX.Element {
                 (FR-028a).
               */}
               {template.bindingIssue !== null && (
-                <p className="text-[11px] text-destructive" data-binding-issue>
+                <p className="text-2xs text-destructive" data-binding-issue>
                   {'! '}
                   {template.bindingIssue.kind === 'sourceMissing'
                     ? copy.dataSources.bindingMissing
@@ -184,7 +184,7 @@ export function TemplatesPage(): React.JSX.Element {
                 </ConfirmButton>
               </div>
               {renamingId === template.id && (
-                <p className="text-[11px] text-muted-foreground">{copy.templates.renameHint}</p>
+                <p className="text-2xs text-muted-foreground">{copy.templates.renameHint}</p>
               )}
             </CardContent>
           </Card>

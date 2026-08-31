@@ -44,7 +44,7 @@ function PrinterCard({ printer, pending }: { printer: Printer; pending: number }
         >
           <CardTitle>{printer.name}</CardTitle>
         </Button>
-        <p className="font-mono text-[11px] text-muted-foreground">
+        <p className="font-mono text-2xs text-muted-foreground">
           {printer.kind} · {printer.address}
         </p>
       </CardHeader>

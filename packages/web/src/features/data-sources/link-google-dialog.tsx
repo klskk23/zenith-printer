@@ -129,7 +129,7 @@ export function LinkGoogleDialog({
           {list !== null && preview === null && (
             <div className="space-y-1">
               <p className="text-xs font-medium">{copy.dataSources.googlePickWorksheet}</p>
-              <p className="text-[11px] text-muted-foreground">{list.spreadsheetTitle}</p>
+              <p className="text-2xs text-muted-foreground">{list.spreadsheetTitle}</p>
               <div className="flex flex-col gap-1">
                 {list.worksheets.map((worksheet) => (
                   <Button
@@ -157,16 +157,16 @@ export function LinkGoogleDialog({
                   onChange={(event) => setName(event.target.value)}
                 />
                 {nameTaken && (
-                  <p className="text-[11px] text-destructive">{copy.dataSources.googleNameTaken}</p>
+                  <p className="text-2xs text-destructive">{copy.dataSources.googleNameTaken}</p>
                 )}
               </div>
 
               <div>
-                <p className="mb-1 text-[11px] text-muted-foreground">
+                <p className="mb-1 text-2xs text-muted-foreground">
                   {copy.dataSources.googleTotalRows(preview.totalRows)}
                 </p>
                 <div className="scrollbar-themed overflow-x-auto rounded border border-border">
-                  <table className="w-full text-[11px]">
+                  <table className="w-full text-2xs">
                     <thead>
                       <tr className="border-b border-border bg-muted/40">
                         {preview.columns.map((column) => (
@@ -191,7 +191,7 @@ export function LinkGoogleDialog({
                 </div>
               </div>
 
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-2xs text-muted-foreground">
                 {copy.dataSources.googleReadOnlyNote}
               </p>
               <Failure error={create.error} />

@@ -47,7 +47,7 @@ export function ImagePruneCard(): React.JSX.Element {
   return (
     <section className="space-y-2 rounded border border-border p-3" data-image-prune>
       <h3 className="text-xs font-semibold">{copy.settings.maintenanceHeading}</h3>
-      <p className="text-[11px] text-muted-foreground">{copy.settings.maintenanceScope}</p>
+      <p className="text-2xs text-muted-foreground">{copy.settings.maintenanceScope}</p>
 
       <div className="flex items-center gap-2 pt-1">
         <Button variant="outline" disabled={prune.isPending} onClick={() => setConfirming(true)}>
@@ -55,14 +55,14 @@ export function ImagePruneCard(): React.JSX.Element {
         </Button>
       </div>
 
-      <p className="text-[11px] text-muted-foreground">{copy.settings.pruneImagesHint}</p>
+      <p className="text-2xs text-muted-foreground">{copy.settings.pruneImagesHint}</p>
 
       {prune.isError && (
-        <p className="text-[11px] text-destructive">{prune.error.message}</p>
+        <p className="text-2xs text-destructive">{prune.error.message}</p>
       )}
 
       {result !== undefined && !prune.isPending && (
-        <div className="space-y-0.5 text-[11px]" data-prune-result>
+        <div className="space-y-0.5 text-2xs" data-prune-result>
           <p className={result.removed > 0 ? 'text-foreground' : 'text-muted-foreground'}>
             {result.removed === 0 && result.strayFilesRemoved === 0
               ? copy.settings.pruneNothing

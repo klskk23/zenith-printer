@@ -113,7 +113,7 @@ export function ImageField({ element, onChange }: ImageFieldProps): React.JSX.El
         <p className="text-xs text-muted-foreground">{copy.editor.image.notChosen}</p>
       )}
 
-      <p className="text-[11px] text-muted-foreground">{copy.editor.image.pasteHint}</p>
+      <p className="text-2xs text-muted-foreground">{copy.editor.image.pasteHint}</p>
       {error !== null && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
