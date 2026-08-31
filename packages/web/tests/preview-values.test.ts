@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { irToSvg, type LabelIR } from '@zenith/shared'
-import { designValues, previewIr } from '../src/editor/preview-values.ts'
+import { clampOrdinal, designValues, previewIr } from '../src/editor/preview-values.ts'
 
 /**
  * What the canvas draws while a design is being written.
@@ -120,5 +120,41 @@ describe('previewIr', () => {
       ],
     }
     expect(previewIr(withLine, {}).unresolved).toEqual([])
+  })
+})
+
+/**
+ * Which row of the bound table the canvas stands in for.
+ *
+ * The failure it guards is silent: asking for a row past the end returns an
+ * empty page, every `${列名}` renders blank, and the canvas looks like a design
+ * that has lost its binding rather than a number field that is out of range.
+ */
+describe('clampOrdinal', () => {
+  it('keeps a row inside the table', () => {
+    expect(clampOrdinal(2, 3)).toBe(2)
+  })
+
+  it('holds at the last row rather than asking for one past it', () => {
+    // What a refresh that shortened the table leaves behind.
+    expect(clampOrdinal(9, 3)).toBe(3)
+  })
+
+  it('holds at the first rather than asking for row zero', () => {
+    // What an emptied number field produces: Number('') is 0.
+    expect(clampOrdinal(0, 3)).toBe(1)
+    expect(clampOrdinal(-4, 3)).toBe(1)
+  })
+
+  it('survives a field that is not a number at all', () => {
+    expect(clampOrdinal(Number.NaN, 3)).toBe(1)
+  })
+
+  it('answers 1 when there is no table, so nothing has to special-case it', () => {
+    expect(clampOrdinal(1, 0)).toBe(1)
+  })
+
+  it('does not invent a fractional row', () => {
+    expect(clampOrdinal(2.7, 5)).toBe(2)
   })
 })

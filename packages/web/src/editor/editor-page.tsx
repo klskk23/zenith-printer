@@ -39,7 +39,7 @@ import { ElementContextMenu } from './context-menu.tsx'
 import { symbolFitMm } from './barcode-width.ts'
 import { copyElement, duplicateElement, pasteElement } from './clipboard.ts'
 import { imageBoxMm, refit, refitReferences } from './autofit.ts'
-import { designValues, previewIr } from './preview-values.ts'
+import { clampOrdinal, designValues, previewIr } from './preview-values.ts'
 import type { VariableDefinition } from '@zenith/shared'
 import { imageFileFrom, naturalSizeOf, useUploadImage } from '../features/images/hooks.ts'
 import { canRedo, canUndo, commit, initUndo, redo, undo } from './undo.ts'
@@ -226,19 +226,41 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
    * are reported below the canvas and block printing; they do not stop drawing.
    */
   /**
-   * The bound table's first row, so `${列名}` draws as what it will say.
+   * A row of the bound table, so `${列名}` draws as what it will say.
    *
    * Without it every data-source reference renders blank, and the canvas is
    * the only place the layout can be judged.
+   *
+   * Which row is the operator's choice, defaulting to the first — which is all
+   * this ever used to offer. The first row is rarely the interesting one: the
+   * layout question is whether the longest name still fits, or what the design
+   * does with the empty cell further down.
+   *
+   * Held here rather than in the design. It changes what is drawn and nothing
+   * else, so it is not saved, and it starts again at row one whenever the
+   * table changes underneath it.
    */
   const sources = useDataSources()
   const pools = useSequencePools().data ?? []
-  const firstRow = useDataSourceRows(dataSourceId, 1, 1).data?.rows[0]?.values ?? {}
-  const columns = sources.data?.find((source) => source.id === dataSourceId)?.columns ?? []
+  const boundSource = sources.data?.find((source) => source.id === dataSourceId)
+  const columns = boundSource?.columns ?? []
+  const rowCount = boundSource?.rowCount ?? 0
+  const [previewOrdinal, setPreviewOrdinal] = useState(1)
+  // Clamped on read rather than corrected by an effect: a refresh can shorten
+  // the table under a choice already made, and asking for row 9 of 3 would
+  // return nothing and blank every reference on the canvas.
+  const shownOrdinal = clampOrdinal(previewOrdinal, rowCount)
+  const previewRow = useDataSourceRows(dataSourceId, shownOrdinal, 1).data?.rows[0]?.values ?? {}
+
+  // Rebinding replaces the table; an ordinal from the old one points at a
+  // different row, or at none.
+  useEffect(() => {
+    setPreviewOrdinal(1)
+  }, [dataSourceId])
 
   const values = useMemo(
-    () => ({ ...firstRow, ...designValues(variables) }),
-    [variables, JSON.stringify(firstRow)],
+    () => ({ ...previewRow, ...designValues(variables) }),
+    [variables, JSON.stringify(previewRow)],
   )
   /**
    * Keep reference-bearing boxes in step with the values behind them.
@@ -821,6 +843,10 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                       onCreatePool={() => setPanel('variables')}
                       columns={columns}
                       unresolved={preview.unresolved}
+                      rowCount={rowCount}
+                      previewOrdinal={shownOrdinal}
+                      onPreviewOrdinalChange={setPreviewOrdinal}
+                      previewValues={previewRow}
                     />
                   </TabsContent>
                 </CardContent>
@@ -856,7 +882,11 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           templateId={template?.id ?? null}
           profileId={profileId}
           printer={printer}
-          variableValues={values}
+          // The design's own variables only. `values` also carries the row the
+          // *canvas* is standing in for, and that row is a preview convenience
+          // — sending it would pin every label in the batch to whichever row
+          // happened to be on screen when the dialog was opened.
+          variableValues={designValues(variables)}
           unresolved={preview.unresolved}
           dataSourceId={dataSourceId}
           onClose={() => setPrintOpen(false)}

@@ -35,6 +35,17 @@ export interface VariablesPanelProps {
   columns: readonly string[]
   /** Names the content references but nothing defines. */
   unresolved: readonly string[]
+  /**
+   * The row of the bound table the canvas is currently drawn against.
+   *
+   * Zero rows means no table, or an empty one; either way there is nothing to
+   * choose between and the control is not offered.
+   */
+  rowCount: number
+  previewOrdinal: number
+  onPreviewOrdinalChange: (ordinal: number) => void
+  /** That row's cells, so the number field says what it selected. */
+  previewValues: Readonly<Record<string, string>>
 }
 
 function uniqueName(existing: readonly VariableDefinition[], base: string): string {
@@ -51,6 +62,10 @@ export function VariablesPanel({
   onCreatePool,
   columns,
   unresolved,
+  rowCount,
+  previewOrdinal,
+  onPreviewOrdinalChange,
+  previewValues,
 }: VariablesPanelProps): React.JSX.Element {
   // Held locally while typing. Writing straight through remounted the row on
   // every keystroke, which took the focus with it — one character per click.
@@ -78,6 +93,59 @@ export function VariablesPanel({
 
   return (
     <div className="space-y-3" data-variables-panel>
+      {/*
+        Which row of the bound table the canvas stands in for.
+        Above the variables rather than below, because it explains what is
+        already on screen: `${列名}` has no value while a design is being
+        written, and the canvas has been substituting row one since it could
+        substitute anything. Row one is still the default — the point is only
+        that it is no longer the only one available, since the layout question
+        is usually about the longest name or the empty cell, not the first row.
+      */}
+      {rowCount > 0 && (
+        <section className="space-y-1 rounded-md border border-dashed border-border p-2" data-preview-row>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-medium">{copy.variables.tempHeading}</span>
+            <Input
+              type="number"
+              min={1}
+              max={rowCount}
+              className="h-7 w-20"
+              aria-label={copy.variables.tempRow}
+              value={previewOrdinal}
+              // Not clamped here. The value handed back is the clamped one,
+              // so the field corrects itself on the next render and there is
+              // one place that decides what is in range.
+              onChange={(event) => onPreviewOrdinalChange(Number(event.target.value))}
+            />
+            <span className="text-[11px] text-muted-foreground">
+              {copy.variables.tempRowOf(rowCount)}
+            </span>
+          </div>
+
+          {columns.length > 0 && (
+            <dl className="space-y-0.5 text-[11px]">
+              {columns.map((column) => {
+                const value = previewValues[column] ?? ''
+                return (
+                  <div key={column} className="flex gap-2">
+                    <dt className="shrink-0 text-muted-foreground">{column}</dt>
+                    {/* An empty cell is stated, not left blank: "row 87 has no
+                        name" is the case worth stepping through the table to
+                        find, and a blank line hides it. */}
+                    <dd className={value === '' ? 'truncate text-muted-foreground' : 'truncate'}>
+                      {value === '' ? copy.variables.tempEmptyCell : value}
+                    </dd>
+                  </div>
+                )
+              })}
+            </dl>
+          )}
+
+          <p className="text-[11px] text-muted-foreground">{copy.variables.tempHint}</p>
+        </section>
+      )}
+
       {variables.length === 0 && (
         <p className="text-[11px] text-muted-foreground">{copy.variables.empty}</p>
       )}

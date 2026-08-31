@@ -243,6 +243,17 @@ export const copy = {
     needsFields: '填完上面的变量后才能预览',
     needsTemplateForSequence: '序号字段需要先保存为模板：序号要跨批次接着往下走，而未保存的设计没有可以接续的东西。',
     failed: '无法生成预览',
+    expand: (rows: number): string => `展开全部 ${rows} 行`,
+    collapse: '收起',
+    rowLabel: (ordinal: number): string => `第 ${ordinal} 行`,
+    rowClipped: '超出标签',
+    // Named apart from the row selector's pagination on purpose: both are on
+    // screen at once, and two controls answering to 「下一页」 are ambiguous to
+    // anyone reading the screen rather than looking at it.
+    previousPage: '上一页效果图',
+    nextPage: '下一页效果图',
+    pageNumber: (n: number): string => `效果图第 ${n} 页`,
+    ofRows: (shown: number, total: number): string => `本页 ${shown} 张，共 ${total} 行`,
   },
 
   print: {
@@ -442,6 +453,11 @@ export const copy = {
       `「${name}」与所绑数据源的一列同名。同一个名称指向两处取值，无法判定用哪一个——请给其中一个改名`,
     unresolved: (names: string): string =>
       `内容里引用了未定义的名称：${names}。在此定义它，或改用数据源的列名`,
+    tempHeading: '临时值',
+    tempRow: '取第几行',
+    tempRowOf: (total: number): string => `共 ${total} 行`,
+    tempEmptyCell: '（空）',
+    tempHint: '只改变画布上显示的内容，不写进设计，也不影响打印',
   },
 
   templates: {

@@ -111,10 +111,20 @@ export function PrintDialog({
   const linkedSource = boundSource?.sourceKind === 'google-sheets' ? boundSource : undefined
   const chosenRows = dataSourceId === null ? 0 : selectedCount(selection, rowCount)
   const labels = dataSourceId === null ? copies : labelTotal(selection, rowCount, copies)
-  const firstOrdinal =
-    selection.kind === 'all'
-      ? 1
-      : [...selection.ordinals].sort((a, b) => a - b)[0]
+  /**
+   * The selected rows in print order, which is ascending ordinal — never tick
+   * order. The first is the label that will genuinely come out first, and the
+   * preview expands to the rest.
+   *
+   * Empty when no table is bound or nothing is chosen; the preview then falls
+   * back to the single label the server draws by default.
+   */
+  const selectedOrdinals =
+    dataSourceId === null
+      ? []
+      : selection.kind === 'all'
+        ? Array.from({ length: rowCount }, (_unused, index) => index + 1)
+        : [...selection.ordinals].sort((a, b) => a - b)
 
   const blocked =
     printer.capabilities === null
@@ -278,9 +288,13 @@ export function PrintDialog({
               printerId={printer.id}
               profileId={profileId}
               variableValues={unresolved.length > 0 ? null : variableValues}
-              // The first row of the batch in print order, which is the first
-              // label that will actually come out.
-              rowOrdinal={dataSourceId === null ? undefined : firstOrdinal}
+              // The columns are resolved from the row, server-side; what
+              // travels in `variableValues` is the design's own variables.
+              dataSourceId={dataSourceId}
+              // In print order. The first is what the collapsed preview shows —
+              // the label that will actually come out first — and the rest is
+              // what expanding is for.
+              rowOrdinals={selectedOrdinals}
               copies={copies}
             />
 

@@ -42,6 +42,15 @@ const previewBody = z.object({
   /** Values for this copy's variable fields, so the preview is a real label. */
   variableValues: z.record(z.string(), z.string()).optional(),
   /**
+   * The table to take that row from.
+   *
+   * Needed because the print dialog previews the design *on screen* and so
+   * sends no `templateId` — and until this existed, that meant `rowOrdinal`
+   * below was accepted and then quietly ignored on every request the dialog
+   * ever made. Every preview drew the same label whatever row it named.
+   */
+  dataSourceId: z.string().min(1).optional(),
+  /**
    * Which row of the bound data source to draw.
    *
    * Defaults to the first, which is the first label the batch will produce —
@@ -186,12 +195,17 @@ function previewIr(
   body: {
     ir: LabelIR
     templateId?: string
+    dataSourceId?: string
     variableValues?: Record<string, string>
     rowOrdinal?: number
   },
 ): LabelIR {
   let ir = body.ir
   let rowValues: Record<string, string> = {}
+  // Named by the caller, or taken from the template when one is being previewed
+  // — the template's own binding wins, since that is the design's answer to
+  // which table it belongs to.
+  let sourceId = body.dataSourceId ?? null
 
   if (body.templateId !== undefined) {
     const templates = new TemplateRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
@@ -200,15 +214,24 @@ function previewIr(
       throw ApiError.notFound({ templateId: body.templateId })
     }
     ir = resolveContent(template, null, null).ir
-
-    if (template.dataSourceId !== null) {
-      const sources = new DataSourceRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
-      const ordinal = body.rowOrdinal ?? sources.ordinals(template.dataSourceId)[0]
-      rowValues = ordinal === undefined ? {} : (sources.rowsAt(template.dataSourceId, [ordinal])[0] ?? {})
-    }
+    sourceId = template.dataSourceId ?? sourceId
   }
 
-  if (body.variableValues === undefined && Object.keys(rowValues).length === 0) {
+  if (sourceId !== null) {
+    const sources = new DataSourceRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids })
+    const ordinal = body.rowOrdinal ?? sources.ordinals(sourceId)[0]
+    // A row that is not there leaves the references unresolved, which the
+    // check below turns into an error naming them. Drawing a blank label
+    // instead would read as a broken design rather than a missing row.
+    rowValues = ordinal === undefined ? {} : (sources.rowsAt(sourceId, [ordinal])[0] ?? {})
+  }
+
+  // Nothing to substitute and no table behind it: the design has no references
+  // to resolve, so skip the walk. `sourceId` is in the condition because a
+  // *bound* design with no row values is the interesting case — an ordinal
+  // past the end of the table — and returning early there draws the literal
+  // `${收件人}` onto the label instead of saying which row is missing.
+  if (body.variableValues === undefined && Object.keys(rowValues).length === 0 && sourceId === null) {
     return ir
   }
   const { ir: evaluated, unresolved } = evaluateIr(ir, { ...rowValues, ...body.variableValues })

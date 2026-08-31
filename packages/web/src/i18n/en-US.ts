@@ -246,6 +246,14 @@ export const copy: Copy = {
     needsTemplateForSequence:
       'Sequence fields need the design saved as a template first: a sequence carries on across print runs, and an unsaved design has nothing to carry on from.',
     failed: 'Could not render a preview',
+    expand: (rows: number): string => `Show all ${rows} rows`,
+    collapse: 'Show one',
+    rowLabel: (ordinal: number): string => `Row ${ordinal}`,
+    rowClipped: 'Clipped',
+    previousPage: 'Previous page of previews',
+    nextPage: 'Next page of previews',
+    pageNumber: (n: number): string => `Preview page ${n}`,
+    ofRows: (shown: number, total: number): string => `${shown} shown, ${total} rows in all`,
   },
 
   print: {
@@ -449,6 +457,11 @@ export const copy: Copy = {
       `"${name}" is also a column of the bound data source. One name pointing at two values leaves no way to say which is meant — rename one of them`,
     unresolved: (names: string): string =>
       `Content references names that nothing defines: ${names}. Define them here, or use a column name from the data source`,
+    tempHeading: 'Preview values',
+    tempRow: 'Row to draw',
+    tempRowOf: (total: number): string => `of ${total}`,
+    tempEmptyCell: '(empty)',
+    tempHint: 'Changes only what the canvas draws. It is not saved with the design and does not affect printing.',
   },
 
   templates: {

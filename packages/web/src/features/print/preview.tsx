@@ -11,6 +11,13 @@
  * copies genuinely differ; the first is one that will actually be printed,
  * where a composite would be a label nobody receives.
  *
+ * Expanded, it shows the rest — every selected row, ten at a time. One label
+ * cannot answer the question people open this dialog with, because a barcode's
+ * width follows its content: row 87 can overflow while row 1 is perfect, and
+ * that is exactly the batch nobody wants to find out about from the roll. Ten
+ * at a time because each one is a real server render, and a selection may run
+ * to a thousand rows.
+ *
  * It renders the design on screen, edits included. It used to render the saved
  * template instead, on the grounds that a job submitted with a `templateId`
  * prints the stored version — true, but it made the preview useless for the
@@ -21,10 +28,16 @@
  * The profile id is still sent, so the cut-off and the image tone are the ones
  * that will be used.
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { LabelIR } from '@zenith/shared'
 import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
+import { Button } from '../../components/ui/button.tsx'
+import { Pagination } from '../../components/ui/pagination.tsx'
+import { previewRequestBody, useLabelPreview, type PreviewRequest } from './use-label-preview.ts'
+
+/** Previews per page. Each is a real render on the server, not a thumbnail. */
+const PAGE_SIZE = 10
 
 export interface PreviewProps {
   ir: LabelIR
@@ -32,11 +45,17 @@ export interface PreviewProps {
   profileId: string | null
   /** Copy one's field values, or null while the form is incomplete. */
   variableValues: Record<string, string> | null
+  /** The bound table, so the server can resolve the row being drawn. */
+  dataSourceId: string | null
   /**
-   * Which row of the bound table to draw. Undefined means the first, which is
-   * the first label the batch will produce (FR-041).
+   * The selected rows, in print order — which is ascending ordinal, always.
+   *
+   * Empty when no table is bound, or when nothing is chosen yet; in both cases
+   * the preview falls back to what it has always shown, the label the server
+   * draws by default. The first entry is the label that will genuinely come out
+   * first (FR-041), and the rest are what expanding reveals.
    */
-  rowOrdinal?: number
+  rowOrdinals?: readonly number[]
   copies: number
 }
 
@@ -45,80 +64,74 @@ export function Preview({
   printerId,
   profileId,
   variableValues,
-  rowOrdinal,
+  dataSourceId,
+  rowOrdinals = [],
   copies,
 }: PreviewProps): React.JSX.Element {
-  const [url, setUrl] = useState<string | null>(null)
-  const [clipped, setClipped] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [page, setPage] = useState(1)
 
   const ready = printerId !== null && variableValues !== null
-  const body = JSON.stringify({
-    printerId,
-    ir,
-    ...(profileId === null ? {} : { profileId }),
-    ...(variableValues === null ? {} : { variableValues }),
-    ...(rowOrdinal === undefined ? {} : { rowOrdinal }),
-  })
 
-  useEffect(() => {
-    if (!ready) {
-      return
-    }
-    let cancelled = false
+  const request = (rowOrdinal: number | undefined): PreviewRequest | null =>
+    printerId === null
+      ? null
+      : { printerId, ir, profileId, variableValues, dataSourceId, rowOrdinal }
 
-    void fetch('/api/preview', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // No offset sent: the server uses the printer's own correction, which is
-      // what will actually be applied when this prints.
-      body,
-    })
-      .then(async (response) => {
-        if (cancelled) {
-          return
-        }
-        if (!response.ok) {
-          setFailed(true)
-          return
-        }
-        setFailed(false)
-        setClipped(response.headers.get('X-Clipped') === 'true')
-        const objectUrl = URL.createObjectURL(await response.blob())
-        setUrl((previous) => {
-          if (previous !== null) {
-            URL.revokeObjectURL(previous)
-          }
-          return objectUrl
-        })
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFailed(true)
-        }
-      })
+  const bodyFor = (rowOrdinal: number | undefined): string | null => {
+    const parts = request(rowOrdinal)
+    return !ready || parts === null ? null : previewRequestBody(parts)
+  }
 
-    return () => {
-      cancelled = true
-    }
-  }, [body, ready])
+  const { url, clipped, failed } = useLabelPreview(expanded ? null : bodyFor(rowOrdinals[0]))
 
-  // Released on unmount only. Revoking on every change would pull the image
-  // out from under the render that is still showing it.
-  useEffect(() => {
-    return () => {
-      if (url !== null) {
-        URL.revokeObjectURL(url)
-      }
-    }
-  }, [url])
+  const pageCount = Math.max(1, Math.ceil(rowOrdinals.length / PAGE_SIZE))
+  // Clamped rather than reset by an effect: the selection can shrink under a
+  // page already open, and a page number past the end shows an empty grid.
+  const shownPage = Math.min(page, pageCount)
+  const onPage = rowOrdinals.slice((shownPage - 1) * PAGE_SIZE, shownPage * PAGE_SIZE)
 
   return (
     <div className="space-y-2" data-preview>
-      <h3 className="text-sm font-semibold">{copy.preview.heading}</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">{copy.preview.heading}</h3>
+        {/*
+          Offered only when there is something more to see. One selected row
+          expands to the label already on screen, and no selection at all has
+          nothing to expand to.
+        */}
+        {rowOrdinals.length > 1 && (
+          <Button size="sm" variant="ghost" onClick={() => setExpanded(!expanded)}>
+            {expanded ? copy.preview.collapse : copy.preview.expand(rowOrdinals.length)}
+          </Button>
+        )}
+      </div>
 
       {!ready ? (
         <p className="text-xs text-muted-foreground">{copy.preview.needsFields}</p>
+      ) : expanded ? (
+        <div className="space-y-2" data-preview-grid>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {onPage.map((ordinal) => (
+              <RowPreview key={ordinal} ordinal={ordinal} body={bodyFor(ordinal)} />
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {copy.preview.ofRows(onPage.length, rowOrdinals.length)}
+          </p>
+          {pageCount > 1 && (
+            <Pagination
+              page={shownPage}
+              pageCount={pageCount}
+              onPageChange={setPage}
+              labels={{
+                previous: copy.preview.previousPage,
+                next: copy.preview.nextPage,
+                page: copy.preview.pageNumber,
+              }}
+            />
+          )}
+        </div>
       ) : failed ? (
         <Alert variant="warning" className="text-xs">
           {copy.preview.failed}
@@ -133,7 +146,7 @@ export function Preview({
         )
       )}
 
-      {clipped && (
+      {!expanded && clipped && (
         <Alert variant="warning" className="text-xs">
           {copy.preview.clipped}
         </Alert>
@@ -143,5 +156,34 @@ export function Preview({
       )}
       <p className="text-[11px] text-muted-foreground">{copy.preview.hint}</p>
     </div>
+  )
+}
+
+/**
+ * One row's label in the expanded grid.
+ *
+ * Its own component so that each has its own request and its own state: a
+ * failure on row 7 leaves the other nine on screen, which is the point of
+ * looking at them together.
+ */
+function RowPreview({ ordinal, body }: { ordinal: number; body: string | null }): React.JSX.Element {
+  const { url, clipped, failed } = useLabelPreview(body)
+  const label = copy.preview.rowLabel(ordinal)
+
+  return (
+    <figure className="space-y-1" data-row-preview={ordinal}>
+      {failed ? (
+        <p className="text-[11px] text-muted-foreground">{copy.preview.failed}</p>
+      ) : (
+        url !== null && (
+          <img src={url} alt={label} className="w-full border border-border bg-white" />
+        )
+      )}
+      <figcaption className="flex items-center gap-1 text-[11px] text-muted-foreground">
+        <span>{label}</span>
+        {/* Said per row: which row overflows is the whole reason to be here. */}
+        {clipped && <span className="text-amber-600">{copy.preview.rowClipped}</span>}
+      </figcaption>
+    </figure>
   )
 }

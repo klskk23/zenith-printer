@@ -51,3 +51,18 @@ export function designValues(
 export function previewIr(ir: LabelIR, values: Readonly<Record<string, string>>): PreviewResult {
   return evaluateIr(ir, values)
 }
+
+/**
+ * Which row the canvas may stand in for, kept inside the table.
+ *
+ * Out-of-range is not a user error to report — it is what a shortened table
+ * leaves behind, and what an empty number field produces mid-edit. Asking for
+ * row 9 of 3 returns nothing, which blanks every `${列名}` on the canvas: the
+ * one failure this module exists to prevent.
+ */
+export function clampOrdinal(ordinal: number, rowCount: number): number {
+  if (!Number.isFinite(ordinal) || rowCount < 1) {
+    return 1
+  }
+  return Math.min(Math.max(1, Math.trunc(ordinal)), rowCount)
+}
