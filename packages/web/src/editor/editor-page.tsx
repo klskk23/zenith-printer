@@ -844,6 +844,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                       columns={columns}
                       unresolved={preview.unresolved}
                       rowCount={rowCount}
+                      dataSourceId={dataSourceId}
                       previewOrdinal={shownOrdinal}
                       onPreviewOrdinalChange={setPreviewOrdinal}
                       previewValues={previewRow}

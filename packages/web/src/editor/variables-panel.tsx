@@ -15,6 +15,7 @@ import { useState } from 'react'
 import type { VariableDefinition } from '@zenith/shared'
 import { Button } from '../components/ui/button.tsx'
 import { Input } from '../components/ui/input.tsx'
+import { PreviewRowPicker } from './preview-row-picker.tsx'
 import { Label } from '../components/ui/label.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 import { copy } from '../i18n/index.ts'
@@ -42,6 +43,8 @@ export interface VariablesPanelProps {
    * choose between and the control is not offered.
    */
   rowCount: number
+  /** The table itself, so the row can be picked out of it rather than typed. */
+  dataSourceId: string | null
   previewOrdinal: number
   onPreviewOrdinalChange: (ordinal: number) => void
   /** That row's cells, so the number field says what it selected. */
@@ -63,6 +66,7 @@ export function VariablesPanel({
   columns,
   unresolved,
   rowCount,
+  dataSourceId,
   previewOrdinal,
   onPreviewOrdinalChange,
   previewValues,
@@ -102,27 +106,27 @@ export function VariablesPanel({
         that it is no longer the only one available, since the layout question
         is usually about the longest name or the empty cell, not the first row.
       */}
-      {rowCount > 0 && (
-        <section className="space-y-1 rounded-md border border-dashed border-border p-2" data-preview-row>
-          <div className="flex items-center gap-2">
+      {rowCount > 0 && dataSourceId !== null && (
+        <section className="space-y-2 rounded-md border border-dashed border-border p-2" data-preview-row>
+          <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-medium">{copy.variables.tempHeading}</span>
-            <Input
-              type="number"
-              min={1}
-              max={rowCount}
-              className="h-7 w-20"
-              aria-label={copy.variables.tempRow}
-              value={previewOrdinal}
-              // Not clamped here. The value handed back is the clamped one,
-              // so the field corrects itself on the next render and there is
-              // one place that decides what is in range.
-              onChange={(event) => onPreviewOrdinalChange(Number(event.target.value))}
-            />
             <span className="text-[11px] text-muted-foreground">
-              {copy.variables.tempRowOf(rowCount)}
+              {copy.variables.tempRowInForce(previewOrdinal, rowCount)}
             </span>
           </div>
 
+          <PreviewRowPicker
+            dataSourceId={dataSourceId}
+            ordinal={previewOrdinal}
+            onChange={onPreviewOrdinalChange}
+          />
+
+          {/*
+            The chosen row's values, spelled out.
+            The table above is listed newest-first and paged, so the row in
+            force is often not on the page being looked at — and "what is the
+            canvas showing right now" should not require finding it.
+          */}
           {columns.length > 0 && (
             <dl className="space-y-0.5 text-[11px]">
               {columns.map((column) => {

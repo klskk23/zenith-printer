@@ -456,6 +456,7 @@ export const copy = {
     tempHeading: '临时值',
     tempRow: '取第几行',
     tempRowOf: (total: number): string => `共 ${total} 行`,
+    tempRowInForce: (ordinal: number, total: number): string => `当前第 ${ordinal} 行，共 ${total} 行`,
     tempEmptyCell: '（空）',
     tempHint: '只改变画布上显示的内容，不写进设计，也不影响打印',
   },

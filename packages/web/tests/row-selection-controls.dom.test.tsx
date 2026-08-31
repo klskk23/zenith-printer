@@ -4,7 +4,9 @@
  * The one that needs care is the order toggle. Printing is always by ascending
  * row number — that is what makes a reprint line up and lets somebody check a
  * stack of labels against the spreadsheet — so a control offering "descending"
- * must not leave anybody thinking the labels come out backwards.
+ * must not leave anybody thinking the labels come out backwards. It is now the
+ * *default* view, which makes that note the常驻 one rather than the exception,
+ * and makes it worth more.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -63,6 +65,14 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+/**
+ * Wait for the first page to land.
+ *
+ * Descending is the default now, so page one is the *end* of the table. Tests
+ * that waited on `A-1` were waiting for a row that is three pages away.
+ */
+const loaded = (): Promise<HTMLElement> => screen.findByText(`A-${TOTAL}`)
+
 /** Render with a selection that the test can read back. */
 function panel(initial: Selection = EMPTY): { current: () => Selection } {
   let selection = initial
@@ -86,22 +96,23 @@ function panel(initial: Selection = EMPTY): { current: () => Selection } {
 describe('pagination', () => {
   it('uses the pagination control rather than bare prev/next', async () => {
     panel()
-    await screen.findByText('A-1')
+    await loaded()
     expect(document.querySelector('[data-pagination]')).not.toBeNull()
   })
 
   it('offers the last page directly, without clicking through', async () => {
-    // 25 rows, ten to a page: three pages. Reaching the end of a long table
-    // should not be a sequence of clicks.
+    // 25 rows, ten to a page: three pages. Reaching the far end of a long
+    // table should not be a sequence of clicks. Listed descending, the far end
+    // is row one.
     panel()
-    await screen.findByText('A-1')
+    await loaded()
     fireEvent.click(screen.getByRole('button', { name: '第 3 页' }))
-    await screen.findByText('A-21')
+    await screen.findByText('A-1')
   })
 
   it('marks the page in view for a screen reader', async () => {
     panel()
-    await screen.findByText('A-1')
+    await loaded()
     expect(screen.getByRole('button', { name: '第 1 页' }).getAttribute('aria-current')).toBe('page')
   })
 })
@@ -109,12 +120,14 @@ describe('pagination', () => {
 describe('selecting the page in view', () => {
   it('ticks every row on it', async () => {
     const state = panel()
-    await screen.findByText('A-1')
+    await loaded()
     fireEvent.click(screen.getByRole('button', { name: '选中本页' }))
 
+    // Listed descending, so page one is the last ten rows. Stored ascending
+    // regardless: the order they were listed in is not part of the selection.
     await waitFor(() => expect(state.current()).toEqual({
       kind: 'explicit',
-      ordinals: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      ordinals: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
     }))
   })
 
@@ -122,7 +135,7 @@ describe('selecting the page in view', () => {
     // Otherwise paging forward and ticking twice loses the first page, and the
     // count at the top is the only thing that would have said so.
     const state = panel()
-    await screen.findByText('A-1')
+    await loaded()
     fireEvent.click(screen.getByRole('button', { name: '选中本页' }))
     fireEvent.click(screen.getByRole('button', { name: '第 2 页' }))
     await screen.findByText('A-11')
@@ -136,7 +149,7 @@ describe('selecting the page in view', () => {
 
   it('turns into an untick once the page is wholly chosen', async () => {
     const state = panel()
-    await screen.findByText('A-1')
+    await loaded()
     fireEvent.click(screen.getByRole('button', { name: '选中本页' }))
 
     const undo = await screen.findByRole('button', { name: '取消本页' })
@@ -150,7 +163,7 @@ describe('the viewing order', () => {
     // Not a client-side reverse: page one descending must be the last rows of
     // the table, not the first ten upside down.
     panel()
-    await screen.findByText('A-1')
+    await loaded()
     fireEvent.click(screen.getByRole('radio', { name: '倒序' }))
 
     await screen.findByText('A-25')
@@ -159,42 +172,45 @@ describe('the viewing order', () => {
 
   it('goes back to page one, since page three means different rows now', async () => {
     panel()
-    await screen.findByText('A-1')
+    await loaded()
     fireEvent.click(screen.getByRole('button', { name: '第 3 页' }))
-    await screen.findByText('A-21')
+    await screen.findByText('A-1')
 
-    fireEvent.click(screen.getByRole('radio', { name: '倒序' }))
-    await screen.findByText('A-25')
+    fireEvent.click(screen.getByRole('radio', { name: '正序' }))
+    // A-10 is on ascending page one and on no descending page but the last.
+    await screen.findByText('A-10')
     expect(screen.getByRole('button', { name: '第 1 页' }).getAttribute('aria-current')).toBe('page')
   })
 
   it('says the print order is unaffected, because "descending" invites the opposite reading', async () => {
+    // Descending is the default, so this is what the dialog says from the
+    // moment it opens — which is the whole reason the note is worth having.
     panel()
-    await screen.findByText('A-1')
-    expect(document.querySelector('[data-order-note]')).toBeNull()
+    await loaded()
+    expect(await screen.findByText(/打印一律按行号升序/)).toBeDefined()
 
-    fireEvent.click(screen.getByRole('radio', { name: '倒序' }))
-    const note = await screen.findByText(/打印一律按行号升序/)
-    expect(note).toBeDefined()
+    fireEvent.click(screen.getByRole('radio', { name: '正序' }))
+    await waitFor(() => expect(document.querySelector('[data-order-note]')).toBeNull())
   })
 
   it('keeps a selection made in one order when the order flips', async () => {
     // The selection is a set of row numbers; how they were listed is not part
-    // of it.
+    // of it. Descending page one is rows 25 down to 16.
     const state = panel()
-    await screen.findByText('A-1')
+    await loaded()
     fireEvent.click(screen.getByRole('button', { name: '选中本页' }))
-    fireEvent.click(screen.getByRole('radio', { name: '倒序' }))
-    await screen.findByText('A-25')
+    fireEvent.click(screen.getByRole('radio', { name: '正序' }))
+    await screen.findByText('A-10')
 
     const current = state.current()
-    expect(current.kind === 'explicit' && current.ordinals).toEqual([1,2,3,4,5,6,7,8,9,10])
+    expect(current.kind === 'explicit' && current.ordinals).toEqual([16,17,18,19,20,21,22,23,24,25])
   })
 
   it('shows a row already chosen as ticked in the other order', async () => {
     const state = panel({ kind: 'explicit', ordinals: [25] })
-    await screen.findByText('A-1')
-    fireEvent.click(screen.getByRole('radio', { name: '倒序' }))
+    await loaded()
+    fireEvent.click(screen.getByRole('radio', { name: '正序' }))
+    fireEvent.click(await screen.findByRole('button', { name: '第 3 页' }))
 
     const row = (await screen.findByText('A-25')).closest('tr')!
     expect(within(row).getByRole('checkbox').getAttribute('data-state')).toBe('checked')

@@ -460,6 +460,7 @@ export const copy: Copy = {
     tempHeading: 'Preview values',
     tempRow: 'Row to draw',
     tempRowOf: (total: number): string => `of ${total}`,
+    tempRowInForce: (ordinal: number, total: number): string => `Row ${ordinal} of ${total}`,
     tempEmptyCell: '(empty)',
     tempHint: 'Changes only what the canvas draws. It is not saved with the design and does not affect printing.',
   },

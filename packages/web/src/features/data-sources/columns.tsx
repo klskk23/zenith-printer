@@ -21,6 +21,7 @@ import {
   type RowSelectionState,
 } from '@tanstack/react-table'
 import { Checkbox } from '../../components/ui/checkbox.tsx'
+import { ToggleGroupItem } from '../../components/ui/toggle-group.tsx'
 import { copy } from '../../i18n/index.ts'
 import type { DataSourceRow } from './hooks.ts'
 
@@ -62,6 +63,38 @@ export function selectionColumn(options: {
           checked={options.isSelected(ordinal)}
           onCheckedChange={() => options.onToggle(ordinal)}
         />
+      )
+    },
+  }
+}
+
+/**
+ * A dot, for the tables where exactly one row may be chosen.
+ *
+ * A tick box would be the wrong promise: it says "and this one too", and there
+ * is no such thing here — choosing a row replaces the choice. Built on the
+ * toggle group already in use for the order switch, which gives it `radio`
+ * semantics; shadcn/ui has a RadioGroup for this, but its root has to wrap
+ * every item, and here the items are cells scattered through a table body.
+ *
+ * The group itself lives above the table so that all the rows are inside one
+ * roving-focus group, which is what makes the arrow keys move between rows.
+ */
+export function choiceColumn(chosen: number | null): DataSourceColumnDef {
+  return {
+    id: 'choose',
+    header: () => null,
+    cell: (ctx) => {
+      const ordinal = ctx.row.original.ordinal
+      return (
+        <ToggleGroupItem
+          value={String(ordinal)}
+          aria-label={`${copy.rowSelection.ordinal} ${ordinal}`}
+          aria-checked={ordinal === chosen}
+          className="h-6 w-6 rounded-full border border-border p-0 data-[state=on]:bg-foreground"
+        >
+          <span className="sr-only">{ordinal}</span>
+        </ToggleGroupItem>
       )
     },
   }

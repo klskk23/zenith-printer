@@ -50,7 +50,7 @@ const ROWS = [
 ]
 
 /** Every row page the editor asked for, so "which row" is checkable. */
-const rowRequests: Array<{ page: number; pageSize: number }> = []
+const rowRequests: Array<{ page: number; pageSize: number; order: string }> = []
 /** Preview bodies the print dialog sent, so the boundary between the two is checkable. */
 const previews: Array<Record<string, unknown>> = []
 let saved: Array<Record<string, unknown>> = []
@@ -91,15 +91,23 @@ beforeEach(() => {
       const query = new URLSearchParams(rows[2])
       const page = Number(query.get('page'))
       const pageSize = Number(query.get('pageSize'))
-      rowRequests.push({ page, pageSize })
-      // Paged the way the server pages: page N at size 1 is row N.
+      const order = query.get('order') ?? 'asc'
+      rowRequests.push({ page, pageSize, order })
+      // Paged the way the server pages: page N at size 1 is row N, and
+      // descending page one is the END of the table.
+      const ordered = order === 'desc' ? [...ROWS].reverse() : ROWS
       const from = (page - 1) * pageSize
-      body = { rows: ROWS.slice(from, from + pageSize), page, pageSize, total: ROWS.length }
+      body = { rows: ordered.slice(from, from + pageSize), page, pageSize, total: ROWS.length }
     } else if (url.includes('/data-sources')) {
       body = { dataSources: sources }
     } else if (url.includes('/templates') && init?.method === 'POST') {
-      saved.push(JSON.parse(String(init.body)) as Record<string, unknown>)
-      body = { id: 'tpl-1' }
+      const payload = JSON.parse(String(init.body)) as Record<string, unknown>
+      saved.push(payload)
+      // The whole saved template, as the server returns it. A bare `{ id }`
+      // left the editor reloading a template with no `variables`, which threw
+      // into the error boundary after the assertion had already passed —
+      // noise that could hide a real crash later.
+      body = { ...payload, id: 'tpl-1', version: 1, createdAt: 'T', updatedAt: 'T', bindingIssue: null }
     } else if (url.includes('/templates')) {
       body = { templates: [] }
     } else if (url.includes('/printers')) {
@@ -154,7 +162,20 @@ async function bindAndReference(): Promise<void> {
 const canvasText = (): string =>
   document.querySelector('[data-label-canvas] svg')?.textContent ?? ''
 
-const rowInput = (): HTMLInputElement => screen.getByLabelText('取第几行') as HTMLInputElement
+/**
+ * Pick a row out of the table, the way the print dialog's is picked.
+ *
+ * A dot rather than a tick box: the canvas draws one label, so choosing a row
+ * replaces the choice instead of adding to it.
+ */
+const pickRow = async (ordinal: number): Promise<void> => {
+  // Wait for the whole page of rows first. Clicking while it is still arriving
+  // lands on a node React is about to replace, and the click goes nowhere.
+  await vi.waitFor(() =>
+    expect(document.querySelectorAll('[data-preview-row-picker] tbody tr')).toHaveLength(ROWS.length),
+  )
+  fireEvent.click(await screen.findByRole('radio', { name: `行号 ${ordinal}` }))
+}
 
 /** Choose the printer — the print button stays disabled until one is — and open the dialog. */
 async function openPrintDialog(): Promise<void> {
@@ -178,7 +199,7 @@ describe('the row the canvas uses', () => {
     await bindAndReference()
     await vi.waitFor(() => expect(canvasText()).toContain('垫片'))
 
-    fireEvent.change(rowInput(), { target: { value: '3' } })
+    await pickRow(3)
 
     // The long name is the reason to look at another row at all.
     await vi.waitFor(() => expect(canvasText()).toContain('一个名字很长的零件'))
@@ -188,9 +209,9 @@ describe('the row the canvas uses', () => {
   it('fetches that row rather than filtering a page it already has', async () => {
     openDesign()
     await bindAndReference()
-    fireEvent.change(rowInput(), { target: { value: '2' } })
+    await pickRow(2)
     await vi.waitFor(() => expect(canvasText()).toContain('螺栓'))
-    expect(rowRequests).toContainEqual({ page: 2, pageSize: 1 })
+    expect(rowRequests.some((r) => r.page === 2 && r.pageSize === 1)).toBe(true)
   })
 
   it('shows the values it is standing in for', async () => {
@@ -198,33 +219,48 @@ describe('the row the canvas uses', () => {
     // number field with no way to tell what it selected.
     openDesign()
     await bindAndReference()
-    fireEvent.change(rowInput(), { target: { value: '2' } })
+    await pickRow(2)
     const panel = document.querySelector('[data-variables-panel]')!
     await vi.waitFor(() => expect(panel.textContent).toContain('BBB-2'))
   })
 })
 
-describe('the bounds of it', () => {
-  it('refuses to go below the first row', async () => {
+describe('the table it is picked from', () => {
+  it('is the one the print dialog uses, listed the same way', async () => {
+    // Same data, same columns, same paging — learning a second control for it
+    // would be an accident of which screen you happen to be on.
     openDesign()
     await bindAndReference()
-    fireEvent.change(rowInput(), { target: { value: '0' } })
-    await vi.waitFor(() => expect(canvasText()).toContain('垫片'))
-    expect(rowRequests.some((request) => request.page < 1)).toBe(false)
+    const picker = document.querySelector('[data-preview-row-picker]')!
+    await vi.waitFor(() => expect(picker.querySelectorAll('tbody tr').length).toBe(ROWS.length))
+    expect(picker.textContent).toContain('AAA-1')
+    expect(picker.textContent).toContain('名称')
   })
 
-  it('refuses to go past the last', async () => {
+  it('lists the newest end first', async () => {
+    // The rows people came to find are the ones just added.
     openDesign()
     await bindAndReference()
-    fireEvent.change(rowInput(), { target: { value: '9' } })
+    await vi.waitFor(() => expect(rowRequests.some((r) => r.pageSize === 10)).toBe(true))
+    expect(rowRequests.filter((r) => r.pageSize === 10)[0]?.order).toBe('desc')
+  })
+
+  it('holds one row at a time, not a set of them', async () => {
+    openDesign()
+    await bindAndReference()
+    await pickRow(3)
     await vi.waitFor(() => expect(canvasText()).toContain('一个名字很长的零件'))
-    expect(rowRequests.some((request) => request.page > ROWS.length)).toBe(false)
+
+    await pickRow(2)
+
+    await vi.waitFor(() => expect(canvasText()).toContain('螺栓'))
+    expect(canvasText()).not.toContain('一个名字很长的零件')
   })
 
   it('is not offered at all when no table is bound', () => {
     openDesign()
     openVariablesTab()
-    expect(screen.queryByLabelText('取第几行')).toBeNull()
+    expect(document.querySelector('[data-preview-row-picker]')).toBeNull()
   })
 })
 
@@ -234,7 +270,7 @@ describe('what it is not', () => {
     // be a second, invisible piece of state deciding what a design means.
     openDesign()
     await bindAndReference()
-    fireEvent.change(rowInput(), { target: { value: '3' } })
+    await pickRow(3)
     await vi.waitFor(() => expect(canvasText()).toContain('一个名字很长的零件'))
 
     fireEvent.click(screen.getByText('保存为模板'))
@@ -265,7 +301,7 @@ describe('the boundary with printing', () => {
   it('does not send the canvas row as the batch\'s values', async () => {
     openDesign()
     await bindAndReference()
-    fireEvent.change(rowInput(), { target: { value: '3' } })
+    await pickRow(3)
     await vi.waitFor(() => expect(canvasText()).toContain('一个名字很长的零件'))
 
     await openPrintDialog()
