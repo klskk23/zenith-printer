@@ -38,6 +38,35 @@ function scrollAreaTags(): Array<{ file: string; tag: string }> {
     })
 }
 
+/**
+ * The editor's side columns, which are where tables end up.
+ *
+ * A Radix viewport wraps its children in a `display: table` element, so
+ * everything inside is shrink-wrapped to its own content width. `ui/table.tsx`
+ * scrolls sideways with `w-full overflow-x-auto`, and `w-full` measured against
+ * a shrink-to-fit parent is circular: the box takes the table's full width,
+ * never overflows, never draws a scrollbar, and carries the whole column off
+ * the side of the window — buttons and all. That is what putting the
+ * data-source table in the variables panel did.
+ *
+ * Checked by reading the source for the same reason as the rules above: happy-
+ * dom performs no layout, so a column that pushes the page sideways and one
+ * that scrolls tidily are the same zero-by-zero box to it.
+ */
+const editorPage = readFileSync(join(SRC, 'editor', 'editor-page.tsx'), 'utf8')
+
+describe('the editor columns', () => {
+  it('scrolls its side columns without a Radix viewport', () => {
+    expect(editorPage).not.toMatch(/<ScrollArea/)
+  })
+
+  it('still scrolls them — the fix is not to stop scrolling', () => {
+    // Two side columns, each its own scroller with a definite height.
+    const scrollers = editorPage.match(/scrollbar-themed h-full overflow-y-auto/g) ?? []
+    expect(scrollers).toHaveLength(2)
+  })
+})
+
 describe('scroll regions', () => {
   it('finds the ScrollAreas, so an empty pass cannot look like a passing one', () => {
     expect(scrollAreaTags().length).toBeGreaterThan(0)

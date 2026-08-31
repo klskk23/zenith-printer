@@ -50,7 +50,6 @@ import { useDataSourceRows, useDataSources } from '../features/data-sources/hook
 import { useSequencePools } from '../features/sequence-pools/hooks.ts'
 import { ELEMENT_TYPES, createBlankLabel, createElement, type ElementType } from './elements.ts'
 import { blockingViolations, inspect } from './guards.ts'
-import { ScrollArea } from '../components/ui/scroll-area.tsx'
 
 type SidePanel = 'element' | 'variables'
 
@@ -689,7 +688,10 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
       <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1 pt-3" {...columnLayout}>
         {/* Left: what the label is, what can go on it, and what is on it. */}
         <ResizablePanel id="left" defaultSize="16" minSize="12" maxSize="30">
-          <ScrollArea className="h-full">
+          {/* Same as the right column: a side panel is a place a table can
+              end up, and one of the two being a ScrollArea is a trap laid for
+              whoever puts one here next. */}
+          <div className="scrollbar-themed h-full overflow-y-auto">
             <aside className="space-y-4 pr-3">
             <section className="space-y-1.5">
               <h3 className="text-xs font-semibold">{copy.editor.canvas}</h3>
@@ -734,7 +736,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
               <LayersPanel ir={ir} selectedId={selectedId} onSelect={setSelectedId} onChange={setIr} />
             </section>
           </aside>
-          </ScrollArea>
+          </div>
         </ResizablePanel>
 
         <ResizableHandle withHandle />
@@ -794,7 +796,19 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
 
         {/* Right: the selected element, and the fields it can be bound to. */}
         <ResizablePanel id="right" defaultSize="24" minSize="16" maxSize="40">
-          <ScrollArea className="h-full">
+          {/*
+            A plain scroller, not a ScrollArea.
+
+            Radix wraps a viewport's children in a `display: table` element, so
+            anything inside it is shrink-wrapped to its own content width. The
+            data-source table in the variables panel scrolls sideways on its
+            own — `w-full overflow-x-auto` — and `w-full` against a
+            shrink-to-fit parent is circular: the box takes the table's full
+            width, never overflows, never offers a scrollbar, and pushes the
+            whole column past the edge of the window instead. `ui/scroll-area.tsx`
+            says as much at the top; this is the case it was warning about.
+          */}
+          <div className="scrollbar-themed h-full overflow-y-auto">
             <aside className="pl-3">
             <Card>
               {/*
@@ -854,7 +868,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
               </Tabs>
             </Card>
           </aside>
-          </ScrollArea>
+          </div>
         </ResizablePanel>
       </ResizablePanelGroup>
 

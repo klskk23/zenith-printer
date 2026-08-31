@@ -73,7 +73,10 @@ export function Pagination({
   return (
     <nav
       aria-label={labels.page(page)}
-      className={cn('flex items-center justify-center gap-1', className)}
+      // Wraps rather than overflowing: this also has to fit the editor's
+      // side column, where a long table's page numbers are wider than the
+      // column is.
+      className={cn('flex flex-wrap items-center justify-center gap-1', className)}
       data-pagination
     >
       <Button
