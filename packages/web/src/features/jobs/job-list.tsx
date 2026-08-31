@@ -23,8 +23,8 @@ import { useCancelJob, useJobs, type PrintJob } from './hooks.ts'
 
 const STATUS_STYLE: Record<JobStatus, string> = {
   queued: 'text-muted-foreground',
-  printing: 'text-blue-600 font-medium',
-  completed: 'text-emerald-600',
+  printing: 'text-info font-medium',
+  completed: 'text-success',
   failed: 'text-destructive font-medium',
   cancelled: 'text-muted-foreground line-through',
 }
@@ -44,7 +44,7 @@ function ProgressLabel({ job }: { job: PrintJob }): React.JSX.Element {
         value={unknown ? null : Math.round((job.pagesPrinted! / Math.max(1, job.requestedCopies)) * 100)}
       />
       {unknown ? (
-        <span className="font-medium text-amber-700">
+        <span className="font-medium text-warning">
           {copy.jobs.progressUnknown(job.requestedCopies)}
         </span>
       ) : (

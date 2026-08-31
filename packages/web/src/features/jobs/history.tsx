@@ -78,7 +78,7 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
           {/* Follows the interface language; this used to be hardcoded zh-CN,
               so an English interface still showed Chinese timestamps. */}
           <span>{formatInstant(jobInstant(job), preferences.language)}</span>
-          <span className={unknown ? 'font-medium text-amber-700' : ''}>
+          <span className={unknown ? 'font-medium text-warning' : ''}>
             {unknown
               ? copy.jobs.progressUnknown(job.requestedCopies)
               : copy.jobs.progress(job.pagesPrinted ?? 0, job.requestedCopies)}
@@ -89,7 +89,7 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
           {job.snapshot.widthMm}×{job.snapshot.heightMm}mm · {job.id.slice(0, 8)}
           {(job.overflowWarnings?.length ?? 0) > 0 && (
             // Recorded at submission, because the design may have changed since.
-            <span className="ml-2 text-amber-600">
+            <span className="ml-2 text-warning">
               {copy.overflow.inHistory} ({job.overflowWarnings!.length})
             </span>
           )}

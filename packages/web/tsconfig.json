@@ -9,7 +9,13 @@
     // electron and react-native. Vite resolves the browser build here, so the
     // type checker has to be told to resolve the same one, or @zenith/shared
     // fails to typecheck the moment the web package pulls it in.
-    "customConditions": ["browser"]
+    "customConditions": ["browser"],
+    // The other half of the `@` alias vite.config.ts already had. Without it
+    // the bundler resolves `@/components/ui/button` and the type checker does
+    // not — which is exactly the state anything added by `shadcn add` would
+    // arrive in, since that is the import style it writes.
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
 }

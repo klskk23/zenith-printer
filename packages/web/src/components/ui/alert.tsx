@@ -6,7 +6,10 @@ const alertVariants = cva('rounded-md border px-3 py-2 text-sm', {
     variant: {
       default: 'border-border bg-muted text-foreground',
       destructive: 'border-destructive/40 bg-destructive/10 text-destructive',
-      warning: 'border-amber-500/40 bg-amber-500/10 text-amber-800',
+      // Was `text-amber-800` on a fixed amber tint: a dark brown, chosen for
+      // white paper, printed onto a near-black background in dark mode. The
+      // token follows the theme.
+      warning: 'border-warning/40 bg-warning/10 text-warning',
     },
   },
   defaultVariants: { variant: 'default' },

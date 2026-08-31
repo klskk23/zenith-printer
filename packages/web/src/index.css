@@ -12,12 +12,44 @@
 @theme {
   --color-background: oklch(1 0 0);
   --color-foreground: oklch(0.145 0 0);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.145 0 0);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.145 0 0);
   --color-primary: oklch(0.205 0 0);
   --color-primary-foreground: oklch(0.985 0 0);
+  --color-secondary: oklch(0.97 0 0);
+  --color-secondary-foreground: oklch(0.205 0 0);
   --color-muted: oklch(0.97 0 0);
   --color-muted-foreground: oklch(0.556 0 0);
-  --color-border: oklch(0.922 0 0);
+  --color-accent: oklch(0.97 0 0);
+  --color-accent-foreground: oklch(0.205 0 0);
   --color-destructive: oklch(0.577 0.245 27.325);
+  --color-destructive-foreground: oklch(0.985 0 0);
+  --color-border: oklch(0.922 0 0);
+  --color-input: oklch(0.922 0 0);
+  --color-ring: oklch(0.708 0 0);
+
+  /*
+   * Two names beyond shadcn's set, because this application has two states its
+   * set has no word for — and they were being written as raw palette colours
+   * that do not follow the theme at all.
+   *
+   * `warning` is "it printed, but not the way you asked": content clipped off
+   * the label, a count nobody can verify after a crash. `destructive` would
+   * overstate it and `muted` would hide it.
+   * `info` is "this is happening right now", which the queue uses for the job
+   * on the head; `success` is a finished one.
+   *
+   * Values are Tailwind's own amber-600/blue-600 in light and amber-400/
+   * blue-400 in dark — the same relationship shadcn gives `destructive`, whose
+   * dark value is lighter and less saturated than its light one.
+   */
+  --color-warning: oklch(66.6% 0.179 58.318);
+  --color-warning-foreground: oklch(0.985 0 0);
+  --color-info: oklch(54.6% 0.245 262.881);
+  --color-success: oklch(59.6% 0.145 163.225);
+
   --radius: 0.5rem;
 }
 
@@ -28,12 +60,30 @@
 :root[data-theme='dark'] {
   --color-background: oklch(0.145 0 0);
   --color-foreground: oklch(0.985 0 0);
+  --color-card: oklch(0.205 0 0);
+  --color-card-foreground: oklch(0.985 0 0);
+  --color-popover: oklch(0.205 0 0);
+  --color-popover-foreground: oklch(0.985 0 0);
   --color-primary: oklch(0.922 0 0);
   --color-primary-foreground: oklch(0.205 0 0);
+  --color-secondary: oklch(0.269 0 0);
+  --color-secondary-foreground: oklch(0.985 0 0);
   --color-muted: oklch(0.269 0 0);
   --color-muted-foreground: oklch(0.708 0 0);
-  --color-border: oklch(0.371 0 0);
+  --color-accent: oklch(0.269 0 0);
+  --color-accent-foreground: oklch(0.985 0 0);
   --color-destructive: oklch(0.704 0.191 22.216);
+  --color-destructive-foreground: oklch(0.985 0 0);
+  /* Solid, not shadcn's `oklch(1 0 0 / 10%)`: this application draws borders
+     over `muted` fills as often as over the page, and a translucent one
+     changes weight with whatever happens to be behind it. */
+  --color-border: oklch(0.371 0 0);
+  --color-input: oklch(0.371 0 0);
+  --color-ring: oklch(0.556 0 0);
+  --color-warning: oklch(82.8% 0.189 84.429);
+  --color-warning-foreground: oklch(0.205 0 0);
+  --color-info: oklch(70.7% 0.165 254.624);
+  --color-success: oklch(76.5% 0.177 163.223);
 }
 
 /*
@@ -45,12 +95,30 @@
   :root:not([data-theme='light']) {
     --color-background: oklch(0.145 0 0);
     --color-foreground: oklch(0.985 0 0);
+    --color-card: oklch(0.205 0 0);
+    --color-card-foreground: oklch(0.985 0 0);
+    --color-popover: oklch(0.205 0 0);
+    --color-popover-foreground: oklch(0.985 0 0);
     --color-primary: oklch(0.922 0 0);
     --color-primary-foreground: oklch(0.205 0 0);
+    --color-secondary: oklch(0.269 0 0);
+    --color-secondary-foreground: oklch(0.985 0 0);
     --color-muted: oklch(0.269 0 0);
     --color-muted-foreground: oklch(0.708 0 0);
-    --color-border: oklch(0.371 0 0);
+    --color-accent: oklch(0.269 0 0);
+    --color-accent-foreground: oklch(0.985 0 0);
     --color-destructive: oklch(0.704 0.191 22.216);
+    --color-destructive-foreground: oklch(0.985 0 0);
+    /* Solid, not shadcn's `oklch(1 0 0 / 10%)`: this application draws borders
+       over `muted` fills as often as over the page, and a translucent one
+       changes weight with whatever happens to be behind it. */
+    --color-border: oklch(0.371 0 0);
+    --color-input: oklch(0.371 0 0);
+    --color-ring: oklch(0.556 0 0);
+    --color-warning: oklch(82.8% 0.189 84.429);
+    --color-warning-foreground: oklch(0.205 0 0);
+    --color-info: oklch(70.7% 0.165 254.624);
+    --color-success: oklch(76.5% 0.177 163.223);
   }
 }
 

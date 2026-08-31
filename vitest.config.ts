@@ -1,4 +1,8 @@
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
+
+const here = dirname(fileURLToPath(import.meta.url))
 
 const HARDWARE_GLOB = '**/*.hardware.test.ts'
 
@@ -24,7 +28,13 @@ export default defineConfig({
         // entry bundles a copy of its own — rendering that one under React 19
         // fails with "a React Element from an older version of React", a fault
         // that exists only in the test.
-        resolve: { conditions: ['browser', 'import', 'module', 'default'] },
+        resolve: {
+          conditions: ['browser', 'import', 'module', 'default'],
+          // The same `@` alias vite.config.ts and tsconfig give the app. A
+          // component added by `shadcn add` imports that way, and without this
+          // it would build and typecheck and then fail only under test.
+          alias: { '@': resolve(here, 'packages/web/src') },
+        },
         test: {
           name: 'web',
           // Components need a DOM. Kept as its own project so the logic suite

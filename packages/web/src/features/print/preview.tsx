@@ -182,7 +182,7 @@ function RowPreview({ ordinal, body }: { ordinal: number; body: string | null })
       <figcaption className="flex items-center gap-1 text-[11px] text-muted-foreground">
         <span>{label}</span>
         {/* Said per row: which row overflows is the whole reason to be here. */}
-        {clipped && <span className="text-amber-600">{copy.preview.rowClipped}</span>}
+        {clipped && <span className="text-warning">{copy.preview.rowClipped}</span>}
       </figcaption>
     </figure>
   )
