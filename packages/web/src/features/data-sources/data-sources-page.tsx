@@ -16,6 +16,7 @@ import { LinkGoogleDialog } from './link-google-dialog.tsx'
 import { RefreshButton } from './refresh-button.tsx'
 import { spreadsheetUrl } from './sheet-url.ts'
 import { PoolsPanel } from '../sequence-pools/pools-panel.tsx'
+import { Skeleton } from '../../components/ui/skeleton.tsx'
 import { useDataSources,
   useGoogleStatus,
   useUnlinkDataSource, useDeleteDataSource, useRenameDataSource, type DataSource } from './hooks.ts'
@@ -102,6 +103,17 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
       )}
 
       <LinkGoogleDialog open={linking} onOpenChange={setLinking} />
+
+      {/* Same rule as the home page: the empty state waits until the answer is
+          in. Here it already did — this renders nothing at all meanwhile, which
+          is a blank where a list is about to be. */}
+      {sources.isPending && (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }, (_unused, index) => (
+            <Skeleton key={index} className="h-14" />
+          ))}
+        </div>
+      )}
 
       {sources.data !== undefined && sources.data.length === 0 && (
         <Card>

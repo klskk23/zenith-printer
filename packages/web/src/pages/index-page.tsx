@@ -17,6 +17,7 @@ import { Button } from '../components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx'
 import { Alert } from '../components/ui/alert.tsx'
 import { usePrinters } from '../features/printers/hooks.ts'
+import { Skeleton } from '../components/ui/skeleton.tsx'
 import { useJobs, type PrintJob } from '../features/jobs/hooks.ts'
 import { useTemplates, type Template } from '../features/templates/hooks.ts'
 import { useWorkspace } from '../app/workspace.tsx'
@@ -140,6 +141,17 @@ export function IndexPage(): React.JSX.Element {
   const recentTemplates = (templates.data ?? []).slice(0, RECENT_TEMPLATES)
   const recentJobs = (jobs.data ?? []).slice(0, RECENT_JOBS)
 
+  /**
+   * "Not here" and "not here *yet*" are different answers.
+   *
+   * `data ?? []` makes them the same length, and the empty state tests length —
+   * so an unanswered query announced that nothing had been saved and nothing
+   * had been printed, on every single visit, until the data landed.
+   */
+  const loadingTemplates = templates.isPending
+  const loadingJobs = jobs.isPending
+  const loadingPrinters = printers.isPending
+
   return (
     <div className="space-y-6">
       {/* A paused queue is the first thing worth knowing on this page. */}
@@ -152,7 +164,12 @@ export function IndexPage(): React.JSX.Element {
             {copy.index.managePrinters}
           </Button>
         </div>
-        {printers.data?.length === 0 ? (
+        {loadingPrinters ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </div>
+        ) : printers.data?.length === 0 ? (
           <Alert>{copy.index.noPrinters}</Alert>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
@@ -175,7 +192,13 @@ export function IndexPage(): React.JSX.Element {
           floor. A lower floor here because this list sits inside a column of
           other sections rather than filling the page.
         */}
-        {recentTemplates.length === 0 ? (
+        {loadingTemplates ? (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
+            {Array.from({ length: RECENT_TEMPLATES }, (_unused, index) => (
+              <Skeleton key={index} className="h-28" />
+            ))}
+          </div>
+        ) : recentTemplates.length === 0 ? (
           <Alert>{copy.index.noTemplates}</Alert>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
@@ -193,7 +216,13 @@ export function IndexPage(): React.JSX.Element {
             {copy.index.allHistory}
           </Button>
         </div>
-        {recentJobs.length === 0 ? (
+        {loadingJobs ? (
+          <div className="space-y-1 rounded-md border border-border p-3">
+            {Array.from({ length: 3 }, (_unused, index) => (
+              <Skeleton key={index} className="h-6" />
+            ))}
+          </div>
+        ) : recentJobs.length === 0 ? (
           <Alert>{copy.index.noRecentJobs}</Alert>
         ) : (
           <ul className="divide-y divide-border rounded-md border border-border px-3">
