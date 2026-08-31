@@ -10,6 +10,7 @@
  * promising something there is no such thing as here.
  */
 import { useState } from 'react'
+import { copy } from '../i18n/index.ts'
 import { useDataSourceRows, useDataSources } from '../features/data-sources/hooks.ts'
 import { choiceColumn } from '../features/data-sources/columns.tsx'
 import {
@@ -18,6 +19,79 @@ import {
   RowBrowser,
   type RowOrder,
 } from '../features/data-sources/row-browser.tsx'
+
+export interface PreviewValuesProps {
+  /** Zero rows means no table, or an empty one: nothing to choose between. */
+  rowCount: number
+  dataSourceId: string | null
+  ordinal: number
+  onChange: (ordinal: number) => void
+  /** The chosen row's cells. */
+  values: Readonly<Record<string, string>>
+  /** The bound table's column names, in table order. */
+  columns: readonly string[]
+}
+
+/**
+ * The whole 临时值 block: which row, and what that row says.
+ *
+ * Below the data source rather than above the variables, which is where it
+ * started. A ten-row table with its own pager is the tallest thing in this
+ * column, and everything under it — including "add a constant" and "new
+ * sequence pool" — was a screen of scrolling away. A control you have to go
+ * looking for reads as one that is not there.
+ */
+export function PreviewValues({
+  rowCount,
+  dataSourceId,
+  ordinal,
+  onChange,
+  values,
+  columns,
+}: PreviewValuesProps): React.JSX.Element | null {
+  if (rowCount < 1 || dataSourceId === null) {
+    return null
+  }
+  return (
+    <section className="space-y-2 rounded-md border border-dashed border-border p-2" data-preview-row>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-2xs font-medium">{copy.variables.tempHeading}</span>
+        <span className="text-2xs text-muted-foreground">
+          {copy.variables.tempRowInForce(ordinal, rowCount)}
+        </span>
+      </div>
+
+      <PreviewRowPicker dataSourceId={dataSourceId} ordinal={ordinal} onChange={onChange} />
+
+      {/*
+        The chosen row's values, spelled out.
+        The table above is listed newest-first and paged, so the row in force is
+        often not on the page being looked at — and "what is the canvas showing
+        right now" should not require finding it.
+      */}
+      {columns.length > 0 && (
+        <dl className="space-y-0.5 text-2xs">
+          {columns.map((column) => {
+            const value = values[column] ?? ''
+            return (
+              <div key={column} className="flex gap-2">
+                <dt className="shrink-0 text-muted-foreground">{column}</dt>
+                {/* An empty cell is stated, not left blank: "row 87 has no name"
+                    is the case worth stepping through the table to find, and a
+                    blank line hides it. */}
+                <dd className={value === '' ? 'truncate text-muted-foreground' : 'truncate'}>
+                  {value === '' ? copy.variables.tempEmptyCell : value}
+                </dd>
+              </div>
+            )
+          })}
+        </dl>
+      )}
+
+      <p className="text-2xs text-muted-foreground">{copy.variables.tempHint}</p>
+    </section>
+  )
+}
 
 export interface PreviewRowPickerProps {
   dataSourceId: string

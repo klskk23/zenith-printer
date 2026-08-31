@@ -220,8 +220,10 @@ describe('the row the canvas uses', () => {
     openDesign()
     await bindAndReference()
     await pickRow(2)
-    const panel = document.querySelector('[data-variables-panel]')!
-    await vi.waitFor(() => expect(panel.textContent).toContain('BBB-2'))
+    // Its own section now, below the data source — the variables panel above it
+    // is for what the design declares.
+    const section = document.querySelector('[data-preview-row]')!
+    await vi.waitFor(() => expect(section.textContent).toContain('BBB-2'))
   })
 })
 
@@ -322,5 +324,48 @@ describe('the boundary with printing', () => {
 
     await vi.waitFor(() => expect(previews.length).toBeGreaterThan(0))
     expect(previews[0]).toMatchObject({ dataSourceId: 'ds-1' })
+  })
+})
+
+describe('what comes first in the panel', () => {
+  /**
+   * The design's own variables, above the table.
+   *
+   * They used to sit underneath the whole 临时值 block — the column chips, the
+   * order toggle, ten rows of data, its pager, and the chosen row's values
+   * spelled out. Reaching "add a constant" meant scrolling a screen past a
+   * table of somebody's stock list, and a control you have to go looking for
+   * reads as one that is not there.
+   *
+   * Order in the document, not pixels: happy-dom lays nothing out, but "before"
+   * is exactly what this is about and the DOM knows it.
+   */
+  const orderOf = (...nodes: Element[]): boolean =>
+    nodes.every((node, index) =>
+      index === 0 ||
+      (nodes[index - 1]!.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    )
+
+  it('puts the variables above the data source, and the table below both', async () => {
+    openDesign()
+    await bindAndReference()
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-preview-row-picker]')).not.toBeNull(),
+    )
+
+    expect(
+      orderOf(
+        screen.getByRole('button', { name: '加常量' }),
+        selectTrigger('数据源'),
+        document.querySelector('[data-preview-row-picker]')!,
+      ),
+    ).toBe(true)
+  })
+
+  it('keeps them visible with no table bound at all', () => {
+    openDesign()
+    openVariablesTab()
+    expect(screen.getByRole('button', { name: '加常量' })).toBeDefined()
+    expect(screen.getByRole('button', { name: '新建序号池' })).toBeDefined()
   })
 })

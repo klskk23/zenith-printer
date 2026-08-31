@@ -15,7 +15,6 @@ import { useState } from 'react'
 import type { VariableDefinition } from '@zenith/shared'
 import { Button } from '../components/ui/button.tsx'
 import { Input } from '../components/ui/input.tsx'
-import { PreviewRowPicker } from './preview-row-picker.tsx'
 import { Label } from '../components/ui/label.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 import { copy } from '../i18n/index.ts'
@@ -36,19 +35,6 @@ export interface VariablesPanelProps {
   columns: readonly string[]
   /** Names the content references but nothing defines. */
   unresolved: readonly string[]
-  /**
-   * The row of the bound table the canvas is currently drawn against.
-   *
-   * Zero rows means no table, or an empty one; either way there is nothing to
-   * choose between and the control is not offered.
-   */
-  rowCount: number
-  /** The table itself, so the row can be picked out of it rather than typed. */
-  dataSourceId: string | null
-  previewOrdinal: number
-  onPreviewOrdinalChange: (ordinal: number) => void
-  /** That row's cells, so the number field says what it selected. */
-  previewValues: Readonly<Record<string, string>>
 }
 
 function uniqueName(existing: readonly VariableDefinition[], base: string): string {
@@ -65,11 +51,6 @@ export function VariablesPanel({
   onCreatePool,
   columns,
   unresolved,
-  rowCount,
-  dataSourceId,
-  previewOrdinal,
-  onPreviewOrdinalChange,
-  previewValues,
 }: VariablesPanelProps): React.JSX.Element {
   // Held locally while typing. Writing straight through remounted the row on
   // every keystroke, which took the focus with it — one character per click.
@@ -97,59 +78,6 @@ export function VariablesPanel({
 
   return (
     <div className="space-y-3" data-variables-panel>
-      {/*
-        Which row of the bound table the canvas stands in for.
-        Above the variables rather than below, because it explains what is
-        already on screen: `${列名}` has no value while a design is being
-        written, and the canvas has been substituting row one since it could
-        substitute anything. Row one is still the default — the point is only
-        that it is no longer the only one available, since the layout question
-        is usually about the longest name or the empty cell, not the first row.
-      */}
-      {rowCount > 0 && dataSourceId !== null && (
-        <section className="space-y-2 rounded-md border border-dashed border-border p-2" data-preview-row>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-2xs font-medium">{copy.variables.tempHeading}</span>
-            <span className="text-2xs text-muted-foreground">
-              {copy.variables.tempRowInForce(previewOrdinal, rowCount)}
-            </span>
-          </div>
-
-          <PreviewRowPicker
-            dataSourceId={dataSourceId}
-            ordinal={previewOrdinal}
-            onChange={onPreviewOrdinalChange}
-          />
-
-          {/*
-            The chosen row's values, spelled out.
-            The table above is listed newest-first and paged, so the row in
-            force is often not on the page being looked at — and "what is the
-            canvas showing right now" should not require finding it.
-          */}
-          {columns.length > 0 && (
-            <dl className="space-y-0.5 text-2xs">
-              {columns.map((column) => {
-                const value = previewValues[column] ?? ''
-                return (
-                  <div key={column} className="flex gap-2">
-                    <dt className="shrink-0 text-muted-foreground">{column}</dt>
-                    {/* An empty cell is stated, not left blank: "row 87 has no
-                        name" is the case worth stepping through the table to
-                        find, and a blank line hides it. */}
-                    <dd className={value === '' ? 'truncate text-muted-foreground' : 'truncate'}>
-                      {value === '' ? copy.variables.tempEmptyCell : value}
-                    </dd>
-                  </div>
-                )
-              })}
-            </dl>
-          )}
-
-          <p className="text-2xs text-muted-foreground">{copy.variables.tempHint}</p>
-        </section>
-      )}
-
       {variables.length === 0 && (
         <p className="text-2xs text-muted-foreground">{copy.variables.empty}</p>
       )}
@@ -224,7 +152,9 @@ export function VariablesPanel({
         )
       })}
 
-      <div className="flex gap-2">
+      {/* Wraps: three buttons do not fit this column at its narrowest, and the
+          last of them was running off the edge. */}
+      <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => add('constant')}>
           {copy.variables.addConstant}
         </Button>

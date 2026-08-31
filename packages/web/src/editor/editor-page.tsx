@@ -45,6 +45,7 @@ import { imageFileFrom, naturalSizeOf, useUploadImage } from '../features/images
 import { canRedo, canUndo, commit, initUndo, redo, undo } from './undo.ts'
 import { Inspector } from './inspector.tsx'
 import { VariablesPanel } from './variables-panel.tsx'
+import { PreviewValues } from './preview-row-picker.tsx'
 import { DataSourceBinding } from './data-source-binding.tsx'
 import { useDataSourceRows, useDataSources } from '../features/data-sources/hooks.ts'
 import { useSequencePools } from '../features/sequence-pools/hooks.ts'
@@ -835,6 +836,23 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                     />
                   </TabsContent>
                   <TabsContent value="variables" className="mt-0 space-y-3">
+                    {/*
+                      The design's own variables first.
+
+                      They were last, under a data-source panel and a ten-row
+                      table with its own pager — so "add a constant" sat a
+                      screen of scrolling below somebody else's stock list. What
+                      a design *declares* is the smaller, more permanent thing;
+                      the table is reference material for looking at it.
+                    */}
+                    <VariablesPanel
+                      variables={variables}
+                      onChange={setVariables}
+                      pools={pools}
+                      onCreatePool={() => setPanel('variables')}
+                      columns={columns}
+                      unresolved={preview.unresolved}
+                    />
                     <DataSourceBinding
                       dataSourceId={dataSourceId}
                       onChange={setDataSourceId}
@@ -850,18 +868,13 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
                           : undefined
                       }
                     />
-                    <VariablesPanel
-                      variables={variables}
-                      onChange={setVariables}
-                      pools={pools}
-                      onCreatePool={() => setPanel('variables')}
-                      columns={columns}
-                      unresolved={preview.unresolved}
+                    <PreviewValues
                       rowCount={rowCount}
                       dataSourceId={dataSourceId}
-                      previewOrdinal={shownOrdinal}
-                      onPreviewOrdinalChange={setPreviewOrdinal}
-                      previewValues={previewRow}
+                      ordinal={shownOrdinal}
+                      onChange={setPreviewOrdinal}
+                      values={previewRow}
+                      columns={columns}
                     />
                   </TabsContent>
                 </CardContent>
