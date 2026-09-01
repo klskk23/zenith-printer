@@ -17,7 +17,7 @@ import { ApiRequestError } from '../../api/client.ts'
 import { copy } from '../../i18n/index.ts'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
-import { useRefreshDataSource, type DataSource, type RefreshOutcome } from './hooks.ts'
+import { isFetched, useRefreshDataSource, type DataSource, type RefreshOutcome } from './hooks.ts'
 import { ColumnChangeDialog } from './column-change-dialog.tsx'
 
 export interface RefreshButtonProps {
@@ -44,7 +44,9 @@ export function RefreshButton({
   const [pendingChange, setPendingChange] =
     useState<Extract<RefreshOutcome, { outcome: 'needsConfirmation' }> | null>(null)
 
-  if (source.sourceKind !== 'google-sheets') {
+  // Any source that reads from elsewhere. A table maintained here has nothing
+  // to refresh *from* — the button would be a promise with nothing behind it.
+  if (!isFetched(source)) {
     return null
   }
 

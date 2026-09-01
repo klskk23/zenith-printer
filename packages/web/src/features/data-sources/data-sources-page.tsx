@@ -13,11 +13,13 @@ import { Input } from '../../components/ui/input.tsx'
 import { copy } from '../../i18n/index.ts'
 import { UploadDialog } from './upload-dialog.tsx'
 import { LinkGoogleDialog } from './link-google-dialog.tsx'
+import { ConnectHttpDialog } from './connect-http-dialog.tsx'
 import { RefreshButton } from './refresh-button.tsx'
+import { FreshnessLine } from './freshness-line.tsx'
 import { spreadsheetUrl } from './sheet-url.ts'
 import { PoolsPanel } from '../sequence-pools/pools-panel.tsx'
 import { Skeleton } from '../../components/ui/skeleton.tsx'
-import { useDataSources,
+import { isFetched, useDataSources,
   useGoogleStatus,
   useUnlinkDataSource, useDeleteDataSource, useRenameDataSource, type DataSource } from './hooks.ts'
 
@@ -53,11 +55,15 @@ function OpenInGoogle({ source }: { source: DataSource }): React.JSX.Element | n
 }
 
 export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Element {
+  // One instant for the whole render, so two rows cannot report ages a
+  // millisecond apart and disagree about which of them is stale.
+  const now = new Date()
   const sources = useDataSources()
   const rename = useRenameDataSource()
   const remove = useDeleteDataSource()
 
   const [uploading, setUploading] = useState(false)
+  const [connecting, setConnecting] = useState(false)
   const [linking, setLinking] = useState(false)
   const google = useGoogleStatus()
   const unlink = useUnlinkDataSource()
@@ -84,6 +90,11 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
           >
             {copy.dataSources.linkGoogle}
           </Button>
+          {/* No configuration to check first, unlike Google: an address and a
+              header are all this needs, and both are typed into the form. */}
+          <Button size="sm" variant="outline" onClick={() => setConnecting(true)}>
+            {copy.dataSources.addHttp}
+          </Button>
           <Button size="sm" onClick={() => setUploading(true)}>
             {copy.dataSources.upload}
           </Button>
@@ -103,6 +114,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
       )}
 
       <LinkGoogleDialog open={linking} onOpenChange={setLinking} />
+      <ConnectHttpDialog open={connecting} onOpenChange={setConnecting} />
 
       {/* Same rule as the home page: the empty state waits until the answer is
           in. Here it already did — this renders nothing at all meanwhile, which
@@ -159,18 +171,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
             {/* Where it came from and how fresh it is. Staleness is invisible
                 unless it is written down, and printing yesterday's rows is not
                 something anybody notices until the labels are in hand. */}
-            {source.sourceKind === 'google-sheets' && (
-              <p className="text-2xs text-muted-foreground" data-source-origin>
-                {copy.dataSources.fromGoogle(
-                  source.spreadsheetTitle ?? '',
-                  source.worksheetTitle ?? '',
-                )}
-                {' · '}
-                {source.lastRefreshedAt === undefined
-                  ? copy.dataSources.neverRefreshed
-                  : copy.dataSources.lastRefreshed(new Date(source.lastRefreshedAt).toLocaleString())}
-              </p>
-            )}
+            <FreshnessLine source={source} now={now} />
             <div className="flex flex-wrap gap-2">
               {/* A linked table opens into a grid nothing can be typed into,
                   so calling this "edit" promised something the next screen
@@ -178,9 +179,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
                   The button still goes to the same place; it just says what
                   will be possible when it gets there. */}
               <Button variant="outline" size="sm" onClick={() => onOpen?.(source.id)}>
-                {source.sourceKind === 'google-sheets'
-                  ? copy.dataSources.view
-                  : copy.dataSources.open}
+                {isFetched(source) ? copy.dataSources.view : copy.dataSources.open}
               </Button>
               <RefreshButton source={source} />
               <OpenInGoogle source={source} />
@@ -201,7 +200,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
                   {copy.dataSources.replace}
                 </Button>
               )}
-              {source.sourceKind === 'google-sheets' && (
+              {isFetched(source) && (
                 <ConfirmButton
                   variant="ghost"
                   size="sm"

@@ -11,7 +11,7 @@
  * *selection* is not: TanStack only knows the rows it has been handed, and
  * paging is server-side, so its own select-all would mean "these ten".
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
@@ -40,6 +40,15 @@ export interface RowSelectionPanelProps {
   selection: Selection
   onChange: (selection: Selection) => void
   copies: number
+  /**
+   * A row's key, where the table has a key column.
+   *
+   * Supplied from above because the dialog accumulates it across pages — this
+   * panel only ever holds the ten rows it is showing.
+   */
+  keyOf?: (ordinal: number) => string | undefined
+  /** Rows as they arrive, so the dialog can build that lookup. */
+  onRowsLoaded?: (rows: readonly { ordinal: number; values: Record<string, string> }[]) => void
 }
 
 export function RowSelectionPanel({
@@ -47,6 +56,8 @@ export function RowSelectionPanel({
   selection,
   onChange,
   copies,
+  keyOf,
+  onRowsLoaded,
 }: RowSelectionPanelProps): React.JSX.Element {
   const sources = useDataSources()
   const [page, setPage] = useState(1)
@@ -73,6 +84,14 @@ export function RowSelectionPanel({
   const data = rows.data?.rows ?? []
   const pageOrdinals = useMemo(() => data.map((row) => row.ordinal), [data])
 
+  // Reported upward as they land. The dialog needs a key for every row that
+  // was ever ticked, and ticking happens on a row that is on screen.
+  useEffect(() => {
+    if (data.length > 0) {
+      onRowsLoaded?.(data)
+    }
+  }, [data, onRowsLoaded])
+
   return (
     <div className="space-y-2" data-row-selection>
       <div className="flex items-center justify-between gap-2">
@@ -93,10 +112,10 @@ export function RowSelectionPanel({
         order={order}
         onOrderChange={setOrder}
         chooseColumn={selectionColumn({
-          isSelected: (ordinal) => isSelected(selection, ordinal),
-          onToggle: (ordinal) => onChange(toggle(selection, ordinal, allOrdinals)),
+          isSelected: (ordinal) => isSelected(selection, ordinal, keyOf),
+          onToggle: (ordinal) => onChange(toggle(selection, ordinal, allOrdinals, keyOf)),
         })}
-        isChosen={(ordinal) => isSelected(selection, ordinal)}
+        isChosen={(ordinal) => isSelected(selection, ordinal, keyOf)}
         controls={
           <>
             <Button variant="outline" size="sm" onClick={() => onChange({ kind: 'all' })}>
@@ -110,10 +129,10 @@ export function RowSelectionPanel({
               variant="outline"
               size="sm"
               disabled={pageOrdinals.length === 0}
-              onClick={() => onChange(togglePage(selection, pageOrdinals, allOrdinals))}
+              onClick={() => onChange(togglePage(selection, pageOrdinals, allOrdinals, keyOf))}
               data-select-page
             >
-              {isPageSelected(selection, pageOrdinals)
+              {isPageSelected(selection, pageOrdinals, keyOf)
                 ? copy.rowSelection.pageDeselect
                 : copy.rowSelection.pageSelect}
             </Button>

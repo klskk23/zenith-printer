@@ -11,7 +11,8 @@ import { Label } from '../components/ui/label.tsx'
 import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 import { Alert } from '../components/ui/alert.tsx'
 import { copy } from '../i18n/index.ts'
-import { useDataSources } from '../features/data-sources/hooks.ts'
+import { FreshnessLine } from '../features/data-sources/freshness-line.tsx'
+import { isFetched, useDataSources } from '../features/data-sources/hooks.ts'
 import { RefreshButton } from '../features/data-sources/refresh-button.tsx'
 import type { BindingIssue } from '../features/templates/hooks.ts'
 
@@ -74,14 +75,12 @@ export function DataSourceBinding({
         by which point they have probably typed the name from memory instead,
         which is a reference that resolves to nothing.
       */}
-      {bound?.sourceKind === 'google-sheets' && (
-        <div className="space-y-1">
+      {/* Any table that reads from elsewhere, not only a spreadsheet: the
+          button and the age mean the same thing for both. */}
+      {bound !== undefined && isFetched(bound) && (
+        <div className="space-y-1" data-binding-freshness>
           <RefreshButton source={bound} />
-          <p className="text-2xs text-muted-foreground" data-binding-freshness>
-            {bound.lastRefreshedAt === undefined
-              ? copy.dataSources.neverRefreshed
-              : copy.dataSources.lastRefreshed(new Date(bound.lastRefreshedAt).toLocaleString())}
-          </p>
+          <FreshnessLine source={bound} now={new Date()} />
         </div>
       )}
 

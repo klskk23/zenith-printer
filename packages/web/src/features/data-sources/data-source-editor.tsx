@@ -52,7 +52,7 @@ import {
   toGridRows,
   type GridRow,
 } from './grid-operations.ts'
-import { MAX_ROWS, useDataSourceRows, useDataSources, usePatchRows } from './hooks.ts'
+import { isFetched, MAX_ROWS, useDataSourceRows, useDataSources, usePatchRows } from './hooks.ts'
 import { useWorkspace } from '../../app/workspace.tsx'
 
 /** Room for the surrounding chrome; the grid takes the rest of the window. */
@@ -82,7 +82,10 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
   }, [])
 
   const source = sources.data?.find((candidate) => candidate.id === dataSourceId)
-  const readOnly = source?.sourceKind === 'google-sheets'
+  // Read-only for anything fetched from elsewhere: an edit here survives
+  // exactly until the next refresh replaces it, and then vanishes with nothing
+  // said.
+  const readOnly = source !== undefined && isFetched(source)
   const columnNames = useMemo(() => source?.columns ?? [], [source?.columns])
 
   const columns = useMemo(

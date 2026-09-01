@@ -12,15 +12,41 @@ export interface DataSource {
    * A linked source is read-only locally: editing it here and having the next
    * refresh wipe that edit is the failure this distinction exists to prevent.
    */
-  sourceKind: 'local' | 'google-sheets'
+  sourceKind: 'local' | 'google-sheets' | 'http'
   /** Present only when linked. Flattened onto the same object by the server. */
   spreadsheetId?: string
   spreadsheetTitle?: string
   worksheetId?: number
   worksheetTitle?: string
-  lastRefreshedAt?: string
+  /**
+   * Present only for a source that reads from an address.
+   *
+   * Header **names** and no values: the server never returns those, because a
+   * service with no authentication of its own must not hand back the means of
+   * authenticating somewhere else.
+   */
+  http?: { url: string; headerNames: string[] }
+  /** Which column names a row. Null where identity is still position. */
+  keyColumn?: string | null
+  /** 0 means "only when asked", which is what every source did before. */
+  refreshIntervalSeconds?: number
+  refreshBeforePrint?: boolean
+  /** Null for a table nobody fetches, and for one nobody has fetched yet. */
+  lastRefreshedAt?: string | null
   createdAt: string
   updatedAt: string
+}
+
+/**
+ * Whether a table's rows come from somewhere else.
+ *
+ * The kinds are named rather than defined as "not local", so that a source
+ * arriving without a kind — an older fixture, a response from a version that
+ * did not send one — reads as an ordinary table rather than as a read-only one
+ * nobody can edit and nothing can refresh.
+ */
+export function isFetched(source: Pick<DataSource, 'sourceKind'>): boolean {
+  return source.sourceKind === 'google-sheets' || source.sourceKind === 'http'
 }
 
 export interface DataSourceRow {
@@ -262,4 +288,70 @@ export function useUnlinkDataSource() {
       request<DataSource>(`/data-sources/${id}/unlink`, { method: 'POST', body: { confirmed: true } }),
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })
+}
+
+/**
+ * Connect a table that reads from an address.
+ *
+ * No rows are fetched here — the server creates it empty and the first refresh
+ * fills it — so this returns quickly even when the other end is down, and a
+ * producer that is having a bad afternoon does not stop the table being made.
+ */
+export function useCreateHttpSource() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      name: string
+      url: string
+      keyColumn: string
+      headers?: Record<string, string>
+      refreshIntervalSeconds?: number
+      refreshBeforePrint?: boolean
+    }) => request<DataSource>('/data-sources/http', { method: 'POST', body: input }),
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+/**
+ * Change how an existing one reads.
+ *
+ * `headers` left out means "leave the credential alone" — it cannot be read
+ * back, so requiring it to be resent would be requiring it to be known.
+ */
+export function usePatchHttpSource() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...patch }: {
+      id: string
+      url?: string
+      keyColumn?: string
+      headers?: Record<string, string>
+      refreshIntervalSeconds?: number
+      refreshBeforePrint?: boolean
+    }) => request<DataSource>(`/data-sources/${id}/http`, { method: 'PATCH', body: patch }),
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+/**
+ * Header lines as a person types them, one `Name: value` per line.
+ *
+ * Split on the **first** colon only: a bearer token or a URL in a header value
+ * contains colons of its own, and splitting on all of them would quietly
+ * truncate the credential — which fails later, as a 401 nobody can explain.
+ */
+export function parseHeaderLines(text: string): Record<string, string> {
+  const headers: Record<string, string> = {}
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed.length === 0) {
+      continue
+    }
+    const at = trimmed.indexOf(':')
+    if (at <= 0) {
+      continue
+    }
+    headers[trimmed.slice(0, at).trim()] = trimmed.slice(at + 1).trim()
+  }
+  return headers
 }

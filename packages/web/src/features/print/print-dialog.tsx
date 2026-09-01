@@ -38,7 +38,7 @@ import {
   toRowSelection,
   type Selection,
 } from './selection.ts'
-import { useDataSources } from '../data-sources/hooks.ts'
+import { isFetched, useDataSources } from '../data-sources/hooks.ts'
 import { randomId } from '../../lib/random-id.ts'
 
 export interface PrintDialogProps {
@@ -86,6 +86,14 @@ export function PrintDialog({
 }: PrintDialogProps): React.JSX.Element {
   const [copies, setCopies] = useState(1)
   const [selection, setSelection] = useState<Selection>(EMPTY)
+  /**
+   * Every row key this dialog has seen, by position.
+   *
+   * Accumulated across pages rather than held by the selection panel, which
+   * only ever has the ten rows it is showing. Ticking happens on a visible row,
+   * so a key is always known by the time it is needed.
+   */
+  const [keyByOrdinal, setKeyByOrdinal] = useState<ReadonlyMap<number, string>>(new Map())
   const [selectionCleared, setSelectionCleared] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [warnings, setWarnings] = useState<OverflowWarning[]>([])
@@ -108,7 +116,15 @@ export function PrintDialog({
   // that collided with the selection panel's.
   const boundSource = useDataSources().data?.find((source) => source.id === dataSourceId)
   const rowCount = boundSource?.rowCount ?? 0
-  const linkedSource = boundSource?.sourceKind === 'google-sheets' ? boundSource : undefined
+  const linkedSource = boundSource !== undefined && isFetched(boundSource) ? boundSource : undefined
+  /** The key column, where the bound table has one. */
+  const keyColumn = boundSource?.keyColumn ?? null
+  const keyOf = keyColumn === null ? undefined : (ordinal: number) => keyByOrdinal.get(ordinal)
+  const ordinalByKey = useMemo(
+    () => new Map([...keyByOrdinal].map(([ordinal, key]) => [key, ordinal] as const)),
+    [keyByOrdinal],
+  )
+
   const chosenRows = dataSourceId === null ? 0 : selectedCount(selection, rowCount)
   const labels = dataSourceId === null ? copies : labelTotal(selection, rowCount, copies)
   /**
@@ -124,7 +140,16 @@ export function PrintDialog({
       ? []
       : selection.kind === 'all'
         ? Array.from({ length: rowCount }, (_unused, index) => index + 1)
-        : [...selection.ordinals].sort((a, b) => a - b)
+        : selection.kind === 'keys'
+          ? // Only the ones on a page that has been loaded. A key sitting on a
+            // page nobody has opened cannot be turned into a position, and the
+            // preview showing fewer labels than will print is better than it
+            // showing the wrong ones.
+            selection.keys
+              .map((key) => ordinalByKey.get(key))
+              .filter((ordinal): ordinal is number => ordinal !== undefined)
+              .sort((a, b) => a - b)
+          : [...selection.ordinals].sort((a, b) => a - b)
 
   const blocked =
     printer.capabilities === null
@@ -257,6 +282,13 @@ export function PrintDialog({
                 <RefreshButton
                   source={linkedSource}
                   onApplied={() => {
+                    // A selection made by key survives: the keys still name the
+                    // same rows however the table moved, which is the whole
+                    // reason a key column is required for such a source. Only
+                    // a selection made by position has to go.
+                    if (selection.kind === 'keys') {
+                      return
+                    }
                     setSelection(EMPTY)
                     setSelectionCleared(true)
                   }}
@@ -275,6 +307,23 @@ export function PrintDialog({
                 selection={selection}
                 onChange={setSelection}
                 copies={copies}
+                keyOf={keyOf}
+                onRowsLoaded={(rows) => {
+                  if (keyColumn === null) {
+                    return
+                  }
+                  setKeyByOrdinal((current) => {
+                    const next = new Map(current)
+                    for (const row of rows) {
+                      const key = row.values[keyColumn]
+                      if (key !== undefined) {
+                        next.set(row.ordinal, key)
+                      }
+                    }
+                    // Same map when nothing was added, so this cannot loop.
+                    return next.size === current.size ? current : next
+                  })
+                }}
               />
             )}
 

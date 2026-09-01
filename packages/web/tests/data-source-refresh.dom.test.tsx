@@ -198,7 +198,14 @@ describe('refreshing from the design editor', () => {
       ),
     )
     await screen.findByRole('button', { name: '刷新' })
-    expect(document.querySelector('[data-binding-freshness]')?.textContent).toMatch(/上次刷新/)
+    // An age, not a timestamp. A date beside a table is furniture — a table
+    // read ten days ago used to look exactly like one read this morning.
+    // Asserted as a shape rather than a number, because the number is measured
+    // against the real clock and would be a different one tomorrow; what the
+    // arithmetic does is pinned deterministically in freshness.test.ts.
+    expect(document.querySelector('[data-binding-freshness]')?.textContent).toMatch(
+      /刚刚刷新|分钟前刷新|小时前刷新|天前刷新|尚未刷新过/,
+    )
   })
 
   it('is not offered for a table maintained here', async () => {

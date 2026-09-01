@@ -46,7 +46,9 @@ describe('ticking rows', () => {
 
   it('sends ordinals in table order however they were ticked', () => {
     const selection = { kind: 'explicit' as const, ordinals: [9, 2, 5] }
-    expect(toRowSelection(selection)).toEqual({ ranges: [], ids: [2, 5, 9] })
+    // `keys` rides along empty: the wire shape carries all three ways of naming
+    // rows, and a table with no key column simply names none.
+    expect(toRowSelection(selection)).toEqual({ ranges: [], ids: [2, 5, 9], keys: [] })
   })
 })
 
@@ -167,5 +169,75 @@ describe('whether the page in view is wholly selected', () => {
 
   it('is false for an empty page, which is not "all of nothing"', () => {
     expect(isPageSelected({ kind: 'all' }, [])).toBe(false)
+  })
+})
+
+/**
+ * Choosing rows in a table that changes underneath.
+ *
+ * For a source that reads from elsewhere the key *is* the selection. Stored as
+ * ordinals it would have to be thrown away after every refresh — an ordinal
+ * that still exists but now names a different row is a wrong batch that looks
+ * entirely right, which is the failure the key column was bought to prevent.
+ */
+describe('selecting by key', () => {
+  // The rows on screen: ordinal 1 is "a", 2 is "b", 3 is "c".
+  const keyOf = (ordinal: number): string | undefined => ['a', 'b', 'c'][ordinal - 1]
+  const ordinals = [1, 2, 3]
+
+  it('ticks a row by its key rather than its position', () => {
+    const next = toggle(EMPTY, 2, ordinals, keyOf)
+    expect(next).toEqual({ kind: 'keys', keys: ['b'] })
+  })
+
+  it('unticks it again', () => {
+    const on = toggle(EMPTY, 2, ordinals, keyOf)
+    expect(toggle(on, 2, ordinals, keyOf)).toEqual({ kind: 'keys', keys: [] })
+  })
+
+  it('still shows as ticked after the row moves', () => {
+    // The producer inserted above it, so "b" is at 3 now. Under a selection
+    // stored as ordinals this row would have come untucked and ordinal 2 —
+    // somebody else — would show as chosen instead.
+    const chosen: Selection = { kind: 'keys', keys: ['b'] }
+    const moved = (ordinal: number): string | undefined => ['a', 'inserted', 'b'][ordinal - 1]
+
+    expect(isSelected(chosen, 3, moved)).toBe(true)
+    expect(isSelected(chosen, 2, moved)).toBe(false)
+  })
+
+  it('counts what was chosen, not what is on the page', () => {
+    const chosen: Selection = { kind: 'keys', keys: ['a', 'c'] }
+    expect(selectedCount(chosen, 3)).toBe(2)
+  })
+
+  it('ticks and unticks a whole page by key', () => {
+    const all = togglePage(EMPTY, ordinals, ordinals, keyOf)
+    expect(all).toEqual({ kind: 'keys', keys: ['a', 'b', 'c'] })
+    expect(togglePage(all, ordinals, ordinals, keyOf)).toEqual({ kind: 'keys', keys: [] })
+  })
+
+  it('reports the page as chosen only when every row on it is', () => {
+    const some: Selection = { kind: 'keys', keys: ['a'] }
+    expect(isPageSelected(some, ordinals, keyOf)).toBe(false)
+    expect(isPageSelected({ kind: 'keys', keys: ['a', 'b', 'c'] }, ordinals, keyOf)).toBe(true)
+  })
+
+  it('goes on the wire as keys, sorted', () => {
+    const chosen: Selection = { kind: 'keys', keys: ['c', 'a'] }
+    expect(toRowSelection(chosen)).toEqual({ ranges: [], ids: [], keys: ['a', 'c'] })
+  })
+
+  it('leaves selection by position exactly as it was', () => {
+    // Every table anybody maintains by hand, and what this did before.
+    const chosen = toggle(EMPTY, 2, ordinals)
+    expect(chosen).toEqual({ kind: 'explicit', ordinals: [2] })
+    expect(toRowSelection(chosen)).toEqual({ ranges: [], ids: [2], keys: [] })
+  })
+
+  it('leaves "everything" meaning everything', () => {
+    // It has to keep meaning "the table as it stands when this is submitted",
+    // which no list of names or numbers can say.
+    expect(toRowSelection({ kind: 'all' })).toEqual({ all: true })
   })
 })

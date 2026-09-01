@@ -16,24 +16,57 @@ export const MAX_LABELS_PER_JOB = 1000
 export type Selection =
   | { kind: 'all' }
   | { kind: 'explicit'; ordinals: number[] }
+  /**
+   * Rows named by their key column.
+   *
+   * A separate kind rather than keys carried alongside ordinals, because for a
+   * table that refreshes from elsewhere the key *is* the selection: ordinals
+   * move when the producer inserts or deletes, and a selection stored as
+   * ordinals would have to be thrown away after every refresh — which is
+   * exactly what this replaces.
+   */
+  | { kind: 'keys'; keys: string[] }
+
+/** A row's key, for the rows currently on screen. */
+export type KeyLookup = (ordinal: number) => string | undefined
 
 export const EMPTY: Selection = { kind: 'explicit', ordinals: [] }
 
-/** What goes on the wire (see contracts/rest-api.md). */
+/**
+ * What goes on the wire (see contracts/rest-api.md).
+ *
+ * With a key column, the rows are named by key. That is the whole purchase: a
+ * table that refreshes between choosing and submitting moves its rows, and an
+ * ordinal that still exists but now names a different row is a wrong batch that
+ * looks entirely right. A key that is gone is refused, loudly.
+ *
+ * Without one, positions — which is every table anybody maintains by hand, and
+ * exactly what this did before.
+ */
 export function toRowSelection(
   selection: Selection,
-): { all: true } | { ranges: Array<[number, number]>; ids: number[] } {
+): { all: true } | { ranges: Array<[number, number]>; ids: number[]; keys: string[] } {
   if (selection.kind === 'all') {
     return { all: true }
+  }
+  if (selection.kind === 'keys') {
+    return { ranges: [], ids: [], keys: [...selection.keys].sort() }
   }
   // Sent as individual ids rather than compressed into ranges: the server
   // sorts and de-duplicates anyway, and a compression bug here would be a
   // wrong batch that looks right on screen.
-  return { ranges: [], ids: [...selection.ordinals].sort((a, b) => a - b) }
+  return { ranges: [], ids: [...selection.ordinals].sort((a, b) => a - b), keys: [] }
 }
 
-export function isSelected(selection: Selection, ordinal: number): boolean {
-  return selection.kind === 'all' || selection.ordinals.includes(ordinal)
+export function isSelected(selection: Selection, ordinal: number, keyOf?: KeyLookup): boolean {
+  if (selection.kind === 'all') {
+    return true
+  }
+  if (selection.kind === 'keys') {
+    const key = keyOf?.(ordinal)
+    return key !== undefined && selection.keys.includes(key)
+  }
+  return selection.ordinals.includes(ordinal)
 }
 
 /**
@@ -43,9 +76,31 @@ export function isSelected(selection: Selection, ordinal: number): boolean {
  * the whole table as its starting point — otherwise unticking one row would
  * silently clear the rest.
  */
-export function toggle(selection: Selection, ordinal: number, allOrdinals: readonly number[]): Selection {
+export function toggle(
+  selection: Selection,
+  ordinal: number,
+  allOrdinals: readonly number[],
+  keyOf?: KeyLookup,
+): Selection {
+  // A keyed table ticks by key. The row is on screen to be ticked, so its key
+  // is known; there is no case where this has to guess.
+  if (keyOf !== undefined) {
+    const key = keyOf(ordinal)
+    if (key === undefined) {
+      return selection
+    }
+    const current = selection.kind === 'keys' ? selection.keys : []
+    return {
+      kind: 'keys',
+      keys: current.includes(key) ? current.filter((value) => value !== key) : [...current, key],
+    }
+  }
+
   if (selection.kind === 'all') {
     return { kind: 'explicit', ordinals: allOrdinals.filter((value) => value !== ordinal) }
+  }
+  if (selection.kind === 'keys') {
+    return selection
   }
   const has = selection.ordinals.includes(ordinal)
   return {
@@ -71,9 +126,24 @@ export function togglePage(
   selection: Selection,
   pageOrdinals: readonly number[],
   allOrdinals: readonly number[],
+  keyOf?: KeyLookup,
 ): Selection {
+  if (keyOf !== undefined) {
+    const pageKeys = pageOrdinals.map(keyOf).filter((key): key is string => key !== undefined)
+    const chosen = new Set(selection.kind === 'keys' ? selection.keys : [])
+    const wholePage = pageKeys.length > 0 && pageKeys.every((key) => chosen.has(key))
+    for (const key of pageKeys) {
+      if (wholePage) {
+        chosen.delete(key)
+      } else {
+        chosen.add(key)
+      }
+    }
+    return { kind: 'keys', keys: [...chosen] }
+  }
+
   const current =
-    selection.kind === 'all' ? [...allOrdinals] : [...selection.ordinals]
+    selection.kind === 'all' ? [...allOrdinals] : selection.kind === 'keys' ? [] : [...selection.ordinals]
   const chosen = new Set(current)
   const wholePageChosen =
     pageOrdinals.length > 0 && pageOrdinals.every((ordinal) => chosen.has(ordinal))
@@ -95,15 +165,19 @@ export function togglePage(
 export function isPageSelected(
   selection: Selection,
   pageOrdinals: readonly number[],
+  keyOf?: KeyLookup,
 ): boolean {
   return (
-    pageOrdinals.length > 0 && pageOrdinals.every((ordinal) => isSelected(selection, ordinal))
+    pageOrdinals.length > 0 && pageOrdinals.every((ordinal) => isSelected(selection, ordinal, keyOf))
   )
 }
 
 /** How many rows are selected, given the table's size. */
 export function selectedCount(selection: Selection, total: number): number {
-  return selection.kind === 'all' ? total : selection.ordinals.length
+  if (selection.kind === 'all') {
+    return total
+  }
+  return selection.kind === 'keys' ? selection.keys.length : selection.ordinals.length
 }
 
 /**
