@@ -39,8 +39,10 @@ function originText(source: DataSource): string | null {
   if (source.sourceKind === 'google-sheets') {
     return copy.dataSources.fromGoogle(source.spreadsheetTitle ?? '', source.worksheetTitle ?? '')
   }
-  if (source.sourceKind === 'http') {
-    return copy.dataSources.fromAddress(source.http?.url ?? '')
+  if (source.sourceKind === 'nexus') {
+    // The category, not an address: the address is a deployment detail nobody
+    // reading this page chose or can change.
+    return copy.dataSources.fromLedger(source.name)
   }
   return null
 }

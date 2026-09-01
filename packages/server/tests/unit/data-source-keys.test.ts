@@ -26,12 +26,7 @@ const COLUMNS = ['sys_id', 'name']
 const rows = (...ids: string[]) => ids.map((id) => ({ sys_id: id, name: `名字-${id}` }))
 
 function seeded(...ids: string[]): string {
-  const source = repo.createHttp({
-    name: '设备表',
-    columns: COLUMNS,
-    url: 'http://example.invalid/rows',
-    keyColumn: 'sys_id',
-  })
+  const source = repo.createNexus({ name: '设备表', categoryId: 'cat-1' })
   repo.upsertByKey(source.id, { columns: COLUMNS, rows: keyRows(rows(...ids), 'sys_id') })
   return source.id
 }
@@ -39,32 +34,26 @@ function seeded(...ids: string[]): string {
 const keysInOrder = (id: string): string[] =>
   repo.allRows(id).map((row) => String(row.values.sys_id))
 
-describe('a source that reads over http', () => {
+describe('a source backed by the ledger', () => {
   it('starts with no rows and no refresh behind it', () => {
-    // Creating and reading are separate acts: a producer that happens to be
-    // down must not stop the table being made.
-    const source = repo.createHttp({
-      name: '设备表', columns: COLUMNS, url: 'http://example.invalid/rows', keyColumn: 'sys_id',
-    })
-    expect(source).toMatchObject({ sourceKind: 'http', rowCount: 0, lastRefreshedAt: null })
+    // Creating and reading are separate acts: a ledger that happens to be down
+    // must not stop the source being made.
+    const source = repo.createNexus({ name: '设备表', categoryId: 'cat-1' })
+    expect(source).toMatchObject({ sourceKind: 'nexus', rowCount: 0, lastRefreshedAt: null })
   })
 
-  it('never carries its header values out of the repository', () => {
-    // The object the list endpoint returns cannot leak what it does not hold.
-    const source = repo.createHttp({
-      name: '设备表', columns: COLUMNS, url: 'http://x.invalid/r', keyColumn: 'sys_id',
-      headers: { Authorization: 'Bearer sekrit' },
-    })
-    expect(JSON.stringify(source)).not.toContain('sekrit')
-    expect(source.http?.headerNames).toEqual(['Authorization'])
+  it('keeps the category and nothing else about the connection', () => {
+    // No address and no key: what is not held cannot drift from the
+    // environment it came from, and cannot leak from an endpoint that has no
+    // authentication of its own.
+    const source = repo.createNexus({ name: '设备表', categoryId: 'cat-1' })
+    expect(source.nexus).toEqual({ categoryId: 'cat-1' })
+    expect(JSON.stringify(source)).not.toContain('http')
   })
 
-  it('hands the values only to whoever asks for them by name', () => {
-    const source = repo.createHttp({
-      name: '设备表', columns: COLUMNS, url: 'http://x.invalid/r', keyColumn: 'sys_id',
-      headers: { Authorization: 'Bearer sekrit' },
-    })
-    expect(repo.httpHeaders(source.id)).toEqual({ Authorization: 'Bearer sekrit' })
+  it('reports a key column it never stored', () => {
+    const source = repo.createNexus({ name: '设备表', categoryId: 'cat-1' })
+    expect(source.keyColumn).toBe('sys_id')
   })
 })
 
@@ -151,16 +140,14 @@ describe('unlinking', () => {
     const id = seeded('a', 'b')
     repo.unlink(id)
     const after = repo.find(id)!
-    expect(after).toMatchObject({ sourceKind: 'local', http: null, keyColumn: null, refreshBeforePrint: false })
+    expect(after).toMatchObject({ sourceKind: 'local', nexus: null, keyColumn: null, refreshBeforePrint: false })
     expect(after.rowCount).toBe(2)
   })
 
-  it('leaves nothing to send anywhere', () => {
-    const id = repo.createHttp({
-      name: '设备表', columns: COLUMNS, url: 'http://x.invalid/r', keyColumn: 'sys_id',
-      headers: { Authorization: 'Bearer sekrit' },
-    }).id
+  it('leaves nothing to fetch from', () => {
+    // Releasing forgets the category, and with it every way back to the ledger.
+    const id = repo.createNexus({ name: '设备表二', categoryId: 'cat-1' }).id
     repo.unlink(id)
-    expect(repo.httpHeaders(id)).toEqual({})
+    expect(repo.find(id)?.nexus).toBeNull()
   })
 })

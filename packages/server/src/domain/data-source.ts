@@ -46,25 +46,20 @@ export interface DataSourceLink {
 }
 
 /**
- * Where an http source reads from.
+ * Where a ledger-backed source reads from: a category, and nothing else.
  *
- * **Header values are not here, and that is the design.** They carry whatever
- * credential the other end wants, and this object is what `GET
- * /api/data-sources` returns. Redacting on the way out would work until
- * somebody added a second endpoint; a shape that never holds the values cannot
- * leak them from any endpoint. The names travel, so a person can see that an
- * Authorization header is configured without being told what it says.
+ * No address and no credential, because neither is stored — both come from the
+ * environment, the same road the Google key travels. A copy of a deployment
+ * decision drifts from the decision; a shape with nowhere to put one cannot.
  *
- * Same rule as the Google private key living only in the environment: a service
- * with no authentication must not hand back the means of authenticating
- * somewhere else.
+ * It also cannot leak a credential from any endpoint, which matters because
+ * this service has no authentication of its own.
  */
-export interface HttpOrigin {
-  url: string
-  headerNames: string[]
+export interface NexusOrigin {
+  categoryId: string
 }
 
-export type DataSourceKind = 'local' | 'google-sheets' | 'http'
+export type DataSourceKind = 'local' | 'google-sheets' | 'nexus'
 
 export interface DataSource {
   id: string
@@ -75,13 +70,14 @@ export interface DataSource {
   sourceKind: DataSourceKind
   /** Non-null exactly when `sourceKind` is `google-sheets`. */
   link: DataSourceLink | null
-  /** Non-null exactly when `sourceKind` is `http`. */
-  http: HttpOrigin | null
+  /** Non-null exactly when `sourceKind` is `nexus`. */
+  nexus: NexusOrigin | null
   /**
    * Which column names a row, or null where identity is still position.
    *
-   * Required for an http source and meaningless without one: a table that
-   * changes on its own needs a name for a row that survives the change.
+   * **Derived, not stored.** A ledger-backed source is keyed by the ledger's own
+   * device id; every other kind has no identity beyond its order, and inventing
+   * one would be pretending.
    */
   keyColumn: string | null
   /** How stale the rows may get before a page refreshes them. 0 = only on request. */
@@ -134,56 +130,24 @@ export function assertKnownColumns(columns: readonly string[], values: Record<st
 }
 
 /**
- * Configuring a source that reads rows from an address.
+ * Connecting a source to the ledger.
  *
- * `headers` is where a credential goes. It is stored and never returned — see
- * `HttpOrigin` — so this is the only shape in which its values ever appear.
+ * One field. The address, the credential and the key column are all decided
+ * elsewhere — the first two by the deployment, the third by what the ledger
+ * calls its device id — so there is nothing else here for anybody to get wrong.
  *
- * `refreshIntervalSeconds` defaults to 0, which means "only when asked" and is
- * exactly what this product did before there was any alternative. Automatic
- * refreshing is offered because a key column makes it safe, not because
- * staleness became more urgent; it stays a choice.
+ * `name` is optional and defaults to the category's own name: a data source is
+ * labelled for people, and the category already has a label people chose.
  */
-export const httpSourceInputSchema = z.object({
-  name: dataSourceNameSchema,
-  url: z
-    .string()
-    .url()
-    .refine((value) => value.startsWith('http://') || value.startsWith('https://'), {
-      message: 'the address must be http or https',
-    }),
-  headers: z.record(z.string().min(1), z.string()).default({}),
-  /** Which column names a row. Required: see domain/row-upsert.ts. */
-  keyColumn: z.string().trim().min(1),
-  refreshIntervalSeconds: z.number().int().min(0).max(86_400).default(0),
-  refreshBeforePrint: z.boolean().default(false),
+export const nexusSourceInputSchema = z.object({
+  categoryId: z.string().min(1),
+  name: dataSourceNameSchema.optional(),
 })
-export type HttpSourceInput = z.infer<typeof httpSourceInputSchema>
+export type NexusSourceInput = z.infer<typeof nexusSourceInputSchema>
 
-/**
- * Changing how an existing source reads.
- *
- * Written out rather than `httpSourceInputSchema.partial()`, because that
- * schema gives `headers` a default of `{}` — and a default survives
- * `.partial()`. Sending any unrelated field would then arrive carrying an empty
- * header set and **wipe the stored credential**, silently, with the next
- * refresh failing on a 401 nobody could explain.
- *
- * Here every field is genuinely absent when it is not sent, and absent means
- * "leave it alone". The caller cannot read the credential back, so requiring
- * them to resend it would be requiring them to know it.
- */
-export const httpSourcePatchSchema = z.object({
-  url: z
-    .string()
-    .url()
-    .refine((value) => value.startsWith('http://') || value.startsWith('https://'), {
-      message: 'the address must be http or https',
-    })
-    .optional(),
-  headers: z.record(z.string().min(1), z.string()).optional(),
-  keyColumn: z.string().trim().min(1).optional(),
+/** How stale a source's rows may get, and whether a job refreshes first. */
+export const refreshPolicySchema = z.object({
   refreshIntervalSeconds: z.number().int().min(0).max(86_400).optional(),
   refreshBeforePrint: z.boolean().optional(),
 })
-export type HttpSourcePatch = z.infer<typeof httpSourcePatchSchema>
+export type RefreshPolicy = z.infer<typeof refreshPolicySchema>

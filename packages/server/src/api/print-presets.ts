@@ -57,7 +57,15 @@ export async function registerPrintPresetRoutes(app: FastifyInstance): Promise<v
     }
   }
 
-  typed.get('/api/print-presets', async () => ({ printPresets: presets().list() }))
+  /**
+   * The presets, under a `presets` envelope.
+   *
+   * The ledger fills a dropdown straight from this, so the shape is part of the
+   * contract rather than an implementation detail — and every entry carries a
+   * name a person chose. The id has to be stable; it does not have to be
+   * pretty, because nobody reads it.
+   */
+  typed.get('/api/print-presets', async () => ({ presets: presets().list() }))
 
   typed.post(
     '/api/print-presets',
@@ -121,7 +129,17 @@ export async function registerPrintPresetRoutes(app: FastifyInstance): Promise<v
     {
       schema: {
         params: idParams,
-        body: rowEnvelopeSchema,
+        /**
+         * The row envelope, plus an optional copy count.
+         *
+         * `copies` overrides the preset's own for this batch — the caller
+         * sometimes knows something the preset cannot, such as "two labels per
+         * device this time". Absent means the preset decides, which is the
+         * normal case and the reason the preset has the field at all.
+         */
+        body: rowEnvelopeSchema.and(
+          z.object({ copies: z.number().int().min(1).max(100).optional() }),
+        ),
         headers: z.object({ 'idempotency-key': z.string().min(1).optional() }).loose(),
       },
     },
@@ -149,7 +167,8 @@ export async function registerPrintPresetRoutes(app: FastifyInstance): Promise<v
       const content = resolveContent(template, undefined, profile, printer.capabilities)
 
       const { columns, rows } = request.body
-      const labelCount = rows.length * preset.copies
+      const copies = request.body.copies ?? preset.copies
+      const labelCount = rows.length * copies
       if (labelCount > MAX_LABELS_PER_JOB) {
         // Refused, not split. Two jobs from one intention is two things to
         // reconcile, and the caller is better placed to decide how to divide
@@ -183,7 +202,7 @@ export async function registerPrintPresetRoutes(app: FastifyInstance): Promise<v
           profile,
           content,
           selected,
-          copies: preset.copies,
+          copies,
           idempotencyKey:
             request.headers['idempotency-key'] === undefined
               ? undefined

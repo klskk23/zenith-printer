@@ -18,8 +18,9 @@ import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { SequenceAllocator } from '../domain/sequence-allocator.ts'
 import { checkLabel } from '../domain/overflow.ts'
 import { ApiError, HttpStatus } from './errors.ts'
+import { negotiateLocale } from '../i18n/negotiate.ts'
 import { acceptJob } from './job-acceptance.ts'
-import { refreshFromAddress, withRefreshLock } from './data-sources.ts'
+import { refreshFromLedger, withRefreshLock } from './data-sources.ts'
 import { DataSourceRepo } from '../db/repositories/data-source-repo.ts'
 import {
   assertFitsPrinter,
@@ -151,9 +152,15 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
           : new DataSourceRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }).find(
               template.dataSourceId,
             )
-      if (boundSource?.refreshBeforePrint === true && boundSource.sourceKind === 'http') {
+      if (boundSource?.refreshBeforePrint === true && boundSource.sourceKind === 'nexus') {
         await withRefreshLock(boundSource.id, async () => {
-          const outcome = await refreshFromAddress(app, new DataSourceRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }), boundSource, false)
+          const outcome = await refreshFromLedger(
+            app,
+            new DataSourceRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }),
+            boundSource,
+            false,
+            negotiateLocale(String(request.headers['accept-language'] ?? '')),
+          )
           if (outcome.outcome !== 'applied') {
             // A column change wants a person to look at it, not a job to go
             // ahead on whichever half of the table it happens to have.

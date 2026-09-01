@@ -536,6 +536,85 @@ const printPresets = `
   );
 `
 
+/**
+ * The third origin is the asset ledger, and it keeps almost nothing.
+ *
+ * Migration 16 added a generic `http` kind that stored a URL, a header set and
+ * a key column. Every one of those is a copy of a decision made somewhere else:
+ * the address and the credential belong to the deployment — the same place the
+ * Google key comes from — and the key column is a constant. A stored copy
+ * drifts the first time somebody moves the ledger or rotates a key, and the
+ * only symptom is a refresh that quietly started failing.
+ *
+ * So the columns go, and what a source keeps is a category id.
+ *
+ * Any `http` source becomes `local`: its rows stay and are editable again,
+ * which is exactly what releasing one did. There is nothing else honest to do
+ * — the address it used to read from is no longer stored anywhere.
+ *
+ * **The order is the same as migration 16's, for the same reason.**
+ * `data_source_rows` cascades on delete, so rebuilding the parent with the
+ * child still pointing at it fires an implicit DELETE FROM and takes every row
+ * of every table with it. Child aside and dropped first; parent rebuilt with
+ * nothing left pointing at it.
+ */
+const nexusSources = `
+  CREATE TABLE data_source_rows_backup AS SELECT * FROM data_source_rows;
+  DROP TABLE data_source_rows;
+
+  CREATE TABLE data_sources_new (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL UNIQUE,
+    columns    TEXT NOT NULL,
+    row_count  INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    source_kind TEXT NOT NULL DEFAULT 'local'
+      CHECK (source_kind IN ('local', 'google-sheets', 'nexus')),
+    spreadsheet_id    TEXT,
+    spreadsheet_title TEXT,
+    worksheet_id      INTEGER,
+    worksheet_title   TEXT,
+    last_refreshed_at TEXT,
+
+    -- The whole configuration of a ledger-backed source. The address, the key
+    -- and the key column are not here on purpose: see domain/nexus.ts.
+    category_id TEXT,
+
+    refresh_interval_seconds INTEGER NOT NULL DEFAULT 0,
+    refresh_before_print     INTEGER NOT NULL DEFAULT 0
+  );
+
+  INSERT INTO data_sources_new
+    (id, name, columns, row_count, created_at, updated_at, source_kind,
+     spreadsheet_id, spreadsheet_title, worksheet_id, worksheet_title, last_refreshed_at,
+     refresh_interval_seconds, refresh_before_print)
+  SELECT id, name, columns, row_count, created_at, updated_at,
+         CASE WHEN source_kind = 'http' THEN 'local' ELSE source_kind END,
+         spreadsheet_id, spreadsheet_title, worksheet_id, worksheet_title, last_refreshed_at,
+         refresh_interval_seconds, refresh_before_print
+  FROM data_sources;
+
+  DROP TABLE data_sources;
+  ALTER TABLE data_sources_new RENAME TO data_sources;
+
+  CREATE TABLE data_source_rows (
+    source_id   TEXT NOT NULL REFERENCES data_sources(id) ON DELETE CASCADE,
+    ordinal     INTEGER NOT NULL,
+    values_json TEXT NOT NULL,
+    row_key     TEXT,
+    PRIMARY KEY (source_id, ordinal)
+  );
+
+  INSERT INTO data_source_rows (source_id, ordinal, values_json, row_key)
+  SELECT source_id, ordinal, values_json, row_key FROM data_source_rows_backup;
+
+  DROP TABLE data_source_rows_backup;
+
+  CREATE UNIQUE INDEX idx_data_source_rows_key
+    ON data_source_rows (source_id, row_key) WHERE row_key IS NOT NULL;
+`
+
 export const migrations: Migration[] = [
   { id: 1, name: 'initial_schema', up: initialSchema },
   { id: 2, name: 'template_version', up: templateVersion },
@@ -557,4 +636,5 @@ export const migrations: Migration[] = [
   { id: 15, name: 'claims_outlive_jobs', up: claimsOutliveJobs },
   { id: 16, name: 'http_sources_and_row_keys', up: httpSourcesAndRowKeys },
   { id: 17, name: 'print_presets', up: printPresets },
+  { id: 18, name: 'nexus_sources', up: nexusSources },
 ]

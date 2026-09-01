@@ -85,6 +85,13 @@ services:
       # that must not consume stock.
       # ZENITH_DRY_RUN: "1"
       # ZENITH_GOOGLE_CREDENTIALS: /run/secrets/google.json
+      #
+      # The asset ledger. Both, or the entry point does not appear at all —
+      # a button that answers 401 on the first press is worse than no button.
+      # They are read here and never stored, so they cannot drift from a copy
+      # somebody pasted into a data source months ago.
+      # NEXUS_ASSETS_SERVICE_URL: http://nexus-assets:8080
+      # NEXUS_ASSETS_SERVICE_API_KEY: ${NEXUS_ASSETS_SERVICE_API_KEY:-}
 
     # A restart while a job is printing leaves the printed count unverifiable,
     # so the service marks such jobs failed with an unknown count on the way

@@ -12,6 +12,7 @@ import { createGoogleSheetsClient } from './integrations/google-sheets-client.ts
 import { buildApp } from './app.ts'
 import { openDatabase } from './db/index.ts'
 import { registerStatic } from './static.ts'
+import { createNexusClient } from './integrations/nexus-client.ts'
 
 
 const HOST = process.env.ZENITH_HOST ?? '0.0.0.0'
@@ -42,6 +43,34 @@ function sheetsFrom(log: (message: string) => void) {
   }
 }
 
+/**
+ * The asset ledger client, or nothing at all.
+ *
+ * Both variables or neither. A URL with no key would produce an entry point
+ * that appears and then fails on the first click with a 401, which is a worse
+ * answer than not appearing: "not configured" is a thing somebody can fix, and
+ * a button that lies is not.
+ *
+ * Reported and then ignored on the way past, like the Google credentials:
+ * printing labels does not depend on the ledger, and refusing to start because
+ * an integration is half-configured would take the printer down with it.
+ */
+function nexusFrom(log: (message: string) => void) {
+  const baseUrl = process.env.NEXUS_ASSETS_SERVICE_URL
+  const apiKey = process.env.NEXUS_ASSETS_SERVICE_API_KEY
+  if (baseUrl === undefined && apiKey === undefined) {
+    return undefined
+  }
+  if (baseUrl === undefined || apiKey === undefined) {
+    log(
+      'NEXUS_ASSETS_SERVICE_URL and NEXUS_ASSETS_SERVICE_API_KEY must be set together; ' +
+        'the asset ledger integration is off',
+    )
+    return undefined
+  }
+  return { port: createNexusClient({ baseUrl, apiKey }), baseUrl }
+}
+
 async function main(): Promise<void> {
   const db = openDatabase({ location: DB_PATH })
   const problems: string[] = []
@@ -49,6 +78,7 @@ async function main(): Promise<void> {
     db,
     imageStorageDir: UPLOAD_DIR,
     logLevel: (process.env.LOG_LEVEL as 'info') ?? 'info',
+    nexus: nexusFrom((message) => problems.push(message)),
     ...(() => {
       const sheets = sheetsFrom((message) => problems.push(message))
       return sheets === undefined ? {} : { sheets }

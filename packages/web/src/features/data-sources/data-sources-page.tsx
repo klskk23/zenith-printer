@@ -13,13 +13,13 @@ import { Input } from '../../components/ui/input.tsx'
 import { copy } from '../../i18n/index.ts'
 import { UploadDialog } from './upload-dialog.tsx'
 import { LinkGoogleDialog } from './link-google-dialog.tsx'
-import { ConnectHttpDialog } from './connect-http-dialog.tsx'
+import { ConnectNexusDialog } from './connect-nexus-dialog.tsx'
 import { RefreshButton } from './refresh-button.tsx'
 import { FreshnessLine } from './freshness-line.tsx'
 import { spreadsheetUrl } from './sheet-url.ts'
 import { PoolsPanel } from '../sequence-pools/pools-panel.tsx'
 import { Skeleton } from '../../components/ui/skeleton.tsx'
-import { isFetched, useDataSources,
+import { isFetched, useNexusCategories, useDataSources,
   useGoogleStatus,
   useUnlinkDataSource, useDeleteDataSource, useRenameDataSource, type DataSource } from './hooks.ts'
 
@@ -64,6 +64,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
 
   const [uploading, setUploading] = useState(false)
   const [connecting, setConnecting] = useState(false)
+  const nexus = useNexusCategories()
   const [linking, setLinking] = useState(false)
   const google = useGoogleStatus()
   const unlink = useUnlinkDataSource()
@@ -90,11 +91,14 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
           >
             {copy.dataSources.linkGoogle}
           </Button>
-          {/* No configuration to check first, unlike Google: an address and a
-              header are all this needs, and both are typed into the form. */}
-          <Button size="sm" variant="outline" onClick={() => setConnecting(true)}>
-            {copy.dataSources.addHttp}
-          </Button>
+          {/* Hidden entirely when the deployment has not configured the
+              ledger — the same answer the Google entry gives, and for the same
+              reason: a button that cannot work is worse than no button. */}
+          {nexus.data?.configured === true && (
+            <Button size="sm" variant="outline" onClick={() => setConnecting(true)}>
+              {copy.dataSources.addNexus}
+            </Button>
+          )}
           <Button size="sm" onClick={() => setUploading(true)}>
             {copy.dataSources.upload}
           </Button>
@@ -114,7 +118,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
       )}
 
       <LinkGoogleDialog open={linking} onOpenChange={setLinking} />
-      <ConnectHttpDialog open={connecting} onOpenChange={setConnecting} />
+      <ConnectNexusDialog open={connecting} onOpenChange={setConnecting} />
 
       {/* Same rule as the home page: the empty state waits until the answer is
           in. Here it already did — this renders nothing at all meanwhile, which

@@ -35,8 +35,8 @@ const base = {
   name: '设备表',
   columns: ['sys_id', 'mac'],
   rowCount: 3,
-  sourceKind: 'http',
-  http: { url: 'http://producer.invalid/rows', headerNames: ['Authorization'] },
+  sourceKind: 'nexus',
+  nexus: { categoryId: 'cat-1' },
   keyColumn: 'sys_id',
   createdAt: 'T',
   updatedAt: 'T',
@@ -134,7 +134,7 @@ describe('a table that did not ask', () => {
 
 describe('a table nobody fetches', () => {
   it('is never refreshed on opening', async () => {
-    source = { ...base, sourceKind: 'local', http: undefined, keyColumn: null, refreshIntervalSeconds: 0 }
+    source = { ...base, sourceKind: 'local', nexus: undefined, keyColumn: null, refreshIntervalSeconds: 0 }
     panel()
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(refreshes).toEqual([])

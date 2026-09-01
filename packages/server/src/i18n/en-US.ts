@@ -109,35 +109,40 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'The name is how a preset is recognised in a list, and two the same cannot be told apart',
     next: 'Choose a different name, or edit the existing preset',
   },
-  HTTP_SOURCE_UNREACHABLE: {
-    what: 'Could not reach the system this table reads from',
+  NEXUS_NOT_CONFIGURED: {
+    what: 'The asset ledger is not configured on this machine',
+    why: 'NEXUS_ASSETS_SERVICE_URL and NEXUS_ASSETS_SERVICE_API_KEY are both required, and are read from the environment rather than set here — an endpoint with no authentication of its own must not be handed a credential over the network',
+    next: 'Ask whoever deploys this service to set both and restart it',
+  },
+  NEXUS_UNAUTHORISED: {
+    what: 'The asset ledger did not accept the key this machine sent',
+    why: 'It answered 401 — the key has most likely been rotated or revoked since this service was started',
+    next: 'Ask whoever deploys this service to update NEXUS_ASSETS_SERVICE_API_KEY and restart it. The rows already here are unchanged and still print',
+  },
+  NEXUS_BAD_REQUEST: {
+    what: 'The asset ledger refused the request',
+    why: 'It answered 422, which means it could not tell which category was being asked for',
+    next: 'This is a fault in this service rather than something you can fix here; the rows already here are unchanged and still print',
+  },
+  NEXUS_UNREACHABLE: {
+    what: 'Could not reach the asset ledger',
     why: 'The address did not answer, or took longer than 30 seconds to',
-    next: 'Check that the other system is running and that this machine can reach it, then refresh again. The rows already here are unchanged and still print',
+    next: 'Check that the ledger is running and that this machine can reach it, then refresh again. The rows already here are unchanged and still print',
   },
-  HTTP_SOURCE_BAD_STATUS: {
-    what: 'The system this table reads from refused the request',
-    why: 'It answered with an error status rather than rows — commonly a credential it no longer accepts, or an address that no longer exists',
-    next: 'Check the address and the headers on this data source. The rows already here are unchanged and still print',
+  NEXUS_BAD_SHAPE: {
+    what: 'The asset ledger sent something this cannot read',
+    why: 'It has to answer with JSON carrying `columns` and `rows`, where every value is text and every row has exactly the declared columns',
+    next: 'Show the detail below to whoever maintains the ledger; the rows already here are unchanged and still print',
   },
-  HTTP_SOURCE_BAD_SHAPE: {
-    what: 'The answer was not a table this can read',
-    why: 'It has to be JSON carrying `columns` and `rows`, where every value is text and every row has exactly the declared columns',
-    next: 'Show the detail below to whoever maintains the other system; the rows already here are unchanged and still print',
+  NEXUS_DUPLICATE_KEY: {
+    what: 'Two rows arrived with the same device id',
+    why: 'The device id is what tells one row from another across a refresh, so a repeated value leaves no way to say which row is which',
+    next: 'Show the ids below to whoever maintains the ledger. The rows already here are unchanged and still print',
   },
-  HTTP_SOURCE_DUPLICATE_KEY: {
-    what: 'Two rows arrived with the same key',
-    why: 'The key column is what tells one row from another across a refresh, so a repeated value leaves no way to say which row is which',
-    next: 'Fix the duplicates in the other system, or point this data source at a column whose values are unique, then refresh again',
-  },
-  HTTP_SOURCE_MISSING_KEY: {
-    what: 'A row arrived with nothing in its key column',
-    why: 'A row with no key cannot be matched to the row it replaces, and dropping it would lose data nobody asked to lose',
-    next: 'Fill the key column for every row in the other system, or choose a different key column, then refresh again',
-  },
-  HTTP_SOURCE_KEY_COLUMN_REQUIRED: {
-    what: 'This data source needs a key column first',
-    why: 'Refreshing before printing depends on a row keeping its identity across the refresh; without a key column a refresh can move the rows out from under a selection that was already made',
-    next: 'Set a key column on this data source, then turn this on again',
+  NEXUS_MISSING_KEY: {
+    what: 'A row arrived without a device id',
+    why: 'A row with no id cannot be matched to the row it replaces, and dropping it would lose data nobody asked to lose',
+    next: 'Show this to whoever maintains the ledger. The rows already here are unchanged and still print',
   },
   DATA_SOURCE_NOT_FETCHABLE: {
     what: 'This data source is not fetched from anywhere',

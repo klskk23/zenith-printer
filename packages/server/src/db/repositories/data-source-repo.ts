@@ -15,6 +15,7 @@ import {
   type DataSourceRow,
 } from '../../domain/data-source.ts'
 import { planUpsert, type KeyedRow } from '../../domain/row-upsert.ts'
+import { NEXUS_KEY_COLUMN } from '../../domain/nexus.ts'
 
 type Row = Record<string, unknown>
 
@@ -28,14 +29,23 @@ export interface CreateLinkedInput extends CreateDataSourceInput {
   link: Omit<DataSourceLink, 'lastRefreshedAt'>
 }
 
-export interface CreateHttpInput {
+export interface CreateNexusInput {
   name: string
-  columns: string[]
-  url: string
-  headers?: Record<string, string>
-  keyColumn: string
+  categoryId: string
   refreshIntervalSeconds?: number
   refreshBeforePrint?: boolean
+}
+
+/**
+ * Which column names a row, given where the rows come from.
+ *
+ * A constant per kind rather than a stored value. The ledger keys its rows by
+ * its own device id; a CSV somebody uploaded has no identity beyond its order,
+ * and a spreadsheet has none either — inventing one for them would be
+ * pretending that a position is a name.
+ */
+export function keyColumnFor(kind: DataSource['sourceKind']): string | null {
+  return kind === 'nexus' ? NEXUS_KEY_COLUMN : null
 }
 
 export interface ReplaceLinkedInput {
@@ -73,18 +83,12 @@ export class DataSourceRepo {
               worksheetTitle: String(row.worksheet_title),
               lastRefreshedAt: String(row.last_refreshed_at),
             },
-      http:
-        row.url === null || row.url === undefined
+      nexus:
+        row.category_id === null || row.category_id === undefined
           ? null
-          : {
-              url: String(row.url),
-              // Names only. See HttpOrigin: the values never enter this object,
-              // so no endpoint returning it can leak them.
-              headerNames: Object.keys(
-                JSON.parse(String(row.headers_json ?? '{}')) as Record<string, string>,
-              ),
-            },
-      keyColumn: row.key_column === null || row.key_column === undefined ? null : String(row.key_column),
+          : { categoryId: String(row.category_id) },
+      // Derived from the kind, never stored: see keyColumnFor.
+      keyColumn: keyColumnFor(String(row.source_kind) as DataSource['sourceKind']),
       refreshIntervalSeconds: Number(row.refresh_interval_seconds ?? 0),
       refreshBeforePrint: Number(row.refresh_before_print ?? 0) === 1,
       lastRefreshedAt:
@@ -96,20 +100,7 @@ export class DataSourceRepo {
     }
   }
 
-  /**
-   * The header values, for the one caller that has to send them.
-   *
-   * Deliberately not on `DataSource`: reading them is a separate act from
-   * reading a data source, and the refresh path is the only thing entitled to
-   * it. Anything that merely lists or displays sources cannot reach them by
-   * accident.
-   */
-  httpHeaders(id: string): Record<string, string> {
-    const row = this.#db.prepare('SELECT headers_json FROM data_sources WHERE id = ?').get(id) as
-      | { headers_json: string | null }
-      | undefined
-    return JSON.parse(row?.headers_json ?? '{}') as Record<string, string>
-  }
+
 
   /** The stored row, for tests that need to see the columns themselves. */
   rawRow(id: string): Record<string, unknown> {
@@ -174,7 +165,7 @@ export class DataSourceRepo {
         `UPDATE data_sources
             SET source_kind = 'local', spreadsheet_id = NULL, spreadsheet_title = NULL,
                 worksheet_id = NULL, worksheet_title = NULL, last_refreshed_at = NULL,
-                url = NULL, headers_json = NULL, key_column = NULL,
+                category_id = NULL,
                 refresh_interval_seconds = 0, refresh_before_print = 0,
                 updated_at = ?
           WHERE id = ?`,
@@ -191,19 +182,17 @@ export class DataSourceRepo {
    * genuinely never been refreshed, and saying otherwise is the lie the list
    * page would then display.
    */
-  createHttp(input: CreateHttpInput): DataSource {
-    const created = this.create({ name: input.name, columns: input.columns, rows: [] })
+  createNexus(input: CreateNexusInput): DataSource {
+    const created = this.create({ name: input.name, columns: [NEXUS_KEY_COLUMN], rows: [] })
     this.#db
       .prepare(
         `UPDATE data_sources
-            SET source_kind = 'http', url = ?, headers_json = ?, key_column = ?,
+            SET source_kind = 'nexus', category_id = ?,
                 refresh_interval_seconds = ?, refresh_before_print = ?
           WHERE id = ?`,
       )
       .run(
-        input.url,
-        JSON.stringify(input.headers ?? {}),
-        input.keyColumn,
+        input.categoryId,
         input.refreshIntervalSeconds ?? 0,
         input.refreshBeforePrint === true ? 1 : 0,
         created.id,
@@ -214,7 +203,7 @@ export class DataSourceRepo {
   /** How often a page may leave the rows alone, and whether a job refreshes first. */
   setRefreshPolicy(
     id: string,
-    policy: { refreshIntervalSeconds?: number; refreshBeforePrint?: boolean; headers?: Record<string, string>; url?: string; keyColumn?: string },
+    policy: { refreshIntervalSeconds?: number; refreshBeforePrint?: boolean },
   ): void {
     const current = this.find(id)
     if (current === undefined) {
@@ -223,16 +212,12 @@ export class DataSourceRepo {
     this.#db
       .prepare(
         `UPDATE data_sources
-            SET refresh_interval_seconds = ?, refresh_before_print = ?, url = ?,
-                headers_json = ?, key_column = ?, updated_at = ?
+            SET refresh_interval_seconds = ?, refresh_before_print = ?, updated_at = ?
           WHERE id = ?`,
       )
       .run(
         policy.refreshIntervalSeconds ?? current.refreshIntervalSeconds,
         (policy.refreshBeforePrint ?? current.refreshBeforePrint) ? 1 : 0,
-        policy.url ?? current.http?.url ?? null,
-        JSON.stringify(policy.headers ?? this.httpHeaders(id)),
-        policy.keyColumn ?? current.keyColumn,
         this.#clock.now().toISOString(),
         id,
       )
@@ -315,14 +300,14 @@ export class DataSourceRepo {
   }
 
   #keyColumn(sourceId: string): string | null {
-    const row = this.#db.prepare('SELECT key_column FROM data_sources WHERE id = ?').get(sourceId) as
-      | { key_column: string | null }
+    const row = this.#db.prepare('SELECT source_kind FROM data_sources WHERE id = ?').get(sourceId) as
+      | { source_kind: string }
       | undefined
-    return row?.key_column ?? null
+    return row === undefined ? null : keyColumnFor(row.source_kind as DataSource['sourceKind'])
   }
 
   /**
-   * Looked up here rather than passed in, so that no write path can forget it.
+   * Derived here rather than passed in, so that no write path can forget it.
    *
    * `patchRows`, `replace` and the refresh all funnel through this one method;
    * a `keyColumn` parameter would be a thing three callers had to remember, and

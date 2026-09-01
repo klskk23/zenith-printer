@@ -98,11 +98,32 @@ afterEach(async () => {
 })
 
 describe('managing presets', () => {
+  it('answers under a `presets` envelope, which the ledger fills a dropdown from', async () => {
+    // Part of the contract rather than an implementation detail: the other
+    // side reads `presets[].name` straight into a select.
+    await createPreset()
+    const body = (await app.inject({ method: 'GET', url: '/api/print-presets' })).json()
+    expect(Object.keys(body)).toEqual(['presets'])
+    expect(body.presets[0]).toMatchObject({ id: expect.any(String), name: '设备标签预设' })
+  })
+
+  it('lets one batch override the copy count', async () => {
+    // The caller sometimes knows something the preset cannot — "two per device
+    // this time" — while the preset stays the normal answer.
+    const id = (await createPreset({ copies: 1 })).json().id as string
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/print-presets/${id}/print`,
+      payload: { columns: ['mac', 'sn'], rows: ROWS, copies: 3 } as never,
+    })
+    expect(res.json().requestedCopies).toBe(6)
+  })
+
   it('creates one and lists it', async () => {
     expect((await createPreset()).statusCode).toBe(201)
     const list = (await app.inject({ method: 'GET', url: '/api/print-presets' })).json()
-    expect(list.printPresets).toHaveLength(1)
-    expect(list.printPresets[0]).toMatchObject({ name: '设备标签预设', copies: 1 })
+    expect(list.presets).toHaveLength(1)
+    expect(list.presets[0]).toMatchObject({ name: '设备标签预设', copies: 1 })
   })
 
   it('refuses a name already in use', async () => {
@@ -130,7 +151,7 @@ describe('managing presets', () => {
     // It holds no data of its own; every label it produced is still in history.
     const id = (await createPreset()).json().id as string
     expect((await app.inject({ method: 'DELETE', url: `/api/print-presets/${id}` })).statusCode).toBe(204)
-    expect((await app.inject({ method: 'GET', url: '/api/print-presets' })).json().printPresets).toHaveLength(0)
+    expect((await app.inject({ method: 'GET', url: '/api/print-presets' })).json().presets).toHaveLength(0)
   })
 })
 

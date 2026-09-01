@@ -27,8 +27,7 @@ import { registerPreviewRoutes } from './api/preview.ts'
 import { registerImageRoutes } from './api/images.ts'
 import { registerTemplateIoRoutes } from './api/template-io.ts'
 import type { SheetsPort } from './domain/google-sheets.ts'
-import type { HttpRowsPort } from './domain/http-rows.ts'
-import { createHttpRowsClient } from './integrations/http-rows-client.ts'
+import type { NexusPort } from './domain/nexus.ts'
 import { registerGoogleRoutes } from './api/google.ts'
 import { registerTemplateRoutes } from './api/templates.ts'
 import { registerSequencePoolRoutes } from './api/sequence-pools.ts'
@@ -55,13 +54,14 @@ export interface AppDependencies {
    */
   sheets?: { port: SheetsPort; clientEmail: string }
   /**
-   * How rows are fetched from an HTTP producer.
+   * The asset ledger, or nothing at all.
    *
-   * Defaulted rather than optional: unlike Google, this needs no credentials to
-   * configure, so there is no state in which the capability is unavailable —
-   * only sources that have not been pointed anywhere yet. Tests inject a fake.
+   * Null when the environment does not configure it, exactly like `sheets` —
+   * and for the same reason: the address and the key are deployment decisions,
+   * and an endpoint with no authentication cannot be handed them at runtime.
+   * The UI hides the entry point rather than offering one that cannot work.
    */
-  httpRows?: HttpRowsPort
+  nexus?: { port: NexusPort; baseUrl: string }
 }
 
 export interface AppContext {
@@ -78,7 +78,7 @@ export interface AppContext {
   imageStorageDir: string
   /** Null when no Google credentials are configured. */
   sheets: { port: SheetsPort; clientEmail: string } | null
-  httpRows: HttpRowsPort
+  nexus: { port: NexusPort; baseUrl: string } | null
   /** Undefined when the caller opted out, e.g. focused route tests. */
   queue?: PrintQueue
 }
@@ -110,7 +110,7 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
     clock: deps.clock ?? systemClock,
     ids: deps.idGenerator ?? uuidGenerator,
     sheets: deps.sheets ?? null,
-    httpRows: deps.httpRows ?? createHttpRowsClient(),
+    nexus: deps.nexus ?? null,
   })
 
   app.setErrorHandler((error, request, reply) => {

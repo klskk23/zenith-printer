@@ -21,8 +21,8 @@ import {
   UnknownColumnError,
   assertKnownColumns,
   dataSourceNameSchema,
-  httpSourceInputSchema,
-  httpSourcePatchSchema,
+  nexusSourceInputSchema,
+  refreshPolicySchema,
   rowPatchSchema,
 } from '../domain/data-source.ts'
 import {
@@ -35,7 +35,13 @@ import {
 import { DecodeFailedError } from '../csv/encoding.ts'
 import { templatesBrokenByRemoving, templatesUsingDataSource } from '../domain/template-refs.ts'
 import { ApiError, HttpStatus } from './errors.ts'
-import { HttpSourceError, fetchAllRows } from '../domain/http-rows.ts'
+import { negotiateLocale } from '../i18n/negotiate.ts'
+import {
+  NEXUS_KEY_COLUMN,
+  NexusError,
+  fetchCategoryRows,
+  type NexusPort,
+} from '../domain/nexus.ts'
 import { DuplicateRowKeyError, MissingRowKeyError, keyRows } from '../domain/row-upsert.ts'
 import { asApiError, readByWorksheetId, requireSheets, tableOrRefuse } from './google.ts'
 import { SheetsError } from '../domain/google-sheets.ts'
@@ -47,6 +53,18 @@ import { templatesBrokenByRemoving as brokenBy } from '../domain/template-refs.t
 const MAX_UPLOAD_BYTES = 16 * 1024 * 1024
 
 const idParams = z.object({ id: z.string().min(1) })
+
+/**
+ * The language this request is being read in.
+ *
+ * Passed on to the ledger, which renders its own dates and booleans into words
+ * — and those words go onto a label. Asking for them in the language the
+ * operator is reading is the entire reason it renders them rather than sending
+ * raw values.
+ */
+function localeOf(request: { headers: Record<string, unknown> }): string {
+  return negotiateLocale(String(request.headers['accept-language'] ?? ''))
+}
 /**
  * `pageSize` reaches the table's own ceiling on purpose.
  *
@@ -192,47 +210,46 @@ export async function withRefreshLock<T>(dataSourceId: string, run: () => Promis
   }
 }
 
-export async function refreshFromAddress(
+export async function refreshFromLedger(
   app: FastifyInstance,
   repo: DataSourceRepo,
   source: DataSource,
   confirmed: boolean,
+  locale: string,
 ): Promise<Record<string, unknown>> {
   const log = (conclusion: Record<string, unknown>): void => {
     // Never the row values: business data does not belong in logs, the same
     // boundary the credentials rule guards from the other side.
     app.log.info(
-      { event: 'data_source_refresh', dataSourceId: source.id, sourceKind: 'http', ...conclusion },
+      { event: 'data_source_refresh', dataSourceId: source.id, sourceKind: 'nexus', ...conclusion },
       'data source refresh',
     )
   }
 
-  if (source.http === null || source.keyColumn === null) {
+  if (source.nexus === null) {
     throw ApiError.unprocessable('DATA_SOURCE_NOT_FETCHABLE', { dataSourceId: source.id })
+  }
+  const ledger = app.ctx.nexus
+  if (ledger === null) {
+    throw ApiError.unprocessable('NEXUS_NOT_CONFIGURED', { dataSourceId: source.id })
   }
 
   let fetched
   try {
-    fetched = await fetchAllRows(app.ctx.httpRows, {
-      url: source.http.url,
-      headers: repo.httpHeaders(source.id),
-    })
+    fetched = await fetchCategoryRows(ledger.port, source.nexus.categoryId, locale, MAX_ROWS)
   } catch (err) {
-    if (err instanceof HttpSourceError) {
+    if (err instanceof NexusError) {
       log({ outcome: 'failed', reason: err.kind, detail: err.detail })
       if (err.kind === 'tooManyRows') {
-        return { outcome: 'refusedTooManyRows' as const, rowCount: Number(err.detail.split(' ')[0]), limit: MAX_ROWS }
+        return {
+          outcome: 'refusedTooManyRows' as const,
+          rowCount: Number(err.detail.split(' ')[0]),
+          limit: MAX_ROWS,
+        }
       }
-      const code =
-        err.kind === 'unreachable'
-          ? 'HTTP_SOURCE_UNREACHABLE'
-          : err.kind === 'badStatus'
-            ? 'HTTP_SOURCE_BAD_STATUS'
-            : 'HTTP_SOURCE_BAD_SHAPE'
-      throw ApiError.unprocessable(code, {
+      throw ApiError.unprocessable(nexusErrorCode(err.kind), {
         dataSourceId: source.id,
         detail: err.detail,
-        ...(err.status === null ? {} : { status: err.status }),
       })
     }
     throw err
@@ -246,11 +263,11 @@ export async function refreshFromAddress(
    * identifying rows by position, which is what proceeding without a key would
    * do — and would do silently, since the table would still look full.
    */
-  if (!fetched.columns.includes(source.keyColumn)) {
+  if (!fetched.columns.includes(NEXUS_KEY_COLUMN)) {
     log({ outcome: 'failed', reason: 'keyColumnMissing' })
-    throw ApiError.unprocessable('HTTP_SOURCE_MISSING_KEY', {
+    throw ApiError.unprocessable('NEXUS_MISSING_KEY', {
       dataSourceId: source.id,
-      keyColumn: source.keyColumn,
+      keyColumn: NEXUS_KEY_COLUMN,
     })
   }
 
@@ -271,11 +288,11 @@ export async function refreshFromAddress(
 
   let keyed
   try {
-    keyed = keyRows(fetched.rows, source.keyColumn)
+    keyed = keyRows(fetched.rows, NEXUS_KEY_COLUMN)
   } catch (err) {
     if (err instanceof DuplicateRowKeyError) {
       log({ outcome: 'failed', reason: 'duplicateKey', duplicates: err.duplicates.length })
-      throw ApiError.unprocessable('HTTP_SOURCE_DUPLICATE_KEY', {
+      throw ApiError.unprocessable('NEXUS_DUPLICATE_KEY', {
         dataSourceId: source.id,
         keyColumn: err.column,
         duplicates: err.duplicates,
@@ -283,7 +300,7 @@ export async function refreshFromAddress(
     }
     if (err instanceof MissingRowKeyError) {
       log({ outcome: 'failed', reason: 'missingKey', rowIndex: err.rowIndex })
-      throw ApiError.unprocessable('HTTP_SOURCE_MISSING_KEY', {
+      throw ApiError.unprocessable('NEXUS_MISSING_KEY', {
         dataSourceId: source.id,
         keyColumn: err.column,
         rowIndex: err.rowIndex + 1,
@@ -302,13 +319,79 @@ export async function refreshFromAddress(
     rowsBefore,
     rowsAfter: after?.rowCount ?? 0,
     columnsAdded: decision.columnsAdded,
-    // What the merge did, which "applied" alone cannot say. A refresh that
+    // What the merge did, which "applied" alone cannot say: a refresh that
     // changed nothing and one that replaced the table are different answers.
     added: merged.added,
     updated: merged.updated,
     removed: merged.removed,
     lastRefreshedAt: after?.lastRefreshedAt ?? null,
   }
+}
+
+/** One code per repair. 401 and 422 are different problems for different people. */
+function nexusErrorCode(kind: NexusError['kind']): 'NEXUS_UNREACHABLE' | 'NEXUS_UNAUTHORISED' | 'NEXUS_BAD_REQUEST' | 'NEXUS_BAD_SHAPE' | 'NEXUS_NOT_CONFIGURED' {
+  switch (kind) {
+    case 'unauthorised':
+      return 'NEXUS_UNAUTHORISED'
+    case 'badRequest':
+      return 'NEXUS_BAD_REQUEST'
+    case 'badShape':
+      return 'NEXUS_BAD_SHAPE'
+    case 'notConfigured':
+      return 'NEXUS_NOT_CONFIGURED'
+    default:
+      return 'NEXUS_UNREACHABLE'
+  }
+}
+
+/**
+ * Connect a data source to a category of the ledger.
+ *
+ * One field. The address, the key and the key column are decided elsewhere, so
+ * there is nothing else here for anybody to get wrong — and nothing stored that
+ * could drift from the environment it came from.
+ *
+ * No rows are fetched. Creating and reading are separate acts: a ledger that
+ * happens to be down should not stop the source being created, and the refresh
+ * path already reports every way a read can fail.
+ */
+export async function createNexusSource(
+  app: FastifyInstance,
+  repo: DataSourceRepo,
+  input: { categoryId: string; name?: string },
+  locale: string,
+): Promise<DataSource> {
+  const ledger = requireLedger(app)
+
+  // The category's own name, unless one was given: a data source is labelled
+  // for people, and somebody already chose a label for this.
+  let name = input.name
+  if (name === undefined) {
+    try {
+      const categories = await ledger.port.categories(locale)
+      name = categories.find((category) => category.id === input.categoryId)?.name
+    } catch (err) {
+      if (!(err instanceof NexusError)) {
+        throw err
+      }
+      // Naming is a convenience; failing to fetch one is not a reason to
+      // refuse. The id becomes the name and can be edited afterwards.
+    }
+  }
+  const finalName = name ?? input.categoryId
+
+  if (repo.findByName(finalName) !== undefined) {
+    throw ApiError.conflict('DATA_SOURCE_NAME_TAKEN', { name: finalName })
+  }
+  return repo.createNexus({ name: finalName, categoryId: input.categoryId })
+}
+
+/** The ledger, or a refusal that says it is not configured rather than 500ing. */
+export function requireLedger(app: FastifyInstance): { port: NexusPort; baseUrl: string } {
+  if (app.ctx.nexus === null) {
+    throw ApiError.unprocessable('NEXUS_NOT_CONFIGURED', {})
+  }
+  return app.ctx.nexus
 }
 
 export async function registerDataSourceRoutes(app: FastifyInstance): Promise<void> {
@@ -346,6 +429,29 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
   )
 
   app.post('/api/data-sources', async (request, reply) => {
+    /**
+     * Two ways in, on one path.
+     *
+     * A CSV arrives as multipart; a ledger-backed source arrives as JSON with a
+     * `kind`. The documented route for the latter is `POST
+     * /api/data-sources/nexus`, which carries a schema and therefore appears in
+     * the OpenAPI document — a hand-parsed branch does not. This exists because
+     * `POST /api/data-sources {kind}` is the shape callers reach for, and
+     * refusing it would be pedantry about a path.
+     */
+    if (String(request.headers['content-type'] ?? '').includes('application/json')) {
+      const parsed = z
+        .object({ kind: z.literal('nexus') })
+        .and(nexusSourceInputSchema)
+        .safeParse(request.body)
+      if (!parsed.success) {
+        throw ApiError.unprocessable('VALIDATION_FAILED', { field: 'kind' })
+      }
+      return reply
+        .status(HttpStatus.Created)
+        .send(serialiseSource(await createNexusSource(app, sources(), parsed.data, localeOf(request))))
+    }
+
     const upload = await readUpload(request as never)
     const repo = sources()
 
@@ -422,49 +528,103 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
   )
 
   /**
-   * Create a data source that reads rows from an address.
+   * The categories, for the one dropdown this feature has.
    *
-   * No rows are fetched here. Creating and reading are separate acts: a
-   * producer that happens to be down should not stop the table being created,
-   * and the refresh path already knows how to report every way a read can fail.
-   * The table therefore starts empty and honestly says it has never refreshed.
+   * Proxied rather than fetched by the browser directly, because the browser
+   * must never hold the ledger's key — and because the ledger sends no CORS
+   * headers, so it could not fetch them anyway.
    *
-   * `keyColumn` is required, and is the whole reason this kind of source is
-   * safe to have. See `domain/row-upsert.ts`: without it a row's identity is
-   * its position, and a producer that inserts a row moves every selection made
-   * against the rows below it, silently.
+   * `configured: false` is an answer, not an error. The page hides the entry
+   * point rather than offering one that cannot work, which is how the Google
+   * integration already behaves.
    */
-  typed.post(
-    '/api/data-sources/http',
-    { schema: { body: httpSourceInputSchema } },
-    async (request, reply) => {
-      const repo = sources()
-      if (repo.findByName(request.body.name) !== undefined) {
-        throw ApiError.conflict('DATA_SOURCE_NAME_TAKEN', { name: request.body.name })
+  typed.get('/api/data-sources/nexus/categories', async (request) => {
+    if (app.ctx.nexus === null) {
+      return { configured: false as const, categories: [] }
+    }
+    try {
+      return {
+        configured: true as const,
+        // The locale travels: the ledger renders its own dates and booleans
+        // into words, and those words end up on a label.
+        categories: await app.ctx.nexus.port.categories(localeOf(request)),
       }
-      if (request.body.refreshBeforePrint === true && request.body.keyColumn.length === 0) {
-        throw ApiError.unprocessable('HTTP_SOURCE_KEY_COLUMN_REQUIRED', { name: request.body.name })
+    } catch (err) {
+      if (err instanceof NexusError) {
+        throw ApiError.unprocessable(nexusErrorCode(err.kind), { detail: err.detail })
       }
+      throw err
+    }
+  })
 
-      return reply.status(HttpStatus.Created).send(
-        serialiseSource(
-          repo.createHttp({
-            name: request.body.name,
-            // The producer is the authority on what the columns are; until it
-            // has been read there is nothing to claim, and claiming the key
-            // column alone would describe a table that does not exist yet.
-            columns: [request.body.keyColumn],
-            url: request.body.url,
-            headers: request.body.headers,
-            keyColumn: request.body.keyColumn,
-            refreshIntervalSeconds: request.body.refreshIntervalSeconds,
-            refreshBeforePrint: request.body.refreshBeforePrint,
-          }),
-        ),
-      )
+  /**
+   * A preview of one category's columns.
+   *
+   * Optional for the caller and cheap — one row — but it is what turns "pick a
+   * category" into "pick a category and see what `${…}` you can write". Without
+   * it somebody has to create the source, refresh it, and then go and look.
+   */
+  typed.get(
+    '/api/data-sources/nexus/categories/:id/columns',
+    { schema: { params: idParams } },
+    async (request) => {
+      const ledger = requireLedger(app)
+      try {
+        const page = await ledger.port.rows({
+          categoryId: request.params.id,
+          offset: 0,
+          limit: 1,
+          locale: localeOf(request),
+        })
+        return { columns: page.columns, total: page.total ?? page.rows.length }
+      } catch (err) {
+        if (err instanceof NexusError) {
+          throw ApiError.unprocessable(nexusErrorCode(err.kind), { detail: err.detail })
+        }
+        throw err
+      }
     },
   )
 
+  /**
+   * Connect a data source to a category of the ledger.
+   *
+   * One field. The address, the key and the key column are decided elsewhere,
+   * so there is nothing else here for anybody to get wrong — and nothing stored
+   * that could drift from the environment it came from.
+   *
+   * No rows are fetched. Creating and reading are separate acts: a ledger that
+   * happens to be down should not stop the source being created, and the
+   * refresh path already reports every way a read can fail.
+   */
+  typed.post(
+    '/api/data-sources/nexus',
+    { schema: { body: nexusSourceInputSchema } },
+    async (request, reply) =>
+      reply
+        .status(HttpStatus.Created)
+        .send(serialiseSource(await createNexusSource(app, sources(), request.body, localeOf(request)))),
+  )
+
+  /**
+   * How stale this source's rows may get, and whether a job refreshes first.
+   *
+   * Separate from the rename PATCH because it is a different kind of change: a
+   * rename affects nothing, while these decide what the next refresh does.
+   */
+  typed.patch(
+    '/api/data-sources/:id/refresh-policy',
+    { schema: { params: idParams, body: refreshPolicySchema } },
+    async (request) => {
+      const repo = sources()
+      const source = require(repo, request.params.id)
+      if (source.sourceKind !== 'nexus') {
+        throw ApiError.unprocessable('DATA_SOURCE_NOT_FETCHABLE', { dataSourceId: source.id })
+      }
+      repo.setRefreshPolicy(source.id, request.body)
+      return serialiseSource(require(repo, source.id))
+    },
+  )
 
   /**
    * Refuse to change the contents of a table that is a copy of somebody
@@ -480,48 +640,6 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
       throw ApiError.unprocessable('DATA_SOURCE_READ_ONLY', { dataSourceId: source.id })
     }
   }
-
-  /**
-   * Change how a source reads, without recreating it.
-   *
-   * Kept apart from the rename PATCH because these are a different kind of
-   * change: a rename affects nothing, while any of these decides what the next
-   * refresh does. `headers` absent leaves the stored credential alone — the
-   * caller cannot read it back, so requiring them to resend it would mean
-   * requiring them to know it.
-   */
-  typed.patch(
-    '/api/data-sources/:id/http',
-    {
-      schema: {
-        params: idParams,
-        body: httpSourcePatchSchema,
-      },
-    },
-    async (request) => {
-      const repo = sources()
-      const source = require(repo, request.params.id)
-      if (source.sourceKind !== 'http') {
-        throw ApiError.unprocessable('DATA_SOURCE_NOT_FETCHABLE', { dataSourceId: source.id })
-      }
-
-      const keyColumn = request.body.keyColumn ?? source.keyColumn
-      if (request.body.refreshBeforePrint === true && (keyColumn === null || keyColumn.length === 0)) {
-        // Without a key, a refresh at submission time moves the rows out from
-        // under a selection already made — silently, and in the worst moment.
-        throw ApiError.unprocessable('HTTP_SOURCE_KEY_COLUMN_REQUIRED', { dataSourceId: source.id })
-      }
-
-      repo.setRefreshPolicy(source.id, {
-        refreshIntervalSeconds: request.body.refreshIntervalSeconds,
-        refreshBeforePrint: request.body.refreshBeforePrint,
-        url: request.body.url,
-        headers: request.body.headers,
-        keyColumn: request.body.keyColumn,
-      })
-      return serialiseSource(require(repo, source.id))
-    },
-  )
 
   typed.post(
     '/api/data-sources/:id/unlink',
@@ -565,10 +683,16 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
         throw ApiError.conflict('DATA_SOURCE_REFRESH_IN_PROGRESS', { dataSourceId: source.id })
       }
 
-      if (source.sourceKind === 'http') {
+      if (source.sourceKind === 'nexus') {
         refreshing.add(source.id)
         try {
-          return await refreshFromAddress(app, repo, source, request.body.confirmColumnChange === true)
+          return await refreshFromLedger(
+            app,
+            repo,
+            source,
+            request.body.confirmColumnChange === true,
+            localeOf(request),
+          )
         } finally {
           refreshing.delete(source.id)
         }

@@ -114,35 +114,40 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '名字是列表里认出一个预设的依据，重名就分不清哪个是哪个',
     next: '换一个名字，或者直接改已有的那个预设',
   },
-  HTTP_SOURCE_UNREACHABLE: {
-    what: '连不上这张表的来源系统',
+  NEXUS_NOT_CONFIGURED: {
+    what: '这台机器没有配置资产台账',
+    why: 'NEXUS_ASSETS_SERVICE_URL 与 NEXUS_ASSETS_SERVICE_API_KEY 两个都要有，而且只能从环境变量读——一个自己没有认证的服务，不能通过网络接收凭证',
+    next: '请部署这个服务的人把两个都设上，然后重启',
+  },
+  NEXUS_UNAUTHORISED: {
+    what: '资产台账不认这台机器的密钥',
+    why: '它回了 401——多半是这个服务启动之后密钥被轮换或吊销了',
+    next: '请部署这个服务的人更新 NEXUS_ASSETS_SERVICE_API_KEY 后重启。已经取到的行没有变化，仍然可以打印',
+  },
+  NEXUS_BAD_REQUEST: {
+    what: '资产台账拒绝了这次请求',
+    why: '它回了 422，意思是它看不出要取的是哪个类别',
+    next: '这是本服务的问题，不是你在这里能修的；已经取到的行没有变化，仍然可以打印',
+  },
+  NEXUS_UNREACHABLE: {
+    what: '连不上资产台账',
     why: '地址没有应答，或者超过 30 秒还没答完',
-    next: '确认对方系统在运行、且本机能访问它，然后重新刷新。已经取到的行没有变化，仍然可以打印',
+    next: '确认台账在运行、且本机能访问它，然后重新刷新。已经取到的行没有变化，仍然可以打印',
   },
-  HTTP_SOURCE_BAD_STATUS: {
-    what: '来源系统拒绝了这次请求',
-    why: '它回的是一个错误状态而不是数据——常见的是凭证已失效，或者地址已经不在了',
-    next: '检查这个数据源的地址与请求头。已经取到的行没有变化，仍然可以打印',
+  NEXUS_BAD_SHAPE: {
+    what: '资产台账回来的东西读不了',
+    why: '它必须回带 columns 和 rows 的 JSON，每个值都是文本，每一行的列与 columns 完全一致',
+    next: '把下面的细节交给维护台账的人。已经取到的行没有变化，仍然可以打印',
   },
-  HTTP_SOURCE_BAD_SHAPE: {
-    what: '对方回来的东西不是这里能读的表',
-    why: '必须是带 columns 和 rows 的 JSON，每个值都是文本，每一行的列与 columns 完全一致',
-    next: '把下面的细节交给维护对方系统的人。已经取到的行没有变化，仍然可以打印',
+  NEXUS_DUPLICATE_KEY: {
+    what: '有两行带着同一个设备 id 过来',
+    why: '设备 id 是刷新前后分辨行的依据，重复了就没法说清哪一行是哪一行',
+    next: '把下面这些 id 交给维护台账的人。已经取到的行没有变化，仍然可以打印',
   },
-  HTTP_SOURCE_DUPLICATE_KEY: {
-    what: '有两行带着同一个 key 过来',
-    why: 'key 列是刷新前后分辨行的依据，值重复了就没法说清哪一行是哪一行',
-    next: '在对方系统里修掉重复，或者把这个数据源的 key 列换成一个取值唯一的列，然后重新刷新',
-  },
-  HTTP_SOURCE_MISSING_KEY: {
-    what: '有一行的 key 列是空的',
-    why: '没有 key 的行无法与它要替换的那一行对应上，而直接丢掉它就会丢掉没人想丢的数据',
-    next: '在对方系统里把每一行的 key 列填上，或者换一个 key 列，然后重新刷新',
-  },
-  HTTP_SOURCE_KEY_COLUMN_REQUIRED: {
-    what: '这个数据源得先有 key 列',
-    why: '打印前刷新依赖行在刷新前后还是同一行；没有 key 列，刷新会把行从已经勾好的选择底下挪走',
-    next: '先给这个数据源设一个 key 列，再打开这个开关',
+  NEXUS_MISSING_KEY: {
+    what: '有一行没有设备 id',
+    why: '没有 id 的行无法与它要替换的那一行对应上，而直接丢掉它就会丢掉没人想丢的数据',
+    next: '把这件事交给维护台账的人。已经取到的行没有变化，仍然可以打印',
   },
   DATA_SOURCE_NOT_FETCHABLE: {
     what: '这个数据源不从任何地方取数',

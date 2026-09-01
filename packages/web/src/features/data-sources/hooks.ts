@@ -12,20 +12,20 @@ export interface DataSource {
    * A linked source is read-only locally: editing it here and having the next
    * refresh wipe that edit is the failure this distinction exists to prevent.
    */
-  sourceKind: 'local' | 'google-sheets' | 'http'
+  sourceKind: 'local' | 'google-sheets' | 'nexus'
   /** Present only when linked. Flattened onto the same object by the server. */
   spreadsheetId?: string
   spreadsheetTitle?: string
   worksheetId?: number
   worksheetTitle?: string
   /**
-   * Present only for a source that reads from an address.
+   * Present only for a source backed by the asset ledger.
    *
-   * Header **names** and no values: the server never returns those, because a
-   * service with no authentication of its own must not hand back the means of
-   * authenticating somewhere else.
+   * A category and nothing else. The address and the key live in the
+   * environment and are never returned — a service with no authentication of
+   * its own must not hand back the means of authenticating somewhere else.
    */
-  http?: { url: string; headerNames: string[] }
+  nexus?: { categoryId: string }
   /** Which column names a row. Null where identity is still position. */
   keyColumn?: string | null
   /** 0 means "only when asked", which is what every source did before. */
@@ -46,7 +46,7 @@ export interface DataSource {
  * nobody can edit and nothing can refresh.
  */
 export function isFetched(source: Pick<DataSource, 'sourceKind'>): boolean {
-  return source.sourceKind === 'google-sheets' || source.sourceKind === 'http'
+  return source.sourceKind === 'google-sheets' || source.sourceKind === 'nexus'
 }
 
 export interface DataSourceRow {
@@ -290,68 +290,66 @@ export function useUnlinkDataSource() {
   })
 }
 
-/**
- * Connect a table that reads from an address.
- *
- * No rows are fetched here — the server creates it empty and the first refresh
- * fills it — so this returns quickly even when the other end is down, and a
- * producer that is having a bad afternoon does not stop the table being made.
- */
-export function useCreateHttpSource() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (input: {
-      name: string
-      url: string
-      keyColumn: string
-      headers?: Record<string, string>
-      refreshIntervalSeconds?: number
-      refreshBeforePrint?: boolean
-    }) => request<DataSource>('/data-sources/http', { method: 'POST', body: input }),
-    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+/** The ledger's categories, and whether the ledger is configured at all. */
+export interface NexusCategory {
+  id: string
+  code: string
+  name: string
+  parent_id?: string | null
+  path?: string
+  display_key?: string
+}
+
+const NEXUS_CATEGORIES_KEY = ['nexus-categories']
+
+export function useNexusCategories() {
+  return useQuery({
+    queryKey: NEXUS_CATEGORIES_KEY,
+    queryFn: () =>
+      request<{ configured: boolean; categories: NexusCategory[] }>('/data-sources/nexus/categories'),
+    // Deployment configuration plus a list that changes rarely; refetching it
+    // while somebody stares at a dropdown would achieve nothing.
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/** The columns of one category, so a design can be written before any rows exist. */
+export function useNexusCategoryColumns(categoryId: string | null) {
+  return useQuery({
+    queryKey: ['nexus-category-columns', categoryId],
+    queryFn: () =>
+      request<{ columns: string[]; total: number }>(
+        `/data-sources/nexus/categories/${categoryId ?? ''}/columns`,
+      ),
+    enabled: categoryId !== null,
+    retry: false,
   })
 }
 
 /**
- * Change how an existing one reads.
+ * Connect a data source to a category.
  *
- * `headers` left out means "leave the credential alone" — it cannot be read
- * back, so requiring it to be resent would be requiring it to be known.
+ * No rows are fetched — the server creates it empty and the first refresh fills
+ * it — so this returns quickly even when the ledger is down.
  */
-export function usePatchHttpSource() {
+export function useCreateNexusSource() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...patch }: {
+    mutationFn: (input: { categoryId: string; name?: string }) =>
+      request<DataSource>('/data-sources/nexus', { method: 'POST', body: input }),
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+/** How stale this source's rows may get, and whether a job refreshes first. */
+export function useRefreshPolicy() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...policy }: {
       id: string
-      url?: string
-      keyColumn?: string
-      headers?: Record<string, string>
       refreshIntervalSeconds?: number
       refreshBeforePrint?: boolean
-    }) => request<DataSource>(`/data-sources/${id}/http`, { method: 'PATCH', body: patch }),
+    }) => request<DataSource>(`/data-sources/${id}/refresh-policy`, { method: 'PATCH', body: policy }),
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })
-}
-
-/**
- * Header lines as a person types them, one `Name: value` per line.
- *
- * Split on the **first** colon only: a bearer token or a URL in a header value
- * contains colons of its own, and splitting on all of them would quietly
- * truncate the credential — which fails later, as a 401 nobody can explain.
- */
-export function parseHeaderLines(text: string): Record<string, string> {
-  const headers: Record<string, string> = {}
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim()
-    if (trimmed.length === 0) {
-      continue
-    }
-    const at = trimmed.indexOf(':')
-    if (at <= 0) {
-      continue
-    }
-    headers[trimmed.slice(0, at).trim()] = trimmed.slice(at + 1).trim()
-  }
-  return headers
 }

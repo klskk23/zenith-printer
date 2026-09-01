@@ -8,7 +8,8 @@ container on your LAN — no cloud, no account, no reverse proxy.
 - **Editor in the browser.** SVG canvas: text, barcodes, QR codes, images,
   rulers, snapping, undo.
 - **Variables and data sources.** Type them in, draw them from a sequence pool,
-  upload a CSV, or link a Google Sheet and refresh it when you want.
+  upload a CSV, link a Google Sheet, or pull a category from the asset ledger,
+  and refresh when you want.
 - **Two printer families.** NIIMBOT over USB serial, Honeywell/ZPL over TCP 9100.
 - **Deterministic rendering.** Fonts ship inside the image and system fonts are
   switched off, so one template prints identically on every machine.
