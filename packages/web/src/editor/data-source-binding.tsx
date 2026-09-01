@@ -13,6 +13,7 @@ import { Alert } from '../components/ui/alert.tsx'
 import { copy } from '../i18n/index.ts'
 import { FreshnessLine } from '../features/data-sources/freshness-line.tsx'
 import { isFetched, useDataSources } from '../features/data-sources/hooks.ts'
+import { useAutoRefresh } from '../features/data-sources/use-auto-refresh.ts'
 import { RefreshButton } from '../features/data-sources/refresh-button.tsx'
 import type { BindingIssue } from '../features/templates/hooks.ts'
 
@@ -32,6 +33,9 @@ export function DataSourceBinding({
 }: DataSourceBindingProps): React.JSX.Element {
   const sources = useDataSources()
   const bound = sources.data?.find((candidate) => candidate.id === dataSourceId)
+  // Only for a table that asked for it; a failure shows the rows from last
+  // time rather than blocking the panel.
+  const auto = useAutoRefresh(bound)
 
   return (
     <div className="space-y-2" data-data-source-binding>
@@ -81,6 +85,11 @@ export function DataSourceBinding({
         <div className="space-y-1" data-binding-freshness>
           <RefreshButton source={bound} />
           <FreshnessLine source={bound} now={new Date()} />
+          {auto.failed && (
+            <p className="text-2xs text-warning" data-auto-refresh-failed>
+              {copy.dataSources.autoRefreshFailed}
+            </p>
+          )}
         </div>
       )}
 

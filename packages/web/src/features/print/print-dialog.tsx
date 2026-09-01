@@ -39,6 +39,7 @@ import {
   type Selection,
 } from './selection.ts'
 import { isFetched, useDataSources } from '../data-sources/hooks.ts'
+import { useAutoRefresh } from '../data-sources/use-auto-refresh.ts'
 import { randomId } from '../../lib/random-id.ts'
 
 export interface PrintDialogProps {
@@ -124,6 +125,11 @@ export function PrintDialog({
     () => new Map([...keyByOrdinal].map(([ordinal, key]) => [key, ordinal] as const)),
     [keyByOrdinal],
   )
+
+  // Fired on opening, only for a table that asked for it. A failure leaves
+  // the stored rows in place and says so — printing must not stop because
+  // somebody else's system is having a bad afternoon.
+  const auto = useAutoRefresh(boundSource)
 
   const chosenRows = dataSourceId === null ? 0 : selectedCount(selection, rowCount)
   const labels = dataSourceId === null ? copies : labelTotal(selection, rowCount, copies)
@@ -293,6 +299,11 @@ export function PrintDialog({
                     setSelectionCleared(true)
                   }}
                 />
+                {auto.failed && (
+                  <p className="text-2xs text-warning" data-auto-refresh-failed>
+                    {copy.dataSources.autoRefreshFailed}
+                  </p>
+                )}
                 {selectionCleared && (
                   <p className="text-2xs text-muted-foreground" data-selection-cleared>
                     {copy.dataSources.refreshClearedSelection}
