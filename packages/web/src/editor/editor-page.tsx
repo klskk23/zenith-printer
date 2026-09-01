@@ -31,6 +31,7 @@ import { PrintDialog } from '../features/print/print-dialog.tsx'
 import { TemplateBar } from '../features/templates/template-bar.tsx'
 import { useProfiles } from '../features/profiles/hooks.ts'
 import { useTemplates, type Template } from '../features/templates/hooks.ts'
+import { usePrintPresets } from '../features/print-presets/hooks.ts'
 import { useWorkspace } from '../app/workspace.tsx'
 import type { Profile } from '../features/profiles/hooks.ts'
 import { CanvasViewport } from './canvas-viewport.tsx'
@@ -59,12 +60,35 @@ export interface EditorPageProps {
   tabId: string
   /** Template the tab was opened on, if any. */
   templateId: string | null
+  /**
+   * A print preset to open with, from `?preset=` in the address.
+   *
+   * Sets the printer, the print settings and the copy count once, and then has
+   * no further say: somebody who changes any of them is not to be overruled by
+   * a link they followed a minute ago.
+   */
+  presetId?: string
 }
 
-export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.Element {
+export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): React.JSX.Element {
   const printers = usePrinters()
   const [printerId, setPrinterId] = useState<string | null>(null)
   const [profileId, setProfileId] = useState<string | null>(null)
+  /** Copies the print dialog opens on; a preset may raise it above one. */
+  const [initialCopies, setInitialCopies] = useState(1)
+  const presets = usePrintPresets()
+  /**
+   * What the link could not do, said out loud.
+   *
+   * A link that promises a printer and a count, and lands on the defaults,
+   * looks exactly like one that worked — the way somebody finds out otherwise
+   * is by holding the labels.
+   */
+  const [presetNotices, setPresetNotices] = useState<readonly string[]>([])
+  /** The preset's profile, waiting for that printer's profiles to arrive. */
+  const [pendingProfileId, setPendingProfileId] = useState<string | null>(null)
+  /** Applied once, whatever the outcome. */
+  const presetApplied = useRef(false)
   // The undo stack owns the IR; `ir` is just its present. Snapshots rather
   // than per-operation inverses, so a new element type is undoable the day it
   // exists instead of the day somebody writes its inverse.
@@ -516,7 +540,11 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
    * deliberate choice of a different roll every time the list refetched.
    */
   useEffect(() => {
-    if (printerId === null || profileId !== null) {
+    // Held off while a preset's own profile is still waiting for that
+    // printer's list: applying the default first would move the canvas to one
+    // stock and then to another, leaving a size change in the undo stack that
+    // nobody made.
+    if (printerId === null || profileId !== null || pendingProfileId !== null) {
       return
     }
     const fallback = profiles.data?.find((p) => p.isDefault)
@@ -524,7 +552,83 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
       setProfileId(fallback.id)
       applyProfileStock(fallback)
     }
-  }, [printerId, profileId, profiles.data])
+  }, [printerId, profileId, pendingProfileId, profiles.data])
+
+  /**
+   * Apply the preset the address arrived with — once, and never again.
+   *
+   * Waits for the presets and the printers, because "no such preset" and "not
+   * fetched yet" look identical in an empty list, and announcing the first
+   * while the second is true is how a working link gets reported as broken.
+   *
+   * Every branch below still opens the design. A link that names a deleted
+   * printer is a link with one wrong reference, not a reason to refuse a
+   * label somebody asked to see.
+   */
+  useEffect(() => {
+    if (presetId === undefined || presetApplied.current) {
+      return
+    }
+    if (!presets.isSuccess || !printers.isSuccess) {
+      return
+    }
+    presetApplied.current = true
+
+    const preset = presets.data.find((item) => item.id === presetId)
+    if (preset === undefined) {
+      setPresetNotices([copy.editor.preset.missing])
+      return
+    }
+
+    const notices: string[] = []
+    if (preset.templateId !== templateId) {
+      /**
+       * The address wins.
+       *
+       * Swapping the label out from under somebody who clicked a specific one
+       * is worse than the settings being wrong: they would print the other
+       * label believing it was this one. The preset's other three fields are
+       * still applied — they are what the link was for.
+       */
+      const other = allTemplates.data?.find((item) => item.id === preset.templateId)
+      notices.push(copy.editor.preset.otherTemplate(other?.name ?? preset.templateId))
+    }
+
+    if (printers.data.some((item) => item.id === preset.printerId)) {
+      setPrinterId(preset.printerId)
+      if (preset.profileId !== null) {
+        // Resolved in the effect below: this printer's profiles have not been
+        // fetched yet at this point.
+        setPendingProfileId(preset.profileId)
+      }
+    } else {
+      // Left unselected on purpose. Falling back to whichever printer happens
+      // to be first produces labels on the wrong machine, and the print button
+      // is disabled until one is chosen, which says so without printing
+      // anything to find out.
+      notices.push(copy.editor.preset.printerGone)
+    }
+
+    setInitialCopies(preset.copies)
+    setPresetNotices(notices.length > 0 ? notices : [copy.editor.preset.applied(preset.name)])
+  }, [presetId, presets.isSuccess, presets.data, printers.isSuccess, printers.data, templateId, allTemplates.data])
+
+  /** The preset's profile, once that printer's profiles have arrived. */
+  useEffect(() => {
+    if (pendingProfileId === null || !profiles.isSuccess) {
+      return
+    }
+    const wanted = profiles.data.find((item) => item.id === pendingProfileId)
+    setPendingProfileId(null)
+    if (wanted === undefined) {
+      setPresetNotices((current) => [...current, copy.editor.preset.profileGone])
+      return
+    }
+    setProfileId(wanted.id)
+    // The same path as choosing it by hand: a design laid out on a canvas that
+    // is not the paper prints wrong, and nobody notices until it does.
+    applyProfileStock(wanted)
+  }, [pendingProfileId, profiles.isSuccess, profiles.data, applyProfileStock])
 
   const templateBody = (): Record<string, unknown> => ({
     printerKind: printer?.kind ?? 'niimbot',
@@ -699,6 +803,9 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
               <div className="space-y-1">
                 <Label className="text-2xs">{copy.editor.canvasWidth}</Label>
                 <Input
+                  // The label beside it carries no `for`, so without this the
+                  // field has no accessible name at all.
+                  aria-label={copy.editor.canvasWidth}
                   type="number"
                   step={0.5}
                   value={ir.widthMm}
@@ -708,6 +815,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
               <div className="space-y-1">
                 <Label className="text-2xs">{copy.editor.canvasHeight}</Label>
                 <Input
+                  aria-label={copy.editor.canvasHeight}
                   type="number"
                   step={0.5}
                   value={ir.heightMm}
@@ -886,6 +994,22 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
       </ResizablePanelGroup>
 
       {/*
+        What a `?preset=` link did, or could not do. Alongside the violations
+        rather than as a toast: it describes the state the editor is in, and
+        that is still true five minutes later when somebody finally looks at
+        the printer selector.
+      */}
+      {presetNotices.length > 0 && (
+        <div className="mt-3 space-y-1" data-preset-notice>
+          {presetNotices.map((notice) => (
+            <Alert key={notice} variant="warning" className="py-1.5 text-xs">
+              {notice}
+            </Alert>
+          ))}
+        </div>
+      )}
+
+      {/*
         Problems along the bottom rather than pushing the canvas down. A design
         being dragged around produces and clears warnings constantly, and a
         banner that reflows the editor each time is unusable.
@@ -917,6 +1041,7 @@ export function EditorPage({ tabId, templateId }: EditorPageProps): React.JSX.El
           variableValues={designValues(variables)}
           unresolved={preview.unresolved}
           dataSourceId={dataSourceId}
+          initialCopies={initialCopies}
           onClose={() => setPrintOpen(false)}
         />
       )}

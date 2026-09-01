@@ -139,6 +139,18 @@ export const copy: Copy = {
   },
 
   editor: {
+    preset: {
+      applied: (name: string): string =>
+        `Printer, print settings and copies are set from the preset "${name}". Whether anything prints is still yours to decide.`,
+      missing:
+        'The preset in the address does not exist — it may have been deleted. The label opened, but the printer and copies are at their defaults; check them before printing.',
+      otherTemplate: (name: string): string =>
+        `That preset points at a different label, "${name}". This is still the one the address named — nothing was swapped out from under you — but the printer and copies are set from the preset.`,
+      printerGone:
+        'The printer that preset names has been deleted, so no printer was selected. Choose one rather than printing to whichever is default.',
+      profileGone:
+        'The print settings that preset names have been deleted, so density and stock were not set. Check them before printing.',
+    },
     layers: {
       heading: 'Layers',
       empty: 'Nothing on the canvas yet',

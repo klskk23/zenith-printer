@@ -29,6 +29,15 @@ export interface WorkspaceTab {
   /** Data source editor only. */
   dataSourceId?: string
   /**
+   * Designs only: the print preset the tab was opened on, from `?preset=`.
+   *
+   * Held by the tab rather than read from the address when needed, because the
+   * address is rewritten *from* the active tab — a preset the tab did not keep
+   * would be erased by the first tab switch, and with it the only record of
+   * why this design opened with a printer already chosen.
+   */
+  presetId?: string
+  /**
    * Unsaved designs only: what separates 「未命名设计 1」 from 「未命名设计 2」.
    *
    * Assigned when the tab opens and never touched again, so closing one tab
@@ -116,6 +125,7 @@ export function openTab(
     kind: descriptor.kind,
     templateId: descriptor.templateId ?? null,
     ...(descriptor.dataSourceId === undefined ? {} : { dataSourceId: descriptor.dataSourceId }),
+    ...(descriptor.presetId === undefined ? {} : { presetId: descriptor.presetId }),
     ...(isBlankDesign ? { draftNumber: nextDraftNumber(state.tabs) } : {}),
     isDirty: false,
   }
@@ -228,7 +238,9 @@ export function hasUnsavedWork(state: WorkspaceState): boolean {
  * gone, which the leave prompt has already warned about. An unrecognised
  * address lands on the index rather than an empty workspace.
  */
-export function restoreFromPath(path: string, nextId: IdFactory): WorkspaceState {
-  const descriptor = tabFromPath(path) ?? { kind: 'index' as const }
+export function restoreFromPath(address: string, nextId: IdFactory): WorkspaceState {
+  // The whole address, query included: `?preset=` is part of where a link
+  // meant to land.
+  const descriptor = tabFromPath(address) ?? { kind: 'index' as const }
   return openTab(emptyWorkspace(), descriptor, nextId)
 }

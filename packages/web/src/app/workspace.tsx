@@ -43,8 +43,16 @@ export interface WorkspaceApi {
 
 const WorkspaceContext = createContext<WorkspaceApi | null>(null)
 
+/**
+ * The whole address, query included.
+ *
+ * `?preset=` decides which printer, profile and copy count a design opens
+ * with. Reading only `pathname` is what made a preset link open the right
+ * design with none of its settings — twice over, since the writeback below
+ * would have erased the query on the next tab switch anyway.
+ */
 function currentPath(): string {
-  return typeof window === 'undefined' ? '/' : window.location.pathname
+  return typeof window === 'undefined' ? '/' : window.location.pathname + window.location.search
 }
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -81,8 +89,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     if (activeTab === null || typeof window === 'undefined') {
       return
     }
-    const path = pathForTab({ kind: activeTab.kind, templateId: activeTab.templateId })
-    if (window.location.pathname !== path) {
+    const path = pathForTab({
+      kind: activeTab.kind,
+      templateId: activeTab.templateId,
+      ...(activeTab.presetId === undefined ? {} : { presetId: activeTab.presetId }),
+    })
+    if (currentPath() !== path) {
       window.history.pushState(null, '', path)
     }
   }, [activeTab])
@@ -95,7 +107,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     }
     const onPop = (): void => {
       setState((s) => {
-        const restored = restoreFromPath(window.location.pathname, nextId)
+        const restored = restoreFromPath(currentPath(), nextId)
         const wanted = restored.tabs[0]
         if (wanted === undefined) {
           return s
@@ -104,7 +116,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
           (tab) => tab.kind === wanted.kind && tab.templateId === wanted.templateId,
         )
         return existing === undefined
-          ? openTab(s, { kind: wanted.kind, templateId: wanted.templateId, dataSourceId: wanted.dataSourceId }, nextId)
+          ? openTab(
+              s,
+              {
+                kind: wanted.kind,
+                templateId: wanted.templateId,
+                dataSourceId: wanted.dataSourceId,
+                ...(wanted.presetId === undefined ? {} : { presetId: wanted.presetId }),
+              },
+              nextId,
+            )
           : activateTab(s, existing.id)
       })
     }

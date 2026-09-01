@@ -83,3 +83,55 @@ describe('tabFromPath', () => {
     expect(tabFromPath('/data-sources/ds-1')).toEqual({ kind: 'data-source', dataSourceId: 'ds-1' })
   })
 })
+
+/**
+ * A preset carried in the address.
+ *
+ * `nexus-assets` links a label as `/design/{templateId}?preset={presetId}`,
+ * meaning "take me there with the settings already set" — the printer, the
+ * profile and the copies that the preset records, all four of which otherwise
+ * sit at their defaults no matter which link was followed.
+ *
+ * It stays a query rather than becoming a path segment, and the tab stays a
+ * design tab: it is an initial value, not another kind of thing to open.
+ */
+describe('a design address carrying a preset', () => {
+  it('is read out of the query', () => {
+    expect(tabFromPath('/design/tpl-7?preset=pre-1')).toEqual({
+      kind: 'design',
+      templateId: 'tpl-7',
+      presetId: 'pre-1',
+    })
+  })
+
+  it('is written back, so a refresh and the back button keep it', () => {
+    expect(pathForTab({ kind: 'design', templateId: 'tpl-7', presetId: 'pre-1' })).toBe(
+      '/design/tpl-7?preset=pre-1',
+    )
+  })
+
+  it('round-trips', () => {
+    const address = '/design/tpl-7?preset=pre-1'
+    expect(pathForTab(tabFromPath(address)!)).toBe(address)
+  })
+
+  it('is absent from the address when there is none', () => {
+    expect(pathForTab({ kind: 'design', templateId: 'tpl-7' })).toBe('/design/tpl-7')
+    expect(tabFromPath('/design/tpl-7')?.presetId).toBeUndefined()
+  })
+
+  it('ignores a query on the kinds that have no use for one', () => {
+    // Otherwise a stray `?preset=` on the printers page would be carried into
+    // an address that means nothing by it.
+    expect(tabFromPath('/printers?preset=pre-1')).toEqual({ kind: 'printers' })
+    expect(tabFromPath('/?preset=pre-1')).toEqual({ kind: 'index' })
+  })
+
+  it('survives other query parameters alongside it', () => {
+    expect(tabFromPath('/design/tpl-7?utm=x&preset=pre-1')?.presetId).toBe('pre-1')
+  })
+
+  it('treats an empty preset as none, rather than as a preset named ""', () => {
+    expect(tabFromPath('/design/tpl-7?preset=')?.presetId).toBeUndefined()
+  })
+})

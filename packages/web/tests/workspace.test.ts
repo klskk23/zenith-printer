@@ -352,3 +352,27 @@ describe('restoring after a refresh', () => {
     expect(restoreFromPath('/nope', ids()).tabs[0]!.kind).toBe('index')
   })
 })
+
+/**
+ * A preset arriving with the design.
+ *
+ * The tab has to hold it, not just the address: the address is rewritten from
+ * the active tab, so a preset the tab did not keep would be erased the moment
+ * anything caused a rewrite — which is every tab switch.
+ */
+describe('a design tab opened on a preset', () => {
+  it('keeps it, so the address can be written back from the tab', () => {
+    const state = openTab(emptyWorkspace(), { kind: 'design', templateId: 'tpl-7', presetId: 'pre-1' }, ids())
+    expect(state.tabs[0]).toMatchObject({ templateId: 'tpl-7', presetId: 'pre-1' })
+  })
+
+  it('is restored from a full address, query included', () => {
+    const state = restoreFromPath('/design/tpl-7?preset=pre-1', ids())
+    expect(state.tabs[0]).toMatchObject({ kind: 'design', templateId: 'tpl-7', presetId: 'pre-1' })
+  })
+
+  it('leaves the field off a design opened without one', () => {
+    const state = openTab(emptyWorkspace(), { kind: 'design', templateId: 'tpl-7' }, ids())
+    expect(state.tabs[0]?.presetId).toBeUndefined()
+  })
+})

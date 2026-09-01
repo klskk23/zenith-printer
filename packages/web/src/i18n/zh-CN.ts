@@ -145,6 +145,22 @@ export const copy = {
   },
 
   editor: {
+    /**
+     * When a `?preset=` link could not do all of what it promised.
+     *
+     * Said out loud rather than falling back quietly. A link that says "print
+     * this label" and lands on the default printer at one copy looks like it
+     * worked, and the way somebody finds out otherwise is by holding the
+     * labels.
+     */
+    preset: {
+      applied: (name: string): string => `已按预设「${name}」摆好打印机、打印参数与份数。要不要出纸仍然由你决定。`,
+      missing: '地址里的打印预设不存在（可能已被删除）。标签照常打开，但打印机与份数用的是默认值，请自行确认。',
+      otherTemplate: (name: string): string =>
+        `这个预设指向的是另一张标签「${name}」。打开的仍是地址里的这一张——不替你换掉你点开的东西——但打印机与份数已按预设摆好。`,
+      printerGone: '预设指定的打印机已被删除，所以打印机没有按预设选上。请自己选一台，别直接按默认的打。',
+      profileGone: '预设指定的打印参数已被删除，所以浓度、纸型这些没有按预设摆好。打印前请确认参数。',
+    },
     layers: {
       heading: '图层',
       empty: '画布上还没有元素',

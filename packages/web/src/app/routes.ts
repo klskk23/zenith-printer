@@ -44,6 +44,20 @@ export interface TabDescriptor {
   templateId?: string | null
   /** Data source editor only. */
   dataSourceId?: string
+  /**
+   * Designs only: a print preset to open with, from `?preset=` in the address.
+   *
+   * An **initial value, not another kind of tab**. A link that carries one
+   * means "take me there with the settings already set" — the printer, the
+   * profile and the copies the preset records, which otherwise sit at their
+   * defaults however the design was reached. Once somebody changes any of
+   * them, the preset has had its say.
+   *
+   * It stays in the address so a refresh, a back and a forward all arrive at
+   * the same place rather than at the same design with the settings quietly
+   * back to default.
+   */
+  presetId?: string
 }
 
 /** Kinds that exist at most once; opening again switches to the open one. */
@@ -85,14 +99,26 @@ export function pathForTab(descriptor: TabDescriptor): string {
     // An unsaved design has no id to put in the address, so it gets a name of
     // its own rather than leaving the address pointing at the previous tab.
     const id = descriptor.templateId
-    return id === null || id === undefined ? '/design/new' : `/design/${id}`
+    const path = id === null || id === undefined ? '/design/new' : `/design/${id}`
+    return descriptor.presetId === undefined
+      ? path
+      : `${path}?preset=${encodeURIComponent(descriptor.presetId)}`
   }
   return STATIC_PATHS[descriptor.kind]
 }
 
-/** `null` for an address this app does not serve — the caller decides what to do. */
-export function tabFromPath(path: string): TabDescriptor | null {
+/**
+ * `null` for an address this app does not serve — the caller decides what to do.
+ *
+ * Takes the whole address, path and query together, because the query carries
+ * `?preset=`. Reading only `location.pathname` is what made a preset link open
+ * the right design with none of its settings.
+ */
+export function tabFromPath(address: string): TabDescriptor | null {
+  const [path = '', query = ''] = address.split('?', 2)
   const normalised = path.length > 1 ? path.replace(/\/+$/, '') : path
+  // An empty value is no preset, not a preset with an empty id.
+  const preset = new URLSearchParams(query).get('preset')?.trim() ?? ''
 
   for (const [kind, value] of Object.entries(STATIC_PATHS)) {
     if (value === normalised) {
@@ -108,7 +134,13 @@ export function tabFromPath(path: string): TabDescriptor | null {
   const design = /^\/design\/([^/]+)$/.exec(normalised)
   if (design !== null) {
     const id = design[1]!
-    return { kind: 'design', templateId: id === 'new' ? null : id }
+    return {
+      kind: 'design',
+      templateId: id === 'new' ? null : id,
+      // Only designs: a `?preset=` on any other address would be carried into
+      // one that has no use for it.
+      ...(preset === '' ? {} : { presetId: preset }),
+    }
   }
 
   return null

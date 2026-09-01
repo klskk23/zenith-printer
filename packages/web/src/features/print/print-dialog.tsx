@@ -72,6 +72,14 @@ export interface PrintDialogProps {
    * already been answered, in a dialog whose job is to confirm.
    */
   printer: Printer
+  /**
+   * What the copy field opens on.
+   *
+   * A preset records a count, and a link that carries one means it. Still only
+   * an initial value — the field is the operator's, and nothing rewrites it
+   * once the dialog is open.
+   */
+  initialCopies?: number
   onClose: () => void
 }
 
@@ -83,9 +91,10 @@ export function PrintDialog({
   variableValues,
   unresolved,
   dataSourceId,
+  initialCopies = 1,
   onClose,
 }: PrintDialogProps): React.JSX.Element {
-  const [copies, setCopies] = useState(1)
+  const [copies, setCopies] = useState(initialCopies)
   const [selection, setSelection] = useState<Selection>(EMPTY)
   /**
    * Every row key this dialog has seen, by position.
@@ -269,6 +278,9 @@ export function PrintDialog({
             <div className="space-y-1">
               <Label>{copy.print.copies}</Label>
               <Input
+                // The label beside it carries no `for`, so without this the
+                // field has no accessible name.
+                aria-label={copy.print.copies}
                 type="number"
                 min={1}
                 max={100}

@@ -44,7 +44,7 @@ function TabContent({ tab }: { tab: WorkspaceTab }): React.JSX.Element {
     case 'design':
       // The tab knows which template it was opened on; the editor has to be
       // told, or it starts blank and the template has to be picked again.
-      return <EditorPage tabId={tab.id} templateId={tab.templateId} />
+      return <EditorPage tabId={tab.id} templateId={tab.templateId} presetId={tab.presetId} />
     case 'templates':
       return <TemplatesPage />
     case 'data-sources':
