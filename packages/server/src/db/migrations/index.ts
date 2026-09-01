@@ -409,6 +409,106 @@ const claimsOutliveJobs = `
   CREATE INDEX idx_job_sequence_claims_pool ON job_sequence_claims (pool_id, end_value);
 `
 
+/**
+ * A third kind of origin, and an identity for a row that is not its position.
+ *
+ * Two changes, together because both need `data_sources` rebuilt and rebuilding
+ * it twice would be twice the risk.
+ *
+ * **`http`.** Migration 12 left `source_kind` as a CHECK precisely so that a new
+ * origin would cost a value rather than a column. SQLite cannot alter a CHECK,
+ * so collecting the value means rewriting the table.
+ *
+ * **`key_column` / `row_key`.** Until now a row's identity *was* its ordinal:
+ * `(source_id, ordinal)` is the primary key, every write path goes through a
+ * whole-table DELETE and renumbers 1..n, and a refresh compared only the column
+ * set and the row count. That is sound for a table a person edits and then
+ * prints from — they are looking at it. It is not sound for a table that
+ * changes on its own: an upstream insert shifts every row below it, a selection
+ * of ordinals then names different rows than it did, and nothing anywhere
+ * notices, because the ordinals still exist. `expandSelection` only refuses
+ * ordinals that are *gone*.
+ *
+ * So a row may now carry a key taken from one of its own columns, and a refresh
+ * can upsert by it. Ordinals stay dense 1..n — `patchRows` and the browser's
+ * select-all both depend on that — but they stop being what a row *is*.
+ *
+ * **The order below is the whole point.** `data_source_rows` references
+ * `data_sources` with ON DELETE CASCADE, so dropping the parent to rebuild it
+ * would fire an implicit DELETE FROM and take every row with it. The child is
+ * therefore copied aside and dropped *first*; only then is the parent rebuilt,
+ * with nothing left pointing at it. Doing it the other way round is a silent
+ * total data loss that a migration test on an empty database would not catch.
+ */
+const httpSourcesAndRowKeys = `
+  CREATE TABLE data_source_rows_backup AS SELECT * FROM data_source_rows;
+  DROP TABLE data_source_rows;
+
+  CREATE TABLE data_sources_new (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL UNIQUE,
+    columns    TEXT NOT NULL,
+    row_count  INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    source_kind TEXT NOT NULL DEFAULT 'local'
+      CHECK (source_kind IN ('local', 'google-sheets', 'http')),
+    spreadsheet_id    TEXT,
+    spreadsheet_title TEXT,
+    worksheet_id      INTEGER,
+    worksheet_title   TEXT,
+    last_refreshed_at TEXT,
+
+    -- Where an http source reads from, and what it sends to get in.
+    url          TEXT,
+    -- Credentials. Stored, never returned: the read endpoints redact it, for
+    -- the same reason the Google private key may only come from the
+    -- environment — an endpoint with no authentication must not hand back the
+    -- means of authenticating somewhere else.
+    headers_json TEXT,
+
+    -- Which column names a row. Null means identity is still position, which
+    -- is what every source created before now means.
+    key_column TEXT,
+
+    -- 0 means "only when asked", which is what this product did exclusively
+    -- until there was a key column to make anything else safe.
+    refresh_interval_seconds INTEGER NOT NULL DEFAULT 0,
+    refresh_before_print     INTEGER NOT NULL DEFAULT 0
+  );
+
+  INSERT INTO data_sources_new
+    (id, name, columns, row_count, created_at, updated_at, source_kind,
+     spreadsheet_id, spreadsheet_title, worksheet_id, worksheet_title, last_refreshed_at)
+  SELECT id, name, columns, row_count, created_at, updated_at, source_kind,
+         spreadsheet_id, spreadsheet_title, worksheet_id, worksheet_title, last_refreshed_at
+  FROM data_sources;
+
+  DROP TABLE data_sources;
+  ALTER TABLE data_sources_new RENAME TO data_sources;
+
+  CREATE TABLE data_source_rows (
+    source_id   TEXT NOT NULL REFERENCES data_sources(id) ON DELETE CASCADE,
+    ordinal     INTEGER NOT NULL,
+    values_json TEXT NOT NULL,
+    -- The value of the source's key column for this row, or null where
+    -- identity is still position.
+    row_key     TEXT,
+    PRIMARY KEY (source_id, ordinal)
+  );
+
+  INSERT INTO data_source_rows (source_id, ordinal, values_json)
+  SELECT source_id, ordinal, values_json FROM data_source_rows_backup;
+
+  DROP TABLE data_source_rows_backup;
+
+  -- Partial, so the sources that have no key column are unaffected by it. Two
+  -- rows sharing a key would make "update the row with this key" ambiguous,
+  -- and the refresh path would have to pick one.
+  CREATE UNIQUE INDEX idx_data_source_rows_key
+    ON data_source_rows (source_id, row_key) WHERE row_key IS NOT NULL;
+`
+
 export const migrations: Migration[] = [
   { id: 1, name: 'initial_schema', up: initialSchema },
   { id: 2, name: 'template_version', up: templateVersion },
@@ -428,4 +528,5 @@ export const migrations: Migration[] = [
   { id: 13, name: 'drop_image_ref_count', up: dropImageRefCount },
   { id: 14, name: 'relative_image_paths', up: '', apply: relativiseImagePaths },
   { id: 15, name: 'claims_outlive_jobs', up: claimsOutliveJobs },
+  { id: 16, name: 'http_sources_and_row_keys', up: httpSourcesAndRowKeys },
 ]
