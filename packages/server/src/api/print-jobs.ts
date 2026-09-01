@@ -18,16 +18,10 @@ import { ProfileRepo } from '../db/repositories/profile-repo.ts'
 import { SequenceAllocator } from '../domain/sequence-allocator.ts'
 import { checkLabel } from '../domain/overflow.ts'
 import { ApiError, HttpStatus } from './errors.ts'
-import { BarcodeEmptyValueError, assertBarcodeValuesPresent } from '../domain/barcode-refs.ts'
+import { acceptJob } from './job-acceptance.ts'
 import {
-  allocateSequences,
-  assertBarcodesEncodable,
   assertFitsPrinter,
-  assertNoNameCollisions,
-  assertReferencesResolvable,
-  columnPlaceholders,
   selectRows,
-  buildSnapshot,
   designValues,
   resolveContent,
   reprintSnapshot,
@@ -136,13 +130,6 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
 
       const content = resolveContent(template, input.ir, profile, printer.capabilities)
 
-      // Everything below runs before a single label is burned. Cheap
-      // structural checks first, the sequence claim last, so a rejection never
-      // leaves a claimed range stranded.
-      assertFitsPrinter(content.ir, printer)
-
-      const values = designValues(template)
-
       // The rows this job will print, copied out of the data source now. From
       // here on the job is self-contained: editing the table afterwards cannot
       // change what history says, or what a reprint produces (FR-039).
@@ -155,89 +142,27 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
         copies: input.copies,
       })
 
-      assertNoNameCollisions(template, selected.columns)
-      assertReferencesResolvable(content.ir, { ...values, ...columnPlaceholders(selected) })
-      assertBarcodesEncodable(content.ir, { ...values, ...(selected.rows[0] ?? {}) })
-      try {
-        assertBarcodeValuesPresent(content.ir, selected.selectedRows, values)
-      } catch (err) {
-        if (err instanceof BarcodeEmptyValueError) {
-          throw ApiError.unprocessable('BARCODE_EMPTY_VALUE', {
-            column: err.column,
-            ordinals: err.ordinals,
-          })
-        }
-        throw err
-      }
-
-      // Overflow is recorded, not enforced. Content past the edge is clipped,
-      // and whether that is acceptable is a judgement about this label that the
-      // operator is better placed to make. Holding back ninety-nine good labels
-      // because one will be clipped is the worse outcome.
-      // Checked once, against the design — not once per label. Encoding a
-      // barcode for every row would put a thousand encodes before the first
-      // label comes out, which is the wait the page source exists to remove
-      // (FR-045). What that gives up is knowing which *rows* overflow; the
-      // print dialog says so rather than leaving silence to be read as
-      // "checked, and fine" (FR-045a).
-      const overflowWarnings = checkLabel(content.ir, { ...values, ...(selected.rows[0] ?? {}) }, 0)
-
-      if (printer.queueState === 'paused') {
-        throw ApiError.conflict('QUEUE_PAUSED', { printerId: printer.id })
-      }
-
-      // Without a key from the client we mint one, so a genuinely new request
-      // still succeeds; a retried request supplies the same key and gets the
-      // same job back rather than a second batch of labels.
-      const idempotencyKey = request.headers['idempotency-key'] ?? randomUUID()
-
-      const { job, created } = jobs().createOrGet({
-        idempotencyKey: String(idempotencyKey),
-        printerId: printer.id,
-        templateId: template?.id ?? null,
-        profileId: profile?.id ?? null,
-        requestedCopies: selected.labelCount,
-        // Recorded on the snapshot: the design may be edited afterwards, and
-        // history must show what this run actually produced.
-        snapshot: {
-          ...buildSnapshot(printer, { ...content, rows: selected.rows, copiesPerRow: input.copies }),
-          overflowWarnings,
+      // Everything from here to the queue kick is shared with the preset path,
+      // so the two cannot drift apart on the order of the checks or on when
+      // the serials are claimed. See api/job-acceptance.ts.
+      const accepted = acceptJob(
+        { db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids, queue: app.ctx.queue, log: request.log },
+        {
+          printer,
+          template,
+          profile,
+          content,
+          selected,
+          copies: input.copies,
+          idempotencyKey:
+            request.headers['idempotency-key'] === undefined
+              ? undefined
+              : String(request.headers['idempotency-key']),
         },
-      })
-
-      const allocator = new SequenceAllocator(app.ctx.db, app.ctx.clock, app.ctx.ids)
-      const seqClaims = created
-        ? allocateSequences({
-            db: app.ctx.db,
-            clock: app.ctx.clock,
-            ids: app.ctx.ids,
-            jobId: job.id,
-            template,
-            // Distinct serials needed: one per row when there is a data source,
-            // otherwise one per copy (FR-036).
-            count: selected.rows.length > 0 ? selected.rows.length : input.copies,
-          })
-        : allocator.claimsFor(job.id)
-
-      // Kick the runner without waiting for it. FR-012 requires the response
-      // to come back now, not when the labels stop coming out.
-      if (created) {
-        void app.ctx.queue?.drain(printer.id).catch((err: unknown) => {
-          request.log.error({ err, printerId: printer.id }, 'queue runner failed')
-        })
-      }
+      )
 
       // 202: accepted for printing, not finished printing (FR-012).
-      return reply.status(HttpStatus.Accepted).send({
-        jobId: job.id,
-        status: job.status,
-        requestedCopies: job.requestedCopies,
-        seqClaims,
-        deduplicated: !created,
-        // Returned so the caller can show what will be clipped; the job is
-        // accepted either way.
-        overflowWarnings,
-      })
+      return reply.status(HttpStatus.Accepted).send(accepted)
     },
   )
 

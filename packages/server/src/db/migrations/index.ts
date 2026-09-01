@@ -509,6 +509,33 @@ const httpSourcesAndRowKeys = `
     ON data_source_rows (source_id, row_key) WHERE row_key IS NOT NULL;
 `
 
+/**
+ * A named combination of design, printer, settings and count.
+ *
+ * It exists so that a system on the other side of an HTTP call can print
+ * without knowing what a template is or which printer is which. It hands over
+ * rows and a preset id; everything else is a decision somebody made here, once,
+ * in front of the machine.
+ *
+ * The references are `ON DELETE CASCADE` for the printer and the template and
+ * `SET NULL` for the profile, matching what each deletion means: a preset whose
+ * design or printer is gone cannot print anything and should not sit there
+ * looking usable, while a preset whose print settings were deleted falls back
+ * to the printer's defaults exactly as a job with no profile does.
+ */
+const printPresets = `
+  CREATE TABLE print_presets (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,
+    template_id TEXT NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+    printer_id  TEXT NOT NULL REFERENCES printers(id)  ON DELETE CASCADE,
+    profile_id  TEXT          REFERENCES profiles(id)  ON DELETE SET NULL,
+    copies      INTEGER NOT NULL DEFAULT 1 CHECK (copies >= 1),
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+  );
+`
+
 export const migrations: Migration[] = [
   { id: 1, name: 'initial_schema', up: initialSchema },
   { id: 2, name: 'template_version', up: templateVersion },
@@ -529,4 +556,5 @@ export const migrations: Migration[] = [
   { id: 14, name: 'relative_image_paths', up: '', apply: relativiseImagePaths },
   { id: 15, name: 'claims_outlive_jobs', up: claimsOutliveJobs },
   { id: 16, name: 'http_sources_and_row_keys', up: httpSourcesAndRowKeys },
+  { id: 17, name: 'print_presets', up: printPresets },
 ]

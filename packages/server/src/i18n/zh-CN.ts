@@ -109,6 +109,11 @@ export const APP_ERROR_COPY: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: '同一张表同时被写两次，会得到一半新一半旧的内容',
     next: '等上一次刷新结束后再试',
   },
+  PRINT_PRESET_NAME_TAKEN: {
+    what: '已经有一个同名的打印预设了',
+    why: '名字是列表里认出一个预设的依据，重名就分不清哪个是哪个',
+    next: '换一个名字，或者直接改已有的那个预设',
+  },
   HTTP_SOURCE_UNREACHABLE: {
     what: '连不上这张表的来源系统',
     why: '地址没有应答，或者超过 30 秒还没答完',

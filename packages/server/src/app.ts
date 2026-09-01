@@ -22,6 +22,7 @@ import { systemClock, uuidGenerator, type Clock, type IdGenerator } from './cloc
 import type { Database } from './db/index.ts'
 import { registerPrinterRoutes } from './api/printers.ts'
 import { registerPrintJobRoutes } from './api/print-jobs.ts'
+import { registerPrintPresetRoutes } from './api/print-presets.ts'
 import { registerPreviewRoutes } from './api/preview.ts'
 import { registerImageRoutes } from './api/images.ts'
 import { registerTemplateIoRoutes } from './api/template-io.ts'
@@ -182,6 +183,7 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
 
   void app.register(registerPrinterRoutes)
   void app.register(registerPrintJobRoutes)
+  void app.register(registerPrintPresetRoutes)
   void app.register(registerTemplateRoutes)
   void app.register(registerSequencePoolRoutes)
   void app.register(registerDataSourceRoutes)

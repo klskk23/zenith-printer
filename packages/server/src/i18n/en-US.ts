@@ -104,6 +104,11 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'Two writers on one table would leave it half new and half old',
     next: 'Wait for the running refresh to finish and try again',
   },
+  PRINT_PRESET_NAME_TAKEN: {
+    what: 'A print preset with that name already exists',
+    why: 'The name is how a preset is recognised in a list, and two the same cannot be told apart',
+    next: 'Choose a different name, or edit the existing preset',
+  },
   HTTP_SOURCE_UNREACHABLE: {
     what: 'Could not reach the system this table reads from',
     why: 'The address did not answer, or took longer than 30 seconds to',
