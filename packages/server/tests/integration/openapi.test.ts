@@ -32,6 +32,63 @@ describe('the OpenAPI document', () => {
     expect(res.headers['content-type']).toContain('application/json')
   })
 
+  it('leaves no route out', async () => {
+    /**
+     * The spot-checks below name a handful of paths; this asks the question
+     * somebody is actually asking when they wonder whether the document is
+     * current. Nothing here is hand-written — it is generated from the same
+     * zod schemas that validate requests — but a route registered before the
+     * plugin's `onRoute` hook exists, or one the transform choked on, is
+     * simply absent. And absent is invisible: the console still loads, the
+     * other sixty endpoints still work, and the missing one is found by
+     * whoever was trying to call it.
+     */
+
+    /**
+     * `printRoutes` draws a tree: each line is one *segment*, indented four
+     * columns per level, so a full path has to be rebuilt from the stack of
+     * segments above it. Reading only the top-level lines would make this test
+     * pass while checking almost nothing — the nested routes are most of them.
+     */
+    const registered = new Set<string>()
+    const segments: string[] = []
+    for (const line of app.printRoutes({ commonPrefix: false }).split('\n')) {
+      const start = line.indexOf('/')
+      if (start < 0) {
+        continue
+      }
+      const depth = Math.max(0, Math.round(start / 4) - 1)
+      const segment = line.slice(start).split(' ')[0]!.split('|')[0]!
+      segments.length = depth
+      segments[depth] = segment
+      if (/\([A-Z, ]+\)/.test(line)) {
+        registered.add(segments.join('').replace(/\/$/, '') || '/')
+      }
+    }
+
+    /**
+     * Compared with the parameter *names* erased.
+     *
+     * Two routes may sit at the same position under different names —
+     * `/api/printers/:id/probe` and `/api/printers/:printerId/profiles` — and
+     * Fastify prints the shared segment as `/:id|:printerId`. What matters
+     * here is whether the position is described, not what it is called.
+     */
+    const shape = (path: string): string => path.replace(/[:{]\w+\}?/g, ':x')
+    const documented = new Set(Object.keys((await document()).paths ?? {}).map(shape))
+
+    // The document cannot describe itself.
+    const exempt = new Set(['/api/openapi.json', '/api/docs'])
+
+    const missing = [...registered].filter(
+      (path) => path.startsWith('/api/') && !exempt.has(path) && !documented.has(shape(path)),
+    )
+    // Guards the parser: an empty set of routes would satisfy the check below
+    // perfectly, and a tree format that changed would produce exactly that.
+    expect(registered.size).toBeGreaterThan(40)
+    expect(missing, 'registered but absent from the document').toEqual([])
+  })
+
   it('lists the routes that do the work', async () => {
     const paths = Object.keys((await document()).paths ?? {})
     // A spread of methods and shapes: if the transform silently dropped

@@ -172,14 +172,30 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
     }
   }
 
-  app.get('/api/health', async () => ({ status: 'ok' }))
-
   // Routes are registered eagerly; Fastify resolves the returned promise
   // through `app.after()` when the caller awaits `ready()`.
-  // On the root instance and before the routes, so `onRoute` fires for all of
-  // them. Registering it as a plugin of its own would encapsulate it, and the
-  // document would describe nothing but itself.
+  // On the root instance and before *every* route, so `onRoute` fires for all
+  // of them. Registering it as a plugin of its own would encapsulate it, and
+  // the document would describe nothing but itself. Health used to be declared
+  // above this line and was consequently the one endpoint missing from the
+  // document — silently, since an absent path breaks nothing that was already
+  // working and is found only by whoever went looking for it.
   registerOpenApi(app)
+
+  /**
+   * Registered as a plugin like every other route group, not with a bare
+   * `app.get`.
+   *
+   * `app.register` defers; `app.get` does not. A route declared directly on the
+   * root instance is therefore in place before the swagger plugin has loaded
+   * its `onRoute` hook, and never reaches the document — which is exactly what
+   * had happened to this one. Nothing broke: the endpoint answered, the other
+   * sixty were described, and the omission was findable only by somebody who
+   * went looking for health in the console.
+   */
+  void app.register((instance) => {
+    instance.get('/api/health', async () => ({ status: 'ok' }))
+  })
 
   void app.register(registerPrinterRoutes)
   void app.register(registerPrintJobRoutes)
