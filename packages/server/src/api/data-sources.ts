@@ -22,6 +22,7 @@ import {
   assertKnownColumns,
   dataSourceNameSchema,
   httpSourceInputSchema,
+  httpSourcePatchSchema,
   rowPatchSchema,
 } from '../domain/data-source.ts'
 import {
@@ -162,7 +163,36 @@ export function serialiseSource(source: DataSource): Record<string, unknown> {
  * refreshed can still be printed from, and refusing to print because a producer
  * is down would be this system inventing an outage of its own.
  */
-async function refreshFromAddress(
+/**
+ * In-flight refreshes, by data source id.
+ *
+ * Two writers on one table is how a half-replaced table happens: new columns
+ * with old rows, or rows from two different reads. The browser disables its
+ * button, but this service has no authentication and anybody on the network can
+ * call the endpoint directly — so the guard has to be here as well.
+ *
+ * Module scope rather than per-registration, because the submission path
+ * refreshes too when a source asks it to, and two guards would guard nothing.
+ */
+const refreshing = new Set<string>()
+
+export function isRefreshing(dataSourceId: string): boolean {
+  return refreshing.has(dataSourceId)
+}
+
+export async function withRefreshLock<T>(dataSourceId: string, run: () => Promise<T>): Promise<T> {
+  if (refreshing.has(dataSourceId)) {
+    throw ApiError.conflict('DATA_SOURCE_REFRESH_IN_PROGRESS', { dataSourceId })
+  }
+  refreshing.add(dataSourceId)
+  try {
+    return await run()
+  } finally {
+    refreshing.delete(dataSourceId)
+  }
+}
+
+export async function refreshFromAddress(
   app: FastifyInstance,
   repo: DataSourceRepo,
   source: DataSource,
@@ -435,15 +465,6 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
     },
   )
 
-  /**
-   * In-flight refreshes, by data source id.
-   *
-   * Two writers on one table is how a half-replaced table happens: new columns
-   * with old rows, or rows from two different reads. The browser disables its
-   * button, but this service has no authentication and anybody on the network
-   * can call the endpoint directly — so the guard has to be here as well.
-   */
-  const refreshing = new Set<string>()
 
   /**
    * Refuse to change the contents of a table that is a copy of somebody
@@ -459,6 +480,48 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
       throw ApiError.unprocessable('DATA_SOURCE_READ_ONLY', { dataSourceId: source.id })
     }
   }
+
+  /**
+   * Change how a source reads, without recreating it.
+   *
+   * Kept apart from the rename PATCH because these are a different kind of
+   * change: a rename affects nothing, while any of these decides what the next
+   * refresh does. `headers` absent leaves the stored credential alone — the
+   * caller cannot read it back, so requiring them to resend it would mean
+   * requiring them to know it.
+   */
+  typed.patch(
+    '/api/data-sources/:id/http',
+    {
+      schema: {
+        params: idParams,
+        body: httpSourcePatchSchema,
+      },
+    },
+    async (request) => {
+      const repo = sources()
+      const source = require(repo, request.params.id)
+      if (source.sourceKind !== 'http') {
+        throw ApiError.unprocessable('DATA_SOURCE_NOT_FETCHABLE', { dataSourceId: source.id })
+      }
+
+      const keyColumn = request.body.keyColumn ?? source.keyColumn
+      if (request.body.refreshBeforePrint === true && (keyColumn === null || keyColumn.length === 0)) {
+        // Without a key, a refresh at submission time moves the rows out from
+        // under a selection already made — silently, and in the worst moment.
+        throw ApiError.unprocessable('HTTP_SOURCE_KEY_COLUMN_REQUIRED', { dataSourceId: source.id })
+      }
+
+      repo.setRefreshPolicy(source.id, {
+        refreshIntervalSeconds: request.body.refreshIntervalSeconds,
+        refreshBeforePrint: request.body.refreshBeforePrint,
+        url: request.body.url,
+        headers: request.body.headers,
+        keyColumn: request.body.keyColumn,
+      })
+      return serialiseSource(require(repo, source.id))
+    },
+  )
 
   typed.post(
     '/api/data-sources/:id/unlink',

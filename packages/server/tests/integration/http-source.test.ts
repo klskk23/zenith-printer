@@ -335,3 +335,69 @@ describe('releasing it', () => {
     expect(res.json().http ?? null).toBeNull()
   })
 })
+
+describe('changing how it reads', () => {
+  it('leaves the stored credential alone when none is sent', async () => {
+    // The caller cannot read it back, so requiring them to resend it would be
+    // requiring them to know it.
+    const id = await created()
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/data-sources/${id}/http`,
+      payload: { refreshIntervalSeconds: 300 },
+    })
+    await refresh(id)
+    expect(asked[0]?.headers).toMatchObject({ Authorization: 'Bearer nxk_secret' })
+  })
+
+  it('records how stale the rows may get', async () => {
+    const id = await created()
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/data-sources/${id}/http`,
+      payload: { refreshIntervalSeconds: 300 },
+    })
+    expect(res.json()).toMatchObject({ refreshIntervalSeconds: 300 })
+  })
+
+  it('refuses refresh-before-print on a source with no key column', async () => {
+    // Refreshing at submission time would move the rows out from under a
+    // selection already made, in the worst possible moment.
+    //
+    // The state is made directly rather than through the API: a key column is
+    // required to create an http source and the schema will not accept an
+    // empty one, so this is the guard for a row that got into that state some
+    // other way — which the column being nullable keeps possible.
+    const id = await created()
+    app.ctx.db.prepare('UPDATE data_sources SET key_column = NULL WHERE id = ?').run(id)
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/data-sources/${id}/http`,
+      payload: { refreshBeforePrint: true },
+    })
+    expect(res.statusCode).toBe(422)
+    expect(res.json().code).toBe('HTTP_SOURCE_KEY_COLUMN_REQUIRED')
+  })
+
+  it('allows it once there is one', async () => {
+    const id = await created()
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/data-sources/${id}/http`,
+      payload: { refreshBeforePrint: true },
+    })
+    expect(res.json()).toMatchObject({ refreshBeforePrint: true, keyColumn: 'sys_id' })
+  })
+
+  it('refuses to configure a source that reads from nowhere', async () => {
+    const id = await created()
+    await app.inject({ method: 'POST', url: `/api/data-sources/${id}/unlink`, payload: { confirmed: true } })
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/data-sources/${id}/http`,
+      payload: { refreshIntervalSeconds: 60 },
+    })
+    expect(res.statusCode).toBe(422)
+  })
+})

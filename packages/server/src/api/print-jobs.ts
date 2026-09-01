@@ -19,6 +19,8 @@ import { SequenceAllocator } from '../domain/sequence-allocator.ts'
 import { checkLabel } from '../domain/overflow.ts'
 import { ApiError, HttpStatus } from './errors.ts'
 import { acceptJob } from './job-acceptance.ts'
+import { refreshFromAddress, withRefreshLock } from './data-sources.ts'
+import { DataSourceRepo } from '../db/repositories/data-source-repo.ts'
 import {
   assertFitsPrinter,
   selectRows,
@@ -129,6 +131,39 @@ export async function registerPrintJobRoutes(app: FastifyInstance): Promise<void
       }
 
       const content = resolveContent(template, input.ir, profile, printer.capabilities)
+
+      /**
+       * Fetch before printing, where the source asks for it.
+       *
+       * Off by default, and only allowed on a source with a key column — see
+       * `HTTP_SOURCE_KEY_COLUMN_REQUIRED`. Without one, refreshing here would
+       * move the rows out from under a selection somebody has already made,
+       * and would do it in the moment between choosing and printing.
+       *
+       * A producer that cannot be reached is a **409**, not a fall back to the
+       * rows already stored. Printing yesterday's data because today's could
+       * not be fetched is precisely the outcome asking for this was meant to
+       * avoid, and a timing problem is worth retrying.
+       */
+      const boundSource =
+        template?.dataSourceId === null || template?.dataSourceId === undefined
+          ? undefined
+          : new DataSourceRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }).find(
+              template.dataSourceId,
+            )
+      if (boundSource?.refreshBeforePrint === true && boundSource.sourceKind === 'http') {
+        await withRefreshLock(boundSource.id, async () => {
+          const outcome = await refreshFromAddress(app, new DataSourceRepo({ db: app.ctx.db, clock: app.ctx.clock, ids: app.ctx.ids }), boundSource, false)
+          if (outcome.outcome !== 'applied') {
+            // A column change wants a person to look at it, not a job to go
+            // ahead on whichever half of the table it happens to have.
+            throw ApiError.conflict('DATA_SOURCE_REFRESH_IN_PROGRESS', {
+              dataSourceId: boundSource.id,
+              outcome: outcome.outcome,
+            })
+          }
+        })
+      }
 
       // The rows this job will print, copied out of the data source now. From
       // here on the job is self-contained: editing the table afterwards cannot

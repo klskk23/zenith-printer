@@ -159,3 +159,31 @@ export const httpSourceInputSchema = z.object({
   refreshBeforePrint: z.boolean().default(false),
 })
 export type HttpSourceInput = z.infer<typeof httpSourceInputSchema>
+
+/**
+ * Changing how an existing source reads.
+ *
+ * Written out rather than `httpSourceInputSchema.partial()`, because that
+ * schema gives `headers` a default of `{}` — and a default survives
+ * `.partial()`. Sending any unrelated field would then arrive carrying an empty
+ * header set and **wipe the stored credential**, silently, with the next
+ * refresh failing on a 401 nobody could explain.
+ *
+ * Here every field is genuinely absent when it is not sent, and absent means
+ * "leave it alone". The caller cannot read the credential back, so requiring
+ * them to resend it would be requiring them to know it.
+ */
+export const httpSourcePatchSchema = z.object({
+  url: z
+    .string()
+    .url()
+    .refine((value) => value.startsWith('http://') || value.startsWith('https://'), {
+      message: 'the address must be http or https',
+    })
+    .optional(),
+  headers: z.record(z.string().min(1), z.string()).optional(),
+  keyColumn: z.string().trim().min(1).optional(),
+  refreshIntervalSeconds: z.number().int().min(0).max(86_400).optional(),
+  refreshBeforePrint: z.boolean().optional(),
+})
+export type HttpSourcePatch = z.infer<typeof httpSourcePatchSchema>
