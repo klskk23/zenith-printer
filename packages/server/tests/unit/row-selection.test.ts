@@ -82,3 +82,65 @@ describe('labelCount', () => {
     expect(labelCount(0, 5)).toBe(0)
   })
 })
+
+/**
+ * Rows named by key.
+ *
+ * The refusal is the point. `expandSelection` has always refused an ordinal
+ * that is gone, but for a table that refreshes from elsewhere that guard caught
+ * almost nothing: an upstream insert leaves every ordinal in existence and
+ * pointing one row further down, so the selection stayed "valid" and the wrong
+ * labels came out. A key that is gone is actually gone.
+ */
+describe('selecting by key', () => {
+  const index = new Map([
+    ['alpha', 1],
+    ['beta', 2],
+    ['gamma', 3],
+  ])
+
+  it('turns keys into the ordinals they currently sit at', () => {
+    expect(expandSelection({ keys: ['gamma', 'alpha'] }, [1, 2, 3], index)).toEqual([1, 3])
+  })
+
+  it('follows a row that moved, rather than the position it left', () => {
+    // Upstream inserted above `beta`, so it is at 3 now. The old ordinal 2
+    // still exists and names somebody else — which is the failure this is for.
+    const moved = new Map([
+      ['alpha', 1],
+      ['inserted', 2],
+      ['beta', 3],
+    ])
+    expect(expandSelection({ keys: ['beta'] }, [1, 2, 3], moved)).toEqual([3])
+  })
+
+  it('refuses a key the table no longer has', () => {
+    expect(() => expandSelection({ keys: ['alpha', 'deleted'] }, [1, 2, 3], index)).toThrow(
+      StaleRowSelectionError,
+    )
+  })
+
+  it('names the missing keys, not just the count', () => {
+    try {
+      expandSelection({ keys: ['gone', 'alpha', 'also-gone'] }, [1, 2, 3], index)
+      expect.unreachable()
+    } catch (err) {
+      expect((err as StaleRowSelectionError).missingKeys).toEqual(['also-gone', 'gone'])
+    }
+  })
+
+  it('mixes with ordinals without either losing its meaning', () => {
+    expect(expandSelection({ ids: [1], keys: ['gamma'] }, [1, 2, 3], index)).toEqual([1, 3])
+  })
+
+  it('refuses every key when the table has no key column at all', () => {
+    // No index means no source of identity; silently printing nothing, or
+    // everything, would both be worse than saying so.
+    expect(() => expandSelection({ keys: ['alpha'] }, [1, 2, 3])).toThrow(StaleRowSelectionError)
+  })
+
+  it('leaves selection by position exactly as it was', () => {
+    expect(expandSelection({ ids: [3, 1] }, [1, 2, 3])).toEqual([1, 3])
+    expect(expandSelection({ all: true }, [1, 2, 3])).toEqual([1, 2, 3])
+  })
+})

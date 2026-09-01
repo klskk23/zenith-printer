@@ -137,9 +137,14 @@ describe('releasing a linked table', () => {
   it('leaves nothing of the origin on the wire', async () => {
     const id = await linked()
     const body = (await unlink(id, { confirmed: true })).json()
-    for (const field of ['spreadsheetId', 'spreadsheetTitle', 'worksheetId', 'worksheetTitle', 'lastRefreshedAt']) {
+    for (const field of ['spreadsheetId', 'spreadsheetTitle', 'worksheetId', 'worksheetTitle']) {
       expect(body[field]).toBeUndefined()
     }
+    // `lastRefreshedAt` is now a field of *every* source rather than part of
+    // the Google link — an http source has no link and still gets refreshed —
+    // so after unlinking it is present and null. Null is the same disclosure
+    // as absent: nothing.
+    expect(body.lastRefreshedAt).toBeNull()
   })
 
   it('makes the table editable again — the execution path, not just the guard', async () => {

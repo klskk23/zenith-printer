@@ -14,6 +14,7 @@ import {
   type DataSourceLink,
   type DataSourceRow,
 } from '../../domain/data-source.ts'
+import { planUpsert, type KeyedRow } from '../../domain/row-upsert.ts'
 
 type Row = Record<string, unknown>
 
@@ -25,6 +26,16 @@ export interface CreateDataSourceInput {
 
 export interface CreateLinkedInput extends CreateDataSourceInput {
   link: Omit<DataSourceLink, 'lastRefreshedAt'>
+}
+
+export interface CreateHttpInput {
+  name: string
+  columns: string[]
+  url: string
+  headers?: Record<string, string>
+  keyColumn: string
+  refreshIntervalSeconds?: number
+  refreshBeforePrint?: boolean
 }
 
 export interface ReplaceLinkedInput {
@@ -62,9 +73,42 @@ export class DataSourceRepo {
               worksheetTitle: String(row.worksheet_title),
               lastRefreshedAt: String(row.last_refreshed_at),
             },
+      http:
+        row.url === null || row.url === undefined
+          ? null
+          : {
+              url: String(row.url),
+              // Names only. See HttpOrigin: the values never enter this object,
+              // so no endpoint returning it can leak them.
+              headerNames: Object.keys(
+                JSON.parse(String(row.headers_json ?? '{}')) as Record<string, string>,
+              ),
+            },
+      keyColumn: row.key_column === null || row.key_column === undefined ? null : String(row.key_column),
+      refreshIntervalSeconds: Number(row.refresh_interval_seconds ?? 0),
+      refreshBeforePrint: Number(row.refresh_before_print ?? 0) === 1,
+      lastRefreshedAt:
+        row.last_refreshed_at === null || row.last_refreshed_at === undefined
+          ? null
+          : String(row.last_refreshed_at),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at),
     }
+  }
+
+  /**
+   * The header values, for the one caller that has to send them.
+   *
+   * Deliberately not on `DataSource`: reading them is a separate act from
+   * reading a data source, and the refresh path is the only thing entitled to
+   * it. Anything that merely lists or displays sources cannot reach them by
+   * accident.
+   */
+  httpHeaders(id: string): Record<string, string> {
+    const row = this.#db.prepare('SELECT headers_json FROM data_sources WHERE id = ?').get(id) as
+      | { headers_json: string | null }
+      | undefined
+    return JSON.parse(row?.headers_json ?? '{}') as Record<string, string>
   }
 
   /** The stored row, for tests that need to see the columns themselves. */
@@ -130,9 +174,126 @@ export class DataSourceRepo {
         `UPDATE data_sources
             SET source_kind = 'local', spreadsheet_id = NULL, spreadsheet_title = NULL,
                 worksheet_id = NULL, worksheet_title = NULL, last_refreshed_at = NULL,
+                url = NULL, headers_json = NULL, key_column = NULL,
+                refresh_interval_seconds = 0, refresh_before_print = 0,
                 updated_at = ?
           WHERE id = ?`,
       )
+      .run(this.#clock.now().toISOString(), id)
+  }
+
+  /**
+   * Create a data source that reads from an HTTP endpoint.
+   *
+   * Rows are not fetched here — creating and reading are separate acts, so a
+   * table whose producer happens to be down still gets created and can be
+   * refreshed once it is up. `lastRefreshedAt` therefore stays null: it has
+   * genuinely never been refreshed, and saying otherwise is the lie the list
+   * page would then display.
+   */
+  createHttp(input: CreateHttpInput): DataSource {
+    const created = this.create({ name: input.name, columns: input.columns, rows: [] })
+    this.#db
+      .prepare(
+        `UPDATE data_sources
+            SET source_kind = 'http', url = ?, headers_json = ?, key_column = ?,
+                refresh_interval_seconds = ?, refresh_before_print = ?
+          WHERE id = ?`,
+      )
+      .run(
+        input.url,
+        JSON.stringify(input.headers ?? {}),
+        input.keyColumn,
+        input.refreshIntervalSeconds ?? 0,
+        input.refreshBeforePrint === true ? 1 : 0,
+        created.id,
+      )
+    return this.find(created.id)!
+  }
+
+  /** How often a page may leave the rows alone, and whether a job refreshes first. */
+  setRefreshPolicy(
+    id: string,
+    policy: { refreshIntervalSeconds?: number; refreshBeforePrint?: boolean; headers?: Record<string, string>; url?: string; keyColumn?: string },
+  ): void {
+    const current = this.find(id)
+    if (current === undefined) {
+      return
+    }
+    this.#db
+      .prepare(
+        `UPDATE data_sources
+            SET refresh_interval_seconds = ?, refresh_before_print = ?, url = ?,
+                headers_json = ?, key_column = ?, updated_at = ?
+          WHERE id = ?`,
+      )
+      .run(
+        policy.refreshIntervalSeconds ?? current.refreshIntervalSeconds,
+        (policy.refreshBeforePrint ?? current.refreshBeforePrint) ? 1 : 0,
+        policy.url ?? current.http?.url ?? null,
+        JSON.stringify(policy.headers ?? this.httpHeaders(id)),
+        policy.keyColumn ?? current.keyColumn,
+        this.#clock.now().toISOString(),
+        id,
+      )
+  }
+
+  /** Which ordinal each key currently sits at. Empty for a table with no key column. */
+  ordinalByKey(sourceId: string): Map<string, number> {
+    return new Map(
+      this.#db
+        .prepare(
+          'SELECT ordinal, row_key FROM data_source_rows WHERE source_id = ? AND row_key IS NOT NULL',
+        )
+        .all(sourceId)
+        .map((row) => [String((row as Row).row_key), Number((row as Row).ordinal)] as const),
+    )
+  }
+
+  /** The rows as keyed pairs, for planning a merge. */
+  #keyedRows(sourceId: string): KeyedRow[] {
+    return this.#db
+      .prepare(
+        'SELECT values_json, row_key FROM data_source_rows WHERE source_id = ? AND row_key IS NOT NULL ORDER BY ordinal',
+      )
+      .all(sourceId)
+      .map((row) => ({
+        key: String((row as Row).row_key),
+        values: JSON.parse(String((row as Row).values_json)) as Record<string, string>,
+      }))
+  }
+
+  /**
+   * Merge a fetched table in by key, rather than replacing the whole thing.
+   *
+   * The columns are replaced outright — they are the producer's answer to what
+   * the table has — while the rows are matched up by key. See
+   * `domain/row-upsert.ts` for what survives and why.
+   */
+  upsertByKey(
+    id: string,
+    input: { columns: readonly string[]; rows: readonly KeyedRow[] },
+  ): { added: number; updated: number; removed: number } {
+    const plan = planUpsert(this.#keyedRows(id), input.rows)
+
+    this.#db.exec('BEGIN')
+    try {
+      this.#db
+        .prepare('UPDATE data_sources SET columns = ?, last_refreshed_at = ? WHERE id = ?')
+        .run(JSON.stringify(input.columns), this.#clock.now().toISOString(), id)
+      this.#writeRows(id, plan.rows.map((row) => row.values))
+      this.#db.exec('COMMIT')
+    } catch (err) {
+      this.#db.exec('ROLLBACK')
+      throw err
+    }
+    return { added: plan.added, updated: plan.updated, removed: plan.removed }
+  }
+
+  /** Stamp a refresh that changed nothing, so "checked just now" is true. */
+  touchRefreshed(id: string): void {
+    this.#db
+      .prepare('UPDATE data_sources SET last_refreshed_at = ? WHERE id = ?')
       .run(this.#clock.now().toISOString(), id)
   }
 
@@ -153,13 +314,30 @@ export class DataSourceRepo {
     return row === undefined ? undefined : this.#toSource(row as Row)
   }
 
+  #keyColumn(sourceId: string): string | null {
+    const row = this.#db.prepare('SELECT key_column FROM data_sources WHERE id = ?').get(sourceId) as
+      | { key_column: string | null }
+      | undefined
+    return row?.key_column ?? null
+  }
+
+  /**
+   * Looked up here rather than passed in, so that no write path can forget it.
+   *
+   * `patchRows`, `replace` and the refresh all funnel through this one method;
+   * a `keyColumn` parameter would be a thing three callers had to remember, and
+   * forgetting it nulls every key in the table without any error.
+   */
   #writeRows(sourceId: string, rows: readonly Record<string, string>[]): void {
+    const keyColumn = this.#keyColumn(sourceId)
     this.#db.prepare('DELETE FROM data_source_rows WHERE source_id = ?').run(sourceId)
     const insert = this.#db.prepare(
-      'INSERT INTO data_source_rows (source_id, ordinal, values_json) VALUES (?, ?, ?)',
+      'INSERT INTO data_source_rows (source_id, ordinal, values_json, row_key) VALUES (?, ?, ?, ?)',
     )
     for (const [index, values] of rows.entries()) {
-      insert.run(sourceId, index + 1, JSON.stringify(values))
+      // Null where there is no key column: the partial unique index ignores
+      // nulls, so tables without identity are unaffected by it.
+      insert.run(sourceId, index + 1, JSON.stringify(values), keyColumn === null ? null : values[keyColumn] ?? null)
     }
     this.#db
       .prepare('UPDATE data_sources SET row_count = ?, updated_at = ? WHERE id = ?')

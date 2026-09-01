@@ -49,6 +49,16 @@ export const rowSelectionSchema = z.union([
   z.object({
     ranges: z.array(z.tuple([z.number().int().min(1), z.number().int().min(1)])).default([]),
     ids: z.array(z.number().int().min(1)).default([]),
+    /**
+     * Rows named by their key column, where the table has one.
+     *
+     * The reason this exists rather than more ordinals: a table that refreshes
+     * from somewhere else moves its rows around, and an ordinal that still
+     * exists but now names a different row is a wrong batch that looks right.
+     * A key that is gone is refused; that is what makes the refusal mean
+     * something.
+     */
+    keys: z.array(z.string().min(1)).default([]),
   }),
 ])
 export type RowSelection = z.infer<typeof rowSelectionSchema>

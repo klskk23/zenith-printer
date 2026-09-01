@@ -101,10 +101,19 @@ describe('submission schema', () => {
     expect(printJobInputSchema.parse(base).rowSelection).toBeUndefined()
   })
 
-  it('accepts the three ways of naming rows', () => {
+  it('accepts the four ways of naming rows', () => {
     expect(printJobInputSchema.parse({ ...base, rowSelection: { all: true } }).rowSelection).toEqual({ all: true })
     const explicit = printJobInputSchema.parse({ ...base, rowSelection: { ranges: [[5, 12]], ids: [3] } })
-    expect(explicit.rowSelection).toEqual({ ranges: [[5, 12]], ids: [3] })
+    expect(explicit.rowSelection).toEqual({ ranges: [[5, 12]], ids: [3], keys: [] })
+  })
+
+  it('accepts rows named by key, for a table whose rows move under it', () => {
+    const byKey = printJobInputSchema.parse({ ...base, rowSelection: { keys: ['f3ee54e2', '9c1b'] } })
+    expect(byKey.rowSelection).toEqual({ ranges: [], ids: [], keys: ['f3ee54e2', '9c1b'] })
+  })
+
+  it('rejects an empty key, which names nothing', () => {
+    expect(() => printJobInputSchema.parse({ ...base, rowSelection: { keys: [''] } })).toThrow()
   })
 
   it('rejects a row ordinal below one, since ordinals start at one', () => {

@@ -16,15 +16,24 @@
  */
 export type SelectionInput =
   | { all: true }
-  | { ranges?: readonly (readonly [number, number])[]; ids?: readonly number[] }
+  | {
+      ranges?: readonly (readonly [number, number])[]
+      ids?: readonly number[]
+      /** Rows named by key, for a table whose rows move under it. */
+      keys?: readonly string[]
+    }
 
 export class StaleRowSelectionError extends Error {
   readonly missingOrdinals: number[]
+  /** Keys the table no longer has. Empty for a selection made by position. */
+  readonly missingKeys: string[]
 
-  constructor(missingOrdinals: number[]) {
-    super(`selected row(s) no longer exist: ${missingOrdinals.join(', ')}`)
+  constructor(missingOrdinals: number[], missingKeys: string[] = []) {
+    const named = [...missingOrdinals.map(String), ...missingKeys]
+    super(`selected row(s) no longer exist: ${named.join(', ')}`)
     this.name = 'StaleRowSelectionError'
     this.missingOrdinals = missingOrdinals
+    this.missingKeys = missingKeys
   }
 }
 
@@ -44,6 +53,13 @@ export class StaleRowSelectionError extends Error {
 export function expandSelection(
   selection: SelectionInput,
   existing: readonly number[],
+  /**
+   * Key to ordinal, for a table that has a key column.
+   *
+   * Optional because most tables do not: a CSV somebody uploaded has no
+   * identity beyond its order, and inventing one would be pretending.
+   */
+  ordinalByKey?: ReadonlyMap<string, number>,
 ): number[] {
   const available = new Set(existing)
 
@@ -62,9 +78,24 @@ export function expandSelection(
     wanted.add(ordinal)
   }
 
+  /**
+   * A key with no row is refused the same way a missing ordinal is — and here
+   * the refusal finally means what it says. Selecting eight rows and printing
+   * seven leaves a discrepancy for counting time to find.
+   */
+  const missingKeys: string[] = []
+  for (const key of selection.keys ?? []) {
+    const ordinal = ordinalByKey?.get(key)
+    if (ordinal === undefined) {
+      missingKeys.push(key)
+      continue
+    }
+    wanted.add(ordinal)
+  }
+
   const missing = [...wanted].filter((ordinal) => !available.has(ordinal)).sort((a, b) => a - b)
-  if (missing.length > 0) {
-    throw new StaleRowSelectionError(missing)
+  if (missing.length > 0 || missingKeys.length > 0) {
+    throw new StaleRowSelectionError(missing, missingKeys.sort())
   }
 
   return [...wanted].sort((a, b) => a - b)

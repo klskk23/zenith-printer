@@ -45,7 +45,26 @@ export interface DataSourceLink {
   lastRefreshedAt: string
 }
 
-export type DataSourceKind = 'local' | 'google-sheets'
+/**
+ * Where an http source reads from.
+ *
+ * **Header values are not here, and that is the design.** They carry whatever
+ * credential the other end wants, and this object is what `GET
+ * /api/data-sources` returns. Redacting on the way out would work until
+ * somebody added a second endpoint; a shape that never holds the values cannot
+ * leak them from any endpoint. The names travel, so a person can see that an
+ * Authorization header is configured without being told what it says.
+ *
+ * Same rule as the Google private key living only in the environment: a service
+ * with no authentication must not hand back the means of authenticating
+ * somewhere else.
+ */
+export interface HttpOrigin {
+  url: string
+  headerNames: string[]
+}
+
+export type DataSourceKind = 'local' | 'google-sheets' | 'http'
 
 export interface DataSource {
   id: string
@@ -54,8 +73,23 @@ export interface DataSource {
   /** Denormalised so the list page does not COUNT(*) over ten thousand rows. */
   rowCount: number
   sourceKind: DataSourceKind
-  /** Non-null exactly when `sourceKind` is not `local`. */
+  /** Non-null exactly when `sourceKind` is `google-sheets`. */
   link: DataSourceLink | null
+  /** Non-null exactly when `sourceKind` is `http`. */
+  http: HttpOrigin | null
+  /**
+   * Which column names a row, or null where identity is still position.
+   *
+   * Required for an http source and meaningless without one: a table that
+   * changes on its own needs a name for a row that survives the change.
+   */
+  keyColumn: string | null
+  /** How stale the rows may get before a page refreshes them. 0 = only on request. */
+  refreshIntervalSeconds: number
+  /** Whether submitting a job refreshes first. Only allowed with a key column. */
+  refreshBeforePrint: boolean
+  /** When the rows last came from elsewhere; null for a table nobody fetches. */
+  lastRefreshedAt: string | null
   createdAt: string
   updatedAt: string
 }
