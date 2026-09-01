@@ -23,6 +23,7 @@ import { openDatabase } from '../../src/db/index.ts'
 import { FixedClock, SequentialIdGenerator } from '../../src/clock.ts'
 import { NexusError, type NexusCategory, type NexusPort } from '../../src/domain/nexus.ts'
 import { rowEnvelopeSchema, type RowEnvelope } from '@zenith/shared'
+import { PrinterRepo } from '../../src/db/repositories/printer-repo.ts'
 
 let app: FastifyInstance
 let answer: (request: { categoryId: string; offset: number; limit: number }) => RowEnvelope
@@ -423,5 +424,123 @@ describe('releasing it', () => {
     })
     expect(res.json()).toMatchObject({ sourceKind: 'local', rowCount: 3 })
     expect(res.json().nexus ?? null).toBeNull()
+  })
+})
+
+/**
+ * Printing rows chosen by key, through the real route.
+ *
+ * `expandSelection` was covered thoroughly on its own, including the case
+ * where a key has no index to resolve against. What nothing covered was
+ * whether the one caller passes that index — and it did not. Every selection
+ * made by key resolved to nothing, and the refusal said the rows had been
+ * deleted between the tick and the submit, which had not happened to anybody.
+ *
+ * A well-tested unit reached by no wiring is the failure this guards, so these
+ * go through `POST /api/print-jobs` rather than the function.
+ */
+describe('printing rows chosen by key', () => {
+  const printerId = (): string => {
+    const repo = new PrinterRepo({
+      db: app.ctx.db,
+      clock: app.ctx.clock,
+      ids: app.ctx.ids,
+    })
+    const printer = repo.create({
+      name: '标签机', kind: 'niimbot', transport: 'serial', address: '/dev/ttyACM0', printTaskName: 'B1',
+    })
+    repo.saveCapabilities(printer.id, {
+      dpi: 203, printheadPixels: 576, densityMin: 1, densityMax: 5, densityDefault: 3,
+      paperTypes: [1], printDirection: 'top', supportsConsumableLevel: true,
+      model: 'B3S_P', serial: null, firmwareVersion: null,
+    })
+    return printer.id
+  }
+
+  const design = async (dataSourceId: string): Promise<string> =>
+    (
+      await app.inject({
+        method: 'POST',
+        url: '/api/templates',
+        payload: {
+          name: '资产标签', printerKind: 'niimbot', widthMm: 50, heightMm: 30, dpi: 203,
+          elements: [{
+            id: 't', type: 'text', xMm: 2, yMm: 2, widthMm: 40, heightMm: 5,
+            content: '${mac}', fontFamily: 'Noto Sans CJK SC', fontSizeMm: 3,
+          }],
+          variables: [], dataSourceId,
+        },
+      })
+    ).json().id
+
+  it('accepts a selection of keys that are all still there', async () => {
+    const id = await created()
+    await refresh(id)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs',
+      headers: { 'idempotency-key': 'by-key-1' },
+      payload: {
+        printerId: printerId(),
+        templateId: await design(id),
+        copies: 1,
+        rowSelection: { keys: ['aa', 'cc'] },
+      },
+    })
+
+    expect(res.statusCode).toBe(202)
+  })
+
+  it('prints the rows those keys name, not whatever sits at those positions', async () => {
+    // The ledger changed underneath: the first device is gone and a new one
+    // arrived. `cc` is now at a different ordinal than when it was ticked.
+    const id = await created()
+    await refresh(id)
+    answer = () => table(['cc', 'zz'])
+    await refresh(id)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs',
+      headers: { 'idempotency-key': 'by-key-2' },
+      payload: {
+        printerId: printerId(),
+        templateId: await design(id),
+        copies: 1,
+        rowSelection: { keys: ['cc'] },
+      },
+    })
+
+    expect(res.statusCode).toBe(202)
+    const job = (await app.inject({ method: 'GET', url: `/api/print-jobs/${res.json().jobId}` })).json()
+    expect(job.snapshot.rows).toEqual([row('cc')])
+  })
+
+  it('still refuses a key the ledger no longer has, and names it', async () => {
+    // The refusal has to survive the fix: it is the whole reason a selection
+    // carries keys. Printing seven of eight ticked rows leaves a discrepancy
+    // for counting time to find.
+    const id = await created()
+    await refresh(id)
+    answer = () => table(['aa'])
+    await refresh(id)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/print-jobs',
+      headers: { 'idempotency-key': 'by-key-3' },
+      payload: {
+        printerId: printerId(),
+        templateId: await design(id),
+        copies: 1,
+        rowSelection: { keys: ['aa', 'cc'] },
+      },
+    })
+
+    expect(res.statusCode).toBe(422)
+    expect(res.json().code).toBe('ROW_SELECTION_STALE')
+    // Named, so the message can say which ones rather than "some of them".
+    expect(res.json().details.missingKeys).toEqual(['cc'])
   })
 })

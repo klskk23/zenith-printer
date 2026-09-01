@@ -376,10 +376,29 @@ export function selectRows(options: SelectRowsOptions): SelectedRows {
 
   let ordinals: number[]
   try {
-    ordinals = expandSelection(options.selection, repo.ordinals(sourceId))
+    /**
+     * The key index goes in for every table, not only the ones that have one.
+     *
+     * Without it a selection made by key resolves to nothing and is refused as
+     * stale — telling somebody the rows were deleted between ticking them and
+     * pressing print, which is a thing that did not happen and cannot be acted
+     * on. For a table with no key column the map is empty, and a selection
+     * against it carries no keys, so passing it costs one query and removes a
+     * way to be wrong.
+     */
+    ordinals = expandSelection(
+      options.selection,
+      repo.ordinals(sourceId),
+      repo.ordinalByKey(sourceId),
+    )
   } catch (err) {
     if (err instanceof StaleRowSelectionError) {
-      throw ApiError.unprocessable('ROW_SELECTION_STALE', { missingOrdinals: err.missingOrdinals })
+      // Both, because a selection may carry both, and "which ones" is the only
+      // part of this message somebody can act on.
+      throw ApiError.unprocessable('ROW_SELECTION_STALE', {
+        missingOrdinals: err.missingOrdinals,
+        missingKeys: err.missingKeys,
+      })
     }
     throw err
   }

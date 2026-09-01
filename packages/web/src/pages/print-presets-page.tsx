@@ -29,12 +29,22 @@ import {
   SelectValue,
 } from '../components/ui/select.tsx'
 import { usePrinters } from '../features/printers/hooks.ts'
+import { useProfiles } from '../features/profiles/hooks.ts'
 import { useTemplates } from '../features/templates/hooks.ts'
 import {
   useCreatePrintPreset,
   useDeletePrintPreset,
   usePrintPresets,
 } from '../features/print-presets/hooks.ts'
+
+/**
+ * The sentinel for "let the printer decide".
+ *
+ * Radix reserves the empty string for "nothing chosen", which is a different
+ * thing: deferring to the printer is a decision somebody made, and it has to
+ * be selectable so a preset can be moved back to it.
+ */
+const DEFAULT_PROFILE = '__printer_default__'
 
 export function PrintPresetsPage(): React.JSX.Element {
   const presets = usePrintPresets()
@@ -47,6 +57,19 @@ export function PrintPresetsPage(): React.JSX.Element {
   const [templateId, setTemplateId] = useState<string | null>(null)
   const [printerId, setPrinterId] = useState<string | null>(null)
   const [copies, setCopies] = useState(1)
+  /**
+   * `null` is a real choice, not an unset one: it means "whatever the printer
+   * is set to use". Profiles belong to a printer, so choosing a different
+   * printer drops it — a profile id from another machine would name settings
+   * that machine cannot print with.
+   */
+  const [profileId, setProfileId] = useState<string | null>(null)
+  const profiles = useProfiles(printerId)
+
+  const chooseprinter = (next: string): void => {
+    setPrinterId(next)
+    setProfileId(null)
+  }
 
   const ready = name.trim().length > 0 && templateId !== null && printerId !== null
 
@@ -92,7 +115,7 @@ export function PrintPresetsPage(): React.JSX.Element {
             </Label>
             <Label className="block space-y-1">
               <span className="text-2xs text-muted-foreground">{copy.presets.printer}</span>
-              <Select value={printerId ?? ''} onValueChange={setPrinterId}>
+              <Select value={printerId ?? ''} onValueChange={chooseprinter}>
                 <SelectTrigger aria-label={copy.presets.printer}>
                   <SelectValue />
                 </SelectTrigger>
@@ -105,6 +128,30 @@ export function PrintPresetsPage(): React.JSX.Element {
                 </SelectContent>
               </Select>
             </Label>
+            {/* Only once a printer is chosen: profiles belong to one, and an
+                empty dropdown reads as a dead end rather than as a question
+                that has not been asked yet. */}
+            {printerId !== null && (
+              <Label className="block space-y-1">
+                <span className="text-2xs text-muted-foreground">{copy.presets.profile}</span>
+                <Select
+                  value={profileId ?? DEFAULT_PROFILE}
+                  onValueChange={(next) => setProfileId(next === DEFAULT_PROFILE ? null : next)}
+                >
+                  <SelectTrigger aria-label={copy.presets.profile}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DEFAULT_PROFILE}>{copy.presets.profileDefault}</SelectItem>
+                    {(profiles.data ?? []).map((profile) => (
+                      <SelectItem key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Label>
+            )}
           </div>
 
           {create.isError && (
@@ -118,7 +165,7 @@ export function PrintPresetsPage(): React.JSX.Element {
             disabled={!ready || create.isPending}
             onClick={() =>
               create.mutate(
-                { name: name.trim(), templateId: templateId!, printerId: printerId!, copies },
+                { name: name.trim(), templateId: templateId!, printerId: printerId!, copies, profileId },
                 { onSuccess: () => setName('') },
               )
             }
@@ -157,6 +204,10 @@ export function PrintPresetsPage(): React.JSX.Element {
                 {' · '}
                 {printer?.name ?? copy.presets.printerGone}
               </p>
+              {/* Which settings it prints with. A preset that has been quietly
+                  printing at the wrong density is not visible from anywhere
+                  else on this page. */}
+              <PresetProfileLine preset={preset} />
               {/* The thing that goes into somebody else's configuration, so it
                   is shown whole and selectable rather than truncated the way
                   an id is everywhere else here. */}
@@ -181,5 +232,36 @@ export function PrintPresetsPage(): React.JSX.Element {
         )
       })}
     </div>
+  )
+}
+
+/**
+ * The print settings one preset uses, named.
+ *
+ * Its own component because profiles belong to a printer and each preset names
+ * a different one — a single list fetched by the page would be the form's
+ * printer's profiles, shown against everybody's presets.
+ */
+function PresetProfileLine({
+  preset,
+}: {
+  preset: { printerId: string; profileId: string | null }
+}): React.JSX.Element | null {
+  const profiles = useProfiles(preset.profileId === null ? null : preset.printerId)
+  if (preset.profileId === null) {
+    // Deferring to the printer is the ordinary case and says nothing new: the
+    // printer is already named on the line above.
+    return null
+  }
+  const profile = (profiles.data ?? []).find((item) => item.id === preset.profileId)
+  if (profiles.isPending) {
+    return null
+  }
+  return (
+    <p className="text-2xs text-muted-foreground" data-preset-profile>
+      {profile === undefined
+        ? copy.presets.profileGone
+        : copy.presets.profileOf(profile.name)}
+    </p>
   )
 }

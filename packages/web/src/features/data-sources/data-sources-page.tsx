@@ -211,7 +211,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
                   title={copy.dataSources.unlinkTitle}
                   // Says what it costs and what it keeps. A confirmation that
                   // only asks "are you sure" tells nobody anything.
-                  description={copy.dataSources.unlinkConfirm}
+                  description={copy.dataSources.unlinkConfirm(source.sourceKind)}
                   cancelLabel={copy.common.cancel}
                   confirmLabel={copy.dataSources.unlinkGo}
                   onConfirm={() => unlink.mutate(source.id)}

@@ -8,6 +8,16 @@
  * four-field response shape and are shown verbatim, so one fault never gets two
  * different descriptions.
  */
+
+/**
+ * The origins a table can be fetched from.
+ *
+ * Two notices differ only in which system they name, and naming the wrong one
+ * sends somebody to the wrong place to fix their data — an answer that is
+ * worse than no answer. Taking the kind as an argument makes a new origin a
+ * compile error here rather than a sentence about Google shown for a ledger.
+ */
+export type FetchedKind = 'google-sheets' | 'nexus'
 export const copy = {
   app: {
     title: 'Zenith Printer',
@@ -292,9 +302,15 @@ export const copy = {
     },
     unlink: '解除链接',
     unlinkTitle: '解除链接',
-    unlinkConfirm: '解除后不能再从 Google 刷新，来源信息也无法恢复。当前的行会全部保留，改由本机维护——也就是说，你接管这张表。',
+    unlinkConfirm: (kind: FetchedKind): string =>
+      kind === 'nexus'
+        ? '解除后不能再从资产台账刷新，类别也无法恢复。当前的行会全部保留，改由本机维护——也就是说，你接管这张表，它从此不再跟着台账变。'
+        : '解除后不能再从 Google 刷新，来源信息也无法恢复。当前的行会全部保留，改由本机维护——也就是说，你接管这张表。',
     unlinkGo: '解除并接管',
-    readOnlyNotice: '这张表的内容来自 Google，在本机只读。要改内容请回 Google 那边；想在本机接管它，先解除链接。',
+    readOnlyNotice: (kind: FetchedKind): string =>
+      kind === 'nexus'
+        ? '这张表的内容来自资产台账，在本机只读。要改内容请去台账那边改，改完回来刷新；想在本机接管它，先解除链接。'
+        : '这张表的内容来自 Google，在本机只读。要改内容请回 Google 那边；想在本机接管它，先解除链接。',
     columnChangeTitle: '这张表的列变了',
     columnChangeRemoved: (columns: string[]): string => `消失的列：${columns.join('、')}`,
     columnChangeAdded: (columns: string[]): string => `新增的列：${columns.join('、')}`,
@@ -718,6 +734,15 @@ export const copy = {
     template: '设计',
     printer: '打印机',
     copies: '每行份数',
+    profile: '打印参数',
+    /**
+     * Not "no settings": it means whichever profile the printer is set to use.
+     * Somebody standing at the machine already chose that, and a preset that
+     * defers to it keeps following when they change their mind.
+     */
+    profileDefault: '打印机默认',
+    profileOf: (name: string): string => `打印参数：${name}`,
+    profileGone: '打印参数已被删除',
     copiesOf: (n: number): string => `每行 ${n} 份`,
     empty: '还没有预设。建一个之后，把它的 id 交给对方系统。',
     remove: '删除',

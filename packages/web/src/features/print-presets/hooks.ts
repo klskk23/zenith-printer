@@ -24,8 +24,17 @@ const KEY = ['print-presets']
 export function usePrintPresets() {
   return useQuery({
     queryKey: KEY,
-    queryFn: () => request<{ printPresets: PrintPreset[] }>('/print-presets'),
-    select: (data) => data.printPresets,
+    /**
+     * `presets`, matching the envelope the ledger reads.
+     *
+     * That envelope is part of the contract with whatever fills a dropdown
+     * from it, so this side follows the server rather than the other way
+     * around. It read `printPresets` for a while after the server stopped
+     * sending it, and the page simply had nothing on it — no error, no empty
+     * state, because `undefined` is neither.
+     */
+    queryFn: () => request<{ presets: PrintPreset[] }>('/print-presets'),
+    select: (data) => data.presets,
     refetchInterval: false,
   })
 }

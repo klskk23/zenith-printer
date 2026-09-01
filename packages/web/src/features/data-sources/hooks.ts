@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from '../../api/client.ts'
+import type { FetchedKind } from '../../i18n/zh-CN.ts'
 
 export interface DataSource {
   id: string
@@ -45,7 +46,17 @@ export interface DataSource {
  * did not send one — reads as an ordinary table rather than as a read-only one
  * nobody can edit and nothing can refresh.
  */
-export function isFetched(source: Pick<DataSource, 'sourceKind'>): boolean {
+export function isFetched<T extends Pick<DataSource, 'sourceKind'>>(
+  source: T,
+  /**
+   * Narrowed, not just answered true.
+   *
+   * Two notices name the origin they came from, and naming the wrong one sends
+   * somebody to the wrong system to fix their data. Carrying the narrowing to
+   * the caller means a third origin cannot reach a sentence written for the
+   * other two without the compiler saying so.
+   */
+): source is T & { sourceKind: FetchedKind } {
   return source.sourceKind === 'google-sheets' || source.sourceKind === 'nexus'
 }
 

@@ -310,7 +310,9 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
           survives exactly until the next refresh and then vanishes with
           nothing said, so the grid does not offer it at all. */}
       <p className="text-2xs text-muted-foreground" data-paste-hint>
-        {readOnly ? copy.dataSources.readOnlyNotice : copy.dataSources.gridHint}
+        {readOnly && source !== undefined
+          ? copy.dataSources.readOnlyNotice(source.sourceKind)
+          : copy.dataSources.gridHint}
       </p>
 
       {patch.isError && <Alert variant="destructive">{copy.dataSources.patchFailed}</Alert>}

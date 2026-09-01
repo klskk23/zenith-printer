@@ -10,6 +10,7 @@
  * gets two descriptions.
  */
 import type { Copy } from './types.ts'
+import type { FetchedKind } from './zh-CN.ts'
 
 export const copy: Copy = {
   app: {
@@ -292,9 +293,15 @@ export const copy: Copy = {
     },
     unlink: 'Unlink',
     unlinkTitle: 'Unlink from Google',
-    unlinkConfirm: 'Afterwards it can no longer be refreshed from Google, and the origin cannot be restored. Every row is kept and becomes maintained here — you take the table over.',
+    unlinkConfirm: (kind: FetchedKind): string =>
+      kind === 'nexus'
+        ? 'Afterwards it can no longer be refreshed from the asset ledger, and the category cannot be restored. Every row is kept and becomes maintained here — you take the table over, and it stops following the ledger.'
+        : 'Afterwards it can no longer be refreshed from Google, and the origin cannot be restored. Every row is kept and becomes maintained here — you take the table over.',
     unlinkGo: 'Unlink and take over',
-    readOnlyNotice: 'This table comes from Google and is read-only here. Change its contents in Google; to take it over on this machine, unlink it first.',
+    readOnlyNotice: (kind: FetchedKind): string =>
+      kind === 'nexus'
+        ? 'This table comes from the asset ledger and is read-only here. Change its contents in the ledger and refresh; to take it over on this machine, unlink it first.'
+        : 'This table comes from Google and is read-only here. Change its contents in Google; to take it over on this machine, unlink it first.',
     columnChangeTitle: 'The columns of this table changed',
     columnChangeRemoved: (columns: string[]): string => `Columns gone: ${columns.join(', ')}`,
     columnChangeAdded: (columns: string[]): string => `Columns added: ${columns.join(', ')}`,
@@ -724,6 +731,10 @@ export const copy: Copy = {
     template: 'Design',
     printer: 'Printer',
     copies: 'Copies per row',
+    profile: 'Print settings',
+    profileDefault: "The printer's default",
+    profileOf: (name: string): string => `Print settings: ${name}`,
+    profileGone: 'Those print settings were deleted',
     copiesOf: (n: number): string => `${n} per row`,
     empty: 'No presets yet. Create one, then give the other system its id.',
     remove: 'Delete',

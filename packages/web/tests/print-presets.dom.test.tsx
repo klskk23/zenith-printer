@@ -51,7 +51,12 @@ beforeEach(() => {
       } as unknown as Response)
     }
     const body = url.includes('/print-presets')
-      ? { printPresets: presets }
+      ? { presets }
+      : url.includes('/profiles')
+        ? { profiles: [
+            { id: 'prof-1', printerId: 'prn-1', name: '默认', density: 3, labelType: 1, labelWidthMm: 50, labelHeightMm: 30, marginTopMm: 0, marginRightMm: 0, marginBottomMm: 0, marginLeftMm: 0, isDefault: true, halftone: 'none', threshold: 128, createdAt: 'T' },
+            { id: 'prof-2', printerId: 'prn-1', name: '浓度 4', density: 4, labelType: 1, labelWidthMm: 50, labelHeightMm: 30, marginTopMm: 0, marginRightMm: 0, marginBottomMm: 0, marginLeftMm: 0, isDefault: false, halftone: 'none', threshold: 128, createdAt: 'T' },
+          ] }
       : url.includes('/templates')
         ? { templates: [{ id: 'tpl-1', name: '路由器面单', printerKind: 'niimbot', widthMm: 50, heightMm: 30, dpi: 203, elements: [], variables: [], dataSourceId: null, createdAt: 'T', updatedAt: 'T', version: 1, bindingIssue: null }] }
         : url.includes('/printers')
@@ -144,5 +149,70 @@ describe('creating one', () => {
     fireEvent.click(screen.getByRole('button', { name: '新建' }))
     await waitFor(() => expect(posted).toHaveLength(1))
     expect(posted[0]).toMatchObject({ name: '新预设', templateId: 'tpl-1', printerId: 'prn-1', copies: 1 })
+  })
+})
+
+/**
+ * The print settings.
+ *
+ * A preset is a name over four decisions, and the page offered three. The
+ * fourth — density, speed, label type — decides whether the barcode scans, and
+ * leaving it out meant every preset printed at whatever the printer's default
+ * profile happened to be. The server has stored and honoured `profileId` all
+ * along; nothing ever sent it one.
+ */
+describe('the print settings', () => {
+  it('are offered when the chosen printer has profiles', async () => {
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '打印机' }), {
+      pointerType: 'mouse', button: 0,
+    })
+    fireEvent.click(await screen.findByRole('option', { name: 'B3S_P' }))
+    expect(await screen.findByRole('combobox', { name: '打印参数' })).toBeDefined()
+  })
+
+  it('are sent with the preset', async () => {
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.change(await screen.findByRole('textbox', { name: '名称' }), {
+      target: { value: '路由器标签' },
+    })
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '设计' }), {
+      pointerType: 'mouse', button: 0,
+    })
+    fireEvent.click(await screen.findByRole('option', { name: '路由器面单' }))
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '打印机' }), {
+      pointerType: 'mouse', button: 0,
+    })
+    fireEvent.click(await screen.findByRole('option', { name: 'B3S_P' }))
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '打印参数' }), {
+      pointerType: 'mouse', button: 0,
+    })
+    fireEvent.click(await screen.findByRole('option', { name: /浓度 4/ }))
+    fireEvent.click(screen.getByRole('button', { name: '新建' }))
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toMatchObject({ profileId: 'prof-2' })
+  })
+
+  it('lets the printer decide, which is what a preset without one means', async () => {
+    // Not the same as "no settings": it means whichever profile that printer
+    // is set to use, which is the answer somebody standing at it already
+    // chose. Made sayable rather than only reachable by never touching the
+    // control, so a preset can be moved back to it.
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '打印机' }), {
+      pointerType: 'mouse', button: 0,
+    })
+    fireEvent.click(await screen.findByRole('option', { name: 'B3S_P' }))
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '打印参数' }), {
+      pointerType: 'mouse', button: 0,
+    })
+    expect(await screen.findByRole('option', { name: /打印机默认/ })).toBeDefined()
+  })
+
+  it('shows on an existing preset which settings it prints with', async () => {
+    presets = [{ ...PRESET, profileId: 'prof-2' }]
+    render(wrap(<PrintPresetsPage />))
+    expect(await screen.findByText(/浓度 4/)).toBeDefined()
   })
 })
