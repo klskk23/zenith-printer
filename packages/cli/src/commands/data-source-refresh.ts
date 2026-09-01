@@ -1,10 +1,18 @@
 /**
  * Fetch a linked table again, from a script.
  *
- * The product does not refresh on a schedule — a table that changes while
- * somebody is looking at a list of rows renumbers under them, and the numbers
- * are how a row selection is expressed. This command hands that decision back
- * to whoever deploys the service: put it in cron if that suits your table.
+ * Refreshing on a schedule was refused for years, and the reason was sound: a
+ * table that changes while somebody is looking at a list of rows renumbers
+ * under them, and the numbers were how a row selection was expressed.
+ *
+ * That reason no longer holds for a source with a key column — a row's identity
+ * survives the refresh, so a selection made against it does too — and such a
+ * source may now carry `refreshIntervalSeconds`. It stays off by default, and
+ * for a table without a key column it is still refused.
+ *
+ * This command is unaffected either way: it is the manual answer, and putting
+ * it in cron remains the right thing for a table that has no key column and a
+ * deployment that knows when the data changes.
  *
  * Over REST rather than the database file, like `template-import`. There is
  * then one implementation of what a refresh decides — which columns are

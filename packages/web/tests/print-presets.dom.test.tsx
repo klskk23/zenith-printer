@@ -1,0 +1,148 @@
+/**
+ * The print presets page.
+ *
+ * Constitution ("page reachability"): every page that can be navigated to needs
+ * a render assertion, because a blank one is the cheapest failure to test and
+ * the most embarrassing to ship.
+ *
+ * Beyond that, the thing worth asserting is the id. A preset exists so another
+ * system can print without knowing what a template is; that system is
+ * configured with the id, so the id has to be *on the page*, whole. Everywhere
+ * else in this application an id is an implementation detail shown eight
+ * characters at a time.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { PrintPresetsPage } from '../src/pages/print-presets-page.tsx'
+import { TAB_KINDS, pathForTab, tabFromPath } from '../src/app/routes.ts'
+
+const PRESET = {
+  id: '75a4c13c-b232-42eb-98ee-90954b7a5426',
+  name: '路由器标签',
+  templateId: 'tpl-1',
+  printerId: 'prn-1',
+  profileId: null,
+  copies: 2,
+  createdAt: 'T',
+  updatedAt: 'T',
+}
+
+const posted: Array<Record<string, unknown>> = []
+let presets: Array<Record<string, unknown>>
+
+function wrap(node: React.ReactNode): React.JSX.Element {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false } } })
+  return <QueryClientProvider client={client}>{node}</QueryClientProvider>
+}
+
+beforeEach(() => {
+  posted.length = 0
+  presets = [PRESET]
+  vi.stubGlobal('fetch', vi.fn((input: string, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/print-presets') && init?.method === 'POST') {
+      posted.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+      return Promise.resolve({
+        ok: true, status: 201,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve(PRESET),
+        text: () => Promise.resolve(JSON.stringify(PRESET)),
+      } as unknown as Response)
+    }
+    const body = url.includes('/print-presets')
+      ? { printPresets: presets }
+      : url.includes('/templates')
+        ? { templates: [{ id: 'tpl-1', name: '路由器面单', printerKind: 'niimbot', widthMm: 50, heightMm: 30, dpi: 203, elements: [], variables: [], dataSourceId: null, createdAt: 'T', updatedAt: 'T', version: 1, bindingIssue: null }] }
+        : url.includes('/printers')
+          ? { printers: [{ id: 'prn-1', name: 'B3S_P', kind: 'niimbot', transport: 'serial', address: '/dev/x', capabilities: null, queueState: 'running', queuePausedReason: null, lastProbedAt: null, createdAt: 'T', offsetXDots: 0, offsetYDots: 0 }] }
+          : {}
+    return Promise.resolve({
+      ok: true, status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: () => Promise.resolve(body),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    } as unknown as Response)
+  }))
+})
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+describe('the route', () => {
+  it('is one of the tab kinds', () => {
+    expect(TAB_KINDS).toContain('print-presets')
+  })
+
+  it('has an address, and it round-trips', () => {
+    const path = pathForTab({ kind: 'print-presets' })
+    expect(path).toBe('/print-presets')
+    expect(tabFromPath(path)).toEqual({ kind: 'print-presets' })
+  })
+})
+
+describe('the page', () => {
+  it('renders the presets that exist', async () => {
+    render(wrap(<PrintPresetsPage />))
+    expect(await screen.findByText('路由器标签')).toBeDefined()
+  })
+
+  it('shows the id whole, because that is what the other system is given', async () => {
+    // Not truncated: it goes into somebody else's configuration file.
+    render(wrap(<PrintPresetsPage />))
+    expect(await screen.findByText(PRESET.id)).toBeDefined()
+  })
+
+  it('says what it is pointed at', async () => {
+    render(wrap(<PrintPresetsPage />))
+    expect(await screen.findByText(/路由器面单/)).toBeDefined()
+    expect(await screen.findByText(/B3S_P/)).toBeDefined()
+  })
+
+  it('says so when the design behind one is gone', async () => {
+    // A preset naming a deleted design cannot print; showing a blank where a
+    // name goes reads as missing data rather than as a broken preset.
+    presets = [{ ...PRESET, templateId: 'deleted' }]
+    render(wrap(<PrintPresetsPage />))
+    expect(await screen.findByText(/设计已被删除/)).toBeDefined()
+  })
+
+  it('offers an empty state once the answer is in', async () => {
+    presets = []
+    render(wrap(<PrintPresetsPage />))
+    expect(await screen.findByText(/还没有预设/)).toBeDefined()
+  })
+
+  it('does not claim to be empty while it is still loading', async () => {
+    // Same rule as the home page: `data ?? []` made "not here" and "not here
+    // yet" the same length.
+    presets = []
+    render(wrap(<PrintPresetsPage />))
+    expect(screen.queryByText(/还没有预设/)).toBeNull()
+  })
+})
+
+describe('creating one', () => {
+  it('will not submit until it has a name, a design and a printer', async () => {
+    render(wrap(<PrintPresetsPage />))
+    const create = await screen.findByRole('button', { name: '新建' })
+    expect(create.hasAttribute('disabled')).toBe(true)
+  })
+
+  it('sends what was chosen', async () => {
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.change(await screen.findByLabelText('名称'), { target: { value: '新预设' } })
+
+    // Radix selects: opened on pointerdown, chosen by clicking the option.
+    fireEvent.pointerDown(screen.getByRole('combobox', { name: '设计' }), { pointerType: 'mouse', button: 0 })
+    fireEvent.click(await screen.findByRole('option', { name: '路由器面单' }))
+    fireEvent.pointerDown(screen.getByRole('combobox', { name: '打印机' }), { pointerType: 'mouse', button: 0 })
+    fireEvent.click(await screen.findByRole('option', { name: 'B3S_P' }))
+
+    fireEvent.click(screen.getByRole('button', { name: '新建' }))
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toMatchObject({ name: '新预设', templateId: 'tpl-1', printerId: 'prn-1', copies: 1 })
+  })
+})

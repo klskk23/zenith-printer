@@ -24,6 +24,9 @@ export const TAB_KINDS = [
   'printers',
   'queue',
   'history',
+  // Below the day-to-day entries: a preset is set up once and then used by
+  // something other than a person.
+  'print-presets',
   // Developer-facing, so it sits below the day-to-day entries and above
   // settings — which is still the thing people visit once.
   'api-docs',
@@ -55,6 +58,7 @@ const SINGLETON_KINDS = new Set<TabKind>([
   'api-docs',
   'settings',
   'data-sources',
+  'print-presets',
 ])
 
 export function isSingletonKind(kind: TabKind): boolean {
@@ -68,6 +72,7 @@ const STATIC_PATHS: Record<Exclude<TabKind, 'design' | 'data-source'>, string> =
   queue: '/queue',
   history: '/history',
   'api-docs': '/api-docs',
+  'print-presets': '/print-presets',
   settings: '/settings',
   'data-sources': '/data-sources',
 }

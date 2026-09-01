@@ -38,7 +38,7 @@ describe('the shape', () => {
   })
 
   it('takes column names in any script', () => {
-    const result = parse({ columns: ['资产编号'], rows: [{ 资产编号: 'A-1' }] })
+    const result = parse({ columns: ['收件人'], rows: [{ 收件人: '张三' }] })
     expect(result.success).toBe(true)
   })
 

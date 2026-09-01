@@ -39,6 +39,7 @@ export const copy = {
       history: '打印历史',
       settings: '设置',
       'data-sources': '数据源',
+      'print-presets': '打印预设',
       'api-docs': '接口调试',
       'data-source': '数据源',
     },
@@ -705,6 +706,24 @@ export const copy = {
     pruneAction: '清理',
     pruneRunning: '正在清理…',
     pruneDone: (deleted: number): string => `已删除 ${deleted} 条历史记录。`,
+  },
+
+  presets: {
+    heading: '打印预设',
+    explain: '预设是「用哪个设计、哪台打印机、哪套参数、打几份」的一个具名组合。外部系统只要拿着它的 id 把数据交过来，就能打印，不必知道这四件事——而这四件事随时可以在这里改，对面不用改任何东西。',
+    addHeading: '新建预设',
+    add: '新建',
+    name: '名称',
+    template: '设计',
+    printer: '打印机',
+    copies: '每行份数',
+    copiesOf: (n: number): string => `每行 ${n} 份`,
+    empty: '还没有预设。建一个之后，把它的 id 交给对方系统。',
+    remove: '删除',
+    removeConfirm: '删除后对面系统再用这个 id 就会收到「找不到」。已经打出去的记录不受影响。',
+    createFailed: '建不了。名称可能重复了，或者所选的设计、打印机已经不在。',
+    templateGone: '设计已被删除',
+    printerGone: '打印机已被删除',
   },
 
   images: {

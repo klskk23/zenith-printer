@@ -42,6 +42,7 @@ export const copy: Copy = {
       history: 'Print history',
       settings: 'Settings',
       'data-sources': 'Data sources',
+      'print-presets': 'Print presets',
       'api-docs': 'API console',
       'data-source': 'Data source',
     },
@@ -711,6 +712,24 @@ export const copy: Copy = {
     pruneAction: 'Clear out',
     pruneRunning: 'Clearing…',
     pruneDone: (deleted: number): string => `Deleted ${deleted} records.`,
+  },
+
+  presets: {
+    heading: 'Print presets',
+    explain: 'A preset is a name over four decisions — which design, which printer, which settings, how many copies. Another system prints by handing over rows and this id, without knowing any of them; and any of them can be changed here without that system changing anything.',
+    addHeading: 'New preset',
+    add: 'Create',
+    name: 'Name',
+    template: 'Design',
+    printer: 'Printer',
+    copies: 'Copies per row',
+    copiesOf: (n: number): string => `${n} per row`,
+    empty: 'No presets yet. Create one, then give the other system its id.',
+    remove: 'Delete',
+    removeConfirm: 'After this, that id answers "not found" for the other system. Labels already printed are unaffected.',
+    createFailed: 'Could not create it. The name may be taken, or the chosen design or printer may be gone.',
+    templateGone: 'Design deleted',
+    printerGone: 'Printer deleted',
   },
 
   images: {
