@@ -104,6 +104,46 @@ const APP: Readonly<Record<AppErrorCode, ErrorCopy>> = {
     why: 'Two writers on one table would leave it half new and half old',
     next: 'Wait for the running refresh to finish and try again',
   },
+  HTTP_SOURCE_UNREACHABLE: {
+    what: 'Could not reach the system this table reads from',
+    why: 'The address did not answer, or took longer than 30 seconds to',
+    next: 'Check that the other system is running and that this machine can reach it, then refresh again. The rows already here are unchanged and still print',
+  },
+  HTTP_SOURCE_BAD_STATUS: {
+    what: 'The system this table reads from refused the request',
+    why: 'It answered with an error status rather than rows — commonly a credential it no longer accepts, or an address that no longer exists',
+    next: 'Check the address and the headers on this data source. The rows already here are unchanged and still print',
+  },
+  HTTP_SOURCE_BAD_SHAPE: {
+    what: 'The answer was not a table this can read',
+    why: 'It has to be JSON carrying `columns` and `rows`, where every value is text and every row has exactly the declared columns',
+    next: 'Show the detail below to whoever maintains the other system; the rows already here are unchanged and still print',
+  },
+  HTTP_SOURCE_DUPLICATE_KEY: {
+    what: 'Two rows arrived with the same key',
+    why: 'The key column is what tells one row from another across a refresh, so a repeated value leaves no way to say which row is which',
+    next: 'Fix the duplicates in the other system, or point this data source at a column whose values are unique, then refresh again',
+  },
+  HTTP_SOURCE_MISSING_KEY: {
+    what: 'A row arrived with nothing in its key column',
+    why: 'A row with no key cannot be matched to the row it replaces, and dropping it would lose data nobody asked to lose',
+    next: 'Fill the key column for every row in the other system, or choose a different key column, then refresh again',
+  },
+  HTTP_SOURCE_KEY_COLUMN_REQUIRED: {
+    what: 'This data source needs a key column first',
+    why: 'Refreshing before printing depends on a row keeping its identity across the refresh; without a key column a refresh can move the rows out from under a selection that was already made',
+    next: 'Set a key column on this data source, then turn this on again',
+  },
+  DATA_SOURCE_NOT_FETCHABLE: {
+    what: 'This data source is not fetched from anywhere',
+    why: 'Its rows are maintained here rather than read from another system, so there is nothing to refresh',
+    next: 'Edit its rows directly, or create a data source that reads from an address',
+  },
+  ROW_SELECTION_STALE_KEYS: {
+    what: 'Some of the chosen rows are no longer there',
+    why: 'They were removed from the other system since they were chosen, and printing the rest without saying so would leave a shortfall to find at counting time',
+    next: 'Refresh the table and choose again',
+  },
   GOOGLE_URL_INVALID: {
     what: 'That is not a Google Sheets link',
     why: 'No spreadsheet id could be found in it — it may be a Docs or Slides link, or a mistyped paste',

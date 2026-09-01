@@ -21,6 +21,7 @@ import {
   UnknownColumnError,
   assertKnownColumns,
   dataSourceNameSchema,
+  httpSourceInputSchema,
   rowPatchSchema,
 } from '../domain/data-source.ts'
 import {
@@ -33,6 +34,8 @@ import {
 import { DecodeFailedError } from '../csv/encoding.ts'
 import { templatesBrokenByRemoving, templatesUsingDataSource } from '../domain/template-refs.ts'
 import { ApiError, HttpStatus } from './errors.ts'
+import { HttpSourceError, fetchAllRows } from '../domain/http-rows.ts'
+import { DuplicateRowKeyError, MissingRowKeyError, keyRows } from '../domain/row-upsert.ts'
 import { asApiError, readByWorksheetId, requireSheets, tableOrRefuse } from './google.ts'
 import { SheetsError } from '../domain/google-sheets.ts'
 import { tableFromValues, TableShapeError } from '../domain/sheet-table.ts'
@@ -141,6 +144,141 @@ async function readUpload(request: {
 export function serialiseSource(source: DataSource): Record<string, unknown> {
   const { link, ...rest } = source
   return link === null ? rest : { ...rest, ...link }
+}
+
+/**
+ * Refresh a source that reads from an address.
+ *
+ * Deliberately unlike the Google path in one respect. A Google read that fails
+ * comes back as `{ outcome: 'failed' }` with a 200, because the server did what
+ * it was asked and has a conclusion to report. Here the failures are the
+ * caller's to act on — an address that no longer exists, a credential the other
+ * end stopped accepting, a body that is not a table — and each has a repair. So
+ * they are errors with stable codes and three-part copy, which is what the
+ * calling system shows to a person.
+ *
+ * What is *not* an error: the rows already stored. Every failure below leaves
+ * them exactly as they were, and every message says so. A table that cannot be
+ * refreshed can still be printed from, and refusing to print because a producer
+ * is down would be this system inventing an outage of its own.
+ */
+async function refreshFromAddress(
+  app: FastifyInstance,
+  repo: DataSourceRepo,
+  source: DataSource,
+  confirmed: boolean,
+): Promise<Record<string, unknown>> {
+  const log = (conclusion: Record<string, unknown>): void => {
+    // Never the row values: business data does not belong in logs, the same
+    // boundary the credentials rule guards from the other side.
+    app.log.info(
+      { event: 'data_source_refresh', dataSourceId: source.id, sourceKind: 'http', ...conclusion },
+      'data source refresh',
+    )
+  }
+
+  if (source.http === null || source.keyColumn === null) {
+    throw ApiError.unprocessable('DATA_SOURCE_NOT_FETCHABLE', { dataSourceId: source.id })
+  }
+
+  let fetched
+  try {
+    fetched = await fetchAllRows(app.ctx.httpRows, {
+      url: source.http.url,
+      headers: repo.httpHeaders(source.id),
+    })
+  } catch (err) {
+    if (err instanceof HttpSourceError) {
+      log({ outcome: 'failed', reason: err.kind, detail: err.detail })
+      if (err.kind === 'tooManyRows') {
+        return { outcome: 'refusedTooManyRows' as const, rowCount: Number(err.detail.split(' ')[0]), limit: MAX_ROWS }
+      }
+      const code =
+        err.kind === 'unreachable'
+          ? 'HTTP_SOURCE_UNREACHABLE'
+          : err.kind === 'badStatus'
+            ? 'HTTP_SOURCE_BAD_STATUS'
+            : 'HTTP_SOURCE_BAD_SHAPE'
+      throw ApiError.unprocessable(code, {
+        dataSourceId: source.id,
+        detail: err.detail,
+        ...(err.status === null ? {} : { status: err.status }),
+      })
+    }
+    throw err
+  }
+
+  /**
+   * Checked before the column change is, and not confirmable.
+   *
+   * Losing the key column is not one more removed column. Confirming a header
+   * change is consent to lose *a column*; it is not consent to go back to
+   * identifying rows by position, which is what proceeding without a key would
+   * do — and would do silently, since the table would still look full.
+   */
+  if (!fetched.columns.includes(source.keyColumn)) {
+    log({ outcome: 'failed', reason: 'keyColumnMissing' })
+    throw ApiError.unprocessable('HTTP_SOURCE_MISSING_KEY', {
+      dataSourceId: source.id,
+      keyColumn: source.keyColumn,
+    })
+  }
+
+  const decision = decideRefresh(source, fetched, { confirmed })
+  if (decision.kind === 'refusedTooManyRows') {
+    log({ outcome: 'refusedTooManyRows', rowCount: decision.rowCount, limit: decision.limit })
+    return { outcome: 'refusedTooManyRows' as const, rowCount: decision.rowCount, limit: decision.limit }
+  }
+  if (decision.kind === 'needsConfirmation') {
+    log({ outcome: 'needsConfirmation', removedColumns: decision.removedColumns })
+    return {
+      outcome: 'needsConfirmation' as const,
+      removedColumns: decision.removedColumns,
+      addedColumns: decision.addedColumns,
+      affectedTemplates: brokenBy(app.ctx.db, source.id, decision.removedColumns),
+    }
+  }
+
+  let keyed
+  try {
+    keyed = keyRows(fetched.rows, source.keyColumn)
+  } catch (err) {
+    if (err instanceof DuplicateRowKeyError) {
+      log({ outcome: 'failed', reason: 'duplicateKey', duplicates: err.duplicates.length })
+      throw ApiError.unprocessable('HTTP_SOURCE_DUPLICATE_KEY', {
+        dataSourceId: source.id,
+        keyColumn: err.column,
+        duplicates: err.duplicates,
+      })
+    }
+    if (err instanceof MissingRowKeyError) {
+      log({ outcome: 'failed', reason: 'missingKey', rowIndex: err.rowIndex })
+      throw ApiError.unprocessable('HTTP_SOURCE_MISSING_KEY', {
+        dataSourceId: source.id,
+        keyColumn: err.column,
+        rowIndex: err.rowIndex + 1,
+      })
+    }
+    throw err
+  }
+
+  const rowsBefore = source.rowCount
+  const merged = repo.upsertByKey(source.id, { columns: fetched.columns, rows: keyed })
+  const after = repo.find(source.id)
+  log({ outcome: 'applied', rowsBefore, rowsAfter: after?.rowCount ?? 0, ...merged })
+
+  return {
+    outcome: 'applied' as const,
+    rowsBefore,
+    rowsAfter: after?.rowCount ?? 0,
+    columnsAdded: decision.columnsAdded,
+    // What the merge did, which "applied" alone cannot say. A refresh that
+    // changed nothing and one that replaced the table are different answers.
+    added: merged.added,
+    updated: merged.updated,
+    removed: merged.removed,
+    lastRefreshedAt: after?.lastRefreshedAt ?? null,
+  }
 }
 
 export async function registerDataSourceRoutes(app: FastifyInstance): Promise<void> {
@@ -254,6 +392,50 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
   )
 
   /**
+   * Create a data source that reads rows from an address.
+   *
+   * No rows are fetched here. Creating and reading are separate acts: a
+   * producer that happens to be down should not stop the table being created,
+   * and the refresh path already knows how to report every way a read can fail.
+   * The table therefore starts empty and honestly says it has never refreshed.
+   *
+   * `keyColumn` is required, and is the whole reason this kind of source is
+   * safe to have. See `domain/row-upsert.ts`: without it a row's identity is
+   * its position, and a producer that inserts a row moves every selection made
+   * against the rows below it, silently.
+   */
+  typed.post(
+    '/api/data-sources/http',
+    { schema: { body: httpSourceInputSchema } },
+    async (request, reply) => {
+      const repo = sources()
+      if (repo.findByName(request.body.name) !== undefined) {
+        throw ApiError.conflict('DATA_SOURCE_NAME_TAKEN', { name: request.body.name })
+      }
+      if (request.body.refreshBeforePrint === true && request.body.keyColumn.length === 0) {
+        throw ApiError.unprocessable('HTTP_SOURCE_KEY_COLUMN_REQUIRED', { name: request.body.name })
+      }
+
+      return reply.status(HttpStatus.Created).send(
+        serialiseSource(
+          repo.createHttp({
+            name: request.body.name,
+            // The producer is the authority on what the columns are; until it
+            // has been read there is nothing to claim, and claiming the key
+            // column alone would describe a table that does not exist yet.
+            columns: [request.body.keyColumn],
+            url: request.body.url,
+            headers: request.body.headers,
+            keyColumn: request.body.keyColumn,
+            refreshIntervalSeconds: request.body.refreshIntervalSeconds,
+            refreshBeforePrint: request.body.refreshBeforePrint,
+          }),
+        ),
+      )
+    },
+  )
+
+  /**
    * In-flight refreshes, by data source id.
    *
    * Two writers on one table is how a half-replaced table happens: new columns
@@ -284,7 +466,10 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
     async (request) => {
       const repo = sources()
       const source = require(repo, request.params.id)
-      if (source.link === null) {
+      // Any source that reads from elsewhere, not only a spreadsheet: an http
+      // source has no `link` and releasing it means exactly the same thing —
+      // keep the rows, forget where they came from.
+      if (source.sourceKind === 'local') {
         throw ApiError.unprocessable('DATA_SOURCE_NOT_LINKED', { dataSourceId: source.id })
       }
       if (request.body.confirmed !== true) {
@@ -312,14 +497,24 @@ export async function registerDataSourceRoutes(app: FastifyInstance): Promise<vo
     async (request) => {
       const repo = sources()
       const source = require(repo, request.params.id)
-      if (source.link === null) {
-        throw ApiError.unprocessable('DATA_SOURCE_NOT_LINKED', { dataSourceId: source.id })
-      }
-      const sheets = requireSheets(app.ctx)
 
       if (refreshing.has(source.id)) {
         throw ApiError.conflict('DATA_SOURCE_REFRESH_IN_PROGRESS', { dataSourceId: source.id })
       }
+
+      if (source.sourceKind === 'http') {
+        refreshing.add(source.id)
+        try {
+          return await refreshFromAddress(app, repo, source, request.body.confirmColumnChange === true)
+        } finally {
+          refreshing.delete(source.id)
+        }
+      }
+
+      if (source.link === null) {
+        throw ApiError.unprocessable('DATA_SOURCE_NOT_LINKED', { dataSourceId: source.id })
+      }
+      const sheets = requireSheets(app.ctx)
 
       /**
        * One line per refresh, so "where did this batch of labels get its data"

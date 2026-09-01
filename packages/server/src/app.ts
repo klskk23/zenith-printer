@@ -26,6 +26,8 @@ import { registerPreviewRoutes } from './api/preview.ts'
 import { registerImageRoutes } from './api/images.ts'
 import { registerTemplateIoRoutes } from './api/template-io.ts'
 import type { SheetsPort } from './domain/google-sheets.ts'
+import type { HttpRowsPort } from './domain/http-rows.ts'
+import { createHttpRowsClient } from './integrations/http-rows-client.ts'
 import { registerGoogleRoutes } from './api/google.ts'
 import { registerTemplateRoutes } from './api/templates.ts'
 import { registerSequencePoolRoutes } from './api/sequence-pools.ts'
@@ -51,6 +53,14 @@ export interface AppDependencies {
    * test that depends on the network.
    */
   sheets?: { port: SheetsPort; clientEmail: string }
+  /**
+   * How rows are fetched from an HTTP producer.
+   *
+   * Defaulted rather than optional: unlike Google, this needs no credentials to
+   * configure, so there is no state in which the capability is unavailable —
+   * only sources that have not been pointed anywhere yet. Tests inject a fake.
+   */
+  httpRows?: HttpRowsPort
 }
 
 export interface AppContext {
@@ -67,6 +77,7 @@ export interface AppContext {
   imageStorageDir: string
   /** Null when no Google credentials are configured. */
   sheets: { port: SheetsPort; clientEmail: string } | null
+  httpRows: HttpRowsPort
   /** Undefined when the caller opted out, e.g. focused route tests. */
   queue?: PrintQueue
 }
@@ -98,6 +109,7 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
     clock: deps.clock ?? systemClock,
     ids: deps.idGenerator ?? uuidGenerator,
     sheets: deps.sheets ?? null,
+    httpRows: deps.httpRows ?? createHttpRowsClient(),
   })
 
   app.setErrorHandler((error, request, reply) => {

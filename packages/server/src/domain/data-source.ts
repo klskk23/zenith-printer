@@ -132,3 +132,30 @@ export function assertKnownColumns(columns: readonly string[], values: Record<st
     throw new UnknownColumnError(unknown)
   }
 }
+
+/**
+ * Configuring a source that reads rows from an address.
+ *
+ * `headers` is where a credential goes. It is stored and never returned — see
+ * `HttpOrigin` — so this is the only shape in which its values ever appear.
+ *
+ * `refreshIntervalSeconds` defaults to 0, which means "only when asked" and is
+ * exactly what this product did before there was any alternative. Automatic
+ * refreshing is offered because a key column makes it safe, not because
+ * staleness became more urgent; it stays a choice.
+ */
+export const httpSourceInputSchema = z.object({
+  name: dataSourceNameSchema,
+  url: z
+    .string()
+    .url()
+    .refine((value) => value.startsWith('http://') || value.startsWith('https://'), {
+      message: 'the address must be http or https',
+    }),
+  headers: z.record(z.string().min(1), z.string()).default({}),
+  /** Which column names a row. Required: see domain/row-upsert.ts. */
+  keyColumn: z.string().trim().min(1),
+  refreshIntervalSeconds: z.number().int().min(0).max(86_400).default(0),
+  refreshBeforePrint: z.boolean().default(false),
+})
+export type HttpSourceInput = z.infer<typeof httpSourceInputSchema>
