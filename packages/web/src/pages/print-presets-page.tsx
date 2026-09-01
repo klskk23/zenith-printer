@@ -11,6 +11,11 @@
  * gets written into somebody else's configuration, so it is shown in full and
  * can be copied, rather than being an implementation detail the way ids
  * elsewhere in this application are.
+ *
+ * The page opens on the list, and both creating and editing happen in a
+ * dialog. A form sitting open above the list put five fields in front of
+ * somebody whose reason for coming here was almost always to read an id off an
+ * existing preset.
  */
 import { useState } from 'react'
 import { copy } from '../i18n/index.ts'
@@ -18,162 +23,58 @@ import { Alert } from '../components/ui/alert.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { Card, CardContent, CardHeader } from '../components/ui/card.tsx'
 import { ConfirmButton } from '../components/ui/confirm-button.tsx'
-import { Input } from '../components/ui/input.tsx'
-import { Label } from '../components/ui/label.tsx'
 import { Skeleton } from '../components/ui/skeleton.tsx'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select.tsx'
 import { usePrinters } from '../features/printers/hooks.ts'
-import { useProfiles } from '../features/profiles/hooks.ts'
 import { useTemplates } from '../features/templates/hooks.ts'
+import { useProfiles } from '../features/profiles/hooks.ts'
+import { PresetDialog } from '../features/print-presets/preset-dialog.tsx'
 import {
-  useCreatePrintPreset,
   useDeletePrintPreset,
   usePrintPresets,
+  type PrintPreset,
 } from '../features/print-presets/hooks.ts'
-
-/**
- * The sentinel for "let the printer decide".
- *
- * Radix reserves the empty string for "nothing chosen", which is a different
- * thing: deferring to the printer is a decision somebody made, and it has to
- * be selectable so a preset can be moved back to it.
- */
-const DEFAULT_PROFILE = '__printer_default__'
 
 export function PrintPresetsPage(): React.JSX.Element {
   const presets = usePrintPresets()
   const templates = useTemplates()
   const printers = usePrinters()
-  const create = useCreatePrintPreset()
   const remove = useDeletePrintPreset()
 
-  const [name, setName] = useState('')
-  const [templateId, setTemplateId] = useState<string | null>(null)
-  const [printerId, setPrinterId] = useState<string | null>(null)
-  const [copies, setCopies] = useState(1)
   /**
-   * `null` is a real choice, not an unset one: it means "whatever the printer
-   * is set to use". Profiles belong to a printer, so choosing a different
-   * printer drops it — a profile id from another machine would name settings
-   * that machine cannot print with.
+   * `undefined` means the dialog is creating; a preset means it is editing
+   * that one. Held here rather than per card so only one is ever open, and so
+   * the dialog is not remounted with every list refetch.
    */
-  const [profileId, setProfileId] = useState<string | null>(null)
-  const profiles = useProfiles(printerId)
+  const [editing, setEditing] = useState<PrintPreset | undefined>(undefined)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
-  const chooseprinter = (next: string): void => {
-    setPrinterId(next)
-    setProfileId(null)
+  const openCreate = (): void => {
+    setEditing(undefined)
+    setDialogOpen(true)
   }
-
-  const ready = name.trim().length > 0 && templateId !== null && printerId !== null
+  const openEdit = (preset: PrintPreset): void => {
+    setEditing(preset)
+    setDialogOpen(true)
+  }
 
   return (
     <div className="space-y-3" data-print-presets>
-      <h2 className="text-sm font-semibold">{copy.presets.heading}</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">{copy.presets.heading}</h2>
+        <Button size="sm" onClick={openCreate}>
+          {copy.presets.addOpen}
+        </Button>
+      </div>
       <p className="text-2xs text-muted-foreground">{copy.presets.explain}</p>
 
-      <Card>
-        <CardHeader>
-          <span className="text-xs font-medium">{copy.presets.addHeading}</span>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Label className="block space-y-1">
-              <span className="text-2xs text-muted-foreground">{copy.presets.name}</span>
-              <Input value={name} onChange={(event) => setName(event.target.value)} />
-            </Label>
-            <Label className="block space-y-1">
-              <span className="text-2xs text-muted-foreground">{copy.presets.copies}</span>
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                value={copies}
-                onChange={(event) => setCopies(Math.max(1, Number(event.target.value) || 1))}
-              />
-            </Label>
-            <Label className="block space-y-1">
-              <span className="text-2xs text-muted-foreground">{copy.presets.template}</span>
-              <Select value={templateId ?? ''} onValueChange={setTemplateId}>
-                <SelectTrigger aria-label={copy.presets.template}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(templates.data ?? []).map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Label>
-            <Label className="block space-y-1">
-              <span className="text-2xs text-muted-foreground">{copy.presets.printer}</span>
-              <Select value={printerId ?? ''} onValueChange={chooseprinter}>
-                <SelectTrigger aria-label={copy.presets.printer}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(printers.data ?? []).map((printer) => (
-                    <SelectItem key={printer.id} value={printer.id}>
-                      {printer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Label>
-            {/* Only once a printer is chosen: profiles belong to one, and an
-                empty dropdown reads as a dead end rather than as a question
-                that has not been asked yet. */}
-            {printerId !== null && (
-              <Label className="block space-y-1">
-                <span className="text-2xs text-muted-foreground">{copy.presets.profile}</span>
-                <Select
-                  value={profileId ?? DEFAULT_PROFILE}
-                  onValueChange={(next) => setProfileId(next === DEFAULT_PROFILE ? null : next)}
-                >
-                  <SelectTrigger aria-label={copy.presets.profile}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={DEFAULT_PROFILE}>{copy.presets.profileDefault}</SelectItem>
-                    {(profiles.data ?? []).map((profile) => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Label>
-            )}
-          </div>
-
-          {create.isError && (
-            <Alert variant="destructive" className="text-xs">
-              {copy.presets.createFailed}
-            </Alert>
-          )}
-
-          <Button
-            size="sm"
-            disabled={!ready || create.isPending}
-            onClick={() =>
-              create.mutate(
-                { name: name.trim(), templateId: templateId!, printerId: printerId!, copies, profileId },
-                { onSuccess: () => setName('') },
-              )
-            }
-          >
-            {copy.presets.add}
-          </Button>
-        </CardContent>
-      </Card>
+      <PresetDialog
+        // Keyed so the dialog's own state starts from this preset rather than
+        // from whichever one was open before it.
+        key={editing?.id ?? 'new'}
+        preset={editing}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
 
       {presets.isPending && (
         <div className="space-y-2">
@@ -214,7 +115,10 @@ export function PrintPresetsPage(): React.JSX.Element {
               <p className="font-mono text-2xs break-all select-all" data-preset-id>
                 {preset.id}
               </p>
-              <div className="pt-1">
+              <div className="flex items-center gap-1 pt-1">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(preset)}>
+                  {copy.presets.edit}
+                </Button>
                 <ConfirmButton
                   variant="ghost"
                   size="sm"
@@ -259,9 +163,7 @@ function PresetProfileLine({
   }
   return (
     <p className="text-2xs text-muted-foreground" data-preset-profile>
-      {profile === undefined
-        ? copy.presets.profileGone
-        : copy.presets.profileOf(profile.name)}
+      {profile === undefined ? copy.presets.profileGone : copy.presets.profileOf(profile.name)}
     </p>
   )
 }

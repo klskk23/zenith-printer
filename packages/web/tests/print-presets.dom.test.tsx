@@ -29,6 +29,8 @@ const PRESET = {
 }
 
 const posted: Array<Record<string, unknown>> = []
+const patched: Array<{ id: string; body: Record<string, unknown> }> = []
+const deleted: string[] = []
 let presets: Array<Record<string, unknown>>
 
 function wrap(node: React.ReactNode): React.JSX.Element {
@@ -38,9 +40,32 @@ function wrap(node: React.ReactNode): React.JSX.Element {
 
 beforeEach(() => {
   posted.length = 0
+  patched.length = 0
+  deleted.length = 0
   presets = [PRESET]
   vi.stubGlobal('fetch', vi.fn((input: string, init?: RequestInit) => {
     const url = String(input)
+    if (url.includes('/print-presets') && init?.method === 'PATCH') {
+      patched.push({
+        id: url.split('/').pop() ?? '',
+        body: JSON.parse(String(init.body)) as Record<string, unknown>,
+      })
+      return Promise.resolve({
+        ok: true, status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve(PRESET),
+        text: () => Promise.resolve(JSON.stringify(PRESET)),
+      } as unknown as Response)
+    }
+    if (url.includes('/print-presets') && init?.method === 'DELETE') {
+      deleted.push(url.split('/').pop() ?? '')
+      return Promise.resolve({
+        ok: true, status: 204,
+        headers: new Headers(),
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(''),
+      } as unknown as Response)
+    }
     if (url.includes('/print-presets') && init?.method === 'POST') {
       posted.push(JSON.parse(String(init.body)) as Record<string, unknown>)
       return Promise.resolve({
@@ -132,13 +157,17 @@ describe('the page', () => {
 describe('creating one', () => {
   it('will not submit until it has a name, a design and a printer', async () => {
     render(wrap(<PrintPresetsPage />))
-    const create = await screen.findByRole('button', { name: '新建' })
-    expect(create.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(await screen.findByRole('button', { name: '新建预设' }))
+    const save = await screen.findByRole('button', { name: '保存' })
+    expect(save.hasAttribute('disabled')).toBe(true)
   })
 
   it('sends what was chosen', async () => {
     render(wrap(<PrintPresetsPage />))
-    fireEvent.change(await screen.findByLabelText('名称'), { target: { value: '新预设' } })
+    fireEvent.click(await screen.findByRole('button', { name: '新建预设' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: '名称' }), {
+      target: { value: '新预设' },
+    })
 
     // Radix selects: opened on pointerdown, chosen by clicking the option.
     fireEvent.pointerDown(screen.getByRole('combobox', { name: '设计' }), { pointerType: 'mouse', button: 0 })
@@ -146,7 +175,7 @@ describe('creating one', () => {
     fireEvent.pointerDown(screen.getByRole('combobox', { name: '打印机' }), { pointerType: 'mouse', button: 0 })
     fireEvent.click(await screen.findByRole('option', { name: 'B3S_P' }))
 
-    fireEvent.click(screen.getByRole('button', { name: '新建' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     await waitFor(() => expect(posted).toHaveLength(1))
     expect(posted[0]).toMatchObject({ name: '新预设', templateId: 'tpl-1', printerId: 'prn-1', copies: 1 })
   })
@@ -164,6 +193,7 @@ describe('creating one', () => {
 describe('the print settings', () => {
   it('are offered when the chosen printer has profiles', async () => {
     render(wrap(<PrintPresetsPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '新建预设' }))
     fireEvent.pointerDown(await screen.findByRole('combobox', { name: '打印机' }), {
       pointerType: 'mouse', button: 0,
     })
@@ -173,6 +203,7 @@ describe('the print settings', () => {
 
   it('are sent with the preset', async () => {
     render(wrap(<PrintPresetsPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '新建预设' }))
     fireEvent.change(await screen.findByRole('textbox', { name: '名称' }), {
       target: { value: '路由器标签' },
     })
@@ -188,7 +219,7 @@ describe('the print settings', () => {
       pointerType: 'mouse', button: 0,
     })
     fireEvent.click(await screen.findByRole('option', { name: /浓度 4/ }))
-    fireEvent.click(screen.getByRole('button', { name: '新建' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(posted).toHaveLength(1))
     expect(posted[0]).toMatchObject({ profileId: 'prof-2' })
@@ -200,6 +231,7 @@ describe('the print settings', () => {
     // chose. Made sayable rather than only reachable by never touching the
     // control, so a preset can be moved back to it.
     render(wrap(<PrintPresetsPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '新建预设' }))
     fireEvent.pointerDown(await screen.findByRole('combobox', { name: '打印机' }), {
       pointerType: 'mouse', button: 0,
     })
@@ -214,5 +246,109 @@ describe('the print settings', () => {
     presets = [{ ...PRESET, profileId: 'prof-2' }]
     render(wrap(<PrintPresetsPage />))
     expect(await screen.findByText(/浓度 4/)).toBeDefined()
+  })
+})
+
+/**
+ * Creating and editing, both in a dialog.
+ *
+ * The form used to sit open at the top of the page, which put a five-field
+ * form above the list on every visit — and the list is what somebody comes
+ * here for. More importantly there was no way to change a preset at all: the
+ * id is written into somebody else's configuration, so the only way to fix a
+ * wrong printer was to delete the preset and hand over a new id, which is
+ * exactly what a preset exists to avoid.
+ */
+describe('the create dialog', () => {
+  it('is behind a button, so the list is what the page opens on', async () => {
+    render(wrap(<PrintPresetsPage />))
+    expect(await screen.findByRole('button', { name: '新建预设' })).toBeDefined()
+    // Nothing to fill in until it is asked for.
+    expect(screen.queryByRole('textbox', { name: '名称' })).toBeNull()
+  })
+
+  it('creates from inside the dialog', async () => {
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '新建预设' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: '名称' }), {
+      target: { value: '新预设' },
+    })
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '设计' }), {
+      pointerType: 'mouse', button: 0,
+    })
+    fireEvent.click(await screen.findByRole('option', { name: '路由器面单' }))
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '打印机' }), {
+      pointerType: 'mouse', button: 0,
+    })
+    fireEvent.click(await screen.findByRole('option', { name: 'B3S_P' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toMatchObject({ name: '新预设', templateId: 'tpl-1', printerId: 'prn-1' })
+  })
+})
+
+describe('the edit dialog', () => {
+  it('opens on a preset already filled in', async () => {
+    // Otherwise editing means retyping what is already there, and a field left
+    // blank by mistake is a change nobody meant to make.
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
+    await waitFor(() =>
+      expect((screen.getByRole('textbox', { name: '名称' }) as HTMLInputElement).value).toBe(
+        '路由器标签',
+      ),
+    )
+    expect((screen.getByRole('spinbutton', { name: '每行份数' }) as HTMLInputElement).value).toBe('2')
+  })
+
+  it('sends only to that preset, and keeps its id', async () => {
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: '名称' }), {
+      target: { value: '改过的名字' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(patched).toHaveLength(1))
+    expect(patched[0]?.id).toBe(PRESET.id)
+    expect(patched[0]?.body).toMatchObject({ name: '改过的名字' })
+  })
+
+  it('carries the copies through untouched when only the name changed', async () => {
+    // The server used to reset them; this side must not hand it an excuse by
+    // omitting what it did not change either.
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: '名称' }), {
+      target: { value: '改过的名字' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(patched).toHaveLength(1))
+    expect(patched[0]?.body).toMatchObject({ copies: 2 })
+  })
+
+  it('does not keep a cancelled edit for the next time it opens', async () => {
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: '名称' }), {
+      target: { value: '半路改的' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    fireEvent.click(await screen.findByRole('button', { name: '编辑' }))
+    await waitFor(() =>
+      expect((screen.getByRole('textbox', { name: '名称' }) as HTMLInputElement).value).toBe(
+        '路由器标签',
+      ),
+    )
+    expect(patched).toHaveLength(0)
+  })
+
+  it('still deletes, and only the one asked for', async () => {
+    render(wrap(<PrintPresetsPage />))
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
+    fireEvent.click(await screen.findByRole('button', { name: '删除', hidden: false }))
+    await waitFor(() => expect(deleted).toEqual([PRESET.id]))
   })
 })

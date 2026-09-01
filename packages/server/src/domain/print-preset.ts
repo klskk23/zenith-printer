@@ -27,7 +27,28 @@ export const printPresetInputSchema = z.object({
 })
 export type PrintPresetInput = z.infer<typeof printPresetInputSchema>
 
-export const printPresetPatchSchema = printPresetInputSchema.partial()
+/**
+ * Written out rather than derived with `.partial()`.
+ *
+ * `.partial()` makes a key optional but leaves its `.default()` in place, and a
+ * default fires precisely when the key is absent — which is what a patch means
+ * by "leave this alone". So renaming a preset also reset its copies to one, and
+ * the next batch printed a third of the labels somebody expected with nothing
+ * in the response saying so.
+ *
+ * Every field here is optional and none carries a default, so an absent key
+ * changes nothing. `profileId` still accepts an explicit `null`: "move it back
+ * to the printer's own settings" is a different instruction from "do not
+ * mention it", and a patch that cannot say the first makes that choice
+ * one-way.
+ */
+export const printPresetPatchSchema = z.object({
+  name: presetNameSchema.optional(),
+  templateId: z.string().min(1).optional(),
+  printerId: z.string().min(1).optional(),
+  profileId: z.string().min(1).nullish(),
+  copies: z.number().int().min(1).max(100).optional(),
+})
 export type PrintPresetPatch = z.infer<typeof printPresetPatchSchema>
 
 export interface PrintPreset {

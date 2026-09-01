@@ -3,7 +3,7 @@
  *
  * A preset holds no data of its own — four references and a count — so there
  * is no optimistic anything here and no cache to keep warm. Create, list,
- * delete.
+ * edit, delete.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from '../../api/client.ts'
@@ -57,6 +57,32 @@ export function useDeletePrintPreset() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => request<void>(`/print-presets/${id}`, { method: 'DELETE' }),
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+/**
+ * Change one, keeping its id.
+ *
+ * The id is the whole point of a preset: it lives in somebody else's
+ * configuration, and every one of the four decisions behind it can be revised
+ * here without that side being told, let alone redeployed. Deleting and
+ * recreating would hand them a new id, which is the thing a preset exists to
+ * avoid.
+ */
+export function useUpdatePrintPreset() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      id: string
+      changes: {
+        name?: string
+        templateId?: string
+        printerId?: string
+        profileId?: string | null
+        copies?: number
+      }
+    }) => request<PrintPreset>(`/print-presets/${input.id}`, { method: 'PATCH', body: input.changes }),
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })
 }

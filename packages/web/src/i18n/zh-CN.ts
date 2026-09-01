@@ -730,6 +730,18 @@ export const copy = {
     explain: '预设是「用哪个设计、哪台打印机、哪套参数、打几份」的一个具名组合。外部系统只要拿着它的 id 把数据交过来，就能打印，不必知道这四件事——而这四件事随时可以在这里改，对面不用改任何东西。',
     addHeading: '新建预设',
     add: '新建',
+    addOpen: '新建预设',
+    edit: '编辑',
+    editHeading: '编辑预设',
+    /**
+     * Said in the edit dialog, because the id is the one thing here that is
+     * not editable — somebody else's configuration already has it written
+     * down, and a preset that could change it would be a different preset
+     * wearing the old one's name.
+     */
+    editExplain: '这里改动的四件事对面立刻生效，且不用改任何东西——因为 id 不变。',
+    save: '保存',
+    saveFailed: '保存不了。名称可能和别的预设重复了，或者所选的设计、打印机已经不在。',
     name: '名称',
     template: '设计',
     printer: '打印机',

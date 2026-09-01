@@ -147,6 +147,42 @@ describe('managing presets', () => {
     expect(res.json().templateId).toBe(other)
   })
 
+  it('changes only what the patch names', async () => {
+    /**
+     * `.partial()` does not remove a `.default()` — it makes the key optional
+     * and then fills it in when it is absent. So a patch that renamed a preset
+     * also quietly reset its copies to one, and the next batch printed a third
+     * of the labels somebody expected, with nothing in the response saying so.
+     */
+    const id = (await createPreset({ copies: 3 })).json().id as string
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/print-presets/${id}`,
+      payload: { name: '改了名字' },
+    })
+    expect(res.json()).toMatchObject({ name: '改了名字', copies: 3 })
+  })
+
+  it('can be moved back to the printer default settings', async () => {
+    // Explicit null has to survive as null — "unset it" and "do not mention
+    // it" are different instructions, and a patch that cannot say the first
+    // makes the choice one-way.
+    const profileId = (
+      await app.inject({
+        method: 'POST',
+        url: `/api/printers/${printerId}/profiles`,
+        payload: { name: '浓度 4', density: 4, labelType: 1, labelWidthMm: 50, labelHeightMm: 30 },
+      })
+    ).json().id as string
+    const id = (await createPreset({ profileId })).json().id as string
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/print-presets/${id}`,
+      payload: { profileId: null },
+    })
+    expect(res.json().profileId).toBeNull()
+  })
+
   it('is deleted without ceremony', async () => {
     // It holds no data of its own; every label it produced is still in history.
     const id = (await createPreset()).json().id as string
