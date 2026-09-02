@@ -160,12 +160,44 @@ describe('the entry point on the list page', () => {
     expect(await screen.findByRole('button', { name: '从资产台账接入' })).toBeDefined()
   })
 
+  it('is offered when the ledger is configured but not answering', async () => {
+    /**
+     * Configured-and-broken is not the same as not configured, and hiding the
+     * entry for both makes a fixable fault look like a deployment decision.
+     *
+     * That is exactly how it failed in the field: the ledger was configured
+     * and unreachable, the entry vanished, and the carefully worded "cannot
+     * reach the ledger" was behind a button that was no longer there.
+     */
+    categoriesFail = true
+    render(wrap(<DataSourcesPage />))
+    expect(await screen.findByRole('button', { name: '从资产台账接入' })).toBeDefined()
+  })
+
   it('is not there at all when it did not', async () => {
     // Same answer the Google entry gives: a button that cannot work is worse
     // than no button, because pressing it is the only way to find out.
     configured = false
     render(wrap(<DataSourcesPage />))
+
+    /**
+     * Waits for the answer before asserting the absence.
+     *
+     * Rendering the page and looking immediately proves nothing: the entry is
+     * absent for the first frame whatever the answer turns out to be, so the
+     * assertion passed even against a page that showed the button the moment
+     * the query resolved.
+     */
+    await waitFor(() =>
+      expect(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.some(([url]) =>
+          String(url).includes('/nexus/categories'),
+        ),
+      ).toBe(true),
+    )
     await screen.findByRole('button', { name: '上传 CSV' })
+    await waitFor(() => expect(screen.queryByRole('button', { name: '链接 Google 表格' })).toBeDefined())
+
     expect(screen.queryByRole('button', { name: '从资产台账接入' })).toBeNull()
   })
 })

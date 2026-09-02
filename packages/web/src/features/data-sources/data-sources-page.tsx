@@ -91,10 +91,24 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
           >
             {copy.dataSources.linkGoogle}
           </Button>
-          {/* Hidden entirely when the deployment has not configured the
-              ledger — the same answer the Google entry gives, and for the same
-              reason: a button that cannot work is worse than no button. */}
-          {nexus.data?.configured === true && (
+          {/*
+            Hidden entirely when the deployment has not configured the ledger —
+            the same answer the Google entry gives, and for the same reason: a
+            button that cannot work is worse than no button.
+
+            **Shown when the call failed**, though. Configured-and-broken is a
+            different thing from not configured: the first is somebody's fault
+            to fix and the second is their decision, and hiding the entry for
+            both turns a fixable fault into a feature that appears not to
+            exist. That is how it failed in the field — the ledger was
+            configured and unreachable, the entry vanished, and the sentence
+            naming the reason was behind a button that was no longer there.
+
+            An error can only come from a deployment that configured it: with
+            neither variable set the endpoint answers `configured: false`
+            rather than failing.
+          */}
+          {(nexus.data?.configured === true || nexus.isError) && (
             <Button size="sm" variant="outline" onClick={() => setConnecting(true)}>
               {copy.dataSources.addNexus}
             </Button>
