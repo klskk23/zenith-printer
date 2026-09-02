@@ -1,10 +1,12 @@
 {
   "name": "@zenith/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
-  "bin": { "zenith": "./src/index.ts" },
+  "bin": {
+    "zenith": "./src/index.ts"
+  },
   "dependencies": {
     "@mmote/niimbluelib": "0.0.1-alpha.43-node",
     "@zenith/server": "*",
