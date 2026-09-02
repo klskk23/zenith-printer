@@ -156,7 +156,8 @@ make up         # docker compose up -d
 | [`deploy/README.md`](../deploy/README.md) | 构建、部署、发布、排查（最厚的一份） |
 | [`docs/design-consensus.md`](design-consensus.md) | 架构为什么是现在这样 |
 | [`docs/google-sheets-data-source.md`](google-sheets-data-source.md) | Google 表格数据源的设计共识与否决项 |
-| [`docs/external-systems.md`](external-systems.md) | 给对接方看的一份：行信封、台账数据源、打印预设 |
+| [`docs/nexus-assets.md`](nexus-assets.md) | **怎么把 nexus-assets 接上**——两边各要做什么，五分钟能读完 |
+| [`docs/external-systems.md`](external-systems.md) | 给对接方看的一份：行信封、台账数据源、打印预设，以及每个决定的理由 |
 | [`.specify/memory/constitution.md`](../.specify/memory/constitution.md) | 这份代码库受哪些规矩约束 |
 
 ## 许可
