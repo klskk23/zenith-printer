@@ -60,6 +60,7 @@ Needs Node 26 (**not 26.4 or newer** — its serial reads stall, see
 |---|---|
 | [中文说明](docs/README_zh.md) | Quick start and everyday use, in Chinese |
 | [`deploy/README.md`](deploy/README.md) | Building, deploying, releasing, troubleshooting |
+| [`docs/nexus-assets.en.md`](docs/nexus-assets.en.md) | **Connecting the nexus-assets ledger** — what each side does, in five minutes |
 | [`docs/design-consensus.md`](docs/design-consensus.md) | Why the architecture is what it is |
 | [`.specify/memory/constitution.md`](.specify/memory/constitution.md) | The rules this codebase is held to |
 

@@ -3,6 +3,8 @@
 给两边的人各看一遍就够了。想知道某个决定为什么是这样，看
 [`external-systems.md`](external-systems.md)——这里只讲怎么用。
 
+**[English →](nexus-assets.en.md)**
+
 两条方向相反的路，各自独立，可以只用一条：
 
 | | 谁发起 | 什么时候用 |
