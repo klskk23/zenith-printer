@@ -54,6 +54,7 @@ import {
 } from './grid-operations.ts'
 import { isFetched, MAX_ROWS, useDataSourceRows, useDataSources, usePatchRows } from './hooks.ts'
 import { useWorkspace } from '../../app/workspace.tsx'
+import { useAutoRefresh } from './use-auto-refresh.ts'
 
 /** Room for the surrounding chrome; the grid takes the rest of the window. */
 const CHROME_PX = 220
@@ -82,6 +83,17 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
   }, [])
 
   const source = sources.data?.find((candidate) => candidate.id === dataSourceId)
+  /**
+   * Read it on opening, if it is due — which a table nobody has read yet
+   * always is.
+   *
+   * The design page and the print dialog already did this; the table's own
+   * editor, the one place somebody opens *to look at the rows*, did not. So a
+   * freshly connected source showed zero rows and, for a ledger source, the
+   * single key column it was created with, until somebody found the refresh
+   * button. It looked exactly like a category with nothing in it.
+   */
+  useAutoRefresh(source)
   // Read-only for anything fetched from elsewhere: an edit here survives
   // exactly until the next refresh replaces it, and then vanishes with nothing
   // said.
@@ -318,6 +330,25 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
       {patch.isError && <Alert variant="destructive">{copy.dataSources.patchFailed}</Alert>}
 
       <DataSheetGrid<GridRow>
+        /**
+         * Remounted when the column set changes.
+         *
+         * The grid latches its columns: handed a different set it keeps
+         * drawing the old headers, and the page has to be reloaded to see the
+         * new ones. That is not a rare corner — a ledger source is created
+         * knowing only its key column, so the *first* refresh of every one of
+         * them changes the set, and what somebody saw was a table with one
+         * column and nothing in it, next to a banner listing the seven columns
+         * that had just arrived.
+         *
+         * Keyed on the names rather than the count, because a rename is the
+         * same problem. The separator is a character no column name can hold,
+         * so `["a\u0000b"]` and `["a", "b"]` cannot collide.
+         *
+         * The cost is the grid's scroll position and selection, which a
+         * changed column set has already invalidated.
+         */
+        key={columnNames.join('\u0000')}
         ref={grid}
         value={value}
         onChange={readOnly ? undefined : onChange}

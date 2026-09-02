@@ -90,6 +90,27 @@ describe('when a page opening should fetch', () => {
   it('immediately for a table with an interval and no read behind it', () => {
     expect(freshnessOf({ lastRefreshedAt: null, refreshIntervalSeconds: 300 }, NOW).overdue).toBe(true)
   })
+
+  it('immediately for a table never read at all, interval or not', () => {
+    /**
+     * The interval governs *re-reading*: 0 means "do not go back on a
+     * schedule". It was also being read as "never read it", which left a
+     * freshly connected source sitting at zero rows and — for a ledger source,
+     * which is created knowing only its key column — a single column, until
+     * somebody discovered there was a button to press.
+     *
+     * Connecting a table *is* the request to read it. Nobody connects one in
+     * order not to see it.
+     */
+    expect(freshnessOf({ lastRefreshedAt: null }, NOW).overdue).toBe(true)
+    expect(freshnessOf({ lastRefreshedAt: null, refreshIntervalSeconds: 0 }, NOW).overdue).toBe(true)
+  })
+
+  it('still not for a table that has been read once and asked for no schedule', () => {
+    // The distinction the change above must not blur: never read is not the
+    // same as read and left alone.
+    expect(freshnessOf({ lastRefreshedAt: ago(10), refreshIntervalSeconds: 0 }, NOW).overdue).toBe(false)
+  })
 })
 
 describe('how an age reads', () => {

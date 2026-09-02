@@ -40,10 +40,20 @@ export function freshnessOf(source: FetchedSource, now: Date): Freshness {
   const interval = source.refreshIntervalSeconds ?? 0
 
   if (last === null || last === undefined) {
-    // Never read. Not "stale" — there is nothing here to be out of date, and
-    // colouring it would be scolding somebody for a table they just made — but
-    // a source with an interval is due for its first read.
-    return { ageSeconds: null, stale: false, overdue: interval > 0 }
+    /**
+     * Never read, so it is due — whatever the interval says.
+     *
+     * The interval governs *re-reading*; 0 means "do not go back on a
+     * schedule". Reading it as "never read it" left a freshly connected table
+     * at zero rows until somebody discovered there was a button to press —
+     * and, for a ledger source, showing a single column, since one is created
+     * knowing only its key column and the rest arrive with the first read.
+     * Connecting a table is the request to read it.
+     *
+     * Not "stale", though: there is nothing here to be out of date, and
+     * colouring it would be scolding somebody for a table they just made.
+     */
+    return { ageSeconds: null, stale: false, overdue: true }
   }
 
   const parsed = Date.parse(last)

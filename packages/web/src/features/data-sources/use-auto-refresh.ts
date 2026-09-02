@@ -15,7 +15,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { freshnessOf } from './freshness.ts'
-import { useRefreshDataSource, type DataSource } from './hooks.ts'
+import { isFetched, useRefreshDataSource, type DataSource } from './hooks.ts'
 
 export interface AutoRefreshState {
   /** True while the automatic attempt is in flight. */
@@ -38,7 +38,16 @@ export function useAutoRefresh(source: DataSource | undefined): AutoRefreshState
   const fired = useRef(new Set<string>())
 
   const id = source?.id
-  const overdue = source === undefined ? false : freshnessOf(source, new Date()).overdue
+  /**
+   * Only a table that is fetched from somewhere.
+   *
+   * A table maintained here has no producer to go back to, and `freshnessOf`
+   * cannot tell — it is given a timestamp and an interval, not a kind. A CSV
+   * somebody uploaded has never been "read", so treating that as overdue sent
+   * a refresh at an endpoint that has nothing to refresh from.
+   */
+  const overdue =
+    source === undefined || !isFetched(source) ? false : freshnessOf(source, new Date()).overdue
 
   useEffect(() => {
     if (id === undefined || !overdue || fired.current.has(id)) {
