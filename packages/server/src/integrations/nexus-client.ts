@@ -30,6 +30,26 @@ import type { RowEnvelope } from '@zenith/shared'
 
 export const DEFAULT_TIMEOUT_MS = 30_000
 
+/**
+ * What actually went wrong, out of `fetch`'s uniformly useless message.
+ *
+ * Every network fault rejects with the literal string `fetch failed`; the
+ * distinguishing part is `cause.code`. Reporting only the message made a name
+ * that does not resolve and a port with nothing behind it the same sentence,
+ * and they are opposite repairs — the first is DNS or the wrong network, the
+ * second is a service that is down or listening elsewhere. Whoever is holding
+ * the failure gets sent to check the wrong thing half the time.
+ */
+function networkFault(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  const cause: unknown = err instanceof Error ? err.cause : undefined
+  const code =
+    typeof cause === 'object' && cause !== null && 'code' in cause
+      ? String((cause as { code: unknown }).code)
+      : undefined
+  return code === undefined ? message : `${code}: ${message}`
+}
+
 export interface NexusClientOptions {
   baseUrl: string
   apiKey: string
@@ -53,7 +73,7 @@ export function createNexusClient(options: NexusClientOptions): NexusPort {
         signal: AbortSignal.timeout(timeoutMs),
       })
     } catch (err) {
-      throw new NexusError('unreachable', err instanceof Error ? err.message : String(err))
+      throw new NexusError('unreachable', networkFault(err))
     }
 
     if (response.status === 401) {
