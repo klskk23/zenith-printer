@@ -22,7 +22,15 @@ import { useJobs, type PrintJob } from '../features/jobs/hooks.ts'
 import { useTemplates, type Template } from '../features/templates/hooks.ts'
 import { useWorkspace } from '../app/workspace.tsx'
 import { ReprintDialog } from '../features/jobs/reprint-dialog.tsx'
+import { Fragment } from 'react'
 import { PageHeader } from '../components/page-header.tsx'
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemGroup,
+  ItemSeparator,
+} from '../components/ui/item.tsx'
 import { PausedQueueBanner } from '../features/jobs/paused-banner.tsx'
 import type { Printer } from '../api/types.ts'
 import { consumableDisplay } from './consumable.ts'
@@ -97,11 +105,20 @@ function TemplateCard({ template }: { template: Template }): React.JSX.Element {
 function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
   const [reprinting, setReprinting] = useState(false)
   return (
-    <li className="flex items-center justify-between gap-3 py-1.5 text-xs">
-      <span className="truncate">
+    // `role` said rather than implied: the group is a `div role="list"`, so
+    // its rows have to name themselves or the list has no items in it.
+    /**
+     * `xs`, and its own padding overridden.
+     *
+     * This list is read at a glance from the home page, so its density is part
+     * of what it is for: at the component's own size the three rows took the
+     * space five used to, and the section stopped fitting above the fold.
+     */
+    <Item role="listitem" size="xs" className="gap-3 px-0 py-1.5 text-xs">
+      <ItemContent className="truncate">
         {job.snapshot.templateName ?? copy.workspace.untitledDesign} · {job.requestedCopies}
-      </span>
-      <span className="flex shrink-0 items-center gap-2">
+      </ItemContent>
+      <ItemActions>
         <span className="text-muted-foreground">{copy.jobs.status[job.status]}</span>
         {job.status === 'failed' && (
           <>
@@ -118,8 +135,8 @@ function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
             />
           </>
         )}
-      </span>
-    </li>
+      </ItemActions>
+    </Item>
   )
 }
 
@@ -232,11 +249,24 @@ export function IndexPage(): React.JSX.Element {
         ) : recentJobs.length === 0 ? (
           <Alert>{copy.index.noRecentJobs}</Alert>
         ) : (
-          <ul className="divide-y divide-border rounded-md border border-border px-3">
-            {recentJobs.map((job) => (
-              <JobRow key={job.id} job={job} />
+          /* A list built from the design system's own list, rather than a
+             `<ul>` carrying its own dividers, border and row padding. The
+             separator goes *between* rows: a trailing rule inside a bordered
+             box draws a line above nothing, which reads as a row that failed
+             to render.
+
+             The gap is forced because the group sets its own through a
+             `has-*` selector, which out-specifies a plain `gap-0` — and the
+             eight pixels it adds on each side of every rule turned a
+             thirty-pixel row into a fifty-pixel one. */
+          <ItemGroup className="gap-0! rounded-md border border-border px-3">
+            {recentJobs.map((job, index) => (
+              <Fragment key={job.id}>
+                {index > 0 && <ItemSeparator className="my-0" />}
+                <JobRow job={job} />
+              </Fragment>
             ))}
-          </ul>
+          </ItemGroup>
         )}
       </section>
     </div>
