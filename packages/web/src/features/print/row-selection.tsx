@@ -93,7 +93,7 @@ export function RowSelectionPanel({
   }, [data, onRowsLoaded])
 
   return (
-    <div className="space-y-2" data-row-selection>
+    <div className="flex flex-col gap-2" data-row-selection>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium">{copy.rowSelection.heading}</span>
         <span className="text-2xs text-muted-foreground" data-selected-summary>

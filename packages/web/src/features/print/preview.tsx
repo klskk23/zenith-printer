@@ -92,7 +92,7 @@ export function Preview({
   const onPage = rowOrdinals.slice((shownPage - 1) * PAGE_SIZE, shownPage * PAGE_SIZE)
 
   return (
-    <div className="space-y-2" data-preview>
+    <div className="flex flex-col gap-2" data-preview>
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{copy.preview.heading}</h3>
         {/*
@@ -110,7 +110,7 @@ export function Preview({
       {!ready ? (
         <p className="text-xs text-muted-foreground">{copy.preview.needsFields}</p>
       ) : expanded ? (
-        <div className="space-y-2" data-preview-grid>
+        <div className="flex flex-col gap-2" data-preview-grid>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {onPage.map((ordinal) => (
               <RowPreview key={ordinal} ordinal={ordinal} body={bodyFor(ordinal)} />
@@ -171,7 +171,7 @@ function RowPreview({ ordinal, body }: { ordinal: number; body: string | null })
   const label = copy.preview.rowLabel(ordinal)
 
   return (
-    <figure className="space-y-1" data-row-preview={ordinal}>
+    <figure className="flex flex-col gap-1" data-row-preview={ordinal}>
       {failed ? (
         <p className="text-2xs text-muted-foreground">{copy.preview.failed}</p>
       ) : (

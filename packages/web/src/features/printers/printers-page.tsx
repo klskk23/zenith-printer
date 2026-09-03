@@ -14,12 +14,23 @@ import { useState } from 'react'
 import { ApiRequestError } from '../../api/client.ts'
 import type { Printer, PrinterKind, TransportKind } from '../../api/types.ts'
 import { copy } from '../../i18n/index.ts'
+import { Printer as PrinterIcon } from 'lucide-react'
+import { PageHeader } from '../../components/page-header.tsx'
 import { Alert } from '../../components/ui/alert.tsx'
+import { Skeleton } from '../../components/ui/skeleton.tsx'
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '../../components/ui/field.tsx'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../../components/ui/empty.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card.tsx'
 import { Input } from '../../components/ui/input.tsx'
-import { Label } from '../../components/ui/label.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select.tsx'
 import { OffsetPanel } from './offset-panel.tsx'
 import { ProfilesPanel } from '../profiles/profiles-panel.tsx'
@@ -28,6 +39,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog.tsx'
@@ -72,7 +84,7 @@ function CapabilityList({ printer }: { printer: Printer }): React.JSX.Element {
   ]
 
   return (
-    <div className="space-y-1">
+    <div className="flex flex-col gap-1">
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         {rows.map(([term, value]) => (
           <div key={term} className="contents">
@@ -97,7 +109,21 @@ function CapabilityList({ printer }: { printer: Printer }): React.JSX.Element {
   )
 }
 
-function AddPrinterForm(): React.JSX.Element {
+/**
+ * Adding a printer, in a dialog.
+ *
+ * The form used to sit open below the list, so every visit to this page put a
+ * five-field form under the printers — and the reason to come here is almost
+ * always one of the printers, not a new one. It also grew: the list is what
+ * somebody scrolls to, and the form was in the way of getting back to it.
+ */
+function AddPrinterDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}): React.JSX.Element {
   const add = useAddPrinter()
   const [kind, setKind] = useState<PrinterKind>('niimbot')
   const [transport, setTransport] = useState<TransportKind>('serial')
@@ -106,18 +132,23 @@ function AddPrinterForm(): React.JSX.Element {
   const [printTaskName, setPrintTaskName] = useState('B1')
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{copy.printers.add}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent data-add-printer>
+        <DialogHeader>
+          <DialogTitle>{copy.printers.add}</DialogTitle>
+        </DialogHeader>
+        <FieldGroup>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label>{copy.printers.fields.name}</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label>{copy.printers.fields.kind}</Label>
+          <Field>
+            <FieldLabel>{copy.printers.fields.name}</FieldLabel>
+            <Input
+              aria-label={copy.printers.fields.name}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel>{copy.printers.fields.kind}</FieldLabel>
             <Select
               value={kind}
               onValueChange={(value) => {
@@ -135,43 +166,60 @@ function AddPrinterForm(): React.JSX.Element {
                 <SelectItem value="zpl">zpl</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
         </div>
 
-        <div className="space-y-1">
-          <Label>{copy.printers.fields.address}</Label>
-          <Input value={address} onChange={(e) => setAddress(e.target.value)} />
-          <p className="text-2xs text-muted-foreground">
+        <Field>
+          <FieldLabel>{copy.printers.fields.address}</FieldLabel>
+          <Input
+            aria-label={copy.printers.fields.address}
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+          />
+          <FieldDescription>
             {transport === 'serial' ? copy.printers.hints.serialAddress : copy.printers.hints.tcpAddress}
-          </p>
-        </div>
+          </FieldDescription>
+        </Field>
 
         {kind === 'niimbot' && (
-          <div className="space-y-1">
-            <Label>{copy.printers.fields.printTaskName}</Label>
-            <Input value={printTaskName} onChange={(e) => setPrintTaskName(e.target.value)} />
-            <p className="text-2xs text-muted-foreground">{copy.printers.hints.printTaskName}</p>
-          </div>
+          <Field>
+            <FieldLabel>{copy.printers.fields.printTaskName}</FieldLabel>
+            <Input
+              aria-label={copy.printers.fields.printTaskName}
+              value={printTaskName}
+              onChange={(e) => setPrintTaskName(e.target.value)}
+            />
+            <FieldDescription>{copy.printers.hints.printTaskName}</FieldDescription>
+          </Field>
         )}
 
-        <Button
-          disabled={name.length === 0 || add.isPending}
-          onClick={() =>
-            add.mutate({
-              name,
-              kind,
-              transport,
-              address,
-              ...(kind === 'niimbot' ? { printTaskName } : {}),
-            })
-          }
-        >
-          {copy.printers.add}
-        </Button>
-
         <ErrorNotice error={add.error} />
-      </CardContent>
-    </Card>
+        </FieldGroup>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            {copy.common.cancel}
+          </Button>
+          <Button
+            disabled={name.length === 0 || add.isPending}
+            onClick={() =>
+              add.mutate(
+                {
+                  name,
+                  kind,
+                  transport,
+                  address,
+                  ...(kind === 'niimbot' ? { printTaskName } : {}),
+                },
+                { onSuccess: () => onOpenChange(false) },
+              )
+            }
+          >
+            {copy.printers.add}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -196,7 +244,7 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
           {printer.printTaskName === undefined ? '' : ` · ${printer.printTaskName}`}
         </p>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="flex flex-col gap-3">
         <CapabilityList printer={printer} />
 
         <OffsetPanel printer={printer} />
@@ -268,21 +316,50 @@ function PrinterCard({ printer }: { printer: Printer }): React.JSX.Element {
 
 export function PrintersPage(): React.JSX.Element {
   const printers = usePrinters()
+  const [adding, setAdding] = useState(false)
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">{copy.printers.heading}</h2>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title={copy.printers.heading}
+        actions={
+          <Button size="sm" onClick={() => setAdding(true)}>
+            {copy.printers.add}
+          </Button>
+        }
+      />
 
-      {printers.isPending && <p className="text-sm text-muted-foreground">{copy.common.loading}</p>}
+      <AddPrinterDialog open={adding} onOpenChange={setAdding} />
+
+      {/* Shaped like the cards it stands in for, so the page does not jump
+          when the answer arrives. */}
+      {printers.isPending && (
+        <div className="grid gap-3 md:grid-cols-2">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+        </div>
+      )}
+
       {printers.data?.length === 0 && (
-        <p className="text-sm text-muted-foreground">{copy.printers.empty}</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PrinterIcon />
+            </EmptyMedia>
+            <EmptyTitle>{copy.printers.empty}</EmptyTitle>
+            <EmptyDescription>{copy.printers.emptyDetail}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button size="sm" onClick={() => setAdding(true)}>
+              {copy.printers.add}
+            </Button>
+          </EmptyContent>
+        </Empty>
       )}
 
       <div className="grid gap-3 md:grid-cols-2">
         {printers.data?.map((printer) => <PrinterCard key={printer.id} printer={printer} />)}
       </div>
-
-      <AddPrinterForm />
     </div>
   )
 }

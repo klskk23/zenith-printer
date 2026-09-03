@@ -266,7 +266,7 @@ export function PrintDialog({
           definite height of its own, and it is its own scroller, so the table
           inside keeps its.
         */}
-        <div className="scrollbar-themed min-h-0 flex-1 space-y-4 overflow-y-auto pr-3">
+        <div className="scrollbar-themed min-h-0 flex-1 flex flex-col gap-4 overflow-y-auto pr-3">
 
         {result === null ? (
           <>
@@ -275,7 +275,7 @@ export function PrintDialog({
             {/* Listed, never enforced: the print button stays enabled. */}
             <OverflowNotice warnings={warnings} />
 
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label>{copy.print.copies}</Label>
               <Input
                 // The label beside it carries no `for`, so without this the
@@ -296,7 +296,7 @@ export function PrintDialog({
               print the wrong labels while looking entirely correct.
             */}
             {linkedSource !== undefined && (
-              <div className="space-y-1" data-print-refresh>
+              <div className="flex flex-col gap-1" data-print-refresh>
                 <RefreshButton
                   source={linkedSource}
                   onApplied={() => {

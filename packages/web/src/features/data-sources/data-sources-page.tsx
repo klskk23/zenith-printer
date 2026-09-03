@@ -4,7 +4,15 @@
  * Shows what a design needs to know to pick one: how many rows it has and what
  * its columns are called, since the column names are what get referenced.
  */
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Table2 } from 'lucide-react'
+import { PageHeader } from '../../components/page-header.tsx'
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../../components/ui/empty.tsx'
 import { useState } from 'react'
 import { Button } from '../../components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card.tsx'
@@ -47,7 +55,7 @@ function OpenInGoogle({ source }: { source: DataSource }): React.JSX.Element | n
   return (
     <Button variant="ghost" size="sm" asChild>
       <a href={url} target="_blank" rel="noopener noreferrer">
-        <ExternalLink className="h-3.5 w-3.5" />
+        <ExternalLink />
         {copy.dataSources.openInGoogle}
       </a>
     </Button>
@@ -73,10 +81,12 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
   const [draftName, setDraftName] = useState('')
 
   return (
-    <div className="space-y-3" data-data-sources-page>
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{copy.dataSources.heading}</h2>
-        <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-3" data-data-sources-page>
+      <PageHeader
+        title={copy.dataSources.heading}
+        description={copy.dataSources.explain}
+        actions={
+          <>
           {/*
             Disabled rather than hidden when no Google identity is configured:
             somebody looking for the feature should learn that it exists and
@@ -116,10 +126,10 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
           <Button size="sm" onClick={() => setUploading(true)}>
             {copy.dataSources.upload}
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <p className="text-2xs text-muted-foreground">{copy.dataSources.explain}</p>
       {/* Says which address to share with, so the answer is on the page rather
           than only inside a failure message. */}
       {google.data?.configured === true && google.data.clientEmail !== null && (
@@ -138,7 +148,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
           in. Here it already did — this renders nothing at all meanwhile, which
           is a blank where a list is about to be. */}
       {sources.isPending && (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {Array.from({ length: 3 }, (_unused, index) => (
             <Skeleton key={index} className="h-14" />
           ))}
@@ -146,11 +156,15 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
       )}
 
       {sources.data !== undefined && sources.data.length === 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{copy.dataSources.empty}</p>
-          </CardContent>
-        </Card>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Table2 />
+            </EmptyMedia>
+            <EmptyTitle>{copy.dataSources.emptyTitle}</EmptyTitle>
+            <EmptyDescription>{copy.dataSources.emptyDetail}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
 
       {sources.data?.map((source) => (
@@ -182,7 +196,7 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
               </span>
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="flex flex-col gap-2">
             <p className="text-2xs text-muted-foreground">
               {copy.dataSources.columns}: {copy.dataSources.columnList(source.columns)}
             </p>

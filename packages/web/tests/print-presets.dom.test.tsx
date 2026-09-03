@@ -142,7 +142,7 @@ describe('the page', () => {
   it('offers an empty state once the answer is in', async () => {
     presets = []
     render(wrap(<PrintPresetsPage />))
-    expect(await screen.findByText(/还没有预设/)).toBeDefined()
+    expect(await screen.findByText(/还没有打印预设/)).toBeDefined()
   })
 
   it('does not claim to be empty while it is still loading', async () => {

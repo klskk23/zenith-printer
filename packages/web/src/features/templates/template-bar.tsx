@@ -59,7 +59,7 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
 
   return (
     <>
-      <div className="space-y-1">
+      <div className="flex flex-col gap-1">
         <Label>{copy.templates.heading}</Label>
         <Select
           value={current?.id ?? NONE}
@@ -95,7 +95,7 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
         // for one. An existing template saves straight over itself.
         onClick={() => (current === null ? setNaming('') : commit(current.name, false))}
       >
-        <Save className="h-4 w-4" />
+        <Save />
         {current === null ? copy.templates.save : copy.templates.update}
       </Button>
 
@@ -112,7 +112,7 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
           <DialogHeader>
             <DialogTitle>{copy.templates.save}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label>{copy.templates.name}</Label>
             <Input
               autoFocus

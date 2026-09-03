@@ -4,7 +4,15 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils.ts'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  /**
+   * Icons are sized here, not at each call site.
+   *
+   * Every button that carried an icon also carried `h-4 w-4` on it — a dozen
+   * copies of the same decision, three of which had drifted to a different
+   * size for no reason anybody recorded. The button knows how big its icon
+   * should be; `shrink-0` keeps it from being squeezed by a long label.
+   */
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -19,11 +27,11 @@ const buttonVariants = cva(
         // Square, and the same height as `default` — an icon button sitting in
         // a row of inputs and selects has to line up with them. It used to be
         // h-8, which made every toolbar it appeared in look a pixel out.
-        icon: 'h-9 w-9',
-        'icon-sm': 'h-8 w-8',
+        icon: 'size-9',
+        'icon-sm': 'size-8',
         // Small enough to sit inside a tab strip or a list row without setting
         // the row's height.
-        'icon-xs': 'h-5 w-5',
+        'icon-xs': 'size-5',
         /**
          * A row in a list or a navigation strip.
          *

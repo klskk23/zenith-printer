@@ -45,7 +45,7 @@ export function ColumnChangeDialog({
         </DialogHeader>
 
         {change !== null && (
-          <div className="scrollbar-themed min-h-0 flex-1 space-y-3 overflow-y-auto pr-2 text-xs">
+          <div className="scrollbar-themed min-h-0 flex-1 flex flex-col gap-3 overflow-y-auto pr-2 text-xs">
             <Alert variant="warning" data-removed-columns>
               {copy.dataSources.columnChangeRemoved(change.removedColumns)}
             </Alert>
@@ -56,9 +56,9 @@ export function ColumnChangeDialog({
             )}
 
             {change.affectedTemplates.length > 0 ? (
-              <div className="space-y-1" data-affected-templates>
+              <div className="flex flex-col gap-1" data-affected-templates>
                 <p className="font-medium">{copy.dataSources.columnChangeAffected}</p>
-                <ul className="space-y-0.5">
+                <ul className="flex flex-col gap-0.5">
                   {change.affectedTemplates.map((template) => (
                     <li key={template.id} className="rounded border border-border px-2 py-1">
                       {template.name}

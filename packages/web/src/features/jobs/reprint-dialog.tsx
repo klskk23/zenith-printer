@@ -122,7 +122,7 @@ export function ReprintDialog({ job, open, onOpenChange, onDone }: ReprintDialog
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <Label htmlFor="reprint-printer">{copy.jobs.reprint.printer}</Label>
           <Select
             value={chosenPrinter ?? undefined}
@@ -148,7 +148,7 @@ export function ReprintDialog({ job, open, onOpenChange, onDone }: ReprintDialog
           </Select>
         </div>
 
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <Label htmlFor="reprint-profile">{copy.jobs.reprint.profile}</Label>
           <Select
             value={profileId ?? ''}
@@ -174,7 +174,7 @@ export function ReprintDialog({ job, open, onOpenChange, onDone }: ReprintDialog
           </Select>
         </div>
 
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <Label>{copy.print.copies}</Label>
           <Input
             autoFocus

@@ -697,7 +697,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
               title={copy.editor.undo}
               onClick={doUndo}
             >
-              <Undo2 className="h-4 w-4" />
+              <Undo2 />
             </Button>
             <Button
               size="icon"
@@ -707,13 +707,13 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
               title={copy.editor.redo}
               onClick={doRedo}
             >
-              <Redo2 className="h-4 w-4" />
+              <Redo2 />
             </Button>
           </div>
 
           <Separator orientation="vertical" className="h-9" />
 
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label>{copy.print.printer}</Label>
             <Select
               value={printerId ?? NONE}
@@ -744,7 +744,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
             canvas to that stock, because designing on a canvas that is not the
             paper produces a label nobody notices is wrong until it prints.
           */}
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label>{copy.profiles.heading}</Label>
             <Select
               value={profileId ?? NONE}
@@ -778,7 +778,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
             disabled={blocking.length > 0 || printerId === null}
             onClick={() => setPrintOpen(true)}
           >
-            <Printer className="h-4 w-4" />
+            <Printer />
             {copy.print.action}
           </Button>
         </div>
@@ -797,10 +797,10 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
               end up, and one of the two being a ScrollArea is a trap laid for
               whoever puts one here next. */}
           <div className="scrollbar-themed h-full overflow-y-auto">
-            <aside className="space-y-4 pr-3">
-            <section className="space-y-1.5">
+            <aside className="flex flex-col gap-4 pr-3">
+            <section className="flex flex-col gap-1.5">
               <h3 className="text-xs font-semibold">{copy.editor.canvas}</h3>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label className="text-2xs">{copy.editor.canvasWidth}</Label>
                 <Input
                   // The label beside it carries no `for`, so without this the
@@ -812,7 +812,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
                   onChange={(e) => setIr({ ...ir, widthMm: Math.max(1, Number(e.target.value) || 1) })}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label className="text-2xs">{copy.editor.canvasHeight}</Label>
                 <Input
                   aria-label={copy.editor.canvasHeight}
@@ -827,7 +827,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
 
             <Separator />
 
-            <section className="space-y-1.5">
+            <section className="flex flex-col gap-1.5">
               <h3 className="text-xs font-semibold">{copy.editor.addElement}</h3>
               <div className="grid grid-cols-2 gap-1">
                 {ELEMENT_TYPES.map((type) => (
@@ -840,7 +840,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
 
             <Separator />
 
-            <section className="space-y-1.5">
+            <section className="flex flex-col gap-1.5">
               <h3 className="text-xs font-semibold">{copy.editor.layers.heading}</h3>
               <LayersPanel ir={ir} selectedId={selectedId} onSelect={setSelectedId} onChange={setIr} />
             </section>
@@ -943,7 +943,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
                       onDelete={deleteElement}
                     />
                   </TabsContent>
-                  <TabsContent value="variables" className="mt-0 space-y-3">
+                  <TabsContent value="variables" className="mt-0 flex flex-col gap-3">
                     {/*
                       The design's own variables first.
 
@@ -1000,7 +1000,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
         the printer selector.
       */}
       {presetNotices.length > 0 && (
-        <div className="mt-3 space-y-1" data-preset-notice>
+        <div className="mt-3 flex flex-col gap-1" data-preset-notice>
           {presetNotices.map((notice) => (
             <Alert key={notice} variant="warning" className="py-1.5 text-xs">
               {notice}
@@ -1015,7 +1015,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
         banner that reflows the editor each time is unusable.
       */}
       {violations.length > 0 && (
-        <div className="mt-3 space-y-1 border-t border-border pt-2">
+        <div className="mt-3 flex flex-col gap-1 border-t border-border pt-2">
           {violations.map((violation, index) => (
             <Alert
               key={`${violation.code}-${index}`}

@@ -72,8 +72,8 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
           <DialogTitle>{replace === undefined ? copy.dataSources.upload : copy.dataSources.replace}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <Label className="block space-y-1">
+        <div className="flex flex-col gap-3">
+          <Label className="block flex flex-col gap-1">
             <span className="text-2xs text-muted-foreground">CSV</span>
             <input
               type="file"
@@ -92,14 +92,14 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
           </Label>
 
           {replace === undefined && (
-            <Label className="block space-y-1">
+            <Label className="block flex flex-col gap-1">
               <span className="text-2xs text-muted-foreground">{copy.dataSources.name}</span>
               <Input value={name} onChange={(event) => setName(event.target.value)} />
             </Label>
           )}
 
           <div className="flex gap-2">
-            <Label className="flex-1 space-y-1">
+            <Label className="flex-1 flex flex-col gap-1">
               <span className="text-2xs text-muted-foreground">{copy.dataSources.encoding}</span>
               <Select
                 value={encoding === '' ? NONE : encoding}
@@ -116,7 +116,7 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
                 </SelectContent>
               </Select>
             </Label>
-            <Label className="flex-1 space-y-1">
+            <Label className="flex-1 flex flex-col gap-1">
               <span className="text-2xs text-muted-foreground">{copy.dataSources.delimiter}</span>
               <Select
                 value={delimiter === '' ? NONE : delimiter}
@@ -137,7 +137,7 @@ export function UploadDialog({ replace, onClose }: UploadDialogProps): React.JSX
           <p className="text-2xs text-muted-foreground">{copy.dataSources.retryHint}</p>
 
           {upload.isPending && (
-            <div className="space-y-1" data-upload-progress>
+            <div className="flex flex-col gap-1" data-upload-progress>
               {/*
                 Indeterminate: the server parses in one pass and cannot report a
                 fraction without buffering twice. What matters at thirty seconds

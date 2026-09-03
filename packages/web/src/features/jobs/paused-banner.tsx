@@ -22,9 +22,9 @@ export function PausedQueueBanner(): React.JSX.Element | null {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       {paused.map((printer) => (
-        <Alert key={printer.id} variant="warning" className="space-y-2 text-xs">
+        <Alert key={printer.id} variant="warning" className="flex flex-col gap-2 text-xs">
           <p className="font-medium">{copy.jobs.paused.heading(printer.name)}</p>
           {printer.queuePausedReason !== null && (
             // The stored reason is a stable code; the wording for it lives here.

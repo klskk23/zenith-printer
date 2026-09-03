@@ -59,7 +59,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
   const dirty = draft !== null
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">{copy.profiles.heading}</h3>
         <Button
@@ -110,16 +110,16 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
       </div>
 
       {editing !== null && (
-        <div className="space-y-2 rounded-md border border-border p-2">
+        <div className="flex flex-col gap-2 rounded-md border border-border p-2">
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label>{copy.profiles.name}</Label>
               <Input
                 value={editing.name ?? ''}
                 onChange={(e) => setDraft({ ...editing, name: e.target.value })}
               />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label>{copy.profiles.density}</Label>
               <Input
                 type="number"
@@ -142,7 +142,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             logo and then had nowhere to go — the print path used 128 whatever
             the preview had been told.
           */}
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label>{copy.profiles.threshold}</Label>
             <Input
               type="number"
@@ -164,7 +164,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             the same logo wants a hard edge on a coated label and a screen on
             rough paper, and the same design is printed on both.
           */}
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label>{copy.profiles.halftone}</Label>
             <Select
               value={editing.halftone ?? 'none'}
@@ -187,7 +187,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
           {/* Stock dimensions. Choosing this profile sets the canvas to them,
               which is the only way to be sure the design matches the paper. */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label>{copy.profiles.labelWidth}</Label>
               <Input
                 type="number"
@@ -197,7 +197,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                 onChange={(e) => setDraft({ ...editing, labelWidthMm: Number(e.target.value) || 1 })}
               />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label>{copy.profiles.labelHeight}</Label>
               <Input
                 type="number"
@@ -209,11 +209,11 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             </div>
           </div>
 
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label>{copy.profiles.margins}</Label>
             <div className="grid grid-cols-4 gap-1.5">
               {MARGIN_KEYS.map((key) => (
-                <div key={key} className="space-y-1">
+                <div key={key} className="flex flex-col gap-1">
                   <Label className="text-2xs">{copy.profiles[MARGIN_LABELS[key]]}</Label>
                   <Input
                     type="number"

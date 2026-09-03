@@ -22,6 +22,7 @@ import { useJobs, type PrintJob } from '../features/jobs/hooks.ts'
 import { useTemplates, type Template } from '../features/templates/hooks.ts'
 import { useWorkspace } from '../app/workspace.tsx'
 import { ReprintDialog } from '../features/jobs/reprint-dialog.tsx'
+import { PageHeader } from '../components/page-header.tsx'
 import { PausedQueueBanner } from '../features/jobs/paused-banner.tsx'
 import type { Printer } from '../api/types.ts'
 import { consumableDisplay } from './consumable.ts'
@@ -49,7 +50,7 @@ function PrinterCard({ printer, pending }: { printer: Printer; pending: number }
           {printer.kind} · {printer.address}
         </p>
       </CardHeader>
-      <CardContent className="space-y-1 text-xs">
+      <CardContent className="flex flex-col gap-1 text-xs">
         <p className="text-muted-foreground">
           {printer.queueState === 'running' ? copy.index.queueRunning : copy.index.queuePaused}
           {pending > 0 ? ` · ${copy.index.pendingJobs(pending)}` : ''}
@@ -153,17 +154,19 @@ export function IndexPage(): React.JSX.Element {
   const loadingPrinters = printers.isPending
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* A paused queue is the first thing worth knowing on this page. */}
       <PausedQueueBanner />
 
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{copy.index.printerSection}</h2>
-          <Button size="sm" variant="ghost" onClick={() => open({ kind: 'printers' })}>
-            {copy.index.managePrinters}
-          </Button>
-        </div>
+      <section className="flex flex-col gap-2">
+        <PageHeader
+          title={copy.index.printerSection}
+          actions={
+            <Button size="sm" variant="ghost" onClick={() => open({ kind: 'printers' })}>
+              {copy.index.managePrinters}
+            </Button>
+          }
+        />
         {loadingPrinters ? (
           <div className="grid gap-3 md:grid-cols-2">
             <Skeleton className="h-24" />
@@ -180,13 +183,15 @@ export function IndexPage(): React.JSX.Element {
         )}
       </section>
 
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{copy.index.templateSection}</h2>
-          <Button size="sm" variant="ghost" onClick={() => open({ kind: 'templates' })}>
-            {copy.index.allTemplates}
-          </Button>
-        </div>
+      <section className="flex flex-col gap-2">
+        <PageHeader
+          title={copy.index.templateSection}
+          actions={
+            <Button size="sm" variant="ghost" onClick={() => open({ kind: 'templates' })}>
+              {copy.index.allTemplates}
+            </Button>
+          }
+        />
         {/*
           Same rule as the library: as many cards as fit, never below the
           floor. A lower floor here because this list sits inside a column of
@@ -209,15 +214,17 @@ export function IndexPage(): React.JSX.Element {
         )}
       </section>
 
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{copy.index.recentJobsSection}</h2>
-          <Button size="sm" variant="ghost" onClick={() => open({ kind: 'history' })}>
-            {copy.index.allHistory}
-          </Button>
-        </div>
+      <section className="flex flex-col gap-2">
+        <PageHeader
+          title={copy.index.recentJobsSection}
+          actions={
+            <Button size="sm" variant="ghost" onClick={() => open({ kind: 'history' })}>
+              {copy.index.allHistory}
+            </Button>
+          }
+        />
         {loadingJobs ? (
-          <div className="space-y-1 rounded-md border border-border p-3">
+          <div className="flex flex-col gap-1 rounded-md border border-border p-3">
             {Array.from({ length: 3 }, (_unused, index) => (
               <Skeleton key={index} className="h-6" />
             ))}

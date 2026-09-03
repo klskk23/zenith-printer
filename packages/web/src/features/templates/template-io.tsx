@@ -153,7 +153,7 @@ export function ImportTemplatesButton(): React.JSX.Element {
                 : copy.templates.importWarningsBody}
             </DialogDescription>
           </DialogHeader>
-          <ul className="max-h-64 space-y-2 overflow-y-auto text-xs scrollbar-themed" data-import-warnings>
+          <ul className="max-h-64 flex flex-col gap-2 overflow-y-auto text-xs scrollbar-themed" data-import-warnings>
             {(warnings ?? []).map((warning, index) => (
               <li key={`${warning.code}-${index}`} className="rounded border border-border p-2">
                 <p className="font-medium">{warning.templateName}</p>

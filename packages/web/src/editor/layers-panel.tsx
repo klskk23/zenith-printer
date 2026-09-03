@@ -46,7 +46,7 @@ export function LayersPanel({ ir, selectedId, onSelect, onChange }: LayersPanelP
     // only `max-height` it grows to fit the content and the root clips it,
     // which looks like a list that has silently lost its last few rows.
     <div className="scrollbar-themed max-h-56 overflow-y-auto">
-      <ul className="space-y-0.5">
+      <ul className="flex flex-col gap-0.5">
         {layers.map((element) => {
           const selected = element.id === selectedId
           return (

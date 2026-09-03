@@ -9,6 +9,14 @@
  * came out — including the case where that number is unknown.
  */
 import { useState } from 'react'
+import { History } from 'lucide-react'
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../../components/ui/empty.tsx'
 import { copy } from '../../i18n/index.ts'
 import { usePreferences } from '../preferences/context.tsx'
 import { formatInstant, hasTemplate, jobInstant } from './job-summary.ts'
@@ -55,7 +63,7 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
 
   return (
     <Card data-history-row={job.id}>
-      <CardContent className="space-y-1 p-3 text-xs">
+      <CardContent className="flex flex-col gap-1 p-3 text-xs">
         <div className="flex items-center justify-between gap-2">
           {/* Stated, not blank: "no template" is a fact about this job, and a
               blank where a name goes reads as missing data instead. */}
@@ -101,40 +109,79 @@ function HistoryRow({ job }: { job: PrintJob }): React.JSX.Element {
   )
 }
 
-export function JobHistory({ printerId }: { printerId: string | null }): React.JSX.Element {
-  const [expanded, setExpanded] = useState(false)
+/**
+ * The actions that act on the history as a whole.
+ *
+ * Split out so the page can put them in its header, beside the title, where
+ * every other page keeps its page-level actions. They used to float alone on a
+ * line of their own above the list, which read as a row that had lost its
+ * table.
+ */
+export function JobHistoryActions({
+  printerId,
+  expanded,
+  onExpandedChange,
+}: {
+  printerId: string | null
+  expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
+}): React.JSX.Element | null {
+  const history = useJobHistory(printerId, expanded ? null : PAGE_SIZE)
+  const total = history.data?.total ?? 0
+  if (total === 0) {
+    return null
+  }
+  return (
+    <>
+      {total > PAGE_SIZE && (
+        <Button size="sm" variant="ghost" onClick={() => onExpandedChange(!expanded)}>
+          {expanded ? copy.history.collapse : copy.history.expand(total)}
+        </Button>
+      )}
+      <HistoryPrune total={total} />
+    </>
+  )
+}
+
+export function JobHistory({
+  printerId,
+  expanded = false,
+}: {
+  printerId: string | null
+  expanded?: boolean
+}): React.JSX.Element {
   const history = useJobHistory(printerId, expanded ? null : PAGE_SIZE)
 
-  /**
-   * How many there are, which is not how many are in hand.
-   *
-   * Read from the server so that "show all 372" can say 372 while holding ten.
-   * Counting the rows would have made the offer describe itself.
-   */
-  const total = history.data?.total ?? 0
   // Newest first: history is read backwards from what just happened. The
   // endpoint returns oldest-first, as it always has.
   const shown = [...(history.data?.jobs ?? [])].reverse()
 
+  /**
+   * Empty when there is nothing to draw — not when the reported total is zero.
+   *
+   * `total` is what the server says exists, which is how "show all 372" can
+   * say 372 while holding ten. Deciding the empty state from it hides rows
+   * that are in hand whenever the two disagree.
+   */
+  if (shown.length === 0) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <History />
+          </EmptyMedia>
+          <EmptyTitle>{copy.history.empty}</EmptyTitle>
+          <EmptyDescription>{copy.history.emptyDetail}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+
   return (
-    <div className="space-y-2">
-      {/* The page supplies the heading; a second one here read as a repeat. */}
-      <div className="flex items-center justify-end gap-1">
-        {total > PAGE_SIZE && (
-          <Button size="sm" variant="ghost" onClick={() => setExpanded(!expanded)}>
-            {expanded ? copy.history.collapse : copy.history.expand(total)}
-          </Button>
-        )}
-        {total > 0 && <HistoryPrune total={total} />}
-      </div>
-
-      {total === 0 && <p className="text-xs text-muted-foreground">{copy.history.empty}</p>}
-
-      <div className="space-y-2">
-        {shown.map((job) => (
-          <HistoryRow key={job.id} job={job} />
-        ))}
-      </div>
+    <div className="flex flex-col gap-2">
+      {shown.map((job) => (
+        <HistoryRow key={job.id} job={job} />
+      ))}
     </div>
   )
 }

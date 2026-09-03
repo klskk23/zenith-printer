@@ -45,7 +45,7 @@ export function ImagePruneCard(): React.JSX.Element {
   const result = prune.data
 
   return (
-    <section className="space-y-2 rounded border border-border p-3" data-image-prune>
+    <section className="flex flex-col gap-2 rounded border border-border p-3" data-image-prune>
       <h3 className="text-xs font-semibold">{copy.settings.maintenanceHeading}</h3>
       <p className="text-2xs text-muted-foreground">{copy.settings.maintenanceScope}</p>
 
@@ -62,7 +62,7 @@ export function ImagePruneCard(): React.JSX.Element {
       )}
 
       {result !== undefined && !prune.isPending && (
-        <div className="space-y-0.5 text-2xs" data-prune-result>
+        <div className="flex flex-col gap-0.5 text-2xs" data-prune-result>
           <p className={result.removed > 0 ? 'text-foreground' : 'text-muted-foreground'}>
             {result.removed === 0 && result.strayFilesRemoved === 0
               ? copy.settings.pruneNothing

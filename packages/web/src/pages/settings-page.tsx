@@ -15,7 +15,13 @@ import { copy } from '../i18n/index.ts'
 import { Button } from '../components/ui/button.tsx'
 import { Alert } from '../components/ui/alert.tsx'
 import { Input } from '../components/ui/input.tsx'
-import { Label } from '../components/ui/label.tsx'
+import { PageHeader } from '../components/page-header.tsx'
+import {
+  Field,
+  FieldContent,
+  FieldGroup,
+  FieldLabel,
+} from '../components/ui/field.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 import { Switch } from '../components/ui/switch.tsx'
 import { usePreferences } from '../features/preferences/context.tsx'
@@ -24,12 +30,21 @@ import { LOCALES } from '../features/preferences/locale.ts'
 import { FONT_FAMILIES, type FontFamilyKey } from '../editor/elements.ts'
 import { ImagePruneCard } from '../features/images/prune-card.tsx'
 
+/**
+ * One setting: its name on the left, its control on the right.
+ *
+ * `Field` rather than a hand-built grid with a divider under each row. The
+ * rows carried their own `divide-y` and their own two-column measurements,
+ * which is a second implementation of something the design system already has
+ * — and the one place in this application where a label and its control were
+ * associated by sitting next to each other rather than by `htmlFor`.
+ */
 function Row({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
   return (
-    <div className="grid grid-cols-[10rem_1fr] items-center gap-3 py-1.5">
-      <Label className="text-xs">{label}</Label>
-      <div className="max-w-64">{children}</div>
-    </div>
+    <Field orientation="horizontal">
+      <FieldLabel className="text-xs">{label}</FieldLabel>
+      <FieldContent className="max-w-64">{children}</FieldContent>
+    </Field>
   )
 }
 
@@ -62,12 +77,12 @@ export function SettingsPage(): React.JSX.Element {
     setDraft((current) => ({ ...current, [key]: value }))
 
   return (
-    <div className="max-w-2xl space-y-4">
-      <h2 className="text-sm font-semibold">{copy.settings.heading}</h2>
+    <div className="flex max-w-2xl flex-col gap-4">
+      <PageHeader title={copy.settings.heading} />
 
       <Alert className="text-xs">{copy.settings.scopeNote}</Alert>
 
-      <section className="divide-y divide-border rounded-md border border-border px-3">
+      <FieldGroup className="rounded-md border border-border px-3 py-1">
         <Row label={copy.settings.language}>
           <Select
             value={draft.language}
@@ -181,7 +196,7 @@ export function SettingsPage(): React.JSX.Element {
             onCheckedChange={(checked) => set('alwaysConfirmTabClose', checked === true)}
           />
         </Row>
-      </section>
+      </FieldGroup>
 
       <div className="flex items-center gap-2">
         <Button disabled={!dirty} onClick={() => update(draft)}>

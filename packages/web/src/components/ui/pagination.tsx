@@ -86,7 +86,7 @@ export function Pagination({
         aria-label={labels.previous}
         onClick={() => onPageChange(page - 1)}
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft />
       </Button>
 
       {pageWindow(page, pageCount).map((slot, index) =>
@@ -120,7 +120,7 @@ export function Pagination({
         aria-label={labels.next}
         onClick={() => onPageChange(page + 1)}
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight />
       </Button>
     </nav>
   )

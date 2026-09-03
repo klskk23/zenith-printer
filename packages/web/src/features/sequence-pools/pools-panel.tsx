@@ -33,7 +33,7 @@ export function PoolsPanel(): React.JSX.Element {
       <CardHeader className="pb-2">
         <CardTitle>{copy.pools.heading}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="flex flex-col gap-3">
         <p className="text-2xs text-muted-foreground">{copy.pools.explain}</p>
 
         {pools.data?.length === 0 && (
@@ -41,7 +41,7 @@ export function PoolsPanel(): React.JSX.Element {
         )}
 
         {pools.data?.map((pool) => (
-          <div key={pool.id} className="space-y-1 rounded-md border border-border p-2">
+          <div key={pool.id} className="flex flex-col gap-1 rounded-md border border-border p-2">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-sm font-medium">{pool.name}</span>
               <span className="font-mono text-xs text-muted-foreground">
@@ -50,7 +50,7 @@ export function PoolsPanel(): React.JSX.Element {
             </div>
 
             <div className="flex items-end gap-2">
-              <Label className="flex-1 space-y-1">
+              <Label className="flex-1 flex flex-col gap-1">
                 <span className="text-2xs text-muted-foreground">
                   {copy.pools.resetTo(String(pool.floor).padStart(pool.digits, '0'))}
                 </span>
@@ -99,11 +99,11 @@ export function PoolsPanel(): React.JSX.Element {
         ))}
 
         <div className="flex items-end gap-2 border-t border-border pt-2">
-          <Label className="flex-1 space-y-1">
+          <Label className="flex-1 flex flex-col gap-1">
             <span className="text-2xs text-muted-foreground">{copy.pools.name}</span>
             <Input value={name} onChange={(event) => setName(event.target.value)} />
           </Label>
-          <Label className="w-24 space-y-1">
+          <Label className="w-24 flex flex-col gap-1">
             <span className="text-2xs text-muted-foreground">{copy.pools.digits}</span>
             <Input
               type="number"

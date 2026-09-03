@@ -32,7 +32,7 @@ export function DialogContent({
 }
 
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
-  return <div className={cn('flex flex-col space-y-1.5', className)} {...props} />
+  return <div className={cn('flex flex-col gap-1.5', className)} {...props} />
 }
 
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {

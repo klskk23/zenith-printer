@@ -112,9 +112,9 @@ export function LinkGoogleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="scrollbar-themed min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
+        <div className="scrollbar-themed min-h-0 flex-1 flex flex-col gap-3 overflow-y-auto pr-2">
           {list === null && (
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label htmlFor="google-url">{copy.dataSources.googleUrl}</Label>
               <Input
                 id="google-url"
@@ -127,7 +127,7 @@ export function LinkGoogleDialog({
           )}
 
           {list !== null && preview === null && (
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <p className="text-xs font-medium">{copy.dataSources.googlePickWorksheet}</p>
               <p className="text-2xs text-muted-foreground">{list.spreadsheetTitle}</p>
               <div className="flex flex-col gap-1">
@@ -147,8 +147,8 @@ export function LinkGoogleDialog({
           )}
 
           {preview !== null && (
-            <div className="space-y-3">
-              <div className="space-y-1">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="google-name">{copy.dataSources.name}</Label>
                 <Input
                   id="google-name"

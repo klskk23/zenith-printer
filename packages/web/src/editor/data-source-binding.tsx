@@ -38,8 +38,8 @@ export function DataSourceBinding({
   const auto = useAutoRefresh(bound)
 
   return (
-    <div className="space-y-2" data-data-source-binding>
-      <Label className="block space-y-1">
+    <div className="flex flex-col gap-2" data-data-source-binding>
+      <Label className="block flex flex-col gap-1">
         <span className="text-2xs text-muted-foreground">{copy.dataSources.heading}</span>
         <Select
           value={dataSourceId ?? NONE}
@@ -82,7 +82,7 @@ export function DataSourceBinding({
       {/* Any table that reads from elsewhere, not only a spreadsheet: the
           button and the age mean the same thing for both. */}
       {bound !== undefined && isFetched(bound) && (
-        <div className="space-y-1" data-binding-freshness>
+        <div className="flex flex-col gap-1" data-binding-freshness>
           <RefreshButton source={bound} />
           <FreshnessLine source={bound} now={new Date()} />
           {auto.failed && (
@@ -94,7 +94,7 @@ export function DataSourceBinding({
       )}
 
       {bound !== undefined && (
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <p className="text-2xs text-muted-foreground">{copy.dataSources.columns}</p>
           <div className="flex flex-wrap gap-1">
             {bound.columns.map((column) => (

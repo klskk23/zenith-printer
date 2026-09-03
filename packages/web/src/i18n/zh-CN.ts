@@ -101,6 +101,7 @@ export const copy = {
   printers: {
     heading: '打印机',
     empty: '还没有添加打印机',
+    emptyDetail: '精臣走 USB 串口，霍尼韦尔/ZPL 走网络 9100 端口。加好之后先探测一次，才知道它的打印头有多宽',
     add: '添加打印机',
     probe: '探测',
     probing: '正在探测…',
@@ -304,6 +305,8 @@ export const copy = {
     heading: '数据源',
     explain: '一个数据源就是一张表。设计绑定其中一张，内容里写 ${列名} 引用它的列。',
     empty: '还没有数据源。上传一份 CSV，或从表格软件里复制一片单元格粘贴进来',
+    emptyTitle: '还没有数据源',
+    emptyDetail: '上传一份 CSV、从表格软件里复制一片单元格粘贴进来，或者链接一张 Google 表格',
     refreshFailed: (reason: string): string => {
       const why: Record<string, string> = {
         notShared: '这张表已不再分享给本机',
@@ -522,6 +525,7 @@ export const copy = {
   templates: {
     heading: '模板',
     empty: '还没有保存模板',
+    emptyDetail: '在标签设计里画一张，保存之后会出现在这里',
     save: '保存为模板',
     saveAs: '另存为',
     update: '保存',
@@ -678,6 +682,14 @@ export const copy = {
   jobs: {
     heading: '打印队列',
     empty: '队列为空',
+    /**
+     * The second line of an empty state answers "so where did it go".
+     *
+     * A page that says only "empty" leaves somebody wondering whether their
+     * job failed to submit; the queue empties because jobs finish, and saying
+     * where they went is the whole difference.
+     */
+    emptyDetail: '提交的作业会出现在这里，打印完后转到打印历史',
     // Stated rather than left blank: a blank where a name goes reads as
     // missing data, not as "there was never a template".
     adHoc: '未使用模板（一次性设计）',
@@ -725,6 +737,7 @@ export const copy = {
   history: {
     heading: '打印历史',
     empty: '还没有完成的任务',
+    emptyDetail: '打印完成或失败的作业都会留在这里，可以从这里补打',
     adHoc: '未保存的标签',
     expand: (total: number): string => `查看全部 ${total} 条`,
     collapse: '收起',
@@ -772,7 +785,8 @@ export const copy = {
     profileOf: (name: string): string => `打印参数：${name}`,
     profileGone: '打印参数已被删除',
     copiesOf: (n: number): string => `每行 ${n} 份`,
-    empty: '还没有预设。建一个之后，把它的 id 交给对方系统。',
+    empty: '建一个之后，把它的 id 交给对方系统，那边就能拿着 id 把数据交过来打印',
+    emptyTitle: '还没有打印预设',
     remove: '删除',
     removeConfirm: '删除后对面系统再用这个 id 就会收到「找不到」。已经打出去的记录不受影响。',
     createFailed: '建不了。名称可能重复了，或者所选的设计、打印机已经不在。',

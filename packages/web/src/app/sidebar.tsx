@@ -27,7 +27,7 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
 
   return (
     <nav className="w-40 shrink-0 border-r border-border p-2">
-      <ul className="space-y-0.5">
+      <ul className="flex flex-col gap-0.5">
         {entries.map((kind) => {
           const isActive = activeTab?.kind === kind
           return (

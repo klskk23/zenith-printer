@@ -139,8 +139,8 @@ export function PresetDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <Label className="block space-y-1">
+        <div className="flex flex-col gap-3">
+          <Label className="block flex flex-col gap-1">
             <span className="text-2xs text-muted-foreground">{copy.presets.name}</span>
             <Input
               aria-label={copy.presets.name}
@@ -149,7 +149,7 @@ export function PresetDialog({
             />
           </Label>
 
-          <Label className="block space-y-1">
+          <Label className="block flex flex-col gap-1">
             <span className="text-2xs text-muted-foreground">{copy.presets.template}</span>
             <Select value={templateId ?? ''} onValueChange={setTemplateId}>
               <SelectTrigger aria-label={copy.presets.template}>
@@ -165,7 +165,7 @@ export function PresetDialog({
             </Select>
           </Label>
 
-          <Label className="block space-y-1">
+          <Label className="block flex flex-col gap-1">
             <span className="text-2xs text-muted-foreground">{copy.presets.printer}</span>
             <Select value={printerId ?? ''} onValueChange={choosePrinter}>
               <SelectTrigger aria-label={copy.presets.printer}>
@@ -185,7 +185,7 @@ export function PresetDialog({
               empty dropdown reads as a dead end rather than as a question that
               has not been asked yet. */}
           {printerId !== null && (
-            <Label className="block space-y-1">
+            <Label className="block flex flex-col gap-1">
               <span className="text-2xs text-muted-foreground">{copy.presets.profile}</span>
               <Select
                 value={profileId ?? DEFAULT_PROFILE}
@@ -206,7 +206,7 @@ export function PresetDialog({
             </Label>
           )}
 
-          <Label className="block space-y-1">
+          <Label className="block flex flex-col gap-1">
             <span className="text-2xs text-muted-foreground">{copy.presets.copies}</span>
             <Input
               aria-label={copy.presets.copies}

@@ -94,6 +94,7 @@ export const copy: Copy = {
   printers: {
     heading: 'Printers',
     empty: 'No printers added yet',
+    emptyDetail: 'NIIMBOT over USB serial, Honeywell/ZPL over TCP port 9100. Probe one after adding it — that is how its head width is known',
     add: 'Add printer',
     probe: 'Probe',
     probing: 'Probing…',
@@ -291,6 +292,8 @@ export const copy: Copy = {
     explain:
       'A data source is one table. A design binds to one of them and references its columns as ${column} inside content.',
     empty: 'No data sources yet. Upload a CSV, or copy a block of cells from a spreadsheet and paste it in',
+    emptyTitle: 'No data sources yet',
+    emptyDetail: 'Upload a CSV, paste a block of cells from a spreadsheet, or link a Google Sheet',
     refreshFailed: (reason: string): string => {
       const why: Record<string, string> = {
         notShared: 'the spreadsheet is no longer shared with this machine',
@@ -513,6 +516,7 @@ export const copy: Copy = {
   templates: {
     heading: 'Templates',
     empty: 'No saved templates yet',
+    emptyDetail: 'Draw one in the editor; saving it puts it here',
     save: 'Save as template',
     saveAs: 'Save as new',
     update: 'Save',
@@ -670,6 +674,7 @@ export const copy: Copy = {
   jobs: {
     heading: 'Print queue',
     empty: 'The queue is empty',
+    emptyDetail: 'Submitted jobs appear here, and move to history once they have printed',
     adHoc: 'No template (one-off design)',
     template: 'Template',
     time: 'Time',
@@ -717,6 +722,7 @@ export const copy: Copy = {
   history: {
     heading: 'Print history',
     empty: 'Nothing finished yet',
+    emptyDetail: 'Finished and failed jobs stay here, and can be reprinted from here',
     adHoc: 'Unsaved label',
     expand: (total: number): string => `Show all ${total}`,
     collapse: 'Show fewer',
@@ -754,7 +760,8 @@ export const copy: Copy = {
     profileOf: (name: string): string => `Print settings: ${name}`,
     profileGone: 'Those print settings were deleted',
     copiesOf: (n: number): string => `${n} per row`,
-    empty: 'No presets yet. Create one, then give the other system its id.',
+    empty: 'Create one and give the other system its id; it can then print by sending rows',
+    emptyTitle: 'No print presets yet',
     remove: 'Delete',
     removeConfirm: 'After this, that id answers "not found" for the other system. Labels already printed are unaffected.',
     createFailed: 'Could not create it. The name may be taken, or the chosen design or printer may be gone.',

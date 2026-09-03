@@ -27,9 +27,9 @@ export function OverflowNotice({ warnings }: { warnings: OverflowWarning[] }): R
   }
 
   return (
-    <Alert variant="warning" className="space-y-1 text-xs">
+    <Alert variant="warning" className="flex flex-col gap-1 text-xs">
       <p className="font-medium">{copy.overflow.heading}</p>
-      <ul className="space-y-0.5">
+      <ul className="flex flex-col gap-0.5">
         {warnings.map((warning, index) => (
           <li key={`${warning.rowIndex}-${warning.elementId}-${index}`} className="font-mono">
             {copy.overflow.row(warning.rowIndex)} · {copy.overflow.reasons[warning.reason]} ·{' '}

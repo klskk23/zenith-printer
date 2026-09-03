@@ -67,13 +67,13 @@ export function EditPrinterDialog({ printer, open, onOpenChange }: EditPrinterDi
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="space-y-1">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
             <Label>{copy.printers.fields.name}</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label>{copy.printers.fields.address}</Label>
             <Input value={address} onChange={(e) => setAddress(e.target.value)} />
             <p className="text-2xs text-muted-foreground">
@@ -84,7 +84,7 @@ export function EditPrinterDialog({ printer, open, onOpenChange }: EditPrinterDi
           </div>
 
           {printer.kind === 'niimbot' && (
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label>{copy.printers.fields.printTaskName}</Label>
               <Input value={printTaskName} onChange={(e) => setPrintTaskName(e.target.value)} />
               <p className="text-2xs text-muted-foreground">{copy.printers.hints.printTaskName}</p>

@@ -19,7 +19,16 @@
  */
 import { useState } from 'react'
 import { copy } from '../i18n/index.ts'
-import { Alert } from '../components/ui/alert.tsx'
+import { BookmarkPlus } from 'lucide-react'
+import { PageHeader } from '../components/page-header.tsx'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../components/ui/empty.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { Card, CardContent, CardHeader } from '../components/ui/card.tsx'
 import { ConfirmButton } from '../components/ui/confirm-button.tsx'
@@ -58,14 +67,16 @@ export function PrintPresetsPage(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-3" data-print-presets>
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{copy.presets.heading}</h2>
-        <Button size="sm" onClick={openCreate}>
-          {copy.presets.addOpen}
-        </Button>
-      </div>
-      <p className="text-2xs text-muted-foreground">{copy.presets.explain}</p>
+    <div className="flex flex-col gap-3" data-print-presets>
+      <PageHeader
+        title={copy.presets.heading}
+        description={copy.presets.explain}
+        actions={
+          <Button size="sm" onClick={openCreate}>
+            {copy.presets.addOpen}
+          </Button>
+        }
+      />
 
       <PresetDialog
         // Keyed so the dialog's own state starts from this preset rather than
@@ -77,7 +88,7 @@ export function PrintPresetsPage(): React.JSX.Element {
       />
 
       {presets.isPending && (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {Array.from({ length: 2 }, (_unused, index) => (
             <Skeleton key={index} className="h-20" />
           ))}
@@ -85,7 +96,20 @@ export function PrintPresetsPage(): React.JSX.Element {
       )}
 
       {presets.data !== undefined && presets.data.length === 0 && (
-        <Alert>{copy.presets.empty}</Alert>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <BookmarkPlus />
+            </EmptyMedia>
+            <EmptyTitle>{copy.presets.emptyTitle}</EmptyTitle>
+            <EmptyDescription>{copy.presets.empty}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button size="sm" onClick={openCreate}>
+              {copy.presets.addOpen}
+            </Button>
+          </EmptyContent>
+        </Empty>
       )}
 
       {(presets.data ?? []).map((preset) => {
@@ -99,7 +123,7 @@ export function PrintPresetsPage(): React.JSX.Element {
                 {copy.presets.copiesOf(preset.copies)}
               </span>
             </CardHeader>
-            <CardContent className="space-y-1">
+            <CardContent className="flex flex-col gap-1">
               <p className="text-2xs text-muted-foreground">
                 {template?.name ?? copy.presets.templateGone}
                 {' · '}

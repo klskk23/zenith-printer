@@ -53,7 +53,7 @@ export function PreviewValues({
     return null
   }
   return (
-    <section className="space-y-2 rounded-md border border-dashed border-border p-2" data-preview-row>
+    <section className="flex flex-col gap-2 rounded-md border border-dashed border-border p-2" data-preview-row>
       <div className="flex items-center justify-between gap-2">
         <span className="text-2xs font-medium">{copy.variables.tempHeading}</span>
         <span className="text-2xs text-muted-foreground">
@@ -70,7 +70,7 @@ export function PreviewValues({
         right now" should not require finding it.
       */}
       {columns.length > 0 && (
-        <dl className="space-y-0.5 text-2xs">
+        <dl className="flex flex-col gap-0.5 text-2xs">
           {columns.map((column) => {
             const value = values[column] ?? ''
             return (
@@ -111,7 +111,7 @@ export function PreviewRowPicker({
   const source = useDataSources().data?.find((candidate) => candidate.id === dataSourceId)
 
   return (
-    <div className="space-y-2" data-preview-row-picker>
+    <div className="flex flex-col gap-2" data-preview-row-picker>
       <RowBrowser
         rows={rows.data?.rows ?? []}
         columns={source?.columns ?? []}

@@ -77,7 +77,7 @@ export function VariablesPanel({
   }
 
   return (
-    <div className="space-y-3" data-variables-panel>
+    <div className="flex flex-col gap-3" data-variables-panel>
       {variables.length === 0 && (
         <p className="text-2xs text-muted-foreground">{copy.variables.empty}</p>
       )}
@@ -87,7 +87,7 @@ export function VariablesPanel({
         return (
           // Keyed by position, not by name: the name is what this row edits,
           // and keying by it remounts the input on every keystroke.
-          <div key={index} className="space-y-1 rounded-md border border-border p-2">
+          <div key={index} className="flex flex-col gap-1 rounded-md border border-border p-2">
             <div className="flex items-center gap-2">
               <Input
                 aria-label={copy.variables.name}
@@ -110,7 +110,7 @@ export function VariablesPanel({
             </div>
 
             {variable.kind === 'constant' ? (
-              <Label className="block space-y-1">
+              <Label className="block flex flex-col gap-1">
                 <span className="text-2xs text-muted-foreground">{copy.variables.value}</span>
                 <Input
                   value={variable.value}
@@ -118,7 +118,7 @@ export function VariablesPanel({
                 />
               </Label>
             ) : (
-              <Label className="block space-y-1">
+              <Label className="block flex flex-col gap-1">
                 <span className="text-2xs text-muted-foreground">{copy.variables.pool}</span>
                 <Select
                   value={variable.poolId}

@@ -268,7 +268,7 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
                 title={copy.dataSources.undoTitle}
                 onClick={() => step('undo')}
               >
-                <Undo2 className="h-4 w-4" />
+                <Undo2 />
               </Button>
               <Button
                 size="icon"
@@ -278,7 +278,7 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
                 title={copy.dataSources.redoTitle}
                 onClick={() => step('redo')}
               >
-                <Redo2 className="h-4 w-4" />
+                <Redo2 />
               </Button>
             </div>
 

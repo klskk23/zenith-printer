@@ -82,7 +82,7 @@ export function OffsetPanel({ printer }: { printer: Printer }): React.JSX.Elemen
   }, [printer.offsetXDots, printer.offsetYDots])
 
   return (
-    <div className="space-y-2 rounded-md border border-border p-3">
+    <div className="flex flex-col gap-2 rounded-md border border-border p-3">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-semibold">{copy.offset.heading}</h4>
         <div className="flex items-end gap-2">
@@ -115,7 +115,7 @@ export function OffsetPanel({ printer }: { printer: Printer }): React.JSX.Elemen
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {DIRECTIONS.map((key) => (
-          <div key={key} className="space-y-1">
+          <div key={key} className="flex flex-col gap-1">
             <Label className="text-2xs">{copy.offset[DIRECTION_LABELS[key]]}</Label>
             <Input
               type="number"
@@ -163,7 +163,7 @@ export function OffsetPanel({ printer }: { printer: Printer }): React.JSX.Elemen
         */}
         {save.isSuccess && !save.isPending && (
           <span className="flex items-center gap-1 text-2xs text-muted-foreground">
-            <Check className="h-3 w-3" />
+            <Check />
             {copy.offset.saved}
           </span>
         )}

@@ -6,7 +6,16 @@
  */
 import { useState } from 'react'
 import { copy } from '../i18n/index.ts'
-import { Alert } from '../components/ui/alert.tsx'
+import { LayoutTemplate } from 'lucide-react'
+import { PageHeader } from '../components/page-header.tsx'
+import { Skeleton } from '../components/ui/skeleton.tsx'
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../components/ui/empty.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { ConfirmButton } from '../components/ui/confirm-button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx'
@@ -52,30 +61,52 @@ export function TemplatesPage(): React.JSX.Element {
   const visible = (templates.data ?? []).filter((template) => matches(template, query))
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold">{copy.workspace.tabs.templates}</h2>
-        <div className="flex items-center gap-2">
-          <Input
-            className="max-w-56"
-            value={query}
-            placeholder={copy.templates.searchPlaceholder}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={(templates.data ?? []).length === 0}
-            onClick={() => void exportTemplates([], 'zenith-templates.json')}
-          >
-            {copy.templates.exportAll}
-          </Button>
-          <ImportTemplatesButton />
-        </div>
-      </div>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title={copy.workspace.tabs.templates}
+        actions={
+          <>
+            <Input
+              className="max-w-56"
+              value={query}
+              placeholder={copy.templates.searchPlaceholder}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={(templates.data ?? []).length === 0}
+              onClick={() => void exportTemplates([], 'zenith-templates.json')}
+            >
+              {copy.templates.exportAll}
+            </Button>
+            <ImportTemplatesButton />
+          </>
+        }
+      />
 
-      {templates.isPending && <p className="text-xs text-muted-foreground">{copy.common.loading}</p>}
-      {templates.data?.length === 0 && <Alert>{copy.index.noTemplates}</Alert>}
+      {/* Cards, not a line of text: the grid below is cards, and a loading
+          state shaped like the thing it is standing in for does not make the
+          page jump when the answer arrives. */}
+      {templates.isPending && (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
+          {Array.from({ length: 3 }, (_unused, index) => (
+            <Skeleton key={index} className="h-56" />
+          ))}
+        </div>
+      )}
+
+      {templates.data?.length === 0 && (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <LayoutTemplate />
+            </EmptyMedia>
+            <EmptyTitle>{copy.templates.empty}</EmptyTitle>
+            <EmptyDescription>{copy.templates.emptyDetail}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
 
       {/*
         As many cards as fit, never narrower than the floor. Fixed column
@@ -89,7 +120,7 @@ export function TemplatesPage(): React.JSX.Element {
         {visible.map((template) => (
           <Card key={template.id}>
             <CardHeader className="pb-2">
-              <div className="min-w-0 space-y-1">
+              <div className="flex min-w-0 flex-col gap-1">
                 {renamingId === template.id ? (
                   <div className="flex items-center gap-2">
                     <Input
@@ -124,7 +155,7 @@ export function TemplatesPage(): React.JSX.Element {
                 </p>
               </div>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="flex flex-col gap-2">
               <ThumbnailFrame template={template} />
               {/*
                 Which table this design prints from — the thing worth knowing at

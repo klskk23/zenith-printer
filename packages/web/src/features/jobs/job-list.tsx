@@ -6,7 +6,15 @@
  * completely different things: the second requires somebody to walk over and
  * count the labels before reprinting (FR-053).
  */
+import { Inbox } from 'lucide-react'
 import { ApiRequestError } from '../../api/client.ts'
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../../components/ui/empty.tsx'
 import type { JobStatus } from '../../api/types.ts'
 import { useState } from 'react'
 import { copy } from '../../i18n/index.ts'
@@ -33,7 +41,7 @@ function ProgressLabel({ job }: { job: PrintJob }): React.JSX.Element {
   const unknown = job.pagesPrinted === null
 
   return (
-    <div className="w-full space-y-1">
+    <div className="w-full flex flex-col gap-1">
       {/*
         `value={null}` is deliberate and is not the same as zero. After a
         service restart the printed count is genuinely unknown; a bar at zero
@@ -63,7 +71,7 @@ function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
 
   return (
     <Card>
-      <CardContent className="space-y-2 p-3">
+      <CardContent className="flex flex-col gap-2 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             {/*
@@ -135,14 +143,32 @@ export function JobList({ printerId }: { printerId: string | null }): React.JSX.
   // showed the same rows.
   const active = (jobs.data ?? []).filter((job) => belongsInQueue(job, pausedPrinterIds))
 
+  if (active.length === 0) {
+    /**
+     * Said as an empty state, not as a line of grey text.
+     *
+     * "The queue is empty" on its own leaves somebody wondering whether their
+     * job failed to submit. The queue empties because jobs *finish*, and
+     * saying where they went is the whole of the difference.
+     */
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Inbox />
+          </EmptyMedia>
+          <EmptyTitle>{copy.jobs.empty}</EmptyTitle>
+          <EmptyDescription>{copy.jobs.emptyDetail}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+
   return (
-    <div className="space-y-2">
-      {active.length === 0 && <p className="text-xs text-muted-foreground">{copy.jobs.empty}</p>}
-      <div className="space-y-2">
-        {active.map((job) => (
-          <JobRow key={job.id} job={job} />
-        ))}
-      </div>
+    <div className="flex flex-col gap-2">
+      {active.map((job) => (
+        <JobRow key={job.id} job={job} />
+      ))}
     </div>
   )
 }

@@ -64,7 +64,7 @@ interface FieldProps {
 
 function Field({ label, children }: FieldProps): React.JSX.Element {
   return (
-    <div className="space-y-1">
+    <div className="flex flex-col gap-1">
       <Label>{label}</Label>
       {children}
     </div>
@@ -115,7 +115,7 @@ function DotsInput({
 }): React.JSX.Element {
   const mm = (value * 25.4) / dpi
   return (
-    <div className="space-y-1">
+    <div className="flex flex-col gap-1">
       <Input
         type="number"
         min={1}
@@ -161,7 +161,7 @@ function ModuleWidthField({
   const variable = parse(element.content).some((segment) => segment.kind === 'ref')
 
   return (
-    <div className="space-y-1">
+    <div className="flex flex-col gap-1">
       <Field label={copy.editor.moduleWidth}>
         <Input
           type="number"
@@ -259,7 +259,7 @@ export function Inspector({ ir, element, values, onChange, onDelete }: Inspector
     // Named so tests can tell an element's width field from the canvas width
     // field in the left column — both are labelled the same way, and a query
     // across the whole document silently picks the wrong one.
-    <div className="space-y-3" data-inspector>
+    <div className="flex flex-col gap-3" data-inspector>
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">{copy.editor.elements[element.type]}</h3>
         <Button variant="ghost" size="sm" onClick={() => onDelete(element.id)}>
@@ -342,7 +342,7 @@ export function Inspector({ ir, element, values, onChange, onDelete }: Inspector
         same word would mean inverting its pixels.
       */}
       {'inverted' in element && (
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <Label className="flex items-center gap-2 text-sm text-foreground">
             <Checkbox
               checked={element.inverted}

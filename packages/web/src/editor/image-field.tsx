@@ -71,7 +71,7 @@ export function ImageField({ element, onChange }: ImageFieldProps): React.JSX.El
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       <input
         ref={input}
         type="file"

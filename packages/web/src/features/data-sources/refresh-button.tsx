@@ -83,7 +83,7 @@ export function RefreshButton({
         data-refresh
       >
         {size === 'icon' ? (
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw />
         ) : refresh.isPending ? (
           copy.dataSources.refreshing
         ) : (

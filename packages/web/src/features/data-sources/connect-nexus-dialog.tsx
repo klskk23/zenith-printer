@@ -104,7 +104,7 @@ export function ConnectNexusDialog({
           <DialogDescription>{copy.dataSources.nexusExplain}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           {categories.isPending && <Skeleton className="h-9" />}
 
           {/* Said plainly rather than shown as an empty dropdown. A select with
@@ -122,7 +122,7 @@ export function ConnectNexusDialog({
           )}
 
           {list.length > 0 && (
-            <Label className="block space-y-1">
+            <Label className="block flex flex-col gap-1">
               <span className="text-2xs text-muted-foreground">{copy.dataSources.nexusCategory}</span>
               <Select value={categoryId ?? ''} onValueChange={setCategoryId}>
                 <SelectTrigger aria-label={copy.dataSources.nexusCategory}>
@@ -143,7 +143,7 @@ export function ConnectNexusDialog({
           )}
 
           {/* Optional: the category already has a name somebody chose. */}
-          <Label className="block space-y-1">
+          <Label className="block flex flex-col gap-1">
             <span className="text-2xs text-muted-foreground">
               {copy.dataSources.nexusName(chosen?.name ?? '')}
             </span>
