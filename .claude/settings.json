@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "42crunch-api-security-testing@claude-plugins-official": true
+  }
+}
