@@ -57,7 +57,7 @@ describe('round trip', () => {
 
   it('keeps values that were not touched', () => {
     const storage = memoryStorage()
-    savePreferences(storage, { ...DEFAULT_PREFERENCES, theme: 'dark' })
+    savePreferences(storage, { ...DEFAULT_PREFERENCES, displayUnit: 'dot' })
     expect(loadPreferences(storage).defaultDpi).toBe(DEFAULT_PREFERENCES.defaultDpi)
   })
 })
@@ -119,7 +119,6 @@ describe('scope', () => {
       'displayUnit',
       'language',
       'queuePollIntervalMs',
-      'theme',
     ])
   })
 
@@ -137,27 +136,24 @@ function shellHtml(): string {
   return join(dirname(fileURLToPath(import.meta.url)), '..', 'index.html')
 }
 
-describe('the pre-paint script in index.html', () => {
+describe('the HTML shell', () => {
   /**
-   * The stylesheet's `:root` is the light palette and dark is applied by
-   * attribute, so with a dark default the page renders light and flips once
-   * the bundle mounts — a white flash on every load, which is the one thing a
-   * dark theme is chosen to avoid. A small script in the HTML shell sets the
-   * attribute first.
-   *
-   * It carries its own copy of the default because it runs before the bundle
-   * and cannot import this module. The two have to agree, and nothing but a
-   * test can keep them agreeing.
+   * There used to be a script here that set the theme attribute before the
+   * first paint, because the stylesheet held two palettes and the page would
+   * otherwise render light and flip. With one palette there is nothing to
+   * flip between, and the script — with its own second copy of a default that
+   * had to be kept in step — is gone.
    */
-  it('carries the same default as the store', () => {
+  it('sets no palette before the bundle loads', () => {
     const html = readFileSync(shellHtml(), 'utf8')
-    const match = /var theme = '([a-z]+)'/.exec(html)
-    expect(match, 'no pre-paint theme script in index.html').not.toBeNull()
-    expect(match![1]).toBe(DEFAULT_PREFERENCES.theme)
+    expect(html).not.toContain('data-theme')
   })
 
-  it('reads the same storage key the store writes', () => {
+  it('reads no storage of its own', () => {
+    // The shell used to parse the preferences blob to find the theme. Nothing
+    // in it needs storage now, and a second reader of that key was a second
+    // thing to keep in step with the store's shape.
     const html = readFileSync(shellHtml(), 'utf8')
-    expect(html).toContain('zenith.preferences')
+    expect(html).not.toContain('localStorage')
   })
 })

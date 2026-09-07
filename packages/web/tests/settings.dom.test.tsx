@@ -4,6 +4,13 @@
  * Applying each keystroke made the page impossible to explore: changing the
  * language mid-thought reloaded every label around you, with no way back except
  * remembering what it had been.
+ *
+ * These used to be driven through the theme selector, which is gone — there is
+ * one palette now. They run on the language selector instead, which is the
+ * setting the paragraph above is actually about, and the one whose effect is
+ * visible on the page rather than only in storage: this environment has no
+ * `localStorage`, so a test that watched what was written down would be
+ * watching nothing.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -16,10 +23,7 @@ function wrap(ui: React.ReactNode): React.JSX.Element {
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>
 }
 
-afterEach(() => {
-  cleanup()
-  document.documentElement.removeAttribute('data-theme')
-})
+afterEach(cleanup)
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/')
@@ -30,44 +34,43 @@ function openSettings(): HTMLElement {
   render(wrap(<App />))
   fireEvent.click(screen.getAllByText('设置')[0]!)
   // By its label rather than by scanning for a select that happens to contain
-  // "深色": a Radix trigger shows only the *chosen* option, so a text scan
-  // would find it only while dark was already selected.
-  return screen.getByRole('combobox', { name: '主题' })
+  // "中文": a Radix trigger shows only the *chosen* option, so a text scan
+  // would find it only while Chinese was already selected.
+  return screen.getByRole('combobox', { name: '界面语言' })
 }
 
-/**
- * Changed away from dark, not toward it: dark is the default now, so choosing
- * it is not a change and these tests would assert nothing.
- */
 describe('draft editing', () => {
   it('does not apply a change immediately', () => {
-    const theme = openSettings()
-    chooseOption(theme, '浅色')
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    const language = openSettings()
+    chooseOption(language, 'English')
+    // Still Chinese: the page around the setting has not moved.
+    expect(screen.getAllByText('保存').length).toBeGreaterThan(0)
   })
 
   it('reports that something is unsaved', () => {
-    const theme = openSettings()
-    chooseOption(theme, '浅色')
+    const language = openSettings()
+    chooseOption(language, 'English')
     expect(screen.getAllByText('有未保存的修改').length).toBeGreaterThan(0)
   })
 
   it('applies the change on save', () => {
-    const theme = openSettings()
-    chooseOption(theme, '浅色')
+    const language = openSettings()
+    chooseOption(language, 'English')
     fireEvent.click(screen.getAllByText('保存')[0]!)
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+    // Every label on the page moves at once, which is the whole reason this is
+    // a draft rather than applied per keystroke.
+    expect(screen.getAllByText('Save').length).toBeGreaterThan(0)
   })
 
   it('discards the change on cancel', () => {
-    const theme = openSettings()
-    chooseOption(theme, '浅色')
+    const language = openSettings()
+    chooseOption(language, 'English')
     fireEvent.click(screen.getAllByText('取消')[0]!)
 
     // Reads what the control *shows*, which is what the operator sees. The
     // hidden value it used to read could stay right while the label went wrong.
-    expect(selectedText(theme)).toContain('深色')
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    expect(selectedText(language)).toContain('中文')
+    expect(screen.getAllByText('保存').length).toBeGreaterThan(0)
   })
 
   it('disables both buttons when nothing has changed', () => {
@@ -79,34 +82,23 @@ describe('draft editing', () => {
   })
 })
 
-describe('the theme actually takes effect', () => {
-  it('marks the document root', () => {
-    const theme = openSettings()
-    chooseOption(theme, '浅色')
-    fireEvent.click(screen.getAllByText('保存')[0]!)
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-  })
-
-  it('unmarks it for "follow system"', () => {
-    const theme = openSettings()
-    chooseOption(theme, '跟随系统')
-    fireEvent.click(screen.getAllByText('保存')[0]!)
-    expect(document.documentElement.getAttribute('data-theme')).toBeNull()
-  })
-})
-
-describe('the default', () => {
+describe('the palette', () => {
   /**
-   * A label editor is looked at for hours against a white canvas that cannot
-   * be darkened — the paper has to look like paper — so the surroundings are
-   * the only thing that can rest the eyes.
+   * There is one, and it is not a setting.
+   *
+   * Dark mode was dropped: it doubled every colour token and existed mainly to
+   * rest the eyes against a white canvas, which the paper-grey ground now does
+   * without a second palette to keep in step. Asserted here because "somebody
+   * will just add the dropdown back" is exactly how a second palette returns.
    */
-  it('is dark before anyone chooses anything', () => {
-    openSettings()
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+  it('is not offered as a choice', () => {
+    render(wrap(<App />))
+    fireEvent.click(screen.getAllByText('设置')[0]!)
+    expect(screen.queryByRole('combobox', { name: '主题' })).toBeNull()
   })
 
-  it('is what the theme selector shows', () => {
-    expect(selectedText(openSettings())).toContain('深色')
+  it('leaves the document root unmarked', () => {
+    render(wrap(<App />))
+    expect(document.documentElement.getAttribute('data-theme')).toBeNull()
   })
 })

@@ -10,7 +10,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { setRequestLocale } from '../../api/client.ts'
 import { setCopyLocale } from '../../i18n/index.ts'
 import { safeLocalStorage } from '../../lib/storage.ts'
-import { applyTheme } from './theme.ts'
 import {
   DEFAULT_PREFERENCES,
   loadPreferences,
@@ -33,7 +32,6 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     // language and then visibly change.
     setCopyLocale(loaded.language)
     setRequestLocale(loaded.language)
-    applyTheme(loaded.theme)
     return loaded
   })
 
@@ -53,12 +51,6 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     setCopyLocale(preferences.language)
     setRequestLocale(preferences.language)
   }, [preferences.language])
-
-  // The theme setting existed and was stored, and nothing ever read it — the
-  // dropdown was inert.
-  useEffect(() => {
-    applyTheme(preferences.theme)
-  }, [preferences.theme])
 
   const api = useMemo(() => ({ preferences, update }), [preferences, update])
   return <PreferencesContext.Provider value={api}>{children}</PreferencesContext.Provider>

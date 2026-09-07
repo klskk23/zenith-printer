@@ -164,21 +164,6 @@ export function SettingsPage(): React.JSX.Element {
           </Select>
         </Row>
 
-        <Row label={copy.settings.theme}>
-          <Select
-            value={draft.theme}
-            onValueChange={(value) => set('theme', value as 'light' | 'dark' | 'system')}
-          >
-            <SelectTrigger aria-label={copy.settings.theme}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="system">{copy.settings.themes.system}</SelectItem>
-              <SelectItem value="light">{copy.settings.themes.light}</SelectItem>
-              <SelectItem value="dark">{copy.settings.themes.dark}</SelectItem>
-            </SelectContent>
-          </Select>
-        </Row>
 
         <Row label={copy.settings.pollInterval}>
           <Input

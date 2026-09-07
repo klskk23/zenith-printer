@@ -564,8 +564,6 @@ export const copy: Copy = {
     defaultFont: 'Default font',
     displayUnit: 'Size unit',
     displayUnits: { mm: 'Millimetres', dot: 'Dots' },
-    theme: 'Theme',
-    themes: { light: 'Light', dark: 'Dark', system: 'Follow system' },
     pollInterval: 'Queue refresh interval (ms)',
     alwaysConfirmTabClose: 'Always confirm before closing a tab',
     unsaved: 'Unsaved changes',

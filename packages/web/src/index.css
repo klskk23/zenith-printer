@@ -2,68 +2,110 @@
 @import './fonts.css';
 
 /*
- * shadcn/ui design tokens. Custom components must reuse these rather than
- * introducing a second styling system (constitution: "UI component rules").
+ * The token system: "stock and liner".
  *
- * Two palettes. The dark one is not a filter over the light one: on a dark
- * ground the same borders read heavier and the same greys read lighter, so
- * each value is chosen rather than derived.
+ * Zenith makes a physical thing — a matte, slightly warm label, die-cut with
+ * generous corners, printed carbon black, wound on a kraft core. The interface
+ * is built out of that material rather than out of a neutral grey chrome that
+ * could belong to any tool.
+ *
+ * **The one rule worth knowing: pure white means "this will be printed".** The
+ * page is paper-grey; cards are a shade lighter; only the canvas and the print
+ * preview are #FFFFFF. White stops being a background and becomes information.
+ *
+ * Light only. Dark mode is gone — see `deploy/README.md` and the note in
+ * `preferences/store.ts` for what it was for and why the paper ground answers
+ * it: the canvas used to be a white rectangle on near-black, which is the
+ * harshest pairing in the product; against paper-grey the step is small.
+ *
+ * Every value below was converted from a chosen hex and every text pair was
+ * checked against WCAG rather than eyeballed. The comments carry the ratios so
+ * the next person changing one knows what they have to keep.
  */
 @theme {
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.145 0 0);
-  --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.145 0 0);
-  --color-popover: oklch(1 0 0);
-  --color-popover-foreground: oklch(0.145 0 0);
-  --color-primary: oklch(0.205 0 0);
-  --color-primary-foreground: oklch(0.985 0 0);
-  --color-secondary: oklch(0.97 0 0);
-  --color-secondary-foreground: oklch(0.205 0 0);
-  --color-muted: oklch(0.97 0 0);
-  --color-muted-foreground: oklch(0.556 0 0);
-  --color-accent: oklch(0.97 0 0);
-  --color-accent-foreground: oklch(0.205 0 0);
-  --color-destructive: oklch(0.577 0.245 27.325);
-  --color-destructive-foreground: oklch(0.985 0 0);
-  --color-border: oklch(0.922 0 0);
-  --color-input: oklch(0.922 0 0);
-  --color-ring: oklch(0.708 0 0);
+  /* paper #ECEDE6 — the bench. Cooler and greyer than the cream a "warm,
+     organic" palette reaches for by default; real direct-thermal stock has a
+     green-grey cast, and the cream version reads as decoration. */
+  --color-background: oklch(0.943 0.009 113.2);
+  /* ink #14170F — near-black carrying the same green cast, not a neutral
+     #111. 15.4:1 on paper. */
+  --color-foreground: oklch(0.198 0.016 124.5);
+
+  /* face #F6F7F2 — the label itself, one step up from the bench it lies on. */
+  --color-card: oklch(0.974 0.007 115.7);
+  --color-card-foreground: oklch(0.198 0.016 124.5);
+  --color-popover: oklch(0.974 0.007 115.7);
+  --color-popover-foreground: oklch(0.198 0.016 124.5);
+
+  /* moss #3F5C36 — the primary action. Green rather than the clay-orange an
+     organic palette defaults to, so it cannot be confused with `warning`,
+     which is the colour of thermal paper that has been burnt. 6.4:1 both
+     ways. */
+  --color-primary: oklch(0.441 0.069 138.5);
+  --color-primary-foreground: oklch(0.943 0.009 113.2);
+
+  --color-secondary: oklch(0.919 0.012 113.5);
+  --color-secondary-foreground: oklch(0.198 0.016 124.5);
+  --color-muted: oklch(0.919 0.012 113.5);
+  /* muted #5C6153 — 5.4:1, so secondary text is still readable standing up at
+     a bench, which is where this is read. */
+  --color-muted-foreground: oklch(0.484 0.023 123.3);
+  --color-accent: oklch(0.919 0.012 113.5);
+  --color-accent-foreground: oklch(0.198 0.016 124.5);
+
+  /* rust #8C3A28 — 6.5:1. */
+  --color-destructive: oklch(0.457 0.116 33.9);
+  --color-destructive-foreground: oklch(0.974 0.007 115.7);
 
   /*
-   * Two names beyond shadcn's set, because this application has two states its
-   * set has no word for — and they were being written as raw palette colours
-   * that do not follow the theme at all.
+   * Two border weights, because borders were carrying two different jobs.
    *
-   * `warning` is "it printed, but not the way you asked": content clipped off
-   * the label, a count nobody can verify after a crash. `destructive` would
-   * overstate it and `muted` would hide it.
-   * `info` is "this is happening right now", which the queue uses for the job
-   * on the head; `success` is a finished one.
+   * `border` is the hairline that separates content — decorative, no contrast
+   * requirement. `input` is the edge of a field you *put something into*, and
+   * WCAG asks 3:1 of a control whose boundary is the only thing marking it:
+   * liner #9C7143 gives 3.67:1. Kraft-coloured, because the liner is the part
+   * of a label you hold.
    *
-   * Values are Tailwind's own amber-600/blue-600 in light and amber-400/
-   * blue-400 in dark — the same relationship shadcn gives `destructive`, whose
-   * dark value is lighter and less saturated than its light one.
+   * Fields only, not every outlined thing. Buttons carry their own label at
+   * 15:1 and do not need an edge to be found; giving them one put seven kraft
+   * rectangles in the editor's element palette, which shouted louder than the
+   * canvas — the one thing on that screen that is supposed to.
    */
-  --color-warning: oklch(66.6% 0.179 58.318);
-  --color-warning-foreground: oklch(0.985 0 0);
-  --color-info: oklch(54.6% 0.245 262.881);
-  --color-success: oklch(59.6% 0.145 163.225);
+  --color-border: oklch(0.878 0.015 115.1);
+  --color-input: oklch(0.582 0.083 66.8);
+  --color-ring: oklch(0.441 0.069 138.5);
 
   /*
-   * The type scale, with a step for the density this application actually
-   * works at.
+   * Three states this application has and shadcn has no word for.
    *
-   * `text-[11px]` appeared **94 times** — an arbitrary value below Tailwind's
+   * `warning` is "it printed, but not the way you asked" — ochre #8A6414,
+   * 4.55:1, the colour of thermal stock scorched past its mark. It has no
+   * `-foreground` partner because nothing in this application fills a surface
+   * with it: a warning is a tinted panel with ochre text, never a solid ochre
+   * block, so a token for text *on* ochre would be a colour nobody could see.
+   * `info` is "happening right now"; `success` is finished.
+   */
+  --color-warning: oklch(0.529 0.102 80.4);
+  --color-info: oklch(0.446 0.064 233.5);
+  --color-success: oklch(0.441 0.069 138.5);
+
+  /*
+   * Headings are set in the serif this application already ships.
+   *
+   * `Noto Serif CJK SC` is one of the faces the *renderer* prints with, so it
+   * is already in the font directory and already a face this product speaks
+   * in. Using it for the chrome ties the tool to the thing it makes, and costs
+   * no new bytes.
+   */
+  --font-display: 'Noto Serif CJK SC', Georgia, serif;
+
+  /*
+   * The type scale, with a step for the density this application works at.
+   *
+   * `text-[11px]` appeared 94 times — an arbitrary value below Tailwind's
    * smallest step, which put the densest text in the product outside the
-   * system: it could only be changed in 94 places, and nothing tied it to
-   * anything. Named here, it moves in one line.
-   *
-   * The values also go up a little. 11px was below what a shop floor should be
-   * asked to read, and this is a screen people use standing up. Not the full
-   * step each (11→12→14→16, the obvious version): 16px body text in a tool
-   * this dense pushes every panel out of shape, and one column has already
-   * been off the side of the window once.
+   * system. Named here, it moves in one line. The values also go up a little:
+   * 11px is below what somebody standing at a bench should be asked to read.
    */
   --text-2xs: 0.75rem;
   --text-2xs--line-height: calc(1 / 0.75);
@@ -71,91 +113,30 @@
   --text-xs--line-height: calc(1.125 / 0.8125);
 
   /*
-   * One radius, and a scale derived from it — shadcn's convention.
+   * Radius as hierarchy, not as one number applied everywhere.
    *
-   * `--radius` was live but only for bare `rounded`: `rounded-sm/md/lg` read
-   * Tailwind's own `--radius-*`, so 27 of the application's 40 rounded corners
-   * ignored the token that was supposed to govern them. The arithmetic below
-   * reproduces today's values exactly (4/6/8px), so nothing moves — it just
-   * means the one number now decides all of them.
-   *
-   * Note that defining `--radius` at all is what makes bare `rounded` 8px
-   * here; in stock Tailwind it is 4px.
+   * A die-cut label has a generous corner; a text field does not, or it stops
+   * reading as somewhere to type. So the scale spreads: `lg` (cards, dialogs,
+   * the label-shaped things) is 12px, `md` (inputs, buttons) 10px, `sm`
+   * (chips, cells) 8px. Badges and avatars take `rounded-full` and are the
+   * only fully round things, which is what makes them read as tags.
    */
-  --radius: 0.5rem;
+  /*
+   * The sheet's shadow: a label lying on the bench, not a card in a stack.
+   *
+   * Two layers — a tight contact shadow where the paper meets the surface, and
+   * a wider soft one — because that is how a physical sheet reads. Built from
+   * the ink token so the one place this interface raises its voice still uses
+   * the palette's own colour.
+   */
+  --shadow-sheet: 0 1px 2px color-mix(in oklch, var(--color-foreground) 10%, transparent),
+    0 8px 24px -6px color-mix(in oklch, var(--color-foreground) 18%, transparent);
+
+  --radius: 0.75rem;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-}
-
-/*
- * Explicit choice wins over the system setting, so `data-theme` is applied to
- * the root element and takes precedence over the media query below it.
- */
-:root[data-theme='dark'] {
-  --color-background: oklch(0.145 0 0);
-  --color-foreground: oklch(0.985 0 0);
-  --color-card: oklch(0.205 0 0);
-  --color-card-foreground: oklch(0.985 0 0);
-  --color-popover: oklch(0.205 0 0);
-  --color-popover-foreground: oklch(0.985 0 0);
-  --color-primary: oklch(0.922 0 0);
-  --color-primary-foreground: oklch(0.205 0 0);
-  --color-secondary: oklch(0.269 0 0);
-  --color-secondary-foreground: oklch(0.985 0 0);
-  --color-muted: oklch(0.269 0 0);
-  --color-muted-foreground: oklch(0.708 0 0);
-  --color-accent: oklch(0.269 0 0);
-  --color-accent-foreground: oklch(0.985 0 0);
-  --color-destructive: oklch(0.704 0.191 22.216);
-  --color-destructive-foreground: oklch(0.985 0 0);
-  /* Solid, not shadcn's `oklch(1 0 0 / 10%)`: this application draws borders
-     over `muted` fills as often as over the page, and a translucent one
-     changes weight with whatever happens to be behind it. */
-  --color-border: oklch(0.371 0 0);
-  --color-input: oklch(0.371 0 0);
-  --color-ring: oklch(0.556 0 0);
-  --color-warning: oklch(82.8% 0.189 84.429);
-  --color-warning-foreground: oklch(0.205 0 0);
-  --color-info: oklch(70.7% 0.165 254.624);
-  --color-success: oklch(76.5% 0.177 163.223);
-}
-
-/*
- * "Follow system" is the absence of an explicit choice, so it is expressed as
- * "no data-theme attribute" rather than as a third value to apply. Guarded
- * against `light` so that choosing light on a dark system still gives light.
- */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --color-background: oklch(0.145 0 0);
-    --color-foreground: oklch(0.985 0 0);
-    --color-card: oklch(0.205 0 0);
-    --color-card-foreground: oklch(0.985 0 0);
-    --color-popover: oklch(0.205 0 0);
-    --color-popover-foreground: oklch(0.985 0 0);
-    --color-primary: oklch(0.922 0 0);
-    --color-primary-foreground: oklch(0.205 0 0);
-    --color-secondary: oklch(0.269 0 0);
-    --color-secondary-foreground: oklch(0.985 0 0);
-    --color-muted: oklch(0.269 0 0);
-    --color-muted-foreground: oklch(0.708 0 0);
-    --color-accent: oklch(0.269 0 0);
-    --color-accent-foreground: oklch(0.985 0 0);
-    --color-destructive: oklch(0.704 0.191 22.216);
-    --color-destructive-foreground: oklch(0.985 0 0);
-    /* Solid, not shadcn's `oklch(1 0 0 / 10%)`: this application draws borders
-       over `muted` fills as often as over the page, and a translucent one
-       changes weight with whatever happens to be behind it. */
-    --color-border: oklch(0.371 0 0);
-    --color-input: oklch(0.371 0 0);
-    --color-ring: oklch(0.556 0 0);
-    --color-warning: oklch(82.8% 0.189 84.429);
-    --color-warning-foreground: oklch(0.205 0 0);
-    --color-info: oklch(70.7% 0.165 254.624);
-    --color-success: oklch(76.5% 0.177 163.223);
-  }
 }
 
 body {
@@ -165,9 +146,13 @@ body {
 }
 
 /*
- * The label canvas is white regardless of theme: it is a sheet of paper, and
- * the preview's job is to look like what comes out of the printer. Inverting
- * it in dark mode would make the preview lie about the print.
+ * Pure white, and the only pure white in the interface.
+ *
+ * The canvas is a sheet of paper and the preview's job is to look like what
+ * comes out of the printer, so it cannot be tinted to match the chrome. Since
+ * the page around it is paper-grey and every card is a shade below white, this
+ * is what makes `#FFFFFF` mean "this will be printed" rather than "this is a
+ * background".
  */
 [data-label-canvas] {
   background-color: #ffffff;
@@ -181,9 +166,9 @@ body {
  * scopes every rule to `.dsg-*`, so there is nothing to override and no global
  * CSS to fight — this maps its sixteen variables onto the theme and stops.
  *
- * It follows light and dark automatically because the tokens on the right do;
- * a grid with its own hard-coded palette would have been a second theme to keep
- * in step, which is the thing the constitution rules out.
+ * It moves with the palette because the tokens on the right do; a grid with
+ * its own hard-coded colours would have been a second palette to keep in step,
+ * which is the thing the constitution rules out.
  */
 .dsg-container {
   --dsg-border-color: var(--color-border);
@@ -276,8 +261,9 @@ body {
 /*
  * The grid's right-click menu.
  *
- * The library paints it `background: white; color: black`, which is invisible
- * as a decision until the dark theme turns it into a white slab.
+ * The library paints it `background: white; color: black` — pure white, which
+ * in this palette is reserved for the thing being printed, and a black that is
+ * not the ink the rest of the interface is set in. Both are overridden below.
  *
  * The values are the ones `SelectContent` and `SelectItem` use, spelled as raw
  * tokens because this element belongs to a third-party component and never

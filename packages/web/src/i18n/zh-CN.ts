@@ -573,8 +573,6 @@ export const copy = {
     defaultFont: '默认字体',
     displayUnit: '尺寸显示单位',
     displayUnits: { mm: '毫米', dot: '打印点' },
-    theme: '主题',
-    themes: { light: '浅色', dark: '深色', system: '跟随系统' },
     pollInterval: '队列刷新间隔（毫秒）',
     alwaysConfirmTabClose: '关闭标签页时总是确认',
     unsaved: '有未保存的修改',

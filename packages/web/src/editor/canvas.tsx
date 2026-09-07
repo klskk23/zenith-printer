@@ -268,9 +268,19 @@ export function EditorCanvas({
   }, [drag, onGestureEnd])
 
   return (
-    // Paper is white in either theme: the preview's job is to look like what
-    // comes out of the printer, and inverting it would make it lie.
-    <div data-label-canvas className="inline-block border border-border shadow-sm">
+    /*
+     * The one place this interface raises its voice.
+     *
+     * The canvas is the only pure white in the product — the mark that says
+     * this rectangle will exist on paper — and it is lifted off the bench by
+     * its own shadow rather than outlined by a drawn line. A physical sheet
+     * has an edge because of where it sits, not because somebody drew round
+     * it, and this is the thing the whole application is for.
+     */
+    <div
+      data-label-canvas
+      className="inline-block shadow-sheet"
+    >
       <svg
         ref={svgRef}
         width={grid.widthDots * zoom}

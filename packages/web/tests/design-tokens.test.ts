@@ -112,28 +112,127 @@ describe('the token set', () => {
       'primary', 'primary-foreground', 'secondary', 'secondary-foreground',
       'muted', 'muted-foreground', 'accent', 'accent-foreground',
       'destructive', 'destructive-foreground', 'border', 'input', 'ring',
-      'warning', 'warning-foreground', 'info', 'success',
+      'warning', 'info', 'success',
     ]
     expect(required.filter((name) => !css.includes(`--color-${name}:`))).toEqual([])
   })
 
-  it('gives every one of them a dark value too', () => {
-    // A token defined only in the light block is a colour that silently keeps
-    // its light value on a black background — which is how this started.
-    const light = [...css.matchAll(/@theme \{([\s\S]*?)\n\}/g)][0]?.[1] ?? ''
-    const dark = [...css.matchAll(/\[data-theme='dark'\] \{([\s\S]*?)\n\}/g)][0]?.[1] ?? ''
-    const names = (block: string): string[] =>
-      [...block.matchAll(/--color-([a-z-]+):/g)].map((match) => match[1]!).sort()
-    expect(names(light)).toEqual(names(dark))
+  it('holds one palette and no second one', () => {
+    /**
+     * Dark mode is gone, deliberately.
+     *
+     * It cost two more copies of every token — the explicit choice and the
+     * system preference were written out separately and could disagree — and
+     * the thing it was for was the canvas: a white rectangle on near-black is
+     * the harshest pairing in the product. The page ground is paper-grey now,
+     * so the step from chrome to canvas is small without a second palette to
+     * keep in step.
+     *
+     * Asserted so that adding one back is a visible decision rather than a
+     * quiet media query.
+     */
+    expect(css).not.toContain('data-theme')
+    expect(css).not.toContain('prefers-color-scheme')
   })
 
-  it('says the same thing in both dark blocks', () => {
-    // The explicit choice and the system preference are two selectors carrying
-    // one palette. They are written out twice, so they can disagree.
-    const blocks = [...css.matchAll(/:root(?:\[data-theme='dark'\]|:not\(\[data-theme='light'\]\)) \{([\s\S]*?)\n\s*\}/g)]
-    expect(blocks).toHaveLength(2)
-    const normalise = (block: string): string =>
-      block.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((line) => line.trim()).filter(Boolean).join('\n')
-    expect(normalise(blocks[0]![1]!)).toBe(normalise(blocks[1]![1]!))
+  it('keeps every text pair readable, by measurement', () => {
+    /**
+     * The palette's whole justification is that somebody reads it standing at
+     * a bench. Contrast is the part of that which breaks silently: a colour
+     * nudged half a step still looks fine on the screen it was nudged on.
+     *
+     * WCAG asks 4.5:1 of body text and 3:1 of the boundary of anything you can
+     * act on. The values are read out of the stylesheet and converted, so this
+     * measures what ships rather than what a comment claims.
+     */
+    const token = (name: string): [number, number, number] => {
+      const match = new RegExp(`--color-${name}: oklch\\(([\\d.]+) ([\\d.]+) ([\\d.]+)\\)`).exec(css)
+      expect(match, `--color-${name} is not an oklch triple`).not.toBeNull()
+      return [Number(match![1]), Number(match![2]), Number(match![3])]
+    }
+
+    for (const [fg, bg, floor, what] of [
+      ['foreground', 'background', 4.5, 'body text on the page'],
+      ['card-foreground', 'card', 4.5, 'body text on a card'],
+      ['muted-foreground', 'background', 4.5, 'secondary text'],
+      ['primary-foreground', 'primary', 4.5, 'the label on a primary button'],
+      ['destructive-foreground', 'destructive', 4.5, 'the label on a destructive button'],
+      ['warning', 'background', 4.5, 'warning text'],
+      ['info', 'background', 4.5, 'the in-progress state'],
+      ['input', 'background', 3, 'the edge of something you can act on'],
+      ['ring', 'background', 3, 'the focus ring'],
+    ] as const) {
+      const ratio = contrast(token(fg), token(bg))
+      expect(ratio, `${what}: ${ratio.toFixed(2)}:1, needs ${floor}`).toBeGreaterThanOrEqual(floor)
+    }
+  })
+
+  it('draws form controls with the edge meant for them', () => {
+    /**
+     * `--color-input` was defined, documented with the contrast ratio it
+     * achieves, and referenced by nothing — every form control drew
+     * `border-border` instead, a hairline at 1.22:1 against the page, well
+     * under the 3:1 WCAG asks of the boundary of something you can act on.
+     *
+     * A token nobody uses is a decision that exists only in a comment, and
+     * this one was load-bearing: it is the only reason a text field has a
+     * visible edge on paper-grey.
+     */
+    for (const control of ['input.tsx', 'textarea.tsx', 'select.tsx']) {
+      const source = readFileSync(join(SRC, 'components/ui', control), 'utf8')
+      expect(source, `${control} does not draw border-input`).toContain('border-input')
+    }
+  })
+
+  it('uses the names it invented for itself', () => {
+    // shadcn's own set has to exist whether or not this application has
+    // reached for it yet — a component added tomorrow expects it. The names
+    // beyond that set are this project's, and one of those going unused means
+    // a state was given a colour and then never shown in it.
+    const OWN = ['warning', 'info', 'success']
+    const source = sourceFiles(SRC)
+      .map((file) => readFileSync(file, 'utf8'))
+      .join('\n')
+    expect(OWN.filter((name) => !source.includes(`-${name}`))).toEqual([])
+  })
+
+  it('reserves pure white for the thing being printed', () => {
+    // `#FFFFFF` is not a background in this palette; it is the mark that says
+    // this rectangle will exist on paper. There is exactly one, and a second
+    // would quietly undo the rule.
+    // Comments stripped first: the rule is about what the stylesheet paints,
+    // not about the prose that explains it — and the prose says `#FFFFFF` out
+    // loud, which is the point of it.
+    const declarations = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    const whites = [...declarations.matchAll(/#ffffff\b|#fff\b|\bwhite\b/gi)]
+    expect(
+      whites.map((match) => match[0]),
+      'pure white outside the label canvas',
+    ).toEqual(['#ffffff'])
   })
 })
+
+/**
+ * OKLCH → sRGB → WCAG relative luminance.
+ *
+ * Written out because the stylesheet is authored in OKLCH and the requirement
+ * is stated in sRGB; converting by hand in a comment is how a palette comes to
+ * claim a ratio it does not have.
+ */
+function contrast(a: [number, number, number], b: [number, number, number]): number {
+  const luminance = ([L, C, H]: [number, number, number]): number => {
+    const h = (H * Math.PI) / 180
+    const [aa, bb] = [C * Math.cos(h), C * Math.sin(h)]
+    const l = (L + 0.3963377774 * aa + 0.2158037573 * bb) ** 3
+    const m = (L - 0.1055613458 * aa - 0.0638541728 * bb) ** 3
+    const s = (L - 0.0894841775 * aa - 1.291485548 * bb) ** 3
+    const lin = [
+      4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+    ].map((v) => Math.min(1, Math.max(0, v)))
+    return 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!
+  }
+  const sorted = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (sorted[0]! + 0.05) / (sorted[1]! + 0.05)
+}

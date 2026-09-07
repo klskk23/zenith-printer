@@ -35,7 +35,11 @@ export function PageHeader({
             squeezed to nothing is unusable, whereas a long page title reads
             fine cut short — and every one of these titles is also the tab the
             page was opened from. */}
-        <h2 className="min-w-0 truncate text-sm font-semibold">{title}</h2>
+        {/* Set in the serif the renderer prints with — the one place the
+            chrome speaks in the same voice as the labels it makes. Regular
+            weight, not bold: the serif already carries the emphasis, and
+            bolding it on top reads as shouting. */}
+        <h2 className="min-w-0 truncate font-display text-base">{title}</h2>
         {actions !== undefined && (
           <div className="flex shrink-0 items-center justify-end gap-2">{actions}</div>
         )}
