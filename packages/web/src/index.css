@@ -178,6 +178,14 @@ h1, h2, h3, h4, h5, h6 {
   background: color-mix(in oklch, var(--color-classical-ground) 94%, white);
 }
 
+.classical-nav-item::before {
+  content: attr(data-nav-index);
+  margin-right: 0.75rem;
+  color: var(--color-classical-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+
 [data-page-header] {
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--color-classical-divider);
@@ -249,6 +257,70 @@ h1, h2, h3, h4, h5, h6 {
 .dsg-input {
   color: inherit;
   font-family: inherit;
+}
+
+/* Classical surfaces: paper stays quiet, ink and rules carry hierarchy. */
+[data-classical-shell] .rounded-lg.border,
+[data-classical-shell] [data-slot='card'] {
+  border-color: var(--color-classical-divider);
+  background: color-mix(in oklch, var(--color-classical-surface) 78%, transparent);
+  box-shadow: var(--shadow-classical-hairline);
+}
+
+[data-classical-shell] [data-slot='card-title'] {
+  font-family: var(--font-classical-heading);
+  font-size: 1.2rem;
+  font-weight: 400;
+}
+
+[data-classical-shell] button:not([aria-label='关闭']) {
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+[data-classical-shell] button[data-variant='outline'],
+[data-classical-shell] .border-input {
+  border-color: color-mix(in oklch, var(--color-classical-accent) 58%, transparent);
+  background: transparent;
+}
+
+[data-classical-shell] button[data-variant='outline']:hover,
+[data-classical-shell] button[data-variant='ghost']:hover {
+  background: color-mix(in oklch, var(--color-classical-accent) 9%, transparent);
+  color: var(--color-classical-accent);
+}
+
+[data-classical-shell] table {
+  border-collapse: collapse;
+}
+
+[data-classical-shell] th {
+  font-family: var(--font-classical-body);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-classical-muted);
+  border-bottom-color: var(--color-classical-divider);
+}
+
+[data-classical-shell] td {
+  border-bottom-color: var(--color-classical-divider);
+}
+
+[data-classical-shell] [role='alert'] {
+  border-color: color-mix(in oklch, var(--color-classical-accent) 48%, transparent);
+  background: transparent;
+  color: var(--color-classical-ink);
+}
+
+[data-classical-shell] [data-slot='empty'] {
+  border: 1px dashed var(--color-classical-divider);
+  background: transparent;
+  padding: 2.5rem;
+}
+
+[data-classical-shell] img {
+  filter: sepia(0.12) saturate(0.88) contrast(1.02);
 }
 
 /*

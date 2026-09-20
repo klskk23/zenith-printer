@@ -36,19 +36,15 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
                 variant="ghost"
                 size="row"
                 onClick={() => open(kind === 'design' ? { kind, templateId: null } : { kind })}
+                data-nav-index={String(index + 1).padStart(2, '0')}
                 className={cn(
-                  'justify-between border-l border-transparent pl-3',
+                  'justify-between border-l border-transparent pl-3 classical-nav-item',
                   isActive
                     ? 'border-l-primary bg-transparent font-medium text-foreground'
                     : 'text-muted-foreground hover:border-l-border hover:bg-transparent',
                 )}
               >
-                <span className="flex items-baseline gap-3">
-                  <span className="font-mono text-2xs text-muted-foreground" aria-hidden>
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <span>{copy.workspace.tabs[kind]}</span>
-                </span>
+                <span>{copy.workspace.tabs[kind]}</span>
                 {kind === 'queue' && pendingJobCount > 0 && (
                   <Badge variant="secondary">{pendingJobCount}</Badge>
                 )}
