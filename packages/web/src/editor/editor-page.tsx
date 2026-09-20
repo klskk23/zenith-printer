@@ -650,6 +650,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
     // like it was outlining the screen.
     <div
       className="flex h-full flex-col focus:outline-none"
+      data-classical-editor
       onKeyDown={onKeyDown}
       tabIndex={-1}
     >
