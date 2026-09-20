@@ -29,7 +29,7 @@ export function PageHeader({
   className,
 }: PageHeaderProps): React.JSX.Element {
   return (
-    <div className={cn('flex flex-col gap-1', className)} data-page-header>
+    <div className={cn('flex flex-col gap-1', className)} data-page-header data-classical-page-header>
       <div className="flex min-h-8 items-center justify-between gap-3">
         {/* The title gives way, not the controls: a search box that has been
             squeezed to nothing is unusable, whereas a long page title reads

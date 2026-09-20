@@ -26,9 +26,9 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
   const entries: TabKind[] = TAB_KINDS.filter((kind) => kind !== 'data-source')
 
   return (
-    <nav className="w-40 shrink-0 border-r border-border p-2">
-      <ul className="flex flex-col gap-0.5">
-        {entries.map((kind) => {
+    <nav className="w-52 shrink-0 border-r border-border px-4 py-5" data-classical-sidebar>
+      <ol className="flex flex-col gap-1">
+        {entries.map((kind, index) => {
           const isActive = activeTab?.kind === kind
           return (
             <li key={kind}>
@@ -37,13 +37,18 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
                 size="row"
                 onClick={() => open(kind === 'design' ? { kind, templateId: null } : { kind })}
                 className={cn(
-                  // `justify-between` rather than the size's `justify-start`:
-                  // the queue count sits at the far end of the row.
-                  'justify-between',
-                  isActive ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted/60',
+                  'justify-between border-l border-transparent pl-3',
+                  isActive
+                    ? 'border-l-primary bg-transparent font-medium text-foreground'
+                    : 'text-muted-foreground hover:border-l-border hover:bg-transparent',
                 )}
               >
-                <span>{copy.workspace.tabs[kind]}</span>
+                <span className="flex items-baseline gap-3">
+                  <span className="font-mono text-2xs text-muted-foreground" aria-hidden>
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span>{copy.workspace.tabs[kind]}</span>
+                </span>
                 {kind === 'queue' && pendingJobCount > 0 && (
                   <Badge variant="secondary">{pendingJobCount}</Badge>
                 )}
@@ -51,7 +56,7 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
             </li>
           )
         })}
-      </ul>
+      </ol>
     </nav>
   )
 }
