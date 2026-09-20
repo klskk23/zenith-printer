@@ -167,7 +167,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 [data-classical-content] {
-  background: color-mix(in oklch, var(--color-classical-ground) 88%, white);
+  background: color-mix(in oklch, var(--color-classical-ground) 88%, var(--color-card));
 }
 
 [data-classical-masthead], [data-classical-tab-bar], [data-classical-sidebar], [data-page-header] {
@@ -175,7 +175,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 [data-classical-sidebar] {
-  background: color-mix(in oklch, var(--color-classical-ground) 94%, white);
+  background: color-mix(in oklch, var(--color-classical-ground) 94%, var(--color-card));
 }
 
 .classical-nav-item::before {
