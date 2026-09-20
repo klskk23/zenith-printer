@@ -40,6 +40,7 @@ Thumbs.db
 .idea/
 data/
 packages/web/public/fonts/
+.worktrees/
 
 # Google service-account keys. A committed key reads every sheet shared with it,
 # and a git history is forever — so the pattern is broad on purpose.
