@@ -70,6 +70,12 @@ export const copy: Copy = {
       next: 'Save before leaving, or the changes are lost',
     },
     anotherWindow: 'Another window on this computer changed it; this is what that window last wrote.',
+    staleTitle: 'The server has a newer version',
+    staleBody: 'Someone saved this label after your draft was started. Keep the draft: saving will be refused, and you can then save it as a new label. Discard it: use the server\'s version, and this draft is deleted.',
+    keepDraft: 'Keep the draft',
+    discardDraft: 'Discard the draft, use the server\'s version',
+    orphanTitle: 'The original label was deleted',
+    orphanBody: 'The label this draft belongs to is no longer on the server. Keep editing and save it as a new label, or discard the draft.',
   },
 
   labels: {
@@ -84,6 +90,11 @@ export const copy: Copy = {
     corrupt: 'This draft cannot be read',
     discardDraft: 'Discard this draft',
     searchPlaceholder: 'Search label names',
+    clearDrafts: 'Clear unsaved drafts',
+    clearDraftsTitle: 'Clear these drafts?',
+    clearDraftsBody: (n: number): string =>
+      `These ${n} drafts are deleted from this browser and cannot be recovered. Saved labels are unaffected and return to the server's version.`,
+    clearDraftsConfirm: 'Clear',
   },
 
   status: {
@@ -300,6 +311,8 @@ export const copy: Copy = {
     batchTooLarge: (labels: number, max: number): string =>
       `This batch is ${labels} labels, above the per-job limit of ${max}. Reduce the rows or copies and submit in several batches`,
     needsProbe: 'This printer has not been probed, so its printable area is unknown',
+    headFigure: (labelMm: number, maxMm: number): string => `Label ${labelMm} mm wide; the head prints up to ${maxMm} mm`,
+    headOverflow: (overMm: number): string => `${overMm} mm over; that part will not print`,
   },
 
   dataSources: {
@@ -534,6 +547,8 @@ export const copy: Copy = {
     emptyDetail: 'Draw one in the editor; saving it puts it here',
     save: 'Save',
     saveAs: 'Save as new',
+    saveAsNew: 'Save as a new label',
+    saveDialogTitle: 'Save this label',
     update: 'Save',
     load: 'Load',
     remove: 'Delete',

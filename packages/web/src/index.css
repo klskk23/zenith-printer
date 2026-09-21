@@ -176,6 +176,9 @@ h1, h2, h3, h4, h5, h6 {
  * drop into the dark below.
  */
 .paper {
+  /* Exposed as a property so an SVG shape can be paper too: presentation
+     attributes cannot read a class's background, but `fill: var(--paper)` can. */
+  --paper: #ffffff;
   background: #ffffff;
   color: #14151c;
   border-radius: 3px;

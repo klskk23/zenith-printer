@@ -26,8 +26,7 @@ const usable = isLocalStorageUsable()
 /** Whether drafts on this browser survive a reload. */
 export const persistence: Persistence = usable ? 'local' : 'memory'
 
-export const draftStore: DraftStore = createDraftStore(
-  usable ? localDraftStorage() : memoryDraftStorage(),
-  () => new Date().toISOString(),
-  windowId(),
-)
+/** The storage behind the singleton, so a test can write as another window. */
+export const draftStorage = usable ? localDraftStorage() : memoryDraftStorage()
+
+export const draftStore: DraftStore = createDraftStore(draftStorage, () => new Date().toISOString(), windowId())

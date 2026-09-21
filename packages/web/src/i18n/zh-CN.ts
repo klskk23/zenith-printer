@@ -76,6 +76,12 @@ export const copy = {
       next: '离开前请先保存，否则修改会丢失',
     },
     anotherWindow: '这台机器上另一个窗口改过它，现在显示的是那边最后写下的样子。',
+    staleTitle: '服务器上的版本更新了',
+    staleBody: '这张标签在你这份草稿之后又被别人保存过。继续用草稿：改完保存时会被拒绝，届时可以另存为新标签；放弃草稿：改用服务器上的版本，这份草稿会被删除。',
+    keepDraft: '继续用草稿',
+    discardDraft: '放弃草稿，用服务器版本',
+    orphanTitle: '原标签已被删除',
+    orphanBody: '这份草稿所属的标签已经不在服务器上。可以继续编辑并另存为新标签，或者丢弃这份草稿。',
   },
 
   labels: {
@@ -90,6 +96,11 @@ export const copy = {
     corrupt: '这份草稿无法读取',
     discardDraft: '丢弃这份草稿',
     searchPlaceholder: '搜索标签名称',
+    clearDrafts: '清理未保存的草稿',
+    clearDraftsTitle: '清理这些草稿？',
+    clearDraftsBody: (n: number): string =>
+      `下面 ${n} 份草稿会从这台浏览器上删除，无法恢复。已保存的标签本身不受影响，会回到服务器上的版本。`,
+    clearDraftsConfirm: '清理',
   },
 
   status: {
@@ -313,6 +324,8 @@ export const copy = {
     batchTooLarge: (labels: number, max: number): string =>
       `这一批共 ${labels} 张，超过单个任务的上限 ${max} 张。请减少所选行或份数，分几次提交`,
     needsProbe: '这台打印机尚未探测，无法确定可打印范围',
+    headFigure: (labelMm: number, maxMm: number): string => `标签宽 ${labelMm} mm，打印头最宽 ${maxMm} mm`,
+    headOverflow: (overMm: number): string => `超出 ${overMm} mm，这部分不会被打印`,
   },
 
   dataSources: {
@@ -542,6 +555,8 @@ export const copy = {
     emptyDetail: '点「新建标签」画一张，保存后会出现在这里',
     save: '保存',
     saveAs: '另存为',
+    saveAsNew: '另存为新标签',
+    saveDialogTitle: '保存这张标签',
     update: '保存',
     load: '载入',
     remove: '删除',

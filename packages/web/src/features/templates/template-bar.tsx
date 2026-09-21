@@ -83,7 +83,7 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
       <Dialog open={naming !== null} onOpenChange={(open) => !open && setNaming(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{copy.templates.save}</DialogTitle>
+            <DialogTitle>{copy.templates.saveDialogTitle}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-1">
             <Label>{copy.templates.name}</Label>
@@ -128,6 +128,13 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
           <p className="font-medium">{save.error.body.what}</p>
           <p className="mt-1 opacity-90">{save.error.body.why}</p>
           <p className="mt-1 font-medium">{save.error.body.next}</p>
+          {conflict && current !== null && (
+            // The way out that keeps the work: a new label with this content.
+            // Reloading is the other way, and it is the one that loses it.
+            <Button size="sm" variant="outline" className="mt-2 mr-2" onClick={() => setNaming(current.name)}>
+              {copy.templates.saveAsNew}
+            </Button>
+          )}
           {conflict && current !== null && (
             <Button
               size="sm"

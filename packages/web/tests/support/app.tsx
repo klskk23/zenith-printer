@@ -26,9 +26,22 @@ export const jsonResponse = (body: unknown, status = 200): Promise<Response> =>
     text: () => Promise.resolve(JSON.stringify(body)),
   } as unknown as Response)
 
+/** An error the server would send: the four-field body, at a status. */
+export function apiError(status: number, body: { code: string; what: string; why?: string; next?: string }): ApiFailure {
+  return { __apiStatus: status, body: { why: '', next: '', ...body } }
+}
+
+interface ApiFailure {
+  __apiStatus: number
+  body: unknown
+}
+
+const isFailure = (value: unknown): value is ApiFailure =>
+  typeof value === 'object' && value !== null && '__apiStatus' in value
+
 /**
  * A fetch that answers from a table of routes and `{}` for everything else.
- * A route returns `undefined` to fall through.
+ * A route returns `undefined` to fall through, or `apiError(...)` to refuse.
  */
 export function stubApi(routes: (url: string, init?: RequestInit) => unknown): void {
   vi.stubGlobal(
@@ -36,6 +49,9 @@ export function stubApi(routes: (url: string, init?: RequestInit) => unknown): v
     vi.fn((input: string | URL, init?: RequestInit) => {
       const url = String(input)
       const body = routes(url, init)
+      if (isFailure(body)) {
+        return jsonResponse(body.body, body.__apiStatus)
+      }
       return jsonResponse(body === undefined ? {} : body)
     }),
   )

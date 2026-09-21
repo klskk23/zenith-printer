@@ -34,6 +34,17 @@ import { useTemplates, type Template } from '../features/templates/hooks.ts'
 import { usePrintPresets } from '../features/print-presets/hooks.ts'
 import { useWorkspace } from '../app/workspace.tsx'
 import { useDraft } from '../features/drafts/use-draft.tsx'
+import { changedByAnotherWindow, isBaselineStale, windowId } from '../features/drafts/index.ts'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog.tsx'
 import type { Profile } from '../features/profiles/hooks.ts'
 import { CanvasViewport } from './canvas-viewport.tsx'
 import { LayersPanel } from './layers-panel.tsx'
@@ -108,6 +119,16 @@ export function EditorPage({ templateId, draftId, presetId }: EditorPageProps): 
   const draft = useDraft(draftKey)
   /** Whether this mount picked up where a draft left off, history and all. */
   const restoredFromDraft = useRef(draft.initial !== null)
+  /**
+   * The server has moved past the draft's baseline: asked once, before the
+   * editor is used (FR-027). `null` until the template arrives and the
+   * comparison can be made; then the person's answer.
+   */
+  const [staleAnswer, setStaleAnswer] = useState<'pending' | 'keep' | 'discard' | null>(null)
+  /** The draft found here was last written by another window (FR-029). */
+  const fromAnotherWindow = useRef(
+    draft.initial !== null && changedByAnotherWindow(draft.initial, windowId(), null),
+  )
   // A blank label starts at whatever this browser was told to prefer (FR-071)
   // — unless a draft was left here, in which case it starts where that
   // stopped, undo stack included.
@@ -532,10 +553,30 @@ export function EditorPage({ templateId, draftId, presetId }: EditorPageProps): 
       // wanted only for its name and version (which the save and the
       // conflict warning compare against).
       setTemplate(found)
+      if (draft.initial !== null && isBaselineStale(draft.initial, found.version) && staleAnswer === null) {
+        setStaleAnswer('pending')
+      }
       return
     }
     loadTemplate(found)
   }, [templateId, allTemplates.data])
+
+  /** The label this draft belongs to is gone from the server (FR-030). */
+  const orphaned =
+    templateId !== null &&
+    restoredFromDraft.current &&
+    allTemplates.isSuccess &&
+    allTemplates.data.every((t) => t.id !== templateId)
+
+  const discardStaleDraft = (): void => {
+    const found = allTemplates.data?.find((t) => t.id === templateId)
+    draft.discard()
+    restoredFromDraft.current = false
+    if (found !== undefined) {
+      loadTemplate(found)
+    }
+    setStaleAnswer('discard')
+  }
 
   /**
    * Report unsaved work to the workspace.
@@ -709,6 +750,33 @@ export function EditorPage({ templateId, draftId, presetId }: EditorPageProps): 
         the one thing here that can cost an afternoon. Three parts, as every
         error in this product has — what, why, what to do.
       */}
+      <AlertDialog open={staleAnswer === 'pending'}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{copy.drafts.staleTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{copy.drafts.staleBody}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setStaleAnswer('keep')}>{copy.drafts.keepDraft}</AlertDialogCancel>
+            <AlertDialogAction onClick={discardStaleDraft}>{copy.drafts.discardDraft}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {fromAnotherWindow.current && (
+        <Alert variant="info" className="text-xs" data-another-window>
+          {copy.drafts.anotherWindow}
+        </Alert>
+      )}
+
+      {orphaned && (
+        <Alert variant="warning" className="text-xs" data-orphan-notice>
+          <span className="font-medium">{copy.drafts.orphanTitle}</span>
+          {' — '}
+          {copy.drafts.orphanBody}
+        </Alert>
+      )}
+
       {draftAtRisk && (
         <Alert variant="warning" className="text-xs" data-draft-notice>
           <span className="font-medium">

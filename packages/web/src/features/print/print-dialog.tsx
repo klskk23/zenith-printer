@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog.tsx'
 import { OverflowNotice, type OverflowWarning } from './overflow-notice.tsx'
+import { HeadFigureView } from './head-figure.tsx'
 import { Preview } from './preview.tsx'
 import { RowSelectionPanel } from './row-selection.tsx'
 import { RefreshButton } from '../data-sources/refresh-button.tsx'
@@ -271,6 +272,10 @@ export function PrintDialog({
         {result === null ? (
           <>
             <Alert variant="warning">{copy.print.warning}</Alert>
+
+            {/* Where this label falls on the head — drawn only once the head
+                is known. The unprobed case is already said by `blocked`. */}
+            <HeadFigureView labelWidthMm={ir.widthMm} capabilities={printer.capabilities} />
 
             {/* Listed, never enforced: the print button stays enabled. */}
             <OverflowNotice warnings={warnings} />

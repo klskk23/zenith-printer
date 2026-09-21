@@ -155,15 +155,15 @@
 
 ### Tests（先写，确认红）
 
-- [ ] T063 [P] [US4] 新建 `web/tests/conflict.dom.test.tsx`：(a) store 里草稿 `baseVersion: 1`，fetch 返回 `version: 2` → 进入编辑器前出现 `copy.drafts.staleTitle` 的 `AlertDialog`，含「继续用草稿」与「放弃草稿」；选前者 → 画布为草稿内容；选后者 → 画布为服务器内容且 `store.read` 为 `null`；(b) 保存返回 409 → 出现「另存为新标签」按钮；点击 → 名称输入 → `POST /api/templates` 被调用且 body 为草稿内容，随后 `store.read(旧 id)` 为 `null`；(c) fetch 返回 404 → 画廊该格标 `copy.labels.orphan`，编辑器仍可打开并提供另存
-- [ ] T064 [P] [US4] 扩展 `web/tests/editor-draft.dom.test.tsx`：store 中草稿 `writerId` 为他窗口且 `updatedAt` 晚于本窗口上次写入 → 挂载后出现 `copy.drafts.anotherWindow`；本窗口自己写的 → 不出现
+- [X] T063 [P] [US4] 新建 `web/tests/conflict.dom.test.tsx`：(a) store 里草稿 `baseVersion: 1`，fetch 返回 `version: 2` → 进入编辑器前出现 `copy.drafts.staleTitle` 的 `AlertDialog`，含「继续用草稿」与「放弃草稿」；选前者 → 画布为草稿内容；选后者 → 画布为服务器内容且 `store.read` 为 `null`；(b) 保存返回 409 → 出现「另存为新标签」按钮；点击 → 名称输入 → `POST /api/templates` 被调用且 body 为草稿内容，随后 `store.read(旧 id)` 为 `null`；(c) fetch 返回 404 → 画廊该格标 `copy.labels.orphan`，编辑器仍可打开并提供另存
+- [X] T064 [P] [US4] 扩展 `web/tests/editor-draft.dom.test.tsx`：store 中草稿 `writerId` 为他窗口且 `updatedAt` 晚于本窗口上次写入 → 挂载后出现 `copy.drafts.anotherWindow`；本窗口自己写的 → 不出现
 
 ### Implementation
 
-- [ ] T065 [P] [US4] i18n：`drafts.staleTitle/staleBody/keepDraft/discardDraft`（三要素）、`templates.saveAsNew`（「另存为新标签」）、`templates.saveAsNewName`；`templates.conflict` 改写为指向另存入口
-- [ ] T066 [US4] `web/src/editor/editor-page.tsx`：加载时 `isBaselineStale(draft, template.version)` → 渲染 `StaleDraftDialog`（`AlertDialog`）；`changedByAnotherWindow` → `Alert`；孤儿（模板 404 且有草稿）→ 以草稿打开并标注
-- [ ] T067 [US4] `web/src/features/templates/template-bar.tsx`：`conflict` 为真时显示「另存为新标签」→ 名称 `Dialog` → 走 `asNew` 分支；成功后 `onSaved` + `discard()`
-- [ ] T068 [US4] 跑 T063–T064 转绿
+- [X] T065 [P] [US4] i18n：`drafts.staleTitle/staleBody/keepDraft/discardDraft`（三要素）、`templates.saveAsNew`（「另存为新标签」）、`templates.saveAsNewName`；`templates.conflict` 改写为指向另存入口
+- [X] T066 [US4] `web/src/editor/editor-page.tsx`：加载时 `isBaselineStale(draft, template.version)` → 渲染 `StaleDraftDialog`（`AlertDialog`）；`changedByAnotherWindow` → `Alert`；孤儿（模板 404 且有草稿）→ 以草稿打开并标注
+- [X] T067 [US4] `web/src/features/templates/template-bar.tsx`：`conflict` 为真时显示「另存为新标签」→ 名称 `Dialog` → 走 `asNew` 分支；成功后 `onSaved` + `discard()`
+- [X] T068 [US4] 跑 T063–T064 转绿
 
 **Checkpoint**: quickstart 第 3 步 6、7 条通过。
 
@@ -173,15 +173,15 @@
 
 ### Tests（先写，确认红）
 
-- [ ] T069 [P] [US5] 新建 `web/tests/head-figure.test.ts`：`headFigure({labelWidthMm: 50, maxWidthMm: 57})` → `{labelFraction ≈ .877, overflowFraction: 0}`；`100/57` → `{1, ≈ .43}`；`maxWidthMm ≤ 0` → `null`；`maxWidthFromCapabilities(null)` → `null`，`({printheadPixels: 384, dpi: 203})` → `≈ 48.05`
-- [ ] T070 [P] [US5] 新建 `web/tests/print-head-figure.dom.test.tsx`：打印框在已探测打印机上渲染 `[data-head-figure]` 且其 `aria-label` 含 `50` 与 `57`；溢出时含 `[data-overflow]`；未探测打印机不渲染 `[data-head-figure]` 而显示 `copy.print.needsProbe`；`OverflowNotice` 行为不变（既有测试仍绿）
+- [X] T069 [P] [US5] 新建 `web/tests/head-figure.test.ts`：`headFigure({labelWidthMm: 50, maxWidthMm: 57})` → `{labelFraction ≈ .877, overflowFraction: 0}`；`100/57` → `{1, ≈ .43}`；`maxWidthMm ≤ 0` → `null`；`maxWidthFromCapabilities(null)` → `null`，`({printheadPixels: 384, dpi: 203})` → `≈ 48.05`
+- [X] T070 [P] [US5] 新建 `web/tests/print-head-figure.dom.test.tsx`：打印框在已探测打印机上渲染 `[data-head-figure]` 且其 `aria-label` 含 `50` 与 `57`；溢出时含 `[data-overflow]`；未探测打印机不渲染 `[data-head-figure]` 而显示 `copy.print.needsProbe`；`OverflowNotice` 行为不变（既有测试仍绿）
 
 ### Implementation
 
-- [ ] T071 [P] [US5] `web/src/features/print/head-figure.ts`：`maxWidthFromCapabilities`（`dotsToMm`）、`headFigure`
-- [ ] T072 [P] [US5] `web/src/features/print/head-figure.tsx`：内联 SVG，横条 `stroke=var(--color-primary)`，标签段 `.paper` 色块，溢出段 `var(--color-destructive)`；i18n `print.headFigure(labelMm, maxMm)` 作 `aria-label`
-- [ ] T073 [US5] `web/src/features/print/print-dialog.tsx`：在打印机选择下方嵌入 `HeadFigure`；`capabilities === null` 时不渲染
-- [ ] T074 [US5] 跑 T069–T070 转绿
+- [X] T071 [P] [US5] `web/src/features/print/head-figure.ts`：`maxWidthFromCapabilities`（`dotsToMm`）、`headFigure`
+- [X] T072 [P] [US5] `web/src/features/print/head-figure.tsx`：内联 SVG，横条 `stroke=var(--color-primary)`，标签段 `.paper` 色块，溢出段 `var(--color-destructive)`；i18n `print.headFigure(labelMm, maxMm)` 作 `aria-label`
+- [X] T073 [US5] `web/src/features/print/print-dialog.tsx`：在打印机选择下方嵌入 `HeadFigure`；`capabilities === null` 时不渲染
+- [X] T074 [US5] 跑 T069–T070 转绿
 
 **Checkpoint**: quickstart 第 3 步第 8 条通过。
 
@@ -191,14 +191,14 @@
 
 ### Tests（先写，确认红）
 
-- [ ] T075 [P] [US6] 扩展 `web/tests/gallery.dom.test.tsx`：store 有 3 份未命名 + 2 份已保存标签的草稿 → 「清理未保存的草稿」可用，点击 → `AlertDialog` 列出 5 项名称 → 确认 → `store.list().entries` 为空、画廊无 `[data-unsaved]`、两张已保存标签仍在；取消 → 不变；store 为空 → 按钮 `disabled`
+- [X] T075 [P] [US6] 扩展 `web/tests/gallery.dom.test.tsx`：store 有 3 份未命名 + 2 份已保存标签的草稿 → 「清理未保存的草稿」可用，点击 → `AlertDialog` 列出 5 项名称 → 确认 → `store.list().entries` 为空、画廊无 `[data-unsaved]`、两张已保存标签仍在；取消 → 不变；store 为空 → 按钮 `disabled`
 
 ### Implementation
 
-- [ ] T076 [P] [US6] i18n：`labels.clearDrafts`、`clearDraftsTitle`、`clearDraftsBody(n)`（含不可撤销说明）、`clearDraftsConfirm`
-- [ ] T077 [US6] `web/src/features/drafts/clear-drafts-dialog.tsx`：`AlertDialog` 列清单，确认 → `store.clear()` + 使画廊查询失效
-- [ ] T078 [US6] `web/src/pages/labels-page.tsx`：`PageHeader` 动作区加入按钮（无草稿时 `disabled`）
-- [ ] T079 [US6] 跑 T075 转绿
+- [X] T076 [P] [US6] i18n：`labels.clearDrafts`、`clearDraftsTitle`、`clearDraftsBody(n)`（含不可撤销说明）、`clearDraftsConfirm`
+- [X] T077 [US6] `web/src/features/drafts/clear-drafts-dialog.tsx`：`AlertDialog` 列清单，确认 → `store.clear()` + 使画廊查询失效
+- [X] T078 [US6] `web/src/pages/labels-page.tsx`：`PageHeader` 动作区加入按钮（无草稿时 `disabled`）
+- [X] T079 [US6] 跑 T075 转绿
 
 **Checkpoint**: quickstart 第 3 步第 10 条通过。
 

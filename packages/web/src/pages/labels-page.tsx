@@ -10,7 +10,7 @@
  * Deliberately never counts. A number in the heading turns a shelf of labels
  * into a metric, and nobody here is trying to have more of them.
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useReducer, useState } from 'react'
 import { LayoutTemplate } from 'lucide-react'
 import { collectReferences } from '@zenith/shared'
 import { copy } from '../i18n/index.ts'
@@ -35,18 +35,32 @@ import { thumbnailBoxPx } from '../features/templates/thumbnail-box.ts'
 import { thumbnailValues } from '../features/templates/thumbnail-values.ts'
 import { ThumbnailSvg } from '../features/templates/thumbnail-svg.tsx'
 import { useDrafts } from '../features/drafts/use-draft.tsx'
+import { isCorrupt } from '../features/drafts/schema.ts'
+import { ClearDraftsButton } from '../features/drafts/clear-drafts-dialog.tsx'
 
 /** The budget a tile's paper is fitted into. */
 const TILE = { maxWidthPx: 240, maxHeightPx: 140 }
 
 function Paper({ item }: { item: GalleryItem }): React.JSX.Element {
-  const ir = tileIr(item)
-  const dataSourceId = item.template?.dataSourceId ?? null
+  const { store } = useDrafts()
+  // A draft's picture is the draft, not the saved label: the tile shows what
+  // opening it finds. Read here rather than carried in the index, which holds
+  // only what the list needs.
+  const draft = useMemo(() => {
+    if (item.kind === 'saved' || item.kind === 'corrupt-draft') {
+      return null
+    }
+    const found = store.read(item.key)
+    return found === null || isCorrupt(found) ? null : found
+  }, [store, item.key, item.kind])
+  const ir = draft?.present ?? tileIr(item)
+  const variables = draft?.variables ?? item.template?.variables ?? []
+  const dataSourceId = draft === null ? (item.template?.dataSourceId ?? null) : draft.dataSourceId
   const firstRow = useFirstRow(dataSourceId)
   const box = thumbnailBoxPx(item, TILE)
   const values = useMemo(
-    () => (ir === null ? {} : thumbnailValues(item.template!.variables, firstRow, collectReferences(ir))),
-    [ir, item.template, firstRow],
+    () => (ir === null ? {} : thumbnailValues(variables, firstRow, collectReferences(ir))),
+    [ir, variables, firstRow],
   )
   return (
     <div
@@ -59,7 +73,7 @@ function Paper({ item }: { item: GalleryItem }): React.JSX.Element {
   )
 }
 
-function Tile({ item }: { item: GalleryItem }): React.JSX.Element {
+function Tile({ item, onDraftsChanged }: { item: GalleryItem; onDraftsChanged: () => void }): React.JSX.Element {
   const { open } = useWorkspace()
   const rename = useRenameTemplate()
   const remove = useDeleteTemplate()
@@ -167,6 +181,7 @@ function Tile({ item }: { item: GalleryItem }): React.JSX.Element {
             onConfirm={() => {
               remove.mutate(item.templateId!)
               store.remove(item.key)
+              onDraftsChanged()
             }}
           >
             {copy.templates.remove}
@@ -175,7 +190,14 @@ function Tile({ item }: { item: GalleryItem }): React.JSX.Element {
       )}
       {(item.kind === 'corrupt-draft' || item.kind === 'orphan-draft') && (
         <div className="flex flex-wrap gap-1">
-          <Button size="sm" variant="ghost" onClick={() => store.remove(item.key)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              store.remove(item.key)
+              onDraftsChanged()
+            }}
+          >
             {copy.labels.discardDraft}
           </Button>
         </div>
@@ -191,15 +213,24 @@ export function LabelsPage(): React.JSX.Element {
   const jobs = useJobs(null)
   const { store } = useDrafts()
   const [query, setQuery] = useState('')
-  // Read on every render: the store is synchronous and the list is small,
-  // and a cached copy is exactly how a cleared draft would keep its tile.
-  const drafts = store.list()
+  // The store is synchronous and outside React; a change to it is announced
+  // by bumping this, which is what makes the list below read it again.
+  const [draftsVersion, refreshDrafts] = useReducer((n: number) => n + 1, 0)
+  const drafts = useMemo(() => store.list(), [store, draftsVersion])
 
   const summary = useMemo(() => summarize(printers.data, jobs.data), [printers.data, jobs.data])
   const items = useMemo(
     () => galleryItems(templates.data ?? [], drafts.entries, drafts.corrupt),
     [templates.data, drafts.entries, drafts.corrupt],
   )
+  const toClear = items
+    .filter((item) => item.kind !== 'saved')
+    .map((item) => ({
+      key: item.key,
+      name: item.name ?? copy.labels.untitled,
+      detail: item.kind === 'corrupt-draft' ? copy.labels.corrupt : `${item.widthMm} × ${item.heightMm} mm`,
+      corrupt: item.kind === 'corrupt-draft',
+    }))
   const visible = items.filter(
     (item) => query === '' || (item.name ?? copy.labels.untitled).toLowerCase().includes(query.toLowerCase()),
   )
@@ -225,6 +256,7 @@ export function LabelsPage(): React.JSX.Element {
               {copy.templates.exportAll}
             </Button>
             <ImportTemplatesButton />
+            <ClearDraftsButton items={toClear} onCleared={refreshDrafts} />
             <Button size="sm" onClick={() => open({ kind: 'label', templateId: null })}>
               {copy.labels.new}
             </Button>
@@ -258,7 +290,7 @@ export function LabelsPage(): React.JSX.Element {
       {/* As many tiles as fit, never narrower than the paper budget. */}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-n6 gap-y-n8">
         {visible.map((item) => (
-          <Tile key={item.key} item={item} />
+          <Tile key={item.key} item={item} onDraftsChanged={refreshDrafts} />
         ))}
       </div>
     </div>

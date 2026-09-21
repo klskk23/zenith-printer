@@ -15,7 +15,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
 import { copy } from '../src/i18n/index.ts'
-import { draftStore } from '../src/features/drafts/index.ts'
+import { draftStore, draftStorage } from '../src/features/drafts/index.ts'
 import { DraftsProvider } from '../src/features/drafts/use-draft.tsx'
 import { createDraftStore } from '../src/features/drafts/store.ts'
 import { failingStorage } from './drafts/support.ts'
@@ -160,5 +160,30 @@ describe('when the draft cannot be kept', () => {
     addText()
     await settle()
     expect(screen.queryByText(copy.drafts.unpersisted.what)).toBeNull()
+  })
+})
+
+describe('another window on this machine', () => {
+  it('is announced when it wrote the draft after this one last did', async () => {
+    // Written as some other window would: same storage, a different writer id.
+    createDraftStore(draftStorage, () => new Date(Date.now() + 1000).toISOString(), 'some-other-window').write({
+      draftId: 'tpl-1', templateId: 'tpl-1', baseVersion: 1, present: { ...TEMPLATE, elements: TEMPLATE.elements } as never,
+      past: [], variables: [], dataSourceId: null, name: null,
+    })
+    render(wrap(<App />))
+    await openTemplate()
+    expect(await screen.findByText(copy.drafts.anotherWindow)).toBeDefined()
+  })
+
+  it('is not announced for a draft this window wrote', async () => {
+    render(wrap(<App />))
+    await openTemplate()
+    addText()
+    await settle()
+    cleanup()
+    window.history.replaceState(null, '', '/')
+    render(wrap(<App />))
+    await openTemplate()
+    expect(screen.queryByText(copy.drafts.anotherWindow)).toBeNull()
   })
 })

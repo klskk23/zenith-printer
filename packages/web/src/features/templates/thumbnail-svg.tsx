@@ -27,7 +27,14 @@ export function thumbnailSvg(ir: LabelIR, values: Readonly<Record<string, string
   try {
     return irToSvg(evaluateIr(ir, values).ir)
   } catch {
-    return irToSvg(ir)
+    try {
+      return irToSvg(ir)
+    } catch {
+      // A label mid-edit can hold an element the renderer refuses — a QR
+      // code with nothing in it yet. The tile is still a sheet of paper; it
+      // just has nothing drawn on it. It must never take the gallery down.
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ir.widthMm} ${ir.heightMm}"></svg>`
+    }
   }
 }
 
