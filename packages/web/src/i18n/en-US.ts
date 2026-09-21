@@ -76,6 +76,7 @@ export const copy: Copy = {
     pending: (n: number): string => `${n} pending`,
     lastPrint: 'Last: ',
     noPrinters: 'No printers added yet',
+    printersCount: (n: number): string => (n === 1 ? '1 printer' : `${n} printers`),
     noPrints: 'Nothing printed yet',
   },
 

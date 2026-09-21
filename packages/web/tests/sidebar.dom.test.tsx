@@ -7,7 +7,7 @@
  * the model that cannot report its stock told about rather than left blank.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { copy } from '../src/i18n/index.ts'
 import { renderApp, stubApi } from './support/app.tsx'
 
@@ -55,22 +55,31 @@ describe('the sidebar', () => {
     expect(document.querySelector('nav')!.textContent).not.toContain(copy.workspace.pages['api-docs'])
   })
 
-  it('lists the printers at its foot, with what the service knows about each', async () => {
+  it('folds the printers into one line at its foot, which opens on a click', async () => {
     renderApp('/')
-    const foot = document.querySelector('[data-sidebar-printers]')!
-    await waitFor(() => expect(foot.textContent).toContain('前台机'))
-    expect(foot.textContent).toContain(copy.status.remainingSupported)
-    expect(foot.textContent).toContain(copy.status.remainingUnsupported)
-    expect(foot.textContent).toContain(copy.status.notProbed)
+    const foot = document.querySelector('[data-sidebar-printers]') as HTMLButtonElement
+    await waitFor(() => expect(foot.textContent).toContain(copy.status.printersCount(3)))
+    // Nothing about any one printer is on the page until asked.
+    expect(document.body.textContent).not.toContain('前台机')
+
+    fireEvent.click(foot)
+    const panel = await screen.findByText('前台机')
+    const lines = panel.closest('[data-sidebar-printers-panel]')!
+    expect(lines.textContent).toContain(copy.status.remainingSupported)
+    expect(lines.textContent).toContain(copy.status.remainingUnsupported)
+    expect(lines.textContent).toContain(copy.status.notProbed)
   })
 
-  it('says when there are no printers', async () => {
+  it('says when there are no printers, on the line and in the panel', async () => {
     stubApi((url) => {
       if (url.includes('/printers')) return { printers: [] }
       if (url.includes('/print-jobs')) return { jobs: [] }
       return url.endsWith('/templates') ? { templates: [] } : undefined
     })
     renderApp('/')
+    const foot = document.querySelector('[data-sidebar-printers]') as HTMLButtonElement
+    await waitFor(() => expect(foot.textContent).toContain(copy.status.printersCount(0)))
+    fireEvent.click(foot)
     expect(await screen.findByText(copy.status.noPrinters)).toBeDefined()
   })
 

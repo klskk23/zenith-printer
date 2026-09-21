@@ -204,10 +204,10 @@ describe('the back button', () => {
     land('/design/tpl-7?preset=pre-1')
     await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
 
-    // Applying the preset resized the canvas to its roll, which is an undo
-    // step and so counts as an edit; leaving asks, and this walks away.
+    // Arriving by link is not editing: the preset's roll was applied
+    // quietly, so leaving asks nothing.
     fireEvent.click(screen.getAllByText('打印机')[0]!)
-    fireEvent.click(await screen.findByText('放弃修改并离开'))
+    expect(screen.queryByText('保留这些修改吗？')).toBeNull()
     await waitFor(() => expect(window.location.pathname).toBe('/printers'))
 
     // Back lands on the address the ledger handed out; it resolves and is

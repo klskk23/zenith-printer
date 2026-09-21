@@ -225,13 +225,25 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
    * would no longer sit on the dot grid — which is the alignment the whole
    * editor works to preserve. Anything now outside the label is flagged as a
    * warning, and the size change is one undo step away.
+   *
+   * `quiet` is for the preset link: the roll it names is applied on arrival,
+   * before the person has touched anything, and that must not read as an
+   * edit — or every link from the asset ledger would open a label that asks
+   * "keep your changes?" on the way out. The size is set, the history is not.
    */
   const applyProfileStock = useCallback(
-    (next: Profile | null) => {
+    (next: Profile | null, { quiet = false }: { quiet?: boolean } = {}) => {
       if (next === null) {
         return
       }
       if (next.labelWidthMm === ir.widthMm && next.labelHeightMm === ir.heightMm) {
+        return
+      }
+      if (quiet) {
+        setHistory((current) => ({
+          ...current,
+          present: { ...current.present, widthMm: next.labelWidthMm, heightMm: next.labelHeightMm },
+        }))
         return
       }
       setIr({ ...ir, widthMm: next.labelWidthMm, heightMm: next.labelHeightMm })
@@ -628,9 +640,10 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
       return
     }
     setProfileId(wanted.id)
-    // The same path as choosing it by hand: a design laid out on a canvas that
-    // is not the paper prints wrong, and nobody notices until it does.
-    applyProfileStock(wanted)
+    // The same resize as choosing it by hand — a design laid out on a canvas
+    // that is not the paper prints wrong — but quietly: arriving by link is
+    // not editing.
+    applyProfileStock(wanted, { quiet: true })
   }, [pendingProfileId, profiles.isSuccess, profiles.data, applyProfileStock])
 
   const templateBody = (): Record<string, unknown> => ({

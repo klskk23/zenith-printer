@@ -81,6 +81,7 @@ export const copy = {
     pending: (n: number): string => `${n} 个待处理`,
     lastPrint: '最近：',
     noPrinters: '还没有添加打印机',
+    printersCount: (n: number): string => `${n} 台打印机`,
     noPrints: '还没有打印记录',
   },
 

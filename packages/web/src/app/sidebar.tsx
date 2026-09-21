@@ -2,10 +2,12 @@
  * The sidebar: the product's name, seven entries, and the printers.
  *
  * One column, always there. The brand sits at its top rather than in a bar
- * across the page, so the sidebar and the name read as one piece of furniture;
- * the printers sit at its foot, visible from every page — what the service
- * knows about each without touching it (probed or not, and whether the model
- * can report its stock), and whether the service itself is reachable.
+ * across the page, so the sidebar and the name read as one piece of furniture.
+ * The printers sit at its foot as one small line — a dot and a count — and
+ * open on a click into what the service knows about each (probed or not, and
+ * whether the model can report its stock). Three lines of printer detail
+ * standing permanently in a 200px column read as clutter; one line that can
+ * be asked does not.
  *
  * The order is the design's, not alphabetical: what people come here to do
  * (labels), what feeds it (data sources), what it goes to (printers), what
@@ -13,11 +15,12 @@
  * no entry — it needs a label to open, and is reached by clicking one. The
  * API console has none either: a developer's page, reached from settings.
  */
-import { Database, History, ListOrdered, Printer, Settings, SlidersHorizontal, Tag } from 'lucide-react'
+import { ChevronUp, Database, History, ListOrdered, Printer, Settings, SlidersHorizontal, Tag } from 'lucide-react'
 import { copy } from '../i18n/index.ts'
 import { cn } from '../lib/utils.ts'
 import { Badge } from '../components/ui/badge.tsx'
 import { Button } from '../components/ui/button.tsx'
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.tsx'
 import { SIDEBAR_KINDS } from './routes.ts'
 import { useWorkspace } from './workspace.tsx'
 import { Dot } from './status-strip.tsx'
@@ -56,6 +59,52 @@ function PrinterLine({ printer }: { printer: PrinterStatus }): React.JSX.Element
       <span className="truncate text-foreground">{printer.name}</span>
       <span className="ml-auto shrink-0 text-muted-foreground">{stock}</span>
     </li>
+  )
+}
+
+/**
+ * The foot's one line, and the panel it opens.
+ *
+ * The dot summarises: lit when every printer is probed and running, dark when
+ * any is not — the one case worth a glance from another page.
+ */
+function PrintersDisclosure({
+  printers,
+  loading,
+}: {
+  printers: readonly PrinterStatus[]
+  loading: boolean
+}): React.JSX.Element {
+  const allLive = printers.length > 0 && printers.every((p) => p.probed && p.queueState === 'running')
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="row"
+          className="justify-between rounded-sm px-n3 py-n2 text-2xs text-foreground/72 hover:bg-foreground/6 hover:text-foreground"
+          disabled={loading}
+          data-sidebar-printers
+        >
+          <span className="flex items-center gap-n2">
+            <Dot live={allLive} />
+            <span>{loading ? '…' : copy.status.printersCount(printers.length)}</span>
+          </span>
+          <ChevronUp className="size-3 opacity-60" aria-hidden />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="start" className="w-56" data-sidebar-printers-panel>
+        {printers.length === 0 ? (
+          <span className="text-2xs text-muted-foreground">{copy.status.noPrinters}</span>
+        ) : (
+          <ul className="flex flex-col gap-n2">
+            {printers.map((printer) => (
+              <PrinterLine key={printer.id} printer={printer} />
+            ))}
+          </ul>
+        )}
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -116,24 +165,9 @@ export function Sidebar({ pendingJobCount, printers, printersLoading, connection
 
       <div className="flex-1" />
 
-      {/* The machines, from every page. What the service knows without
-          touching them; a printer that cannot report its stock is told about,
-          never left blank. */}
-      <div className="flex flex-col gap-n2 px-n3" data-sidebar-printers>
-        {printersLoading ? (
-          <span className="text-2xs text-muted-foreground" aria-busy>
-            …
-          </span>
-        ) : printers.length === 0 ? (
-          <span className="text-2xs text-muted-foreground">{copy.status.noPrinters}</span>
-        ) : (
-          <ul className="flex flex-col gap-n1">
-            {printers.map((printer) => (
-              <PrinterLine key={printer.id} printer={printer} />
-            ))}
-          </ul>
-        )}
-        <div className="flex items-center gap-n2 pt-n2 text-2xs" data-connection>
+      <div className="flex flex-col gap-px">
+        <PrintersDisclosure printers={printers} loading={printersLoading} />
+        <div className="flex items-center gap-n2 px-n3 py-n2 text-2xs" data-connection>
           <Dot live={connection === 'connected'} />
           <span className={connection === 'disconnected' ? 'text-destructive' : 'text-muted-foreground'}>
             {connectionLabel}

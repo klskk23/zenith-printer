@@ -82,7 +82,8 @@ describe('the sidebar order', () => {
     // It needs a table to open; an entry that opened an empty one is a dead end.
     render(wrap(<App />))
     const nav = document.querySelector('nav')!
-    expect(nav.querySelectorAll('button')).toHaveLength(SIDEBAR_KINDS.length)
+    // The entries only: the foot has a button of its own (the printers).
+    expect(nav.querySelectorAll('ol button')).toHaveLength(SIDEBAR_KINDS.length)
   })
 })
 
