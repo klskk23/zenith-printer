@@ -19,6 +19,7 @@ import { Button } from '../components/ui/button.tsx'
 import { ConfirmButton } from '../components/ui/confirm-button.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { Skeleton } from '../components/ui/skeleton.tsx'
+import { Separator } from '../components/ui/separator.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../components/ui/empty.tsx'
 import { useWorkspace } from '../app/workspace.tsx'
 import { StatusStrip } from '../app/status-strip.tsx'
@@ -185,6 +186,9 @@ export function LabelsPage(): React.JSX.Element {
         }
       />
 
+      {/* A rule between the page's head and its status line — fading at
+          the ends, so it reads as a pause rather than a box edge. */}
+      <Separator fade />
       <PausedQueueBanner />
       <StatusStrip summary={summary} loading={jobs.isPending} />
 
