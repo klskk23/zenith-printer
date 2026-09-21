@@ -53,14 +53,28 @@ export const copy: Copy = {
     close: 'Close',
     unsavedMark: 'Unsaved changes',
     confirmCloseTitle: 'Close this tab?',
-    confirmCloseBody: 'This tab has unsaved changes. Closing it cannot be undone.',
+    confirmCloseBody: 'Your changes are kept as a draft on this computer and restored the next time you open this label.',
     confirmCloseCancel: 'Cancel',
-    confirmCloseConfirm: 'Close anyway',
+    confirmCloseConfirm: 'Close',
     leavePrompt: 'There are unsaved changes. Leave anyway?',
     softLimitWarning: (count: number): string =>
       `${count} design and template tabs are open. Opening more may slow editing down; nothing is blocked.`,
     disconnectedBanner:
       'Disconnected from the print service. Editing continues, but saving and printing will fail.',
+  },
+
+  drafts: {
+    unpersisted: {
+      what: 'Changes to this label cannot be kept on this computer',
+      why: 'The browser is out of local storage space',
+      next: 'Save before leaving, or clear unsaved drafts to make room',
+    },
+    noStorage: {
+      what: 'This browser does not allow drafts to be kept',
+      why: 'Private browsing or a policy blocks local storage',
+      next: 'Save before leaving, or the changes are lost',
+    },
+    anotherWindow: 'Another window on this computer changed it; this is what that window last wrote.',
   },
 
   apiDocs: {

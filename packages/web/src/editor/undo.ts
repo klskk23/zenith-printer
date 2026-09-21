@@ -8,8 +8,9 @@
  * A snapshot needs nothing written per operation, so a new element type or a
  * new property is undoable the day it exists.
  *
- * Not persisted (FR-088). The history belongs to the tab; closing it discards
- * the history along with everything else about that tab.
+ * Persisted, up to `UNDO_LIMIT`, as part of the label's draft (005): leaving
+ * the editor and coming back finds the history where it was. The draft store
+ * drops it first when storage is short — see features/drafts/trim.ts.
  */
 import type { LabelIR } from '@zenith/shared'
 

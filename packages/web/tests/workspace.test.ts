@@ -14,7 +14,9 @@ import {
   editingTabCount,
   emptyWorkspace,
   exceedsSoftLimit,
+  hasUnsavedWork,
   markDirty,
+  markUnpersisted,
   openTab,
   restoreFromPath,
   setTabTemplate,
@@ -27,8 +29,13 @@ function ids(): () => string {
   return () => `tab-${(n += 1)}`
 }
 
-function open(state: WorkspaceState, descriptor: Parameters<typeof openTab>[1], nextId = ids()): WorkspaceState {
-  return openTab(state, descriptor, nextId)
+function open(
+  state: WorkspaceState,
+  descriptor: Parameters<typeof openTab>[1],
+  nextId = ids(),
+  nextDraftId = ids(),
+): WorkspaceState {
+  return openTab(state, descriptor, nextId, nextDraftId)
 }
 
 describe('opening tabs', () => {
@@ -185,6 +192,55 @@ describe('unsaved marker', () => {
 
     state = markDirty(state, state.tabs[1]!.id, true)
     expect(state.tabs.some((t) => t.isDirty)).toBe(true)
+  })
+
+  it('only counts work that could actually be lost', () => {
+    // A dirty tab whose draft is on disk survives a reload; the leave prompt
+    // is for the one whose draft could not be written.
+    const next = ids()
+    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
+    state = markDirty(state, state.tabs[0]!.id, true)
+    expect(hasUnsavedWork(state)).toBe(false)
+    state = markUnpersisted(state, state.tabs[0]!.id, true)
+    expect(hasUnsavedWork(state)).toBe(true)
+    state = markUnpersisted(state, state.tabs[0]!.id, false)
+    expect(hasUnsavedWork(state)).toBe(false)
+  })
+
+  it('returns the same state when the persistence flag is already right', () => {
+    const next = ids()
+    const state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
+    expect(markUnpersisted(state, state.tabs[0]!.id, false)).toBe(state)
+  })
+})
+
+describe('draft keys', () => {
+  it('gives a blank design a draft id of its own', () => {
+    const state = open(emptyWorkspace(), { kind: 'design', templateId: null }, ids(), () => 'd-abc')
+    expect(state.tabs[0]!.draftId).toBe('d-abc')
+  })
+
+  it('keeps the draft id when the design is first saved', () => {
+    // The key the editor writes under changes to the template id on its own
+    // (template?.id ?? draftId); the tab does not need to relabel anything.
+    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, ids(), () => 'd-abc')
+    state = setTabTemplate(state, state.tabs[0]!.id, 'tpl-9')
+    expect(state.tabs[0]).toMatchObject({ templateId: 'tpl-9', draftId: 'd-abc' })
+  })
+
+  it('takes the draft id from the address, so a reload finds the same draft', () => {
+    const state = restoreFromPath('/design/new/d-abc', ids())
+    expect(state.tabs[0]).toMatchObject({ kind: 'design', templateId: null, draftId: 'd-abc' })
+  })
+
+  it('mints one when the address has none', () => {
+    const state = restoreFromPath('/design/new', ids(), () => 'd-minted')
+    expect(state.tabs[0]!.draftId).toBe('d-minted')
+  })
+
+  it('gives a saved design no separate draft id', () => {
+    const state = open(emptyWorkspace(), { kind: 'design', templateId: 'tpl-1' }, ids(), () => 'never')
+    expect(state.tabs[0]!.draftId).toBeUndefined()
   })
 })
 

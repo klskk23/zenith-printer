@@ -33,6 +33,7 @@ import { useProfiles } from '../features/profiles/hooks.ts'
 import { useTemplates, type Template } from '../features/templates/hooks.ts'
 import { usePrintPresets } from '../features/print-presets/hooks.ts'
 import { useWorkspace } from '../app/workspace.tsx'
+import { useDraft } from '../features/drafts/use-draft.tsx'
 import type { Profile } from '../features/profiles/hooks.ts'
 import { CanvasViewport } from './canvas-viewport.tsx'
 import { LayersPanel } from './layers-panel.tsx'
@@ -68,9 +69,11 @@ export interface EditorPageProps {
    * a link they followed a minute ago.
    */
   presetId?: string
+  /** Unsaved designs only: the key their draft is stored under. */
+  draftId?: string
 }
 
-export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): React.JSX.Element {
+export function EditorPage({ tabId, templateId, draftId, presetId }: EditorPageProps): React.JSX.Element {
   const printers = usePrinters()
   const [printerId, setPrinterId] = useState<string | null>(null)
   const [profileId, setProfileId] = useState<string | null>(null)
@@ -95,14 +98,29 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
   const { preferences } = usePreferences()
   const workspace = useWorkspace()
   const allTemplates = useTemplates()
-  // A blank label starts at whatever this browser was told to prefer (FR-071).
+  /**
+   * The draft this label is edited under.
+   *
+   * Keyed by the template for a saved label and by the tab's own draft id for
+   * a new one — from the props, so that the first save (which points the tab
+   * at the new template) moves the editor to the template's key on its own.
+   */
+  const draftKey = templateId ?? draftId ?? tabId
+  const draft = useDraft(draftKey)
+  /** Whether this mount picked up where a draft left off, history and all. */
+  const restoredFromDraft = useRef(draft.initial !== null)
+  // A blank label starts at whatever this browser was told to prefer (FR-071)
+  // — unless a draft was left here, in which case it starts where that
+  // stopped, undo stack included.
   const [history, setHistory] = useState(() =>
-    initUndo(
-      createBlankLabel(preferences.defaultDpi, {
-        widthMm: preferences.defaultLabelWidthMm,
-        heightMm: preferences.defaultLabelHeightMm,
-      }),
-    ),
+    draft.initial === null
+      ? initUndo(
+          createBlankLabel(preferences.defaultDpi, {
+            widthMm: preferences.defaultLabelWidthMm,
+            heightMm: preferences.defaultLabelHeightMm,
+          }),
+        )
+      : { ...initUndo(draft.initial.present), past: draft.initial.past },
   )
   const ir = history.present
   /**
@@ -143,8 +161,8 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
   const doUndo = useCallback(() => setHistory((current) => undo(current)), [])
   const doRedo = useCallback(() => setHistory((current) => redo(current)), [])
 
-  const [variables, setVariables] = useState<VariableDefinition[]>([])
-  const [dataSourceId, setDataSourceId] = useState<string | null>(null)
+  const [variables, setVariables] = useState<VariableDefinition[]>(() => draft.initial?.variables ?? [])
+  const [dataSourceId, setDataSourceId] = useState<string | null>(() => draft.initial?.dataSourceId ?? null)
   const [template, setTemplate] = useState<Template | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   /**
@@ -511,9 +529,17 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
       return
     }
     const found = allTemplates.data?.find((t) => t.id === templateId)
-    if (found !== undefined) {
-      loadTemplate(found)
+    if (found === undefined) {
+      return
     }
+    if (restoredFromDraft.current) {
+      // The draft already holds the content and the history; the template is
+      // wanted only for its name and version (which the save and the
+      // conflict warning compare against).
+      setTemplate(found)
+      return
+    }
+    loadTemplate(found)
   }, [templateId, allTemplates.data])
 
   /**
@@ -527,6 +553,35 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
   useEffect(() => {
     workspace.setDirty(tabId, isDirty)
   }, [tabId, isDirty])
+
+  /**
+   * Keep the draft current.
+   *
+   * Every change to the label, its history, its variables or its binding is
+   * offered to the draft; the hook debounces the writes and flushes them when
+   * the editor is left. Only while dirty: a freshly loaded template has
+   * nothing to keep, and writing it anyway would mark it as edited.
+   */
+  useEffect(() => {
+    if (!isDirty) {
+      return
+    }
+    draft.update({
+      templateId: template?.id ?? templateId,
+      baseVersion: template?.version ?? null,
+      present: history.present,
+      past: [...history.past],
+      variables,
+      dataSourceId,
+      name: null,
+    })
+  }, [history, variables, dataSourceId, isDirty])
+
+  // The leave prompt fires only for a draft that could not be written.
+  const draftAtRisk = draft.status === 'unpersisted' || draft.status === 'no-storage'
+  useEffect(() => {
+    workspace.setUnpersisted(tabId, isDirty && draftAtRisk)
+  }, [tabId, isDirty, draftAtRisk])
 
   /**
    * Preselect the printer's default profile.
@@ -654,6 +709,23 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
       tabIndex={-1}
     >
       {/*
+        Said before anything else on the page: a draft that cannot be kept is
+        the one thing here that can cost an afternoon. Three parts, as every
+        error in this product has — what, why, what to do.
+      */}
+      {draftAtRisk && (
+        <Alert variant="warning" className="text-xs" data-draft-notice>
+          <span className="font-medium">
+            {draft.status === 'no-storage' ? copy.drafts.noStorage.what : copy.drafts.unpersisted.what}
+          </span>
+          {' — '}
+          {draft.status === 'no-storage' ? copy.drafts.noStorage.why : copy.drafts.unpersisted.why}
+          {'。'}
+          {draft.status === 'no-storage' ? copy.drafts.noStorage.next : copy.drafts.unpersisted.next}
+        </Alert>
+      )}
+
+      {/*
         Top bar, in two groups: what this design *is* on the left — which
         template, and saving it — and everything about printing on the right.
         They were interleaved before, so answering "where will this go" meant
@@ -670,6 +742,9 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
           buildBody={templateBody}
           onLoad={loadTemplate}
           onSaved={(saved) => {
+            // Saved means the server has it; the draft's job is done (FR-023).
+            draft.discard()
+            restoredFromDraft.current = false
             setTemplate(saved)
             setVariables(saved.variables)
             setDataSourceId(saved.dataSourceId)

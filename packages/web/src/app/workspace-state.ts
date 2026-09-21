@@ -11,6 +11,7 @@
  * switching away and back costs nothing.
  */
 import { isSingletonKind, tabFromPath, type TabDescriptor, type TabKind } from './routes.ts'
+import { randomId } from '../lib/random-id.ts'
 
 /**
  * Advice, not a gate. A design tab keeps a full editing state resident, so ten
@@ -44,7 +45,18 @@ export interface WorkspaceTab {
    * cannot relabel the rest. See `nextDraftNumber`.
    */
   draftNumber?: number
+  /**
+   * Unsaved designs only: the key the draft is stored under. Random rather
+   * than the tab id, because it goes into the address and has to survive a
+   * reload; a saved design's draft is keyed by its template id instead.
+   */
+  draftId?: string
   isDirty: boolean
+  /**
+   * Dirty, and the draft could not be written — the one case where leaving
+   * really loses work. Gates the browser's leave prompt.
+   */
+  unpersisted: boolean
 }
 
 export interface WorkspaceState {
@@ -102,6 +114,7 @@ export function openTab(
   state: WorkspaceState,
   descriptor: TabDescriptor,
   nextId: IdFactory,
+  nextDraftId: IdFactory = randomId,
 ): WorkspaceState {
   const existing = findSingleton(state, descriptor.kind)
   if (existing !== undefined) {
@@ -126,8 +139,11 @@ export function openTab(
     templateId: descriptor.templateId ?? null,
     ...(descriptor.dataSourceId === undefined ? {} : { dataSourceId: descriptor.dataSourceId }),
     ...(descriptor.presetId === undefined ? {} : { presetId: descriptor.presetId }),
-    ...(isBlankDesign ? { draftNumber: nextDraftNumber(state.tabs) } : {}),
+    ...(isBlankDesign
+      ? { draftNumber: nextDraftNumber(state.tabs), draftId: descriptor.draftId ?? nextDraftId() }
+      : {}),
     isDirty: false,
+    unpersisted: false,
   }
   return { tabs: [...state.tabs, tab], activeId: tab.id }
 }
@@ -206,6 +222,17 @@ export function markDirty(state: WorkspaceState, id: string, isDirty: boolean): 
   }
 }
 
+/** Same identity rule as `markDirty`, for the same reason. */
+export function markUnpersisted(state: WorkspaceState, id: string, unpersisted: boolean): WorkspaceState {
+  if (!state.tabs.some((tab) => tab.id === id && tab.unpersisted !== unpersisted)) {
+    return state
+  }
+  return {
+    ...state,
+    tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, unpersisted } : tab)),
+  }
+}
+
 /**
  * The kinds whose tabs cost something to keep open.
  *
@@ -226,9 +253,14 @@ export function exceedsSoftLimit(state: WorkspaceState): boolean {
   return editingTabCount(state) >= SOFT_TAB_LIMIT
 }
 
-/** Whether leaving the page would discard work — the gate for the leave prompt. */
+/**
+ * Whether leaving the page would discard work — the gate for the leave prompt.
+ *
+ * Dirty is not enough any more: a dirty tab whose draft is on disk survives
+ * a reload. Only a tab whose draft could not be written has something to lose.
+ */
 export function hasUnsavedWork(state: WorkspaceState): boolean {
-  return state.tabs.some((tab) => tab.isDirty)
+  return state.tabs.some((tab) => tab.isDirty && tab.unpersisted)
 }
 
 /**
@@ -238,9 +270,13 @@ export function hasUnsavedWork(state: WorkspaceState): boolean {
  * gone, which the leave prompt has already warned about. An unrecognised
  * address lands on the index rather than an empty workspace.
  */
-export function restoreFromPath(address: string, nextId: IdFactory): WorkspaceState {
+export function restoreFromPath(
+  address: string,
+  nextId: IdFactory,
+  nextDraftId: IdFactory = randomId,
+): WorkspaceState {
   // The whole address, query included: `?preset=` is part of where a link
   // meant to land.
   const descriptor = tabFromPath(address) ?? { kind: 'index' as const }
-  return openTab(emptyWorkspace(), descriptor, nextId)
+  return openTab(emptyWorkspace(), descriptor, nextId, nextDraftId)
 }

@@ -45,6 +45,13 @@ export interface TabDescriptor {
   /** Data source editor only. */
   dataSourceId?: string
   /**
+   * Unsaved designs only: the key their draft is stored under.
+   *
+   * In the address, so that a reload of `/design/new/<id>` finds the same
+   * draft rather than opening a fresh blank label beside it.
+   */
+  draftId?: string
+  /**
    * Designs only: a print preset to open with, from `?preset=` in the address.
    *
    * An **initial value, not another kind of tab**. A link that carries one
@@ -99,7 +106,12 @@ export function pathForTab(descriptor: TabDescriptor): string {
     // An unsaved design has no id to put in the address, so it gets a name of
     // its own rather than leaving the address pointing at the previous tab.
     const id = descriptor.templateId
-    const path = id === null || id === undefined ? '/design/new' : `/design/${id}`
+    const path =
+      id === null || id === undefined
+        ? descriptor.draftId === undefined
+          ? '/design/new'
+          : `/design/new/${encodeURIComponent(descriptor.draftId)}`
+        : `/design/${id}`
     return descriptor.presetId === undefined
       ? path
       : `${path}?preset=${encodeURIComponent(descriptor.presetId)}`
@@ -131,12 +143,14 @@ export function tabFromPath(address: string): TabDescriptor | null {
     return { kind: 'data-source', dataSourceId: source[1]! }
   }
 
-  const design = /^\/design\/([^/]+)$/.exec(normalised)
+  const design = /^\/design\/([^/]+)(?:\/([^/]+))?$/.exec(normalised)
   if (design !== null) {
     const id = design[1]!
+    const draftId = id === 'new' && design[2] !== undefined ? decodeURIComponent(design[2]) : undefined
     return {
       kind: 'design',
       templateId: id === 'new' ? null : id,
+      ...(draftId === undefined ? {} : { draftId }),
       // Only designs: a `?preset=` on any other address would be carried into
       // one that has no use for it.
       ...(preset === '' ? {} : { presetId: preset }),

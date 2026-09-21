@@ -18,6 +18,7 @@ import {
   exceedsSoftLimit,
   hasUnsavedWork,
   markDirty,
+  markUnpersisted,
   openTab,
   restoreFromPath,
   setTabTemplate,
@@ -33,6 +34,8 @@ export interface WorkspaceApi {
   activate: (id: string) => void
   close: (id: string) => void
   setDirty: (id: string, isDirty: boolean) => void
+  /** Whether the tab's draft failed to reach storage — see `hasUnsavedWork`. */
+  setUnpersisted: (id: string, unpersisted: boolean) => void
   /** Bind a tab to a template — used the first time a design is saved. */
   setTemplate: (id: string, templateId: string | null) => void
   /** True once the tab count reaches the soft limit; advice only. */
@@ -77,6 +80,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     (id: string, templateId: string | null) => setState((s) => setTabTemplate(s, id, templateId)),
     [],
   )
+  const setUnpersisted = useCallback(
+    (id: string, unpersisted: boolean) => setState((s) => markUnpersisted(s, id, unpersisted)),
+    [],
+  )
 
   const activeTab = useMemo(
     () => state.tabs.find((tab) => tab.id === state.activeId) ?? null,
@@ -92,6 +99,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     const path = pathForTab({
       kind: activeTab.kind,
       templateId: activeTab.templateId,
+      ...(activeTab.draftId === undefined ? {} : { draftId: activeTab.draftId }),
       ...(activeTab.presetId === undefined ? {} : { presetId: activeTab.presetId }),
     })
     if (currentPath() !== path) {
@@ -113,7 +121,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
           return s
         }
         const existing = s.tabs.find(
-          (tab) => tab.kind === wanted.kind && tab.templateId === wanted.templateId,
+          (tab) =>
+            tab.kind === wanted.kind &&
+            tab.templateId === wanted.templateId &&
+            (wanted.draftId === undefined || tab.draftId === wanted.draftId),
         )
         return existing === undefined
           ? openTab(
@@ -122,6 +133,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
                 kind: wanted.kind,
                 templateId: wanted.templateId,
                 dataSourceId: wanted.dataSourceId,
+                ...(wanted.draftId === undefined ? {} : { draftId: wanted.draftId }),
                 ...(wanted.presetId === undefined ? {} : { presetId: wanted.presetId }),
               },
               nextId,
@@ -159,11 +171,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       activate,
       close,
       setDirty,
+      setUnpersisted,
       setTemplate,
       atSoftLimit: exceedsSoftLimit(state),
       editingTabs: editingTabCount(state),
     }),
-    [state, activeTab, open, activate, close, setDirty, setTemplate],
+    [state, activeTab, open, activate, close, setDirty, setUnpersisted, setTemplate],
   )
 
   return <WorkspaceContext.Provider value={api}>{children}</WorkspaceContext.Provider>

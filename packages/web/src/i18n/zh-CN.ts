@@ -59,13 +59,28 @@ export const copy = {
     close: '关闭',
     unsavedMark: '有未保存的修改',
     confirmCloseTitle: '关闭这个标签页？',
-    confirmCloseBody: '该标签页有未保存的修改，关闭后无法恢复。',
+    confirmCloseBody: '修改会作为草稿保留在本机，下次打开这张标签时恢复。',
     confirmCloseCancel: '取消',
-    confirmCloseConfirm: '仍然关闭',
+    confirmCloseConfirm: '关闭',
     leavePrompt: '有未保存的修改，确定要离开吗？',
     softLimitWarning: (count: number): string =>
       `已打开 ${count} 个设计与模板标签页。继续开启可能影响编辑流畅度，但不会被阻止。`,
     disconnectedBanner: '与打印服务的连接已断开。编辑不会中断，但保存和打印会失败。',
+  },
+
+  drafts: {
+    // Three parts, as the constitution asks of every error: what, why, next.
+    unpersisted: {
+      what: '这张标签的修改无法在本机保留',
+      why: '浏览器的本机存储空间不足',
+      next: '离开前请先保存，或清理未保存的草稿腾出空间',
+    },
+    noStorage: {
+      what: '这台浏览器不允许保存草稿',
+      why: '隐私模式或策略限制了本机存储',
+      next: '离开前请先保存，否则修改会丢失',
+    },
+    anotherWindow: '这台机器上另一个窗口改过它，现在显示的是那边最后写下的样子。',
   },
 
   apiDocs: {

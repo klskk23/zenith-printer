@@ -91,19 +91,19 @@
 
 ### Tests（先写，确认红）
 
-- [ ] T031 [P] [US2] 新建 `web/tests/editor-draft.dom.test.tsx`（假 fetch 返回一张模板；注入内存 `DraftStorage`）：(a) 拖动/修改元素后 350 ms 内 `store.read(templateId)` 有 `present` 与 `past.length ≥ 1`；(b) 卸载 `EditorPage` 再重新挂载同一 `templateId` → 画布显示修改后的内容，且「撤销」按钮可用；(c) 新标签（`templateId=null`，`draftId` 给定）同样往返；(d) 保存成功后 `store.read` 为 `null`；(e) `write` 返回 `'unpersisted'` 时编辑器顶部出现 `copy.drafts.unpersisted` 文案，恢复 `'stored'` 后消失；(f) `localStorage` 不可用（内存 storage + `isLocalStorageUsable()` 假为 false）时显示 `copy.drafts.noStorage`
-- [ ] T032 [P] [US2] 新建 `web/tests/tab-close-copy.dom.test.tsx`：有未保存修改的标签页点关闭 → 确认框文案含「草稿」且不含「无法恢复」；确认后草稿仍在 `store`；再次打开该模板的标签页内容仍在
-- [ ] T033 [P] [US2] 更新 `web/tests/workspace.test.ts`：`openTab` 对 `templateId === null` 的设计分配稳定 `draftId`（注入的 id 工厂），`setTabTemplate` 后 `draftId` 保留（草稿键不因保存而变，保存后由 store 删除）
-- [ ] T034 [P] [US2] 新建 `web/tests/use-draft.test.ts`（Node，假计时器）：`useDraft` 的纯调度核心 `scheduleWrite/flush`：300 ms 内多次调用只写一次；`flush()` 立即写；`pagehide`/`visibilitychange` 触发 `flush`
+- [X] T031 [P] [US2] 新建 `web/tests/editor-draft.dom.test.tsx`（假 fetch 返回一张模板；注入内存 `DraftStorage`）：(a) 拖动/修改元素后 350 ms 内 `store.read(templateId)` 有 `present` 与 `past.length ≥ 1`；(b) 卸载 `EditorPage` 再重新挂载同一 `templateId` → 画布显示修改后的内容，且「撤销」按钮可用；(c) 新标签（`templateId=null`，`draftId` 给定）同样往返；(d) 保存成功后 `store.read` 为 `null`；(e) `write` 返回 `'unpersisted'` 时编辑器顶部出现 `copy.drafts.unpersisted` 文案，恢复 `'stored'` 后消失；(f) `localStorage` 不可用（内存 storage + `isLocalStorageUsable()` 假为 false）时显示 `copy.drafts.noStorage`
+- [X] T032 [P] [US2] 新建 `web/tests/tab-close-copy.dom.test.tsx`：有未保存修改的标签页点关闭 → 确认框文案含「草稿」且不含「无法恢复」；确认后草稿仍在 `store`；再次打开该模板的标签页内容仍在
+- [X] T033 [P] [US2] 更新 `web/tests/workspace.test.ts`：`openTab` 对 `templateId === null` 的设计分配稳定 `draftId`（注入的 id 工厂），`setTabTemplate` 后 `draftId` 保留（草稿键不因保存而变，保存后由 store 删除）
+- [X] T034 [P] [US2] 新建 `web/tests/use-draft.test.ts`（Node，假计时器）：`useDraft` 的纯调度核心 `scheduleWrite/flush`：300 ms 内多次调用只写一次；`flush()` 立即写；`pagehide`/`visibilitychange` 触发 `flush`
 
 ### Implementation
 
-- [ ] T035 [P] [US2] i18n `zh-CN.ts`/`en-US.ts` 新增 `drafts` 区：`unpersisted`（三要素：修改无法在本机保留 / 本机存储空间不足 / 离开前请先保存）、`noStorage`（这台浏览器不允许保存草稿 / 隐私模式或策略限制 / 离开即丢失）、`anotherWindow`（这台机器上另一个窗口改过它）；`workspace.confirmCloseBody` 改为「修改会作为草稿保留在本机，下次打开时恢复」；`confirmCloseConfirm` 改为「关闭」
-- [ ] T036 [P] [US2] `web/src/features/drafts/use-draft.ts`：`createWriteScheduler(store, delayMs, timers)`（纯逻辑，T034 测它）+ `useDraft(draftKey, { templateId, baseVersion })` hook：初始读；`update(snapshot)` 走调度；`flush()`；卸载/`pagehide`/`visibilitychange→hidden` 冲刷；暴露 `status: 'stored'|'stored-without-history'|'unpersisted'|'no-storage'`；`discard()`
-- [ ] T037 [US2] `web/src/app/workspace-state.ts`：`WorkspaceTab` 加 `draftId: string`（设计标签页必有：`templateId ?? nextId()`）；`openTab` 与 `setTabTemplate` 维护它；`hasUnsavedWork` 改为读取注入的 `unpersistedIds`（只有落不了盘的才算"会丢"）
-- [ ] T038 [US2] `web/src/editor/editor-page.tsx`：接收 `draftKey`；用 `useDraft` 初始化 `history`（有草稿 → `{past, present}`；无 → 服务器模板或空白）；每次 `history`/`variables`/`dataSourceId` 变化调用 `update`；`onSaved` 后 `discard()`；顶部按 `status` 显示 T035 的提示（`Alert variant="warning"`）；更新 `undo.ts` 顶部"Not persisted (FR-088)"注释为"持久化进草稿，见 005"
-- [ ] T039 [US2] `web/src/App.tsx`：`EditorPage` 传 `draftKey={tab.draftId}`；`web/src/app/tab-bar.tsx`：关闭确认使用新文案；`web/src/app/workspace.tsx`：`beforeunload` 只在存在 `unpersisted` 草稿时提示
-- [ ] T040 [US2] 跑 T031–T034 转绿；`render-smoke` 仍绿
+- [X] T035 [P] [US2] i18n `zh-CN.ts`/`en-US.ts` 新增 `drafts` 区：`unpersisted`（三要素：修改无法在本机保留 / 本机存储空间不足 / 离开前请先保存）、`noStorage`（这台浏览器不允许保存草稿 / 隐私模式或策略限制 / 离开即丢失）、`anotherWindow`（这台机器上另一个窗口改过它）；`workspace.confirmCloseBody` 改为「修改会作为草稿保留在本机，下次打开时恢复」；`confirmCloseConfirm` 改为「关闭」
+- [X] T036 [P] [US2] `web/src/features/drafts/use-draft.ts`：`createWriteScheduler(store, delayMs, timers)`（纯逻辑，T034 测它）+ `useDraft(draftKey, { templateId, baseVersion })` hook：初始读；`update(snapshot)` 走调度；`flush()`；卸载/`pagehide`/`visibilitychange→hidden` 冲刷；暴露 `status: 'stored'|'stored-without-history'|'unpersisted'|'no-storage'`；`discard()`
+- [X] T037 [US2] `web/src/app/workspace-state.ts`：`WorkspaceTab` 加 `draftId: string`（设计标签页必有：`templateId ?? nextId()`）；`openTab` 与 `setTabTemplate` 维护它；`hasUnsavedWork` 改为读取注入的 `unpersistedIds`（只有落不了盘的才算"会丢"）
+- [X] T038 [US2] `web/src/editor/editor-page.tsx`：接收 `draftKey`；用 `useDraft` 初始化 `history`（有草稿 → `{past, present}`；无 → 服务器模板或空白）；每次 `history`/`variables`/`dataSourceId` 变化调用 `update`；`onSaved` 后 `discard()`；顶部按 `status` 显示 T035 的提示（`Alert variant="warning"`）；更新 `undo.ts` 顶部"Not persisted (FR-088)"注释为"持久化进草稿，见 005"
+- [X] T039 [US2] `web/src/App.tsx`：`EditorPage` 传 `draftKey={tab.draftId}`；`web/src/app/tab-bar.tsx`：关闭确认使用新文案；`web/src/app/workspace.tsx`：`beforeunload` 只在存在 `unpersisted` 草稿时提示
+- [X] T040 [US2] 跑 T031–T034 转绿；`render-smoke` 仍绿
 
 **Checkpoint**: quickstart 第 2 步 7 条手动验收通过。**可独立提交为第 2 步；此后才允许 Phase 5。**
 

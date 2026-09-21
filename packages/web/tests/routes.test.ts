@@ -135,3 +135,23 @@ describe('a design address carrying a preset', () => {
     expect(tabFromPath('/design/tpl-7?preset=')?.presetId).toBeUndefined()
   })
 })
+
+describe('an unsaved design carries its draft id in the address', () => {
+  it('writes it', () => {
+    expect(pathForTab({ kind: 'design', templateId: null, draftId: 'd-abc' })).toBe('/design/new/d-abc')
+  })
+
+  it('keeps the preset beside it', () => {
+    expect(pathForTab({ kind: 'design', templateId: null, draftId: 'd-abc', presetId: 'p1' })).toBe(
+      '/design/new/d-abc?preset=p1',
+    )
+  })
+
+  it('reads it back', () => {
+    expect(tabFromPath('/design/new/d-abc')).toEqual({ kind: 'design', templateId: null, draftId: 'd-abc' })
+  })
+
+  it('still reads the bare form, which mints a draft id later', () => {
+    expect(tabFromPath('/design/new')).toEqual({ kind: 'design', templateId: null })
+  })
+})
