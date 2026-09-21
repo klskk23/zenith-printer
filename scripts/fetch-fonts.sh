@@ -37,10 +37,16 @@ mkdir -p "$FULL"
 declare -A PKG_URL=(
   [noto]="pool/main/f/fonts-noto-cjk/fonts-noto-cjk_20240730+repack1-1_all.deb"
   [dejavu]="pool/main/f/fonts-dejavu/fonts-dejavu-mono_2.37-9_all.deb"
+  # Inter is the *interface* face for Latin text and numerals (SIL OFL 1.1).
+  # It is not a render font: it never reaches resvg, is not listed in
+  # packages/server/src/render/fonts.ts, and must not be offered as a label
+  # font — a label set in it here would print in something else.
+  [inter]="pool/main/f/fonts-inter/fonts-inter_4.1+ds1-2_all.deb"
 )
 declare -A PKG_SHA=(
   [noto]="f5dc28a754e17327d99f0a612134d92c8dd6187314ae967cb77f25df60860139"
   [dejavu]="156a3e2e83f094f8aa1248433e92833ddcfdf12f0392497fbe127170a2dd19cf"
+  [inter]="4fda64450b0c237815d3d68602f5631c1571d6f921c5ac7dc4552c3aa5e3a0b2"
 )
 
 # destination filename : system path : package : path inside the package
@@ -49,6 +55,8 @@ FONTS=(
   "NotoSansCJK-Bold.ttc:/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc:noto:usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
   "NotoSerifCJK-Regular.ttc:/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc:noto:usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc"
   "DejaVuSansMono.ttf:/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf:dejavu:usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+  "Inter-Regular.otf:/usr/share/fonts/opentype/inter/Inter-Regular.otf:inter:usr/share/fonts/opentype/inter/Inter-Regular.otf"
+  "Inter-Medium.otf:/usr/share/fonts/opentype/inter/Inter-Medium.otf:inter:usr/share/fonts/opentype/inter/Inter-Medium.otf"
 )
 
 want_hash() { awk -v f="$1" '$2 == f { print $1 }' "$MANIFEST"; }

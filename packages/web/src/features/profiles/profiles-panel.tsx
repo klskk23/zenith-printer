@@ -61,7 +61,7 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{copy.profiles.heading}</h3>
+        <h3 className="text-sm font-medium">{copy.profiles.heading}</h3>
         <Button
           size="sm"
           variant="outline"

@@ -261,7 +261,7 @@ export function Inspector({ ir, element, values, onChange, onDelete }: Inspector
     // across the whole document silently picks the wrong one.
     <div className="flex flex-col gap-3" data-inspector>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{copy.editor.elements[element.type]}</h3>
+        <h3 className="text-sm font-medium">{copy.editor.elements[element.type]}</h3>
         <Button variant="ghost" size="sm" onClick={() => onDelete(element.id)}>
           {copy.editor.delete}
         </Button>

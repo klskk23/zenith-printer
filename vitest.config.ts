@@ -80,6 +80,14 @@ export default defineConfig({
         'packages/web/src/features/preferences/store.ts',
         'packages/web/src/features/printers/offset-directions.ts',
         'packages/web/src/pages/consumable.ts',
+        // 005: what a draft keeps, what it drops when storage is short, and
+        // whether a label fits the head — each of these wrong loses somebody's
+        // work or prints a clipped label.
+        'packages/web/src/features/drafts/*.ts',
+        'packages/web/src/features/print/head-figure.ts',
+        'packages/web/src/features/templates/thumbnail-values.ts',
+        'packages/web/src/features/templates/gallery-items.ts',
+        'packages/web/src/app/status-summary.ts',
       ],
       exclude: [
         '**/*.d.ts',

@@ -2,238 +2,224 @@
 @import './fonts.css';
 
 /*
- * The token system: "stock and liner".
+ * The token system: Nocturne.
  *
- * Zenith makes a physical thing — a matte, slightly warm label, die-cut with
- * generous corners, printed carbon black, wound on a kraft core. The interface
- * is built out of that material rather than out of a neutral grey chrome that
- * could belong to any tool.
+ * A quiet, compact dark interface — blue-grey ground, one blurple accent used
+ * as a line and a glow and never as a fill, radii of 4/8/14, headings at
+ * weight 500. Every value in the `@theme` block below is Nocturne's own,
+ * verbatim; the contract that says which is which is
+ * specs/005-nocturne-web-redesign/contracts/visual-tokens.md, and
+ * tests/design-tokens.test.ts compares the two byte for byte.
  *
- * **The one rule worth knowing: pure white means "this will be printed".** The
- * page is paper-grey; cards are a shade lighter; only the canvas and the print
- * preview are #FFFFFF. White stops being a background and becomes information.
+ * **The one rule that is this product's rather than Nocturne's: pure white
+ * means "this will be printed".** Nocturne forbids pure white. This product
+ * prints on white stock, and a canvas that is not white is lying about the
+ * print. So `.paper` — the canvas, a thumbnail, a print preview — is
+ * `#ffffff`, and it is the only thing that is. Everything standing on the
+ * dark ground will not be printed; only the white will. The glow around it
+ * is what keeps a 19.8:1 edge from cutting the eye.
  *
- * Light only. Dark mode is gone — see `deploy/README.md` and the note in
- * `preferences/store.ts` for what it was for and why the paper ground answers
- * it: the canvas used to be a white rectangle on near-black, which is the
- * harshest pairing in the product; against paper-grey the step is small.
- *
- * Every value below was converted from a chosen hex and every text pair was
- * checked against WCAG rather than eyeballed. The comments carry the ratios so
- * the next person changing one knows what they have to keep.
+ * One palette. There is no theme switch and no `prefers-color-scheme`; the
+ * interface is dark because it is a darkroom, and the label is the lightbox.
  */
 @theme {
-  /* Classical editorial roles: warm paper, ink, and accent as a stroke. */
-  --color-classical-ground: oklch(0.952 0.008 90);
-  --color-classical-surface: oklch(0.972 0.006 90);
-  --color-classical-ink: oklch(0.23 0.018 70);
-  --color-classical-muted: oklch(0.48 0.018 70);
-  --color-classical-accent: oklch(0.58 0.11 72);
-  --color-classical-divider: color-mix(in oklch, var(--color-classical-ink) 18%, transparent);
-  --font-classical-heading: 'Noto Serif CJK SC', Georgia, serif;
-  --font-classical-body: 'Noto Sans CJK SC', system-ui, sans-serif;
-  --shadow-classical-hairline: 0 1px 2px color-mix(in oklch, var(--color-classical-ink) 10%, transparent);
-  /* paper #ECEDE6 — the bench. Cooler and greyer than the cream a "warm,
-     organic" palette reaches for by default; real direct-thermal stock has a
-     green-grey cast, and the cream version reads as decoration. */
-  --color-background: oklch(0.943 0.009 113.2);
-  /* ink #14170F — near-black carrying the same green cast, not a neutral
-     #111. 15.4:1 on paper. */
-  --color-foreground: oklch(0.198 0.016 124.5);
-
-  /* face #F6F7F2 — the label itself, one step up from the bench it lies on. */
-  --color-card: oklch(0.974 0.007 115.7);
-  --color-card-foreground: oklch(0.198 0.016 124.5);
-  --color-popover: oklch(0.974 0.007 115.7);
-  --color-popover-foreground: oklch(0.198 0.016 124.5);
-
-  /* moss #3F5C36 — the primary action. Green rather than the clay-orange an
-     organic palette defaults to, so it cannot be confused with `warning`,
-     which is the colour of thermal paper that has been burnt. 6.4:1 both
-     ways. */
-  --color-primary: oklch(0.441 0.069 138.5);
-  --color-primary-foreground: oklch(0.943 0.009 113.2);
-
-  --color-secondary: oklch(0.919 0.012 113.5);
-  --color-secondary-foreground: oklch(0.198 0.016 124.5);
-  --color-muted: oklch(0.919 0.012 113.5);
-  /* muted #5C6153 — 5.4:1, so secondary text is still readable standing up at
-     a bench, which is where this is read. */
-  --color-muted-foreground: oklch(0.484 0.023 123.3);
-  --color-accent: oklch(0.919 0.012 113.5);
-  --color-accent-foreground: oklch(0.198 0.016 124.5);
-
-  /* rust #8C3A28 — 6.5:1. */
-  --color-destructive: oklch(0.457 0.116 33.9);
-  --color-destructive-foreground: oklch(0.974 0.007 115.7);
+  /* --- Nocturne ground and text ------------------------------------- */
+  --color-background: #161826;
+  --color-foreground: #e9e9ed;
+  --color-card: #232532;
+  --color-card-foreground: #e9e9ed;
+  --color-popover: #232532;
+  --color-popover-foreground: #e9e9ed;
 
   /*
-   * Two border weights, because borders were carrying two different jobs.
-   *
-   * `border` is the hairline that separates content — decorative, no contrast
-   * requirement. `input` is the edge of a field you *put something into*, and
-   * WCAG asks 3:1 of a control whose boundary is the only thing marking it:
-   * liner #9C7143 gives 3.67:1. Kraft-coloured, because the liner is the part
-   * of a label you hold.
-   *
-   * Fields only, not every outlined thing. Buttons carry their own label at
-   * 15:1 and do not need an edge to be found; giving them one put seven kraft
-   * rectangles in the editor's element palette, which shouted louder than the
-   * canvas — the one thing on that screen that is supposed to.
+   * The accent, as a line. `primary` is the outline of a button, a focus ring,
+   * the mark beside the active entry — at ~5:1 on the ground it is fine for
+   * chrome and large type, and Nocturne says not to set body text in it.
+   * Accent-coloured *words* use `accent-300`, which clears 4.5:1.
    */
-  --color-border: oklch(0.878 0.015 115.1);
-  --color-input: oklch(0.582 0.083 66.8);
-  --color-ring: oklch(0.441 0.069 138.5);
+  --color-primary: #9184d9;
+  --color-primary-foreground: #161826;
+  --color-ring: #9184d9;
+  --color-info: #9184d9;
+
+  /* Tinted surfaces come off the ramps, never off the accent itself. */
+  --color-secondary: #3f424d;
+  --color-secondary-foreground: #f3f5fe;
+  --color-muted: #292b31;
+  --color-muted-foreground: #9397ab;
+  --color-accent: #2b2741;
+  --color-accent-foreground: #e7e5fe;
 
   /*
-   * Three states this application has and shadcn has no word for.
-   *
-   * `warning` is "it printed, but not the way you asked" — ochre #8A6414,
-   * 4.55:1, the colour of thermal stock scorched past its mark. It has no
-   * `-foreground` partner because nothing in this application fills a surface
-   * with it: a warning is a tinted panel with ochre text, never a solid ochre
-   * block, so a token for text *on* ochre would be a colour nobody could see.
-   * `info` is "happening right now"; `success` is finished.
+   * This application's three states, which Nocturne does not have: it has
+   * one accent and no semantics. Added rather than changed, held to the same
+   * floor (≥ 4.5:1 on the ground), low in chroma, and used only for text and
+   * lines — a state is never a solid block.
+   *   destructive: failed, or cannot be undone
+   *   warning:     it printed, but not the way you asked
+   *   success:     finished
    */
-  --color-warning: oklch(0.529 0.102 80.4);
-  --color-info: oklch(0.446 0.064 233.5);
-  --color-success: oklch(0.441 0.069 138.5);
+  --color-destructive: #e07a7a;
+  --color-destructive-foreground: #161826;
+  --color-warning: #d9a441;
+  --color-success: #7fb58a;
 
   /*
-   * Headings are set in the serif this application already ships.
-   *
-   * `Noto Serif CJK SC` is one of the faces the *renderer* prints with, so it
-   * is already in the font directory and already a face this product speaks
-   * in. Using it for the chrome ties the tool to the thing it makes, and costs
-   * no new bytes.
+   * Two edge weights. `border` is the divider — decorative, no contrast
+   * requirement, Nocturne's own 16% of the text colour. `input` is the edge
+   * of something you type into, which WCAG asks 3:1 of; 45% is Nocturne's
+   * hover edge and clears it.
    */
-  --font-display: 'Noto Serif CJK SC', Georgia, serif;
+  --color-border: color-mix(in srgb, #e9e9ed 16%, transparent);
+  --color-input: color-mix(in srgb, #e9e9ed 45%, transparent);
 
+  /* --- Nocturne tonal ramps ------------------------------------------ */
+  --color-neutral-100: #f3f5fe;
+  --color-neutral-200: #e4e7f5;
+  --color-neutral-300: #cfd3e5;
+  --color-neutral-400: #b2b6ca;
+  --color-neutral-500: #9397ab;
+  --color-neutral-600: #75798c;
+  --color-neutral-700: #595d6c;
+  --color-neutral-800: #3f424d;
+  --color-neutral-900: #292b31;
+
+  --color-accent-100: #f5f4ff;
+  --color-accent-200: #e7e5fe;
+  --color-accent-300: #d2cefd;
+  --color-accent-400: #b5abfc;
+  --color-accent-500: #968ae0;
+  --color-accent-600: #796cbf;
+  --color-accent-700: #5d5294;
+  --color-accent-800: #423a6a;
+  --color-accent-900: #2b2741;
+
+  /* --- Type ------------------------------------------------------------ */
   /*
-   * The type scale, with a step for the density this application works at.
-   *
-   * `text-[11px]` appeared 94 times — an arbitrary value below Tailwind's
-   * smallest step, which put the densest text in the product outside the
-   * system. Named here, it moves in one line. The values also go up a little:
-   * 11px is below what somebody standing at a bench should be asked to read.
+   * Inter for Latin and numerals — the measurements, ids and English this
+   * interface shows — with the CJK sans the product already ships behind it.
+   * One family for headings and body; hierarchy is size and space. Inter is
+   * an interface face only: it is not a render font and is not offered as
+   * one (tests/fonts.test.ts).
    */
+  --font-sans: 'Inter', 'Noto Sans CJK SC', system-ui, sans-serif;
+  --font-mono: 'DejaVu Sans Mono', ui-monospace, monospace;
+
+  /* A named step for the density this application works at. */
   --text-2xs: 0.75rem;
   --text-2xs--line-height: calc(1 / 0.75);
   --text-xs: 0.8125rem;
   --text-xs--line-height: calc(1.125 / 0.8125);
 
-  /*
-   * Radius as hierarchy, not as one number applied everywhere.
-   *
-   * A die-cut label has a generous corner; a text field does not, or it stops
-   * reading as somewhere to type. So the scale spreads: `lg` (cards, dialogs,
-   * the label-shaped things) is 12px, `md` (inputs, buttons) 10px, `sm`
-   * (chips, cells) 8px. Badges and avatars take `rounded-full` and are the
-   * only fully round things, which is what makes them read as tags.
-   */
-  /*
-   * The sheet's shadow: a label lying on the bench, not a card in a stack.
-   *
-   * Two layers — a tight contact shadow where the paper meets the surface, and
-   * a wider soft one — because that is how a physical sheet reads. Built from
-   * the ink token so the one place this interface raises its voice still uses
-   * the palette's own colour.
-   */
-  --shadow-sheet: 0 1px 2px color-mix(in oklch, var(--color-foreground) 10%, transparent),
-    0 8px 24px -6px color-mix(in oklch, var(--color-foreground) 18%, transparent);
+  /* --- Shape ------------------------------------------------------------ */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius: 8px;
 
-  --radius: 0.75rem;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Elevation: a hairline edge plus ambient darkness. Never stacked. */
+  --shadow-sm: 0 0 0 1px #3f424d;
+  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+  /*
+   * Nocturne's compact spacing scale (0.70×), for the shell.
+   *
+   * Exposed as its own steps rather than by rescaling Tailwind's `--spacing`:
+   * the global base also sizes the editor's rulers, the data grid and every
+   * third-party padding, none of which this brief is about. The sidebar, the
+   * top bar, the status strip and the gallery tiles use these; the canvas and
+   * the grid keep their density.
+   */
+  --spacing-n1: 2.8px;
+  --spacing-n2: 5.6px;
+  --spacing-n3: 8.4px;
+  --spacing-n4: 11.2px;
+  --spacing-n6: 16.8px;
+  --spacing-n8: 22.4px;
 }
 
 body {
-  background-color: var(--color-classical-ground);
-  color: var(--color-classical-ink);
-  font-family: var(--font-classical-body);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
   line-height: 1.55;
 }
 
+/* Headings are the body face at weight 500 — never bolder. */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-classical-heading);
-  font-weight: 400;
-  letter-spacing: -0.015em;
-}
-
-[data-classical-shell] {
-  background: var(--color-classical-ground);
-}
-
-[data-classical-content] {
-  background: color-mix(in oklch, var(--color-classical-ground) 88%, var(--color-card));
-}
-
-[data-classical-masthead], [data-classical-tab-bar], [data-classical-sidebar], [data-page-header] {
-  border-color: var(--color-classical-divider);
-}
-
-[data-classical-sidebar] {
-  background: color-mix(in oklch, var(--color-classical-ground) 94%, var(--color-card));
-}
-
-.classical-nav-item::before {
-  content: attr(data-nav-index);
-  margin-right: 0.75rem;
-  color: var(--color-classical-muted);
-  font-family: ui-monospace, monospace;
-  font-size: 0.7rem;
-}
-
-[data-page-header] {
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--color-classical-divider);
-}
-
-[data-page-header] h2 {
-  font-size: clamp(1.55rem, 2vw, 2rem);
-}
-
-[data-classical-masthead] h1 {
-  font-size: 1.45rem;
-}
-
-[data-classical-tab-bar] [data-state='active'], [data-classical-tab-bar] button:hover {
-  color: var(--color-classical-accent);
-}
-
-[data-classical-shell] button:focus-visible,
-[data-classical-shell] a:focus-visible,
-[data-classical-shell] input:focus-visible {
-  outline: 2px solid var(--color-classical-accent);
-  outline-offset: 2px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
 }
 
 /*
- * Pure white, and the only pure white in the interface.
- *
- * The canvas is a sheet of paper and the preview's job is to look like what
- * comes out of the printer, so it cannot be tinted to match the chrome. Since
- * the page around it is paper-grey and every card is a shade below white, this
- * is what makes `#FFFFFF` mean "this will be printed" rather than "this is a
- * background".
+ * Focus is the accent, always, and never the browser's default ring.
+ * One rule rather than one per component, so a control added tomorrow has
+ * it too.
  */
-[data-label-canvas] {
-  background-color: #ffffff;
-  color: #000000;
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+
+/*
+ * The paper — the only pure white in the interface.
+ *
+ * Ink is near-black rather than black, because thermal transfer never lays
+ * down pure black either. The corner is a die-cut label's small radius, not
+ * the interface's `--radius`: this is a physical object, not a card. The
+ * shadow is what makes it a lightbox: a hairline, two rings of glow, and a
+ * drop into the dark below.
+ */
+.paper {
+  background: #ffffff;
+  color: #14151c;
+  border-radius: 3px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.3),
+    0 0 22px -1px rgba(233, 233, 237, 0.26),
+    0 0 70px -6px rgba(233, 233, 237, 0.16),
+    0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* The canvas: a larger sheet, a wider glow. */
+.paper-lg {
+  border-radius: 5px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.28),
+    0 0 40px -4px rgba(233, 233, 237, 0.22),
+    0 0 130px -10px rgba(233, 233, 237, 0.14),
+    0 18px 50px rgba(0, 0, 0, 0.6);
+}
+
+/*
+ * A rule that fades at its ends.
+ *
+ * Nocturne's freestanding rules run transparent → divider over 48px at each
+ * end, so a rule reads as a pause rather than a box edge. Applied as a
+ * background so it works on a Separator, a table row's bottom edge, or
+ * anything else one pixel tall.
+ */
+.separator-fade {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-border) 48px,
+    var(--color-border) calc(100% - 48px),
+    transparent
+  );
 }
 
 /*
  * The data source grid, dressed in this application's tokens.
  *
- * react-datasheet-grid indirects every colour through a `--dsg-*` variable and
- * scopes every rule to `.dsg-*`, so there is nothing to override and no global
- * CSS to fight — this maps its sixteen variables onto the theme and stops.
- *
- * It moves with the palette because the tokens on the right do; a grid with
- * its own hard-coded colours would have been a second palette to keep in step,
- * which is the thing the constitution rules out.
+ * react-datasheet-grid indirects every colour through a `--dsg-*` variable
+ * and scopes every rule to `.dsg-*`, so there is nothing to override and no
+ * global CSS to fight — this maps its variables onto the theme and stops.
  */
 .dsg-container {
   --dsg-border-color: var(--color-border);
@@ -242,15 +228,17 @@ h1, h2, h3, h4, h5, h6 {
   --dsg-header-text-color: var(--color-muted-foreground);
   --dsg-header-active-text-color: var(--color-foreground);
   --dsg-selection-border-color: var(--color-primary);
-  --dsg-selection-background-color: color-mix(in oklch, var(--color-primary) 12%, transparent);
+  --dsg-selection-background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
   --dsg-selection-disabled-border-color: var(--color-muted-foreground);
-  --dsg-selection-disabled-background-color: color-mix(in oklch, var(--color-muted) 60%, transparent);
-  --dsg-scroll-shadow-color: color-mix(in oklch, var(--color-foreground) 18%, transparent);
+  --dsg-selection-disabled-background-color: color-mix(in srgb, var(--color-muted) 60%, transparent);
+  --dsg-scroll-shadow-color: rgba(0, 0, 0, 0.45);
   --dsg-selection-border-radius: 0.25rem;
   --dsg-transition-duration: 0.1s;
 
   color: var(--color-foreground);
   font-size: 0.75rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-neutral-800) transparent;
 }
 
 /* The cell editor is an input; without this it keeps the browser's own font. */
@@ -259,189 +247,65 @@ h1, h2, h3, h4, h5, h6 {
   font-family: inherit;
 }
 
-/* Classical surfaces: paper stays quiet, ink and rules carry hierarchy. */
-[data-classical-shell] .rounded-lg.border,
-[data-classical-shell] [data-slot='card'] {
-  border-color: var(--color-classical-divider);
-  background: color-mix(in oklch, var(--color-classical-surface) 78%, transparent);
-  box-shadow: var(--shadow-classical-hairline);
-}
-
-[data-classical-shell] [data-slot='card-title'] {
-  font-family: var(--font-classical-heading);
-  font-size: 1.2rem;
-  font-weight: 400;
-}
-
-[data-classical-shell] button:not([aria-label='关闭']) {
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
-}
-
-[data-classical-shell] button[data-variant='outline'],
-[data-classical-shell] .border-input {
-  border-color: color-mix(in oklch, var(--color-classical-accent) 58%, transparent);
-  background: transparent;
-}
-
-[data-classical-shell] button[data-variant='outline']:hover,
-[data-classical-shell] button[data-variant='ghost']:hover {
-  background: color-mix(in oklch, var(--color-classical-accent) 9%, transparent);
-  color: var(--color-classical-accent);
-}
-
-[data-classical-shell] table {
-  border-collapse: collapse;
-}
-
-[data-classical-shell] th {
-  font-family: var(--font-classical-body);
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-classical-muted);
-  border-bottom-color: var(--color-classical-divider);
-}
-
-[data-classical-shell] td {
-  border-bottom-color: var(--color-classical-divider);
-}
-
-[data-classical-shell] [role='alert'] {
-  border-color: color-mix(in oklch, var(--color-classical-accent) 48%, transparent);
-  background: transparent;
-  color: var(--color-classical-ink);
-}
-
-[data-classical-shell] [data-slot='empty'] {
-  border: 1px dashed var(--color-classical-divider);
-  background: transparent;
-  padding: 2.5rem;
-}
-
-[data-classical-shell] img {
-  filter: sepia(0.12) saturate(0.88) contrast(1.02);
-}
-
-[data-classical-editor] [role='toolbar'] {
-  padding: 0.9rem 0 1rem;
-  border-bottom-color: var(--color-classical-divider);
-}
-
-[data-classical-editor] [role='toolbar'] > div {
-  background: transparent;
-}
-
-[data-classical-editor] [data-label-canvas] {
-  border: 1px solid var(--color-classical-divider);
-  box-shadow: var(--shadow-classical-hairline);
-}
-
-[data-classical-editor] aside {
-  border-color: var(--color-classical-divider);
-}
-
-[data-classical-editor] aside > section > h3 {
-  font-family: var(--font-classical-heading);
-  font-size: 1rem;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  padding-bottom: 0.35rem;
-  border-bottom: 1px solid var(--color-classical-divider);
-}
-
-/*
- * A native scrollbar shaped like the ScrollArea component's.
- *
- * For regions that cannot use ScrollArea: ones that centre their content (its
- * viewport wraps children in a `display: table` element), ones that attach a
- * wheel handler to the scrolling element (Radix scrolls an inner element you
- * were not given), and ones belonging to a third-party component that manages
- * its own scrolling.
- *
- * Same shape either way — 8px, rounded thumb in the border colour, no track —
- * so which mechanism a region happens to use is not visible.
- *
- * Both syntaxes are needed: the standard properties cover Firefox and recent
- * Chromium, the `::-webkit-` rules cover Safari and older Chromium.
- */
-.scrollbar-themed {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
-}
-
-.scrollbar-themed::-webkit-scrollbar {
-  width: 0.5rem;
-  height: 0.5rem;
-}
-
-.scrollbar-themed::-webkit-scrollbar-track,
-.scrollbar-themed::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.scrollbar-themed::-webkit-scrollbar-thumb {
-  border-radius: 9999px;
-  background-color: var(--color-border);
-}
-
-.scrollbar-themed::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-muted-foreground);
-}
-
-/* The data source grid owns its scrolling, so it takes the class above. */
-.dsg-container {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
-}
-
-.dsg-container::-webkit-scrollbar {
-  width: 0.5rem;
-  height: 0.5rem;
-}
-
-.dsg-container::-webkit-scrollbar-track,
-.dsg-container::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.dsg-container::-webkit-scrollbar-thumb {
-  border-radius: 9999px;
-  background-color: var(--color-border);
-}
-
-.dsg-container::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-muted-foreground);
-}
-
 /*
  * The grid's right-click menu.
  *
- * The library paints it `background: white; color: black` — pure white, which
- * in this palette is reserved for the thing being printed, and a black that is
- * not the ink the rest of the interface is set in. Both are overridden below.
- *
- * The values are the ones `SelectContent` and `SelectItem` use, spelled as raw
- * tokens because this element belongs to a third-party component and never
- * passes through `cn()`. The first attempt reached for `--color-popover` and
- * `--radius-md`, which shadcn's larger palette has and this one does not: an
- * undefined custom property makes the whole declaration invalid, so the menu
- * came out transparent rather than obviously wrong.
+ * The library paints it white on black — white is reserved here, and black
+ * is not the ink the rest of the interface is set in. Spelled as raw tokens
+ * because this element belongs to a third-party component and never passes
+ * through `cn()`.
  */
 .dsg-context-menu {
-  background: var(--color-background);
-  color: var(--color-foreground);
+  background: var(--color-popover);
+  color: var(--color-popover-foreground);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: 0 4px 12px 0 color-mix(in oklch, var(--color-foreground) 12%, transparent);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   padding: 0.25rem;
   font-size: 0.75rem;
 }
 .dsg-context-menu-item {
   padding: 0.25rem 0.5rem;
-  border-radius: calc(var(--radius) - 0.25rem);
+  border-radius: var(--radius-sm);
   cursor: default;
 }
 .dsg-context-menu-item:hover {
-  background: var(--color-muted);
+  background: var(--color-accent);
+}
+
+/*
+ * A native scrollbar shaped like the ScrollArea component's.
+ *
+ * For regions that cannot use ScrollArea: ones that centre their content,
+ * ones that attach a wheel handler to the scrolling element, and ones
+ * belonging to a third-party component that manages its own scrolling.
+ * Same shape either way, so which mechanism a region uses is not visible.
+ */
+.scrollbar-themed {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-neutral-800) transparent;
+}
+
+.scrollbar-themed::-webkit-scrollbar,
+.dsg-container::-webkit-scrollbar {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+.scrollbar-themed::-webkit-scrollbar-track,
+.scrollbar-themed::-webkit-scrollbar-corner,
+.dsg-container::-webkit-scrollbar-track,
+.dsg-container::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scrollbar-themed::-webkit-scrollbar-thumb,
+.dsg-container::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: var(--color-neutral-800);
+}
+
+.scrollbar-themed::-webkit-scrollbar-thumb:hover,
+.dsg-container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-neutral-700);
 }

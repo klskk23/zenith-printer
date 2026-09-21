@@ -238,7 +238,7 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-sm font-semibold">{source.name}</h2>
+          <h2 className="text-sm font-medium">{source.name}</h2>
           {dirty && (
             <span className="text-xs text-muted-foreground" data-unsaved>
               {copy.dataSources.unsaved}

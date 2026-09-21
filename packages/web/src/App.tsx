@@ -78,14 +78,14 @@ function Workspace({ connection }: { connection: ConnectionState }): React.JSX.E
     // Fixed to the viewport rather than growing with content: the editor's
     // resizable columns need a height to divide, and a page that scrolls as a
     // whole would give them an unbounded one.
-    <div className="flex h-screen flex-col overflow-hidden" data-classical-shell>
+    <div className="flex h-screen flex-col overflow-hidden">
       <StatusBar connection={connection} />
       <TabBar />
 
       <div className="flex min-h-0 flex-1">
         <Sidebar pendingJobCount={pending} />
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col" data-classical-content>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           {connection === 'disconnected' && <DisconnectedBanner />}
           {atSoftLimit && (
             <Alert variant="warning" className="m-4 text-xs">

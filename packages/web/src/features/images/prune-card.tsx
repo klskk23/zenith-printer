@@ -46,7 +46,7 @@ export function ImagePruneCard(): React.JSX.Element {
 
   return (
     <section className="flex flex-col gap-2 rounded border border-border p-3" data-image-prune>
-      <h3 className="text-xs font-semibold">{copy.settings.maintenanceHeading}</h3>
+      <h3 className="text-xs font-medium">{copy.settings.maintenanceHeading}</h3>
       <p className="text-2xs text-muted-foreground">{copy.settings.maintenanceScope}</p>
 
       <div className="flex items-center gap-2 pt-1">

@@ -7,10 +7,12 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary text-primary-foreground',
-        secondary: 'border-transparent bg-muted text-muted-foreground',
-        outline: 'border-border text-foreground',
-        destructive: 'border-transparent bg-destructive text-white',
+        // Tints off the ramps, never the accent as a fill: a solid blurple
+        // badge would be the loudest thing on the screen.
+        default: 'border-accent-700 bg-accent-800 text-accent-100',
+        secondary: 'border-neutral-700 bg-neutral-800 text-neutral-100',
+        outline: 'border-primary text-primary',
+        destructive: 'border-destructive/50 bg-destructive/12 text-destructive',
       },
     },
     defaultVariants: { variant: 'default' },

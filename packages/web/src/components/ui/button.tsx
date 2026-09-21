@@ -15,11 +15,18 @@ const buttonVariants = cva(
   'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
+      /**
+       * Buttons are outlined, never filled. The accent is a line in this
+       * palette — a solid blurple block would be the one thing on the screen
+       * louder than the label, which is the one thing meant to be loud.
+       * Hover and pressed states are tints off the same colour.
+       */
       variant: {
-        default: 'border border-primary/70 bg-transparent text-primary hover:bg-primary/10',
-        outline: 'border border-primary/45 bg-transparent hover:bg-primary/10',
-        ghost: 'text-foreground hover:bg-primary/8 hover:text-primary',
-        destructive: 'bg-destructive text-white hover:opacity-90',
+        default: 'border border-primary bg-transparent text-primary hover:bg-primary/12 active:bg-primary/22',
+        outline: 'border border-border bg-transparent hover:bg-foreground/7 active:bg-foreground/14',
+        ghost: 'text-primary hover:bg-primary/10 active:bg-primary/18',
+        destructive:
+          'border border-destructive bg-transparent text-destructive hover:bg-destructive/12 active:bg-destructive/22',
       },
       size: {
         default: 'h-9 px-4 py-2',

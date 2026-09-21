@@ -20,10 +20,10 @@
 
 **Purpose**: 字体资产、测试配置、清掉本会话遗留的浅色方案
 
-- [ ] T001 [P] 用 `scripts/fetch-fonts.sh` 同一套方式取得 Inter Regular/Medium 源文件并用 `scripts/subset-fonts.py` 生成 Latin+数字子集，产出 `web/public/fonts/subset/Inter-Regular.woff2` 与 `Inter-Medium.woff2`（各 ≤ 60 KB）；在 `scripts/fetch-fonts.sh` 里记录来源与许可
-- [ ] T002 [P] 在 `vitest.config.ts` 的 coverage `include` 加入 `packages/web/src/features/drafts/*.ts`、`packages/web/src/features/print/head-figure.ts`、`packages/web/src/features/templates/thumbnail-values.ts`、`packages/web/src/app/status-summary.ts`
-- [ ] T003 [P] 删除 `web/tests/classical-shell.dom.test.tsx`（Classical 壳层不复存在；它断言的 `data-classical-*` 标记将随第 1 步移除）
-- [ ] T004 在 `.gitignore` 加入 `.playwright-mcp/`（本会话截图目录，不入库）
+- [X] T001 [P] 用 `scripts/fetch-fonts.sh` 同一套方式取得 Inter Regular/Medium 源文件并用 `scripts/subset-fonts.py` 生成 Latin+数字子集，产出 `web/public/fonts/subset/Inter-Regular.woff2` 与 `Inter-Medium.woff2`（各 ≤ 60 KB）；在 `scripts/fetch-fonts.sh` 里记录来源与许可
+- [X] T002 [P] 在 `vitest.config.ts` 的 coverage `include` 加入 `packages/web/src/features/drafts/*.ts`、`packages/web/src/features/print/head-figure.ts`、`packages/web/src/features/templates/thumbnail-values.ts`、`packages/web/src/app/status-summary.ts`
+- [X] T003 [P] 删除 `web/tests/classical-shell.dom.test.tsx`（Classical 壳层不复存在；它断言的 `data-classical-*` 标记将随第 1 步移除）
+- [X] T004 在 `.gitignore` 加入 `.playwright-mcp/`（本会话截图目录，不入库）
 
 ---
 
@@ -33,21 +33,21 @@
 
 ### Tests（先写，确认红）
 
-- [ ] T005 [P] `web/tests/drafts/schema.test.ts`：`draftSchema` 接受契约里的完整形状；拒绝缺字段、`past` 超过 50、非 ISO 时间；`draftIndexSchema` 只接受 `version: 1`
-- [ ] T006 [P] `web/tests/drafts/trim.test.ts`：`trimForStorage(draft)` 把 `past` 裁到最近 50 条；`dropHistory(draft)` 返回 `past: []` 且 `present` 不变；两者不修改入参
-- [ ] T007 [P] `web/tests/drafts/store.test.ts`（用内存 `DraftStorage` 假实现 + 注入时钟/窗口 id）：`write` 后 `read` 等值；`write` 更新索引；`remove` 同时清索引；`list()` 自愈（索引有键无 → 剔除；键有索引无 → 补上）；损坏 JSON → `read` 返回 `{corrupt: true}` 且 `list().corrupt` 含该 id；**`setItem` 抛 `QuotaExceededError` 一次 → 返回 `'stored-without-history'` 且存下的 `past` 为空**；连续两次抛 → `'unpersisted'` 且什么都没写；`clear()` 只删 `zenith.drafts.v1.*` 前缀的键；**`createdAt` 为 400 天前的草稿仍出现在 `list()` 中**（FR-021：没有 TTL）
-- [ ] T008 [P] `web/tests/drafts/version.test.ts`：`isBaselineStale(draft, serverVersion)`：`server > base` 为 true，等于/小于为 false，`base === null` 为 false；`changedByAnotherWindow(draft, windowId, lastWrittenAt)`：`writerId` 不同且 `updatedAt > lastWrittenAt` 为 true，其余 false
-- [ ] T009 [P] `web/tests/drafts/window-id.test.ts`：同一 `sessionStorage` 两次取同一 id；不同 storage 不同 id；storage 不可用时仍返回非空 id（内存回退）
+- [X] T005 [P] `web/tests/drafts/schema.test.ts`：`draftSchema` 接受契约里的完整形状；拒绝缺字段、`past` 超过 50、非 ISO 时间；`draftIndexSchema` 只接受 `version: 1`
+- [X] T006 [P] `web/tests/drafts/trim.test.ts`：`trimForStorage(draft)` 把 `past` 裁到最近 50 条；`dropHistory(draft)` 返回 `past: []` 且 `present` 不变；两者不修改入参
+- [X] T007 [P] `web/tests/drafts/store.test.ts`（用内存 `DraftStorage` 假实现 + 注入时钟/窗口 id）：`write` 后 `read` 等值；`write` 更新索引；`remove` 同时清索引；`list()` 自愈（索引有键无 → 剔除；键有索引无 → 补上）；损坏 JSON → `read` 返回 `{corrupt: true}` 且 `list().corrupt` 含该 id；**`setItem` 抛 `QuotaExceededError` 一次 → 返回 `'stored-without-history'` 且存下的 `past` 为空**；连续两次抛 → `'unpersisted'` 且什么都没写；`clear()` 只删 `zenith.drafts.v1.*` 前缀的键；**`createdAt` 为 400 天前的草稿仍出现在 `list()` 中**（FR-021：没有 TTL）
+- [X] T008 [P] `web/tests/drafts/version.test.ts`：`isBaselineStale(draft, serverVersion)`：`server > base` 为 true，等于/小于为 false，`base === null` 为 false；`changedByAnotherWindow(draft, windowId, lastWrittenAt)`：`writerId` 不同且 `updatedAt > lastWrittenAt` 为 true，其余 false
+- [X] T009 [P] `web/tests/drafts/window-id.test.ts`：同一 `sessionStorage` 两次取同一 id；不同 storage 不同 id；storage 不可用时仍返回非空 id（内存回退）
 
 ### Implementation
 
-- [ ] T010 [P] `web/src/features/drafts/schema.ts`：`draftSchema`、`draftIndexEntrySchema`、`draftIndexSchema`，类型 `Draft`、`DraftIndexEntry`、`CorruptDraft`（引用 `@zenith/shared` 的 `labelIrSchema` 与变量 schema，`UNDO_LIMIT` 来自 `editor/undo.ts`）
-- [ ] T011 [P] `web/src/features/drafts/storage.ts`：`DraftStorage` 接口；`localDraftStorage()`（直接透传 `localStorage`，**不吞异常**；`keys()` 过滤前缀）；`memoryDraftStorage()`（Map 实现，供测试与隐私模式）；`isLocalStorageUsable()` 复用 `lib/storage.ts` 的探测
-- [ ] T012 [P] `web/src/features/drafts/trim.ts`：`trimForStorage`、`dropHistory`
-- [ ] T013 [P] `web/src/features/drafts/version.ts`：`isBaselineStale`、`changedByAnotherWindow`
-- [ ] T014 [P] `web/src/features/drafts/window-id.ts`：`windowId(storage = sessionStorage)`，键 `zenith.window`
-- [ ] T015 `web/src/features/drafts/store.ts`：`createDraftStore(storage, clock, windowId)` 实现契约的 `read/write/remove/list/clear`（依赖 T010–T014）；`write` 的降级序列：原样 → `dropHistory` 重试 → `'unpersisted'`
-- [ ] T016 `web/src/features/drafts/index.ts`：导出上述模块 + 一个默认单例 `draftStore`（`localDraftStorage` 可用则用之，否则 `memoryDraftStorage`；时钟 `() => new Date().toISOString()`）
+- [X] T010 [P] `web/src/features/drafts/schema.ts`：`draftSchema`、`draftIndexEntrySchema`、`draftIndexSchema`，类型 `Draft`、`DraftIndexEntry`、`CorruptDraft`（引用 `@zenith/shared` 的 `labelIrSchema` 与变量 schema，`UNDO_LIMIT` 来自 `editor/undo.ts`）
+- [X] T011 [P] `web/src/features/drafts/storage.ts`：`DraftStorage` 接口；`localDraftStorage()`（直接透传 `localStorage`，**不吞异常**；`keys()` 过滤前缀）；`memoryDraftStorage()`（Map 实现，供测试与隐私模式）；`isLocalStorageUsable()` 复用 `lib/storage.ts` 的探测
+- [X] T012 [P] `web/src/features/drafts/trim.ts`：`trimForStorage`、`dropHistory`
+- [X] T013 [P] `web/src/features/drafts/version.ts`：`isBaselineStale`、`changedByAnotherWindow`
+- [X] T014 [P] `web/src/features/drafts/window-id.ts`：`windowId(storage = sessionStorage)`，键 `zenith.window`
+- [X] T015 `web/src/features/drafts/store.ts`：`createDraftStore(storage, clock, windowId)` 实现契约的 `read/write/remove/list/clear`（依赖 T010–T014）；`write` 的降级序列：原样 → `dropHistory` 重试 → `'unpersisted'`
+- [X] T016 `web/src/features/drafts/index.ts`：导出上述模块 + 一个默认单例 `draftStore`（`localDraftStorage` 可用则用之，否则 `memoryDraftStorage`；时钟 `() => new Date().toISOString()`）
 
 **Checkpoint**: `npm test -- --project default` 中 `drafts/*` 全绿；`test:coverage` 里 `features/drafts/*.ts` ≥ 80%。
 
@@ -61,23 +61,23 @@
 
 ### Tests（先写，确认红）
 
-- [ ] T017 [P] [US1] 重写 `web/tests/design-tokens.test.ts`：(a) 解析 `web/src/index.css` 的 `@theme` 块，断言 `contracts/visual-tokens.md` 表中每个语义令牌的值**逐字相等**（Nocturne 原值）；(b) 用 WCAG 相对亮度算：`foreground/background ≥ 4.5`、`muted-foreground/background ≥ 4.5`、`accent-300/background ≥ 4.5`、`card-foreground/card ≥ 4.5`、`secondary-foreground/secondary ≥ 4.5`、`destructive/background ≥ 4.5`、`warning/background ≥ 4.5`、`success/background ≥ 4.5`、`primary/background ≥ 3`；(c) `#ffffff`/`#fff`/`white`/`bg-white` 在 `web/src/**` 只出现在 `index.css` 的 `.paper` 规则内；(d) 保留既有的 Tailwind 调色板扫描；(e) `index.css` 不含 `classical`、`--font-display`、`--shadow-sheet`
-- [ ] T018 [P] [US1] 新建 `web/tests/fonts.test.ts`：扫描 `web/src/**/*.tsx` 与 `index.css` 的非 `@font-face` 规则，断言不出现 `font-display`、`font-serif`、`Noto Serif`；断言 `fonts.css` 仍声明 `Noto Serif CJK SC`（渲染字体）且新增 `Inter` 400/500 指向 `/fonts/subset/Inter-*.woff2`；断言 `web/public/fonts/subset/Inter-Regular.woff2` 与 `Inter-Medium.woff2` 存在且各 ≤ 60 KB；断言 `copy.editor.fonts` 的取值与 `packages/server/src/render/fonts.ts` 的 `FONT_FAMILIES` 都不含 `Inter`（界面字体不是渲染字体）
-- [ ] T019 [P] [US1] 新建 `web/tests/heading-weight.dom.test.tsx`：渲染 `PageHeader` 与 `App`，断言所有 `h1–h3` 的 class 不含 `font-bold`/`font-semibold`，含 `font-medium`（结构断言，不断言颜色）
-- [ ] T020 [P] [US1] 新建 `web/tests/paper.dom.test.tsx`：渲染编辑器画布与 `ThumbnailFrame`，断言 `[data-label-canvas]` 与 `[data-thumbnail-frame]` 都带 `paper` 类；断言 `ThumbnailFrame` 不再带 `bg-white`
-- [ ] T021 [US1] 更新 `web/tests/render-smoke.dom.test.tsx` 的侧栏文案期望为当前七项（本步不改导航），确认改令牌后每页仍能渲染；设置页"无主题选项"断言（`settings.dom.test.tsx`）保持不变
+- [X] T017 [P] [US1] 重写 `web/tests/design-tokens.test.ts`：(a) 解析 `web/src/index.css` 的 `@theme` 块，断言 `contracts/visual-tokens.md` 表中每个语义令牌的值**逐字相等**（Nocturne 原值）；(b) 用 WCAG 相对亮度算：`foreground/background ≥ 4.5`、`muted-foreground/background ≥ 4.5`、`accent-300/background ≥ 4.5`、`card-foreground/card ≥ 4.5`、`secondary-foreground/secondary ≥ 4.5`、`destructive/background ≥ 4.5`、`warning/background ≥ 4.5`、`success/background ≥ 4.5`、`primary/background ≥ 3`；(c) `#ffffff`/`#fff`/`white`/`bg-white` 在 `web/src/**` 只出现在 `index.css` 的 `.paper` 规则内；(d) 保留既有的 Tailwind 调色板扫描；(e) `index.css` 不含 `classical`、`--font-display`、`--shadow-sheet`
+- [X] T018 [P] [US1] 新建 `web/tests/fonts.test.ts`：扫描 `web/src/**/*.tsx` 与 `index.css` 的非 `@font-face` 规则，断言不出现 `font-display`、`font-serif`、`Noto Serif`；断言 `fonts.css` 仍声明 `Noto Serif CJK SC`（渲染字体）且新增 `Inter` 400/500 指向 `/fonts/subset/Inter-*.woff2`；断言 `web/public/fonts/subset/Inter-Regular.woff2` 与 `Inter-Medium.woff2` 存在且各 ≤ 60 KB；断言 `copy.editor.fonts` 的取值与 `packages/server/src/render/fonts.ts` 的 `FONT_FAMILIES` 都不含 `Inter`（界面字体不是渲染字体）
+- [X] T019 [P] [US1] 新建 `web/tests/heading-weight.dom.test.tsx`：渲染 `PageHeader` 与 `App`，断言所有 `h1–h3` 的 class 不含 `font-bold`/`font-semibold`，含 `font-medium`（结构断言，不断言颜色）
+- [X] T020 [P] [US1] 新建 `web/tests/paper.dom.test.tsx`：渲染编辑器画布与 `ThumbnailFrame`，断言 `[data-label-canvas]` 与 `[data-thumbnail-frame]` 都带 `paper` 类；断言 `ThumbnailFrame` 不再带 `bg-white`
+- [X] T021 [US1] 更新 `web/tests/render-smoke.dom.test.tsx` 的侧栏文案期望为当前七项（本步不改导航），确认改令牌后每页仍能渲染；设置页"无主题选项"断言（`settings.dom.test.tsx`）保持不变
 
 ### Implementation
 
-- [ ] T022 [US1] 重写 `web/src/index.css`：按 `contracts/visual-tokens.md` 写 `@theme`（十六进制原值 + 三个新增状态色 + neutral/accent 阶梯 + `--radius-sm/md/lg` + `--shadow-sm/md/lg` + `--font-sans` + `--spacing-n1…n8`）；`.paper`/`.paper-lg`；`.separator-fade` 渐变；全局 `:focus-visible` 轮廓；`::selection`；`body` 用 `bg-background text-foreground font-sans`；保留 `.dsg-*` 与 `.scrollbar-themed` 映射（改为新令牌）；**删除所有 `[data-classical-*]`、`.classical-*`、`--color-classical-*`、`--font-display`、`--shadow-sheet`**
-- [ ] T023 [P] [US1] `web/src/fonts.css`：新增 Inter 400/500 `@font-face`；`Noto Serif CJK SC` 保留并加注释说明它是渲染字体而非界面字体
-- [ ] T024 [P] [US1] `web/src/components/ui/button.tsx`：`default` = `border border-primary text-primary bg-transparent hover:bg-primary/12 active:bg-primary/22`；`secondary` = `border border-border hover:bg-foreground/7`；`ghost` = `text-primary hover:bg-primary/10`；`destructive` = `border border-destructive text-destructive bg-transparent hover:bg-destructive/12`（描边，不填充）；`rounded-md`
-- [ ] T025 [P] [US1] `web/src/components/ui/card.tsx`、`dialog.tsx`、`alert-dialog.tsx`：`bg-card shadow-sm`（Card）/ `bg-card shadow-lg rounded-lg`（Dialog）；`input.tsx`、`textarea.tsx`、`select.tsx`：`bg-transparent border-input focus-visible:border-ring`；`separator.tsx` 加 `fade?: boolean` → `separator-fade`；`table.tsx` 行线用 `separator-fade` 底边；`alert.tsx` 的 `warning/destructive/info` 变体改为"淡染面 + 语义色文字 + 语义色左边线"，不做实心填充；`badge.tsx` 各变体改为"阶梯色淡染底 + 描边"（`--color-accent-800`/`--color-neutral-800` 这类阶梯色允许作底，`--color-primary` 本身不作底）
-- [ ] T026 [P] [US1] `web/src/components/page-header.tsx`：`h2` 去 `font-display`，用 `text-base font-medium`；改注释（不再讲衬线）
-- [ ] T027 [P] [US1] `web/src/editor/canvas.tsx`（及 `canvas-viewport.tsx` 若持有画布容器）：`[data-label-canvas]` 元素加 `paper paper-lg`；`web/src/features/templates/thumbnail-frame.tsx`：`bg-white border border-border` → `paper`；`web/src/features/print/preview.tsx` 与 `features/jobs/history.tsx` 的快照容器加 `paper`
-- [ ] T028 [P] [US1] `web/src/app/sidebar.tsx`、`app/status-bar.tsx`、`app/tab-bar.tsx`、`App.tsx`：删除 `data-classical-*` 属性与 `classical-*` 类；侧栏行用 Nocturne 形态（选中：`text-primary bg-primary/11 shadow-[inset_2px_0_0_var(--color-primary)]`；间距 `px-n3 py-n2`）；顶栏/边界一律 `border-border`
-- [ ] T029 [US1] 全仓 `web/src/**/*.tsx` 扫一遍 `font-semibold`/`font-bold` 用于标题的地方改 `font-medium`；`text-white` → `text-foreground`；确认 `design-tokens.test.ts`、`fonts.test.ts` 转绿
-- [ ] T030 [US1] i18n：`settings` 区若仍有主题相关键则删除（`zh-CN.ts`/`en-US.ts` 同步）；跑 `i18n-completeness.test.ts`
+- [X] T022 [US1] 重写 `web/src/index.css`：按 `contracts/visual-tokens.md` 写 `@theme`（十六进制原值 + 三个新增状态色 + neutral/accent 阶梯 + `--radius-sm/md/lg` + `--shadow-sm/md/lg` + `--font-sans` + `--spacing-n1…n8`）；`.paper`/`.paper-lg`；`.separator-fade` 渐变；全局 `:focus-visible` 轮廓；`::selection`；`body` 用 `bg-background text-foreground font-sans`；保留 `.dsg-*` 与 `.scrollbar-themed` 映射（改为新令牌）；**删除所有 `[data-classical-*]`、`.classical-*`、`--color-classical-*`、`--font-display`、`--shadow-sheet`**
+- [X] T023 [P] [US1] `web/src/fonts.css`：新增 Inter 400/500 `@font-face`；`Noto Serif CJK SC` 保留并加注释说明它是渲染字体而非界面字体
+- [X] T024 [P] [US1] `web/src/components/ui/button.tsx`：`default` = `border border-primary text-primary bg-transparent hover:bg-primary/12 active:bg-primary/22`；`secondary` = `border border-border hover:bg-foreground/7`；`ghost` = `text-primary hover:bg-primary/10`；`destructive` = `border border-destructive text-destructive bg-transparent hover:bg-destructive/12`（描边，不填充）；`rounded-md`
+- [X] T025 [P] [US1] `web/src/components/ui/card.tsx`、`dialog.tsx`、`alert-dialog.tsx`：`bg-card shadow-sm`（Card）/ `bg-card shadow-lg rounded-lg`（Dialog）；`input.tsx`、`textarea.tsx`、`select.tsx`：`bg-transparent border-input focus-visible:border-ring`；`separator.tsx` 加 `fade?: boolean` → `separator-fade`；`table.tsx` 行线用 `separator-fade` 底边；`alert.tsx` 的 `warning/destructive/info` 变体改为"淡染面 + 语义色文字 + 语义色左边线"，不做实心填充；`badge.tsx` 各变体改为"阶梯色淡染底 + 描边"（`--color-accent-800`/`--color-neutral-800` 这类阶梯色允许作底，`--color-primary` 本身不作底）
+- [X] T026 [P] [US1] `web/src/components/page-header.tsx`：`h2` 去 `font-display`，用 `text-base font-medium`；改注释（不再讲衬线）
+- [X] T027 [P] [US1] `web/src/editor/canvas.tsx`（及 `canvas-viewport.tsx` 若持有画布容器）：`[data-label-canvas]` 元素加 `paper paper-lg`；`web/src/features/templates/thumbnail-frame.tsx`：`bg-white border border-border` → `paper`；`web/src/features/print/preview.tsx` 与 `features/jobs/history.tsx` 的快照容器加 `paper`
+- [X] T028 [P] [US1] `web/src/app/sidebar.tsx`、`app/status-bar.tsx`、`app/tab-bar.tsx`、`App.tsx`：删除 `data-classical-*` 属性与 `classical-*` 类；侧栏行用 Nocturne 形态（选中：`text-primary bg-primary/11 shadow-[inset_2px_0_0_var(--color-primary)]`；间距 `px-n3 py-n2`）；顶栏/边界一律 `border-border`
+- [X] T029 [US1] 全仓 `web/src/**/*.tsx` 扫一遍 `font-semibold`/`font-bold` 用于标题的地方改 `font-medium`；`text-white` → `text-foreground`；确认 `design-tokens.test.ts`、`fonts.test.ts` 转绿
+- [X] T030 [US1] i18n：`settings` 区若仍有主题相关键则删除（`zh-CN.ts`/`en-US.ts` 同步）；跑 `i18n-completeness.test.ts`
 
 **Checkpoint**: `npm run typecheck && npm run lint && npm test` 全绿；按 quickstart 第 1 步在浏览器目视：深色、描边按钮、白纸带光、Network 无 `NotoSerif*`。**可独立提交为第 1 步。**
 

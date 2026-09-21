@@ -1,32 +1,30 @@
 /**
- * Colour goes through the theme, never around it.
+ * Colour goes through the theme, never around it — and the theme is Nocturne.
  *
- * The constitution's UI rule — build on shadcn/ui and reuse its design tokens —
- * had nothing checking it, and five places had drifted: a warning Alert painted
- * `text-amber-800`, the queue's "printing" state `text-blue-600`, three more
- * amber spans. Every one of them was a colour picked for white paper and then
- * rendered onto a near-black background, because this application has a dark
- * theme and Tailwind's palette scale does not.
+ * Two things are checked here, both by reading the source rather than
+ * rendering it (happy-dom resolves no custom properties and paints nothing,
+ * so `text-warning` and `text-amber-800` look the same to it):
  *
- * So the rule is checked by reading the source. A rendered test cannot see it:
- * happy-dom resolves no custom properties and paints nothing, so `text-warning`
- * and `text-amber-800` are the same string to it either way.
+ *   1. The tokens in index.css are Nocturne's own values, verbatim. The
+ *      design brief was "not one token changed", and a palette that has been
+ *      nudged half a step still looks fine on the screen it was nudged on.
+ *      So the contract table in specs/005/contracts/visual-tokens.md is
+ *      repeated here and compared byte for byte.
+ *   2. Every text pair is readable, by measurement. Nocturne ships its accent
+ *      at ~3:1 against the ground and says so — fine for lines and large
+ *      type, not for body text — which is why this application uses
+ *      `accent-300` for accent-coloured words.
  *
- * Two escapes are allowed, both stated where they are used:
- *   - `[data-label-canvas]`, which is a sheet of paper and stays white in
- *     either theme, or the preview would lie about the print;
- *   - the tokens' own definitions in index.css, which is where colour is
- *     supposed to be written down.
+ * And the one rule that is this product's rather than Nocturne's: pure white
+ * means "this will be printed". It appears in `.paper` and in the canvas's own
+ * SVG fills, and nowhere else.
  */
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const SRC = new URL('../src', import.meta.url).pathname
-
-/** Tailwind's built-in palette scale — the thing that has no dark variant. */
-const PALETTE =
-  /\b(?:bg|text|border|ring|fill|stroke|from|to|via|outline|decoration|shadow|accent|caret|divide)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d{2,3}\b/g
+const css = readFileSync(join(SRC, 'index.css'), 'utf8')
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -47,13 +45,141 @@ function code(file: string): string {
   return readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
 }
 
-const offenders = (): string[] =>
-  sourceFiles(SRC).flatMap((file) => {
-    const matches = code(file).match(PALETTE) ?? []
-    return matches.map((match) => `${file.slice(SRC.length + 1)}: ${match}`)
+const declarations = css.replace(/\/\*[\s\S]*?\*\//g, '')
+
+/** The raw value of a `@theme` token, as written. */
+function token(name: string): string {
+  const match = new RegExp(`--${name}:\\s*([^;]+);`).exec(declarations)
+  expect(match, `--${name} is not defined`).not.toBeNull()
+  return match![1]!.trim()
+}
+
+/**
+ * The Nocturne values, verbatim — see contracts/visual-tokens.md.
+ *
+ * `destructive`, `warning` and `success` are this application's own three
+ * state colours; Nocturne has one accent and no semantic states. They are
+ * additions, held to the same contrast floor, not changes.
+ */
+const NOCTURNE: Record<string, string> = {
+  'color-background': '#161826',
+  'color-foreground': '#e9e9ed',
+  'color-card': '#232532',
+  'color-card-foreground': '#e9e9ed',
+  'color-popover': '#232532',
+  'color-popover-foreground': '#e9e9ed',
+  'color-primary': '#9184d9',
+  'color-primary-foreground': '#161826',
+  'color-secondary': '#3f424d',
+  'color-secondary-foreground': '#f3f5fe',
+  'color-muted': '#292b31',
+  'color-muted-foreground': '#9397ab',
+  'color-accent': '#2b2741',
+  'color-accent-foreground': '#e7e5fe',
+  'color-ring': '#9184d9',
+  'color-info': '#9184d9',
+  'color-border': 'color-mix(in srgb, #e9e9ed 16%, transparent)',
+  'color-input': 'color-mix(in srgb, #e9e9ed 45%, transparent)',
+  'color-neutral-100': '#f3f5fe',
+  'color-neutral-200': '#e4e7f5',
+  'color-neutral-300': '#cfd3e5',
+  'color-neutral-400': '#b2b6ca',
+  'color-neutral-500': '#9397ab',
+  'color-neutral-600': '#75798c',
+  'color-neutral-700': '#595d6c',
+  'color-neutral-800': '#3f424d',
+  'color-neutral-900': '#292b31',
+  'color-accent-100': '#f5f4ff',
+  'color-accent-200': '#e7e5fe',
+  'color-accent-300': '#d2cefd',
+  'color-accent-400': '#b5abfc',
+  'color-accent-500': '#968ae0',
+  'color-accent-600': '#796cbf',
+  'color-accent-700': '#5d5294',
+  'color-accent-800': '#423a6a',
+  'color-accent-900': '#2b2741',
+  'radius-sm': '4px',
+  'radius-md': '8px',
+  'radius-lg': '14px',
+  'shadow-sm': '0 0 0 1px #3f424d',
+  'shadow-md': '0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55)',
+  'shadow-lg': '0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65)',
+}
+
+describe('the tokens are Nocturne, verbatim', () => {
+  it.each(Object.entries(NOCTURNE))('%s', (name, value) => {
+    expect(token(name)).toBe(value)
   })
 
+  it('sets the interface face to Inter with the CJK sans behind it', () => {
+    expect(token('font-sans')).toMatch(/^'Inter', 'Noto Sans CJK SC'/)
+  })
+
+  it('has no display face — headings are the body face at weight 500', () => {
+    expect(declarations).not.toContain('--font-display')
+  })
+
+  it('carries nothing of the previous palette', () => {
+    for (const relic of ['classical', '--shadow-sheet', 'oklch(']) {
+      expect(declarations, `${relic} survived the rewrite`).not.toContain(relic)
+    }
+  })
+
+  it('holds one palette and no second one', () => {
+    // Dark mode as a *choice* is gone; there is one palette and it is dark.
+    // Asserted so that adding a switch back is a visible decision.
+    expect(declarations).not.toContain('data-theme')
+    expect(declarations).not.toContain('prefers-color-scheme')
+  })
+})
+
+describe('the token set', () => {
+  it('defines every name the components reach for', () => {
+    const required = [
+      'background', 'foreground', 'card', 'card-foreground', 'popover', 'popover-foreground',
+      'primary', 'primary-foreground', 'secondary', 'secondary-foreground',
+      'muted', 'muted-foreground', 'accent', 'accent-foreground',
+      'destructive', 'destructive-foreground', 'border', 'input', 'ring',
+      'warning', 'info', 'success',
+    ]
+    expect(required.filter((name) => !declarations.includes(`--color-${name}:`))).toEqual([])
+  })
+
+  it('has a name for the density this application works at', () => {
+    expect(css).toMatch(/--text-2xs:/)
+  })
+
+  it('uses the names it invented for itself', () => {
+    const OWN = ['warning', 'info', 'success', 'accent-300']
+    const source = sourceFiles(SRC).map((file) => readFileSync(file, 'utf8')).join('\n')
+    expect(OWN.filter((name) => !source.includes(`-${name}`))).toEqual([])
+  })
+
+  it('draws form controls with the edge meant for them', () => {
+    for (const control of ['input.tsx', 'textarea.tsx', 'select.tsx']) {
+      const source = readFileSync(join(SRC, 'components/ui', control), 'utf8')
+      expect(source, `${control} does not draw border-input`).toContain('border-input')
+    }
+  })
+})
+
 describe('colour', () => {
+  /**
+   * Tailwind's built-in palette scale, which this theme does not use.
+   *
+   * `neutral` is deliberately absent from the list: Nocturne's tonal ramp is
+   * named `--color-neutral-100…900` and overrides Tailwind's, so
+   * `bg-neutral-800` here is a theme token, not a palette step.
+   */
+  const PALETTE =
+    /\b(?:bg|text|border|ring|fill|stroke|from|to|via|outline|decoration|shadow|accent|caret|divide)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|stone)-\d{2,3}\b/g
+
+  const offenders = (): string[] =>
+    sourceFiles(SRC).flatMap((file) => {
+      const matches = code(file).match(PALETTE) ?? []
+      return matches.map((match) => `${file.slice(SRC.length + 1)}: ${match}`)
+    })
+
   it('scans something, so an empty pass cannot look like a passing one', () => {
     expect(sourceFiles(SRC).length).toBeGreaterThan(50)
   })
@@ -63,21 +189,8 @@ describe('colour', () => {
   })
 
   it('catches a palette step if one is written', () => {
-    // The check itself, checked: a regex that matched nothing would make the
-    // test above pass for the wrong reason forever.
     expect('className="text-amber-800"'.match(PALETTE)).toEqual(['text-amber-800'])
     expect('className="bg-blue-600/10"'.match(PALETTE)).toEqual(['bg-blue-600'])
-  })
-})
-
-describe('the type scale', () => {
-  const css = readFileSync(join(SRC, 'index.css'), 'utf8')
-
-  it('has a name for the density this application works at', () => {
-    // `text-[11px]` was written 94 times: an arbitrary value below Tailwind's
-    // smallest step, so the densest text in the product sat outside the system
-    // and could only be changed 94 times over.
-    expect(css).toMatch(/--text-2xs:/)
   })
 
   it('is never written as an arbitrary size', () => {
@@ -89,149 +202,93 @@ describe('the type scale', () => {
   })
 })
 
-describe('the radius scale', () => {
-  const css = readFileSync(join(SRC, 'index.css'), 'utf8')
+describe('the only white is the paper', () => {
+  /**
+   * Files allowed to say white:
+   *   - index.css, inside the `.paper` rules — the stock itself;
+   *   - editor/canvas.tsx — the SVG the label is drawn in. Its fills are the
+   *     label's own colours (the sheet, and ink inverted onto a black band),
+   *     which is exactly the thing the rule reserves white for.
+   */
+  const WHITE = /#ffffff\b|#fff\b|\bwhite\b|\bbg-white\b|\btext-white\b/gi
 
-  it('derives every step from the one number', () => {
-    // `--radius` used to govern bare `rounded` and nothing else: `rounded-sm`,
-    // `-md` and `-lg` read Tailwind's own values, so 27 of 40 rounded corners
-    // ignored the token meant to decide them.
-    for (const step of ['sm', 'md', 'lg']) {
-      expect(css).toMatch(new RegExp(`--radius-${step}:[^;]*var\\(--radius\\)`))
-    }
+  it('appears in index.css only inside .paper', () => {
+    const outsidePaper = declarations.replace(/\.paper[^{]*\{[^}]*\}/g, '')
+    expect(outsidePaper.match(WHITE) ?? []).toEqual([])
+    expect(declarations.match(/\.paper\b/g)?.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it('catches a white if one is written', () => {
+    // The scan itself, scanned: a regex that matched nothing would make the
+    // two tests around it pass for the wrong reason forever.
+    expect('className="bg-white"'.match(WHITE)).toEqual(['bg-white'])
+    expect('fill="#ffffff"'.match(WHITE)).toEqual(['#ffffff'])
+    expect('text-white'.match(WHITE)).toEqual(['text-white'])
+  })
+
+  it('appears in no component other than the canvas', () => {
+    const hits = sourceFiles(SRC)
+      .filter((file) => !file.endsWith('editor/canvas.tsx') && !file.includes('/i18n/'))
+      .flatMap((file) => {
+        const matches = code(file).match(WHITE) ?? []
+        return matches.map((match) => `${file.slice(SRC.length + 1)}: ${match}`)
+      })
+    expect(hits).toEqual([])
   })
 })
 
-describe('the token set', () => {
-  const css = readFileSync(join(SRC, 'index.css'), 'utf8')
-
-  it('defines every name the components reach for', () => {
-    // Both halves of a shadcn colour pair, plus the two this application adds.
-    const required = [
-      'background', 'foreground', 'card', 'card-foreground', 'popover', 'popover-foreground',
-      'primary', 'primary-foreground', 'secondary', 'secondary-foreground',
-      'muted', 'muted-foreground', 'accent', 'accent-foreground',
-      'destructive', 'destructive-foreground', 'border', 'input', 'ring',
-      'warning', 'info', 'success',
-    ]
-    expect(required.filter((name) => !css.includes(`--color-${name}:`))).toEqual([])
-  })
-
-  it('holds one palette and no second one', () => {
-    /**
-     * Dark mode is gone, deliberately.
-     *
-     * It cost two more copies of every token — the explicit choice and the
-     * system preference were written out separately and could disagree — and
-     * the thing it was for was the canvas: a white rectangle on near-black is
-     * the harshest pairing in the product. The page ground is paper-grey now,
-     * so the step from chrome to canvas is small without a second palette to
-     * keep in step.
-     *
-     * Asserted so that adding one back is a visible decision rather than a
-     * quiet media query.
-     */
-    expect(css).not.toContain('data-theme')
-    expect(css).not.toContain('prefers-color-scheme')
-  })
-
-  it('keeps every text pair readable, by measurement', () => {
-    /**
-     * The palette's whole justification is that somebody reads it standing at
-     * a bench. Contrast is the part of that which breaks silently: a colour
-     * nudged half a step still looks fine on the screen it was nudged on.
-     *
-     * WCAG asks 4.5:1 of body text and 3:1 of the boundary of anything you can
-     * act on. The values are read out of the stylesheet and converted, so this
-     * measures what ships rather than what a comment claims.
-     */
-    const token = (name: string): [number, number, number] => {
-      const match = new RegExp(`--color-${name}: oklch\\(([\\d.]+) ([\\d.]+) ([\\d.]+)\\)`).exec(css)
-      expect(match, `--color-${name} is not an oklch triple`).not.toBeNull()
-      return [Number(match![1]), Number(match![2]), Number(match![3])]
+describe('every text pair is readable, by measurement', () => {
+  /** Composite a token over the page ground, resolving color-mix if needed. */
+  const rgb = (name: string): [number, number, number] => {
+    const value = token(name)
+    const hex = /^#([0-9a-f]{6})$/i.exec(value)
+    if (hex !== null) {
+      return hexToRgb(hex[1]!)
     }
+    const mix = /^color-mix\(in srgb, (#[0-9a-f]{6}) (\d+)%, transparent\)$/i.exec(value)
+    expect(mix, `${name}: neither hex nor a color-mix over transparent`).not.toBeNull()
+    const [r, g, b] = hexToRgb(mix![1]!.slice(1))
+    const alpha = Number(mix![2]) / 100
+    const [br, bg, bb] = hexToRgb(token('color-background').slice(1))
+    return [r * alpha + br * (1 - alpha), g * alpha + bg * (1 - alpha), b * alpha + bb * (1 - alpha)]
+  }
 
-    for (const [fg, bg, floor, what] of [
-      ['foreground', 'background', 4.5, 'body text on the page'],
-      ['card-foreground', 'card', 4.5, 'body text on a card'],
-      ['muted-foreground', 'background', 4.5, 'secondary text'],
-      ['primary-foreground', 'primary', 4.5, 'the label on a primary button'],
-      ['destructive-foreground', 'destructive', 4.5, 'the label on a destructive button'],
-      ['warning', 'background', 4.5, 'warning text'],
-      ['info', 'background', 4.5, 'the in-progress state'],
-      ['input', 'background', 3, 'the edge of something you can act on'],
-      ['ring', 'background', 3, 'the focus ring'],
-    ] as const) {
-      const ratio = contrast(token(fg), token(bg))
-      expect(ratio, `${what}: ${ratio.toFixed(2)}:1, needs ${floor}`).toBeGreaterThanOrEqual(floor)
-    }
-  })
-
-  it('draws form controls with the edge meant for them', () => {
-    /**
-     * `--color-input` was defined, documented with the contrast ratio it
-     * achieves, and referenced by nothing — every form control drew
-     * `border-border` instead, a hairline at 1.22:1 against the page, well
-     * under the 3:1 WCAG asks of the boundary of something you can act on.
-     *
-     * A token nobody uses is a decision that exists only in a comment, and
-     * this one was load-bearing: it is the only reason a text field has a
-     * visible edge on paper-grey.
-     */
-    for (const control of ['input.tsx', 'textarea.tsx', 'select.tsx']) {
-      const source = readFileSync(join(SRC, 'components/ui', control), 'utf8')
-      expect(source, `${control} does not draw border-input`).toContain('border-input')
-    }
-  })
-
-  it('uses the names it invented for itself', () => {
-    // shadcn's own set has to exist whether or not this application has
-    // reached for it yet — a component added tomorrow expects it. The names
-    // beyond that set are this project's, and one of those going unused means
-    // a state was given a colour and then never shown in it.
-    const OWN = ['warning', 'info', 'success']
-    const source = sourceFiles(SRC)
-      .map((file) => readFileSync(file, 'utf8'))
-      .join('\n')
-    expect(OWN.filter((name) => !source.includes(`-${name}`))).toEqual([])
-  })
-
-  it('reserves pure white for the thing being printed', () => {
-    // `#FFFFFF` is not a background in this palette; it is the mark that says
-    // this rectangle will exist on paper. There is exactly one, and a second
-    // would quietly undo the rule.
-    // Comments stripped first: the rule is about what the stylesheet paints,
-    // not about the prose that explains it — and the prose says `#FFFFFF` out
-    // loud, which is the point of it.
-    const declarations = css.replace(/\/\*[\s\S]*?\*\//g, '')
-    const whites = [...declarations.matchAll(/#ffffff\b|#fff\b|\bwhite\b/gi)]
-    expect(
-      whites.map((match) => match[0]),
-      'pure white outside the label canvas',
-    ).toEqual(['#ffffff'])
+  it.each([
+    ['color-foreground', 'color-background', 4.5, 'body text on the page'],
+    ['color-card-foreground', 'color-card', 4.5, 'body text on a card'],
+    ['color-muted-foreground', 'color-background', 4.5, 'secondary text'],
+    ['color-muted-foreground', 'color-card', 4.5, 'secondary text on a card'],
+    ['color-secondary-foreground', 'color-secondary', 4.5, 'text on a secondary surface'],
+    ['color-accent-foreground', 'color-accent', 4.5, 'text on a tinted hover'],
+    ['color-accent-300', 'color-background', 4.5, 'accent-coloured words at body size'],
+    ['color-destructive', 'color-background', 4.5, 'the failed / irreversible state'],
+    ['color-warning', 'color-background', 4.5, 'the printed-but-not-as-asked state'],
+    ['color-success', 'color-background', 4.5, 'the finished state'],
+    ['color-primary', 'color-background', 3, 'accent lines, outlines and large type'],
+    ['color-ring', 'color-background', 3, 'the focus ring'],
+    ['color-input', 'color-background', 3, 'the edge of something you can type into'],
+  ] as const)('%s on %s ≥ %s (%s)', (fg, bg, floor, _what) => {
+    const ratio = contrast(rgb(fg), rgb(bg))
+    expect(ratio, `${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(floor)
   })
 })
 
-/**
- * OKLCH → sRGB → WCAG relative luminance.
- *
- * Written out because the stylesheet is authored in OKLCH and the requirement
- * is stated in sRGB; converting by hand in a comment is how a palette comes to
- * claim a ratio it does not have.
- */
+function hexToRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(0, 2), 16),
+    parseInt(hex.slice(2, 4), 16),
+    parseInt(hex.slice(4, 6), 16),
+  ]
+}
+
+/** WCAG 2.x relative luminance from 8-bit sRGB, then the contrast ratio. */
 function contrast(a: [number, number, number], b: [number, number, number]): number {
-  const luminance = ([L, C, H]: [number, number, number]): number => {
-    const h = (H * Math.PI) / 180
-    const [aa, bb] = [C * Math.cos(h), C * Math.sin(h)]
-    const l = (L + 0.3963377774 * aa + 0.2158037573 * bb) ** 3
-    const m = (L - 0.1055613458 * aa - 0.0638541728 * bb) ** 3
-    const s = (L - 0.0894841775 * aa - 1.291485548 * bb) ** 3
-    const lin = [
-      4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-      -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
-    ].map((v) => Math.min(1, Math.max(0, v)))
-    return 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!
+  const luminance = (channels: [number, number, number]): number => {
+    const [r, g, bl] = channels.map((c) => {
+      const v = c / 255
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * bl!
   }
   const sorted = [luminance(a), luminance(b)].sort((x, y) => y - x)
   return (sorted[0]! + 0.05) / (sorted[1]! + 0.05)

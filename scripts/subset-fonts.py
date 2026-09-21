@@ -36,11 +36,24 @@ def gb2312_text() -> str:
     return ascii_range + punctuation + "".join(chars)
 
 
+# The interface face for Latin text and numerals. Not a render font: the
+# label renderer never sees it, so it needs no CJK and no GB2312 — ASCII plus
+# the Latin-1 and General Punctuation blocks cover every string the chrome
+# shows in it (measurements, ids, the odd English word).
+def latin_text() -> str:
+    return "".join(chr(c) for c in range(0x20, 0x7F)) + "".join(
+        chr(c) for c in list(range(0xA0, 0x100)) + list(range(0x2000, 0x2070))
+    )
+
+
+# source file, output file, family name inside the source, character set
 JOBS = [
-    ("NotoSansCJK-Regular.ttc", "NotoSansCJKsc-Regular.woff2", "Noto Sans CJK SC"),
-    ("NotoSansCJK-Bold.ttc", "NotoSansCJKsc-Bold.woff2", "Noto Sans CJK SC"),
-    ("NotoSerifCJK-Regular.ttc", "NotoSerifCJKsc-Regular.woff2", "Noto Serif CJK SC"),
-    ("DejaVuSansMono.ttf", "DejaVuSansMono.woff2", "DejaVu Sans Mono"),
+    ("NotoSansCJK-Regular.ttc", "NotoSansCJKsc-Regular.woff2", "Noto Sans CJK SC", "gb2312"),
+    ("NotoSansCJK-Bold.ttc", "NotoSansCJKsc-Bold.woff2", "Noto Sans CJK SC", "gb2312"),
+    ("NotoSerifCJK-Regular.ttc", "NotoSerifCJKsc-Regular.woff2", "Noto Serif CJK SC", "gb2312"),
+    ("DejaVuSansMono.ttf", "DejaVuSansMono.woff2", "DejaVu Sans Mono", "gb2312"),
+    ("Inter-Regular.otf", "Inter-Regular.woff2", "Inter", "latin"),
+    ("Inter-Medium.otf", "Inter-Medium.woff2", "Inter", "latin"),
 ]
 
 
@@ -57,10 +70,10 @@ def pick_face(path: Path, family: str) -> TTFont:
 
 def main() -> int:
     SUBSET.mkdir(parents=True, exist_ok=True)
-    text = gb2312_text()
+    texts = {"gb2312": gb2312_text(), "latin": latin_text()}
     missing = []
 
-    for source_name, out_name, family in JOBS:
+    for source_name, out_name, family, charset in JOBS:
         source = FULL / source_name
         if not source.exists():
             missing.append(source_name)
@@ -74,7 +87,7 @@ def main() -> int:
         options.layout_features = ["*"]
 
         subsetter = subset.Subsetter(options=options)
-        subsetter.populate(text=text)
+        subsetter.populate(text=texts[charset])
         subsetter.subset(font)
 
         out = SUBSET / out_name

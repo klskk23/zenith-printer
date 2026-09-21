@@ -21,6 +21,9 @@ export default tseslint.config(
       '**/coverage/**',
       '**/*.min.js',
       'fonts/**',
+      // The subsetting venv the Makefile tells you to create.
+      '.venv/**',
+      '.playwright-mcp/**',
     ],
   },
   js.configs.recommended,

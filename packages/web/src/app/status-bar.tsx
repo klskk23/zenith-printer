@@ -20,14 +20,13 @@ export function StatusBar({ connection }: { connection: ConnectionState }): Reac
 
   return (
     <header
-      className="flex items-center justify-between border-b border-border px-6 py-3"
-      data-classical-masthead
+      className="flex items-center justify-between border-b border-border px-n8 py-n3"
     >
       <div className="flex items-baseline gap-3">
-        <h1 className="font-display text-base font-normal tracking-wide">{copy.app.title}</h1>
+        <h1 className="text-base font-medium">{copy.app.title}</h1>
         <span className="text-2xs text-muted-foreground">{copy.app.subtitle}</span>
       </div>
-      <div className="flex items-center gap-2 text-xs" data-classical-connection>
+      <div className="flex items-center gap-2 text-xs">
         <span
           aria-hidden
           className={cn(

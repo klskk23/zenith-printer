@@ -51,10 +51,9 @@ export function ThumbnailFrame({
   const box = thumbnailBoxPx(template, { maxWidthPx, maxHeightPx })
   return (
     <div
-      className={cn(
-        'mx-auto flex items-center justify-center overflow-hidden rounded border border-border bg-white',
-        className,
-      )}
+      // `paper`, not a private white: this is a picture of the same sheet the
+      // canvas shows, and the two must say white the same way.
+      className={cn('paper mx-auto flex items-center justify-center overflow-hidden', className)}
       style={{ width: box.widthPx, height: box.heightPx }}
       data-thumbnail-frame
     >

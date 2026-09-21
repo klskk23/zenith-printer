@@ -17,11 +17,11 @@ export function AlertDialogContent({
 }: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>): React.JSX.Element {
   return (
     <AlertDialogPrimitive.Portal>
-      <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+      <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-background/70" />
       <AlertDialogPrimitive.Content
         className={cn(
           'fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2',
-          'rounded-lg border border-border bg-background p-5 shadow-lg',
+          'rounded-lg bg-card text-card-foreground p-5 shadow-lg',
           className,
         )}
         {...props}
@@ -42,7 +42,7 @@ export function AlertDialogTitle({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Title>): React.JSX.Element {
-  return <AlertDialogPrimitive.Title className={cn('text-sm font-semibold', className)} {...props} />
+  return <AlertDialogPrimitive.Title className={cn('text-sm font-medium', className)} {...props} />
 }
 
 export function AlertDialogDescription({

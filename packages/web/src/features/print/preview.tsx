@@ -94,7 +94,7 @@ export function Preview({
   return (
     <div className="flex flex-col gap-2" data-preview>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">{copy.preview.heading}</h3>
+        <h3 className="text-sm font-medium">{copy.preview.heading}</h3>
         {/*
           Offered only when there is something more to see. One selected row
           expands to the label already on screen, and no selection at all has
@@ -141,7 +141,7 @@ export function Preview({
           <img
             src={url}
             alt={copy.preview.heading}
-            className="max-w-full border border-border bg-white"
+            className="paper max-w-full"
           />
         )
       )}
@@ -176,7 +176,7 @@ function RowPreview({ ordinal, body }: { ordinal: number; body: string | null })
         <p className="text-2xs text-muted-foreground">{copy.preview.failed}</p>
       ) : (
         url !== null && (
-          <img src={url} alt={label} className="w-full border border-border bg-white" />
+          <img src={url} alt={label} className="paper w-full" />
         )
       )}
       <figcaption className="flex items-center gap-1 text-2xs text-muted-foreground">

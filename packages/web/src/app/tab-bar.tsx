@@ -95,7 +95,7 @@ export function TabBar(): React.JSX.Element {
         horizontal bar under a row of tabs reads as a second border.
       */}
       <ScrollArea orientation="horizontal" className="border-b border-border">
-        <div data-tab-bar data-classical-tab-bar className="flex items-stretch gap-1 px-5">
+        <div data-tab-bar className="flex items-stretch gap-1 px-5">
         {tabs.map((tab) => {
           const isActive = tab.id === state.activeId
           return (

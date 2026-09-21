@@ -269,17 +269,19 @@ export function EditorCanvas({
 
   return (
     /*
-     * The one place this interface raises its voice.
+     * The lightbox.
      *
      * The canvas is the only pure white in the product — the mark that says
-     * this rectangle will exist on paper — and it is lifted off the bench by
-     * its own shadow rather than outlined by a drawn line. A physical sheet
-     * has an edge because of where it sits, not because somebody drew round
-     * it, and this is the thing the whole application is for.
+     * this rectangle will exist on paper. `paper` is that white plus the glow
+     * that keeps its edge from cutting into the dark ground around it; the
+     * `-lg` variant is the wider glow a full-size sheet gets. The fills below
+     * that say white are the sheet's own: the handles sit on the paper and
+     * are drawn in the paper's colours, which is what the rule reserves white
+     * for.
      */
     <div
       data-label-canvas
-      className="inline-block shadow-sheet"
+      className="paper paper-lg inline-block"
     >
       <svg
         ref={svgRef}
@@ -396,7 +398,7 @@ export function EditorCanvas({
                 fill="transparent"
                 // FR-006: overflow is marked, never blocked — dragging past
                 // the edge is a normal intermediate state.
-                stroke={selected ? '#2563eb' : overflowing ? '#dc2626' : 'transparent'}
+                stroke={selected ? 'var(--color-primary)' : overflowing ? '#dc2626' : 'transparent'}
                 strokeWidth={selected || overflowing ? 2 : 0}
                 strokeDasharray={overflowing && !selected ? '4 2' : undefined}
                 className={cn('cursor-move', selected && 'cursor-grab')}
@@ -437,7 +439,7 @@ export function EditorCanvas({
                   width={HANDLE_DOTS}
                   height={HANDLE_DOTS}
                   fill="#ffffff"
-                  stroke="#2563eb"
+                  stroke="var(--color-primary)"
                   strokeWidth={1.5}
                   className="cursor-nwse-resize"
                   onPointerDown={(event) => beginGesture(event, selectedElement, 'resize')}
@@ -452,7 +454,7 @@ export function EditorCanvas({
                 y1={y}
                 x2={x + w / 2}
                 y2={y - ROTATE_ARM_DOTS}
-                stroke="#2563eb"
+                stroke="var(--color-primary)"
                 strokeWidth={1}
               />
               <circle
@@ -460,7 +462,7 @@ export function EditorCanvas({
                 cy={y - ROTATE_ARM_DOTS}
                 r={half}
                 fill="#ffffff"
-                stroke="#2563eb"
+                stroke="var(--color-primary)"
                 strokeWidth={1.5}
                 className="cursor-grab"
                 onPointerDown={(event) => beginGesture(event, selectedElement, 'rotate')}

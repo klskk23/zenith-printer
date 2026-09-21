@@ -26,9 +26,10 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
   const entries: TabKind[] = TAB_KINDS.filter((kind) => kind !== 'data-source')
 
   return (
-    <nav className="w-52 shrink-0 border-r border-border px-4 py-5" data-classical-sidebar>
-      <ol className="flex flex-col gap-1">
-        {entries.map((kind, index) => {
+    // Nocturne's compact scale for the shell: the rows sit at 5.6 / 8.4px.
+    <nav className="w-48 shrink-0 border-r border-border px-n3 py-n6">
+      <ol className="flex flex-col gap-px">
+        {entries.map((kind) => {
           const isActive = activeTab?.kind === kind
           return (
             <li key={kind}>
@@ -36,15 +37,16 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
                 variant="ghost"
                 size="row"
                 onClick={() => open(kind === 'design' ? { kind, templateId: null } : { kind })}
-                data-nav-index={String(index + 1).padStart(2, '0')}
                 className={cn(
-                  'justify-between border-l border-transparent pl-3 classical-nav-item',
+                  'justify-between rounded-sm px-n3 py-n2 text-xs',
+                  // The active entry: accent text on an accent tint, with the
+                  // accent as a line down its left edge — never a filled bar.
                   isActive
-                    ? 'border-l-primary bg-transparent font-medium text-foreground'
-                    : 'text-muted-foreground hover:border-l-border hover:bg-transparent',
+                    ? 'bg-primary/11 text-primary shadow-[inset_2px_0_0_var(--color-primary)] hover:bg-primary/11'
+                    : 'text-foreground/72 hover:bg-foreground/6 hover:text-foreground',
                 )}
               >
-                <span>{copy.workspace.tabs[kind]}</span>
+                <span data-nav-label>{copy.workspace.tabs[kind]}</span>
                 {kind === 'queue' && pendingJobCount > 0 && (
                   <Badge variant="secondary">{pendingJobCount}</Badge>
                 )}

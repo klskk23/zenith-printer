@@ -114,7 +114,11 @@ function JobRow({ job }: { job: PrintJob }): React.JSX.Element {
      * of what it is for: at the component's own size the three rows took the
      * space five used to, and the section stopped fitting above the fold.
      */
-    <Item role="listitem" size="xs" className="gap-3 px-0 py-1.5 text-xs">
+    <Item
+      role="listitem"
+      size="xs"
+      className="gap-3 px-0 py-1.5 text-xs"
+    >
       <ItemContent className="truncate">
         {job.snapshot.templateName ?? copy.workspace.untitledDesign} · {job.requestedCopies}
       </ItemContent>
@@ -178,6 +182,7 @@ export function IndexPage(): React.JSX.Element {
       <section className="flex flex-col gap-2">
         <PageHeader
           title={copy.index.printerSection}
+          compact
           actions={
             <Button size="sm" variant="ghost" onClick={() => open({ kind: 'printers' })}>
               {copy.index.managePrinters}
@@ -203,6 +208,7 @@ export function IndexPage(): React.JSX.Element {
       <section className="flex flex-col gap-2">
         <PageHeader
           title={copy.index.templateSection}
+          compact
           actions={
             <Button size="sm" variant="ghost" onClick={() => open({ kind: 'templates' })}>
               {copy.index.allTemplates}
@@ -234,6 +240,7 @@ export function IndexPage(): React.JSX.Element {
       <section className="flex flex-col gap-2">
         <PageHeader
           title={copy.index.recentJobsSection}
+          compact
           actions={
             <Button size="sm" variant="ghost" onClick={() => open({ kind: 'history' })}>
               {copy.index.allHistory}

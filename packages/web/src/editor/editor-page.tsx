@@ -650,7 +650,6 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
     // like it was outlining the screen.
     <div
       className="flex h-full flex-col focus:outline-none"
-      data-classical-editor
       onKeyDown={onKeyDown}
       tabIndex={-1}
     >
@@ -800,7 +799,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
           <div className="scrollbar-themed h-full overflow-y-auto">
             <aside className="flex flex-col gap-4 pr-3">
             <section className="flex flex-col gap-1.5">
-              <h3 className="text-xs font-semibold">{copy.editor.canvas}</h3>
+              <h3 className="text-xs font-medium">{copy.editor.canvas}</h3>
               <div className="flex flex-col gap-1">
                 <Label className="text-2xs">{copy.editor.canvasWidth}</Label>
                 <Input
@@ -829,7 +828,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
             <Separator />
 
             <section className="flex flex-col gap-1.5">
-              <h3 className="text-xs font-semibold">{copy.editor.addElement}</h3>
+              <h3 className="text-xs font-medium">{copy.editor.addElement}</h3>
               <div className="grid grid-cols-2 gap-1">
                 {ELEMENT_TYPES.map((type) => (
                   <Button key={type} size="sm" variant="outline" onClick={() => addElement(type)}>
@@ -842,7 +841,7 @@ export function EditorPage({ tabId, templateId, presetId }: EditorPageProps): Re
             <Separator />
 
             <section className="flex flex-col gap-1.5">
-              <h3 className="text-xs font-semibold">{copy.editor.layers.heading}</h3>
+              <h3 className="text-xs font-medium">{copy.editor.layers.heading}</h3>
               <LayersPanel ir={ir} selectedId={selectedId} onSelect={setSelectedId} onChange={setIr} />
             </section>
           </aside>

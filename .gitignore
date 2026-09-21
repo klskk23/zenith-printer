@@ -50,3 +50,9 @@ gcp-key*.json
 
 # Pinned font packages downloaded by scripts/fetch-fonts.sh
 fonts/.cache/
+
+# The subsetting venv the Makefile tells you to create (make check-subset-tools)
+.venv/
+
+# Screenshots taken by the browser tooling during a session
+.playwright-mcp/

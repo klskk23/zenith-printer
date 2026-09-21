@@ -19,6 +19,8 @@ export interface PageHeaderProps {
   description?: string
   /** Buttons that act on the page as a whole, not on any one row. */
   actions?: React.ReactNode
+  /** Smaller treatment for section headings nested inside a page. */
+  compact?: boolean
   className?: string
 }
 
@@ -26,20 +28,20 @@ export function PageHeader({
   title,
   description,
   actions,
+  compact = false,
   className,
 }: PageHeaderProps): React.JSX.Element {
   return (
-    <div className={cn('flex flex-col gap-1', className)} data-page-header data-classical-page-header>
+    <div className={cn('flex flex-col gap-1', className)} data-page-header>
       <div className="flex min-h-8 items-center justify-between gap-3">
         {/* The title gives way, not the controls: a search box that has been
             squeezed to nothing is unusable, whereas a long page title reads
-            fine cut short — and every one of these titles is also the tab the
-            page was opened from. */}
-        {/* Set in the serif the renderer prints with — the one place the
-            chrome speaks in the same voice as the labels it makes. Regular
-            weight, not bold: the serif already carries the emphasis, and
-            bolding it on top reads as shouting. */}
-        <h2 className="min-w-0 truncate font-display text-base">{title}</h2>
+            fine cut short. */}
+        {/* Weight 500, never bolder: hierarchy in this palette is size and
+            space, and a bold heading on the dark ground reads as shouting. */}
+        <h2 className={cn('min-w-0 truncate font-medium', compact ? 'text-sm' : 'text-base')}>
+          {title}
+        </h2>
         {actions !== undefined && (
           <div className="flex shrink-0 items-center justify-end gap-2">{actions}</div>
         )}

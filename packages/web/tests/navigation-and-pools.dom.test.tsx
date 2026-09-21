@@ -53,12 +53,19 @@ afterEach(() => {
 })
 
 describe('the sidebar order', () => {
+  it('labels every entry so the order below can be read off the DOM', () => {
+    render(wrap(<App />))
+    const nav = document.querySelector('nav')!
+    const label = [...nav.querySelectorAll('button')].find((button) => button.textContent?.includes('首页'))
+    expect(label?.querySelector('[data-nav-label]')?.textContent).toBe('首页')
+  })
+
   it('puts settings last', () => {
     // Asserted on the rendered list, not on the constant: the sidebar filters
     // one entry out, so the constant alone does not say what people see.
     render(wrap(<App />))
     const nav = document.querySelector('nav')!
-    const labels = [...nav.querySelectorAll('button')].map((b) => b.textContent?.trim())
+    const labels = [...nav.querySelectorAll('[data-nav-label]')].map((b) => b.textContent?.trim())
 
     expect(labels.at(-1)).toBe('设置')
   })
@@ -66,7 +73,7 @@ describe('the sidebar order', () => {
   it('keeps data sources above it, where the day-to-day work is', () => {
     render(wrap(<App />))
     const nav = document.querySelector('nav')!
-    const labels = [...nav.querySelectorAll('button')].map((b) => b.textContent?.trim())
+    const labels = [...nav.querySelectorAll('[data-nav-label]')].map((b) => b.textContent?.trim())
 
     expect(labels.indexOf('数据源')).toBeLessThan(labels.indexOf('设置'))
   })
@@ -105,7 +112,7 @@ describe('the too-many-tabs advice', () => {
   /** Open a sidebar entry by its label. */
   const openTab = (label: string): void => {
     const nav = document.querySelector('nav')!
-    const entry = [...nav.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)
+    const entry = [...nav.querySelectorAll('button')].find((b) => b.querySelector('[data-nav-label]')?.textContent?.trim() === label)
     fireEvent.click(entry!)
   }
 

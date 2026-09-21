@@ -25,10 +25,37 @@
   font-display: swap;
 }
 
+/*
+ * A render font, not an interface font. 「宋体」 in the editor's font menu is
+ * this face, so a label set in it has to load it on the canvas. Nothing in
+ * the chrome uses it — a previous version set page headings in it, which
+ * made this 3.2MB file a first-paint download on every page. With
+ * `font-display: swap` the browser fetches it only when an element asks.
+ */
 @font-face {
   font-family: 'Noto Serif CJK SC';
   src: url('/fonts/subset/NotoSerifCJKsc-Regular.woff2') format('woff2');
   font-weight: 400;
+  font-display: swap;
+}
+
+/*
+ * The interface face for Latin text and numerals — not a render font. It is
+ * absent from FONT_FAMILIES on purpose and must never be offered as a label
+ * font: the renderer would substitute something else. Latin subset only,
+ * ~40KB each; see fonts/README.md.
+ */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/subset/Inter-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/subset/Inter-Medium.woff2') format('woff2');
+  font-weight: 500;
   font-display: swap;
 }
 

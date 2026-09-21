@@ -18,11 +18,11 @@ export function DialogContent({
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>): React.JSX.Element {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-background/70" />
       <DialogPrimitive.Content
         className={cn(
           'fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2',
-          'rounded-lg border border-border bg-background p-5 shadow-lg',
+          'rounded-lg bg-card text-card-foreground p-5 shadow-lg',
           className,
         )}
         {...props}
@@ -43,7 +43,7 @@ export function DialogTitle({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>): React.JSX.Element {
-  return <DialogPrimitive.Title className={cn('text-sm font-semibold', className)} {...props} />
+  return <DialogPrimitive.Title className={cn('text-sm font-medium', className)} {...props} />
 }
 
 export function DialogDescription({
