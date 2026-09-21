@@ -83,13 +83,6 @@ describe('while the lists are still coming', () => {
 })
 
 describe('once they arrive', () => {
-  it('says nothing is there when nothing is there', async () => {
-    render(wrap(<LabelsPage />))
-    release()
-    // Printers really are empty in this fixture; that claim is earned.
-    expect(await screen.findByText(copy.status.noPrinters)).toBeDefined()
-  })
-
   it('shows what did arrive', async () => {
     render(wrap(<LabelsPage />))
     release()

@@ -50,51 +50,21 @@ export const copy: Copy = {
     untitledDesign: 'Untitled label',
     unsavedMark: 'Unsaved changes',
     leavePrompt: 'There are unsaved changes. Leave anyway?',
-    leaveTitle: 'Leave this page?',
-    leaveBody: 'This page has changes that cannot be kept: leaving loses them. Save first, or stay.',
-    leaveStay: 'Stay here',
-    leaveAnyway: 'Leave anyway',
+    leaveTitle: 'Keep these changes?',
+    leaveBody: 'This page has unsaved changes. Stay to save them first; leaving discards them.',
+    leaveStay: 'Stay',
+    leaveAnyway: 'Discard and leave',
     disconnectedBanner:
       'Disconnected from the print service. Editing continues, but saving and printing will fail.',
   },
 
-  drafts: {
-    unpersisted: {
-      what: 'Changes to this label cannot be kept on this computer',
-      why: 'The browser is out of local storage space',
-      next: 'Save before leaving, or clear unsaved drafts to make room',
-    },
-    noStorage: {
-      what: 'This browser does not allow drafts to be kept',
-      why: 'Private browsing or a policy blocks local storage',
-      next: 'Save before leaving, or the changes are lost',
-    },
-    anotherWindow: 'Another window on this computer changed it; this is what that window last wrote.',
-    staleTitle: 'The server has a newer version',
-    staleBody: 'Someone saved this label after your draft was started. Keep the draft: saving will be refused, and you can then save it as a new label. Discard it: use the server\'s version, and this draft is deleted.',
-    keepDraft: 'Keep the draft',
-    discardDraft: 'Discard the draft, use the server\'s version',
-    orphanTitle: 'The original label was deleted',
-    orphanBody: 'The label this draft belongs to is no longer on the server. Keep editing and save it as a new label, or discard the draft.',
-  },
 
   labels: {
     heading: 'Labels',
     new: 'New label',
     empty: 'No labels yet',
     emptyDetail: 'Press "New label" to draw one, or import a file exported elsewhere',
-    untitled: 'Untitled',
-    unsaved: 'Unsaved',
-    savedWithDraft: 'Unsaved changes',
-    orphan: 'The original label was deleted',
-    corrupt: 'This draft cannot be read',
-    discardDraft: 'Discard this draft',
     searchPlaceholder: 'Search label names',
-    clearDrafts: 'Clear unsaved drafts',
-    clearDraftsTitle: 'Clear these drafts?',
-    clearDraftsBody: (n: number): string =>
-      `These ${n} drafts are deleted from this browser and cannot be recovered. Saved labels are unaffected and return to the server's version.`,
-    clearDraftsConfirm: 'Clear',
   },
 
   status: {
@@ -199,6 +169,7 @@ export const copy: Copy = {
     },
     undo: 'Undo',
     redo: 'Redo',
+    back: 'Back to labels',
     moduleWidth: 'Module width',
     moduleWidthHint: (dots: number, mm: number) => `${dots} dot = ${mm.toFixed(3)} mm`,
     atMinModuleWidth: 'Already the smallest scannable size; it cannot go lower',
@@ -317,6 +288,7 @@ export const copy: Copy = {
 
   dataSources: {
     heading: 'Data sources',
+    unsaved: 'Unsaved changes',
     explain:
       'A data source is one table. A design binds to one of them and references its columns as ${column} inside content.',
     empty: 'No data sources yet. Upload a CSV, or copy a block of cells from a spreadsheet and paste it in',
@@ -446,7 +418,6 @@ export const copy: Copy = {
     bindingColumns: (columns: string[]): string => `The bound data source has no: ${columns.join(', ')}`,
     saving: 'Saving…',
     discard: 'Discard changes',
-    unsaved: 'Unsaved changes',
     discardConfirm: 'Discarding loses every unsaved change to this table, and cannot be undone. Rows already saved are untouched.',
     saveTitle: 'Send the changes to the server (Ctrl+S)',
     undo: 'Undo',
@@ -547,7 +518,6 @@ export const copy: Copy = {
     emptyDetail: 'Draw one in the editor; saving it puts it here',
     save: 'Save',
     saveAs: 'Save as new',
-    saveAsNew: 'Save as a new label',
     saveDialogTitle: 'Save this label',
     update: 'Save',
     load: 'Load',
@@ -556,7 +526,6 @@ export const copy: Copy = {
     name: 'Label name',
     conflict:
       'Someone else has changed this label. Reloading replaces your changes with the server\'s version; to keep yours, use "Save as" to make a new label.',
-    reload: 'Reload',
     boundKind: 'Printer kind',
     searchPlaceholder: 'Search label names',
     open: 'Open',
@@ -583,6 +552,10 @@ export const copy: Copy = {
 
   settings: {
     heading: 'Settings',
+    unsaved: 'Unsaved changes',
+    apiDocsHeading: 'API console',
+    apiDocsHint: 'The API console opens in a new window. It talks to this running service: submitting a print job really prints.',
+    apiDocsOpen: 'Open the API console',
     scopeNote:
       'These settings affect this browser only and nobody else. Server configuration (dry-run mode, log level and so on) belongs to the deployment and is deliberately not offered here.',
     language: 'Interface language',
@@ -596,7 +569,6 @@ export const copy: Copy = {
     displayUnits: { mm: 'Millimetres', dot: 'Dots' },
     pollInterval: 'Queue refresh interval (ms)',
     alwaysConfirmTabClose: 'Always confirm before closing a tab',
-    unsaved: 'Unsaved changes',
     maintenanceHeading: 'Server maintenance',
     maintenanceScope: 'These act on the server and affect everyone — unlike the preferences above, which are local to this browser.',
     pruneImages: 'Remove unreferenced images',

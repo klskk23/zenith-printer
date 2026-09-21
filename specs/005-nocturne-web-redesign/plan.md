@@ -30,6 +30,10 @@
 
 **Scale/Scope**: 8 个可导航页面（标签、数据源、打印机、队列、历史、打印预设、接口调试、设置）+ 1 个编辑器 + 2 个数据源内页；约 22 处文案改写；删除 `tab-bar.tsx`、`index-page.tsx`、`templates-page.tsx`，新增 `pages/labels-page.tsx`、`features/drafts/*`、`app/status-strip.tsx`、`features/print/head-figure.ts(x)`。
 
+> **修订（2026-09-21）**：草稿体系（research R3/R4/R11、Phase 2/4/6/8）在用户看过实物后撤销，
+> 改为"退出即放弃、最后保存为准"；壳层对齐预览方案 A（品牌进侧栏、图标、打印机状态在侧栏底部），
+> 接口调试从侧栏移到设置。见 spec.md「Session 2026-09-21（修订）」与 tasks.md Phase 10。
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*

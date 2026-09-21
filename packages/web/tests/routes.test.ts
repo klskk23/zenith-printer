@@ -12,10 +12,16 @@ import { describe, expect, it } from 'vitest'
 import { PAGE_KINDS, SIDEBAR_KINDS, isLegacyAddress, pageFromPath, pathForPage } from '../src/app/routes.ts'
 
 describe('the page set', () => {
-  it('has the eight sidebar entries in the fixed order', () => {
+  it('has the seven sidebar entries in the fixed order', () => {
     expect([...SIDEBAR_KINDS]).toEqual([
-      'labels', 'data-sources', 'printers', 'queue', 'history', 'print-presets', 'api-docs', 'settings',
+      'labels', 'data-sources', 'printers', 'queue', 'history', 'print-presets', 'settings',
     ])
+  })
+
+  it('keeps the API console reachable by address, out of the sidebar', () => {
+    expect((PAGE_KINDS as readonly string[]).includes('api-docs')).toBe(true)
+    expect((SIDEBAR_KINDS as readonly string[]).includes('api-docs')).toBe(false)
+    expect(pageFromPath('/api-docs')).toEqual({ kind: 'api-docs' })
   })
 
   it('has no home, library or design kind', () => {
@@ -34,8 +40,8 @@ describe('pathForPage', () => {
     expect(pathForPage({ kind: 'label', templateId: 'tpl-1' })).toBe('/labels/tpl-1')
   })
 
-  it('names a new label by its draft id', () => {
-    expect(pathForPage({ kind: 'label', templateId: null, draftId: 'd-abc' })).toBe('/labels/new/d-abc')
+  it('names a new label plainly', () => {
+    expect(pathForPage({ kind: 'label', templateId: null })).toBe('/labels/new')
   })
 
   it('carries a preset on a label only', () => {
@@ -59,8 +65,8 @@ describe('pageFromPath', () => {
     expect(pageFromPath('/labels/tpl-1?preset=pre-1')).toEqual({ kind: 'label', templateId: 'tpl-1', presetId: 'pre-1' })
   })
 
-  it('reads a new label with its draft id', () => {
-    expect(pageFromPath('/labels/new/d-abc')).toEqual({ kind: 'label', templateId: null, draftId: 'd-abc' })
+  it('reads a new label', () => {
+    expect(pageFromPath('/labels/new')).toEqual({ kind: 'label', templateId: null })
   })
 
   it('treats an empty preset as none', () => {
@@ -88,7 +94,8 @@ describe('addresses from before', () => {
   it('sends /design and /design/new to a new label', () => {
     expect(pageFromPath('/design')).toEqual({ kind: 'label', templateId: null })
     expect(pageFromPath('/design/new')).toEqual({ kind: 'label', templateId: null })
-    expect(pageFromPath('/design/new/d-1')).toEqual({ kind: 'label', templateId: null, draftId: 'd-1' })
+    // The interim form that carried a draft id: still a new label.
+    expect(pageFromPath('/design/new/d-1')).toEqual({ kind: 'label', templateId: null })
   })
 
   it('knows which addresses are old, so the bar can be rewritten', () => {

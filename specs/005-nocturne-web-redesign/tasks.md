@@ -215,6 +215,19 @@
 
 ---
 
+## Phase 10: 修订（2026-09-21，用户看过实物后）
+
+**Purpose**: 按 Clarifications「Session 2026-09-21（修订）」执行：去草稿、对齐方案 A 壳层、接口调试入设置、返回入口、最后保存为准、核对台账对接。
+
+- [X] T086 删除 `web/src/features/drafts/` 与全部草稿测试；`workspace-state` 收缩为 `{ page, dirty }`；路由去掉 `draftId`（`/labels/new`），旧地址兼容保留
+- [X] T087 编辑器：去掉草稿接入，改为 `workspace.setDirty(isDirty)`；左上「返回标签」按钮；离开（返回/侧栏/刷新）有修改时询问「保留这些修改吗？」
+- [X] T088 `template-bar.tsx`：409 时取当前版本重试一次（最后保存为准），移除「重新载入/另存为新标签」冲突界面
+- [X] T089 侧栏：产品名在顶部、七项带 lucide 图标、底部打印机状态与连接状态；删除顶栏 `StatusBar`；状态带只剩队列与最近一次打印
+- [X] T090 接口调试从侧栏移到设置（新窗口打开 `/api-docs`）；`SIDEBAR_KINDS` 七项、`PAGE_KINDS` 仍含 `api-docs`
+- [X] T091 测试：`sidebar.dom`、`editor-back.dom`、`last-save-wins.dom`、设置页接口入口；画廊/工作区/路由/状态带/渲染冒烟同步；i18n 清掉草稿文案
+- [X] T092 核对 nexus-assets 对接：`docs/nexus-assets.md` 各契约点逐一比对；真实服务上 `GET /api/print-presets` 信封为 `{presets}`；以台账格式的 `/design/{id}?preset=` 打开，地址改写为 `/labels/{id}?preset=` 且预设已应用
+- [X] T093 文档：CHANGELOG、README_zh、设计共识 §6.3、quickstart 同步为"退出即放弃、最后保存为准"
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

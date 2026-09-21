@@ -2,37 +2,26 @@
  * React binding over the workspace reducer.
  *
  * The reducer in `workspace-state.ts` holds the rules; this file only connects
- * them to React and to the address bar. Leaving the editor flushes its draft
- * on unmount (features/drafts/use-draft.tsx), so navigating here needs no
- * ceremony — the page simply changes.
+ * them to React and to the address bar, and holds back a navigation while the
+ * open page has unsaved edits so the shell can ask.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { copy } from '../i18n/index.ts'
 import { isLegacyAddress, pathForPage, type PageDescriptor } from './routes.ts'
-import {
-  hasUnsavedWork,
-  markReloadLoses,
-  markUnpersisted,
-  openPage,
-  reloadWouldLose,
-  restoreFromPath,
-  type WorkspaceState,
-} from './workspace-state.ts'
+import { hasUnsavedWork, markDirty, openPage, restoreFromPath, type WorkspaceState } from './workspace-state.ts'
 
 export interface WorkspaceApi {
   state: WorkspaceState
   page: PageDescriptor
   /**
-   * Go to a page — unless the open page holds work that would be lost, in
-   * which case the request is held and the shell asks first. Everything that
-   * navigates goes through here, so the question cannot be skipped.
+   * Go to a page — unless the open page holds unsaved edits, in which case the
+   * request is held and the shell asks first. Everything that navigates goes
+   * through here, so the question cannot be skipped.
    */
   open: (descriptor: PageDescriptor) => void
-  /** Whether the open page holds work that leaving would lose — see `hasUnsavedWork`. */
-  setUnpersisted: (unpersisted: boolean) => void
-  /** Whether the open label's draft is in memory only — a reload loses it, a page switch does not. */
-  setReloadLoses: (reloadLoses: boolean) => void
-  /** A navigation held back by unsaved work, waiting for an answer. */
+  /** Whether the open page holds unsaved edits — see `hasUnsavedWork`. */
+  setDirty: (dirty: boolean) => void
+  /** A navigation held back by unsaved edits, waiting for an answer. */
   pendingLeave: PageDescriptor | null
   confirmLeave: () => void
   stay: () => void
@@ -68,14 +57,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     }
   }, [pendingLeave])
   const stay = useCallback(() => setPendingLeave(null), [])
-  const setUnpersisted = useCallback(
-    (unpersisted: boolean) => setState((s) => markUnpersisted(s, unpersisted)),
-    [],
-  )
-  const setReloadLoses = useCallback(
-    (reloadLoses: boolean) => setState((s) => markReloadLoses(s, reloadLoses)),
-    [],
-  )
+  const setDirty = useCallback((dirty: boolean) => setState((s) => markDirty(s, dirty)), [])
 
   // The address follows the page. An old-form address is rewritten in place
   // rather than pushed, so Back does not return to the address that redirected.
@@ -88,7 +70,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     if (current === path) {
       return
     }
-    if (isLegacyAddress(current) || /^\/labels\/new$/.test(current)) {
+    if (isLegacyAddress(current)) {
       window.history.replaceState(null, '', path)
     } else {
       window.history.pushState(null, '', path)
@@ -105,14 +87,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  // Leaving with a draft that could not be written gets one prompt. Browsers
-  // show their own wording; ours is set anyway for the few that honour it.
+  // Leaving with unsaved edits gets one prompt. Browsers show their own wording;
+  // ours is set anyway for the few that honour it.
   useEffect(() => {
     if (typeof window === 'undefined') {
       return
     }
     const onBeforeUnload = (event: BeforeUnloadEvent): void => {
-      if (!reloadWouldLose(state)) {
+      if (!hasUnsavedWork(state)) {
         return
       }
       event.preventDefault()
@@ -123,8 +105,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   }, [state])
 
   const api = useMemo<WorkspaceApi>(
-    () => ({ state, page: state.page, open, setUnpersisted, setReloadLoses, pendingLeave, confirmLeave, stay }),
-    [state, open, setUnpersisted, setReloadLoses, pendingLeave, confirmLeave, stay],
+    () => ({ state, page: state.page, open, setDirty, pendingLeave, confirmLeave, stay }),
+    [state, open, setDirty, pendingLeave, confirmLeave, stay],
   )
 
   return <WorkspaceContext.Provider value={api}>{children}</WorkspaceContext.Provider>

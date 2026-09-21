@@ -1,20 +1,19 @@
 /**
  * The labels page — the home page, and the only list of labels.
  *
- * A strip of what the machines are doing, then a gallery. Each tile is a
- * sheet of paper at the label's own proportions (thumbnail-box.ts), drawn
- * from the label's content with the first row of its table filled in
- * (thumbnail-svg.tsx). Unsaved work sits at the top, marked. Clicking a tile
- * opens the editor; there is no "open" button, because the tile is the thing.
+ * A strip of what the queue is doing, then a gallery. Each tile is a sheet of
+ * paper at the label's own proportions (thumbnail-box.ts), drawn from the
+ * label's content with the first row of its table filled in
+ * (thumbnail-svg.tsx). Clicking a tile opens the editor; there is no "open"
+ * button, because the tile is the thing.
  *
  * Deliberately never counts. A number in the heading turns a shelf of labels
  * into a metric, and nobody here is trying to have more of them.
  */
-import { useMemo, useReducer, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { LayoutTemplate } from 'lucide-react'
 import { collectReferences } from '@zenith/shared'
 import { copy } from '../i18n/index.ts'
-import { cn } from '../lib/utils.ts'
 import { PageHeader } from '../components/page-header.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { ConfirmButton } from '../components/ui/confirm-button.tsx'
@@ -34,33 +33,17 @@ import { galleryItems, tileIr, type GalleryItem } from '../features/templates/ga
 import { thumbnailBoxPx } from '../features/templates/thumbnail-box.ts'
 import { thumbnailValues } from '../features/templates/thumbnail-values.ts'
 import { ThumbnailSvg } from '../features/templates/thumbnail-svg.tsx'
-import { useDrafts } from '../features/drafts/use-draft.tsx'
-import { isCorrupt } from '../features/drafts/schema.ts'
-import { ClearDraftsButton } from '../features/drafts/clear-drafts-dialog.tsx'
 
 /** The budget a tile's paper is fitted into. */
 const TILE = { maxWidthPx: 240, maxHeightPx: 140 }
 
 function Paper({ item }: { item: GalleryItem }): React.JSX.Element {
-  const { store } = useDrafts()
-  // A draft's picture is the draft, not the saved label: the tile shows what
-  // opening it finds. Read here rather than carried in the index, which holds
-  // only what the list needs.
-  const draft = useMemo(() => {
-    if (item.kind === 'saved' || item.kind === 'corrupt-draft') {
-      return null
-    }
-    const found = store.read(item.key)
-    return found === null || isCorrupt(found) ? null : found
-  }, [store, item.key, item.kind])
-  const ir = draft?.present ?? tileIr(item)
-  const variables = draft?.variables ?? item.template?.variables ?? []
-  const dataSourceId = draft === null ? (item.template?.dataSourceId ?? null) : draft.dataSourceId
-  const firstRow = useFirstRow(dataSourceId)
+  const ir = tileIr(item)
+  const firstRow = useFirstRow(item.template.dataSourceId)
   const box = thumbnailBoxPx(item, TILE)
   const values = useMemo(
-    () => (ir === null ? {} : thumbnailValues(variables, firstRow, collectReferences(ir))),
-    [ir, variables, firstRow],
+    () => thumbnailValues(item.template.variables, firstRow, collectReferences(ir)),
+    [ir, item.template.variables, firstRow],
   )
   return (
     <div
@@ -68,60 +51,46 @@ function Paper({ item }: { item: GalleryItem }): React.JSX.Element {
       style={{ width: box.widthPx, height: box.heightPx }}
       data-thumbnail-frame
     >
-      {ir !== null && <ThumbnailSvg ir={ir} values={values} name={item.name ?? copy.labels.untitled} />}
+      <ThumbnailSvg ir={ir} values={values} name={item.name} />
     </div>
   )
 }
 
-function Tile({ item, onDraftsChanged }: { item: GalleryItem; onDraftsChanged: () => void }): React.JSX.Element {
+function Tile({ item }: { item: GalleryItem }): React.JSX.Element {
   const { open } = useWorkspace()
   const rename = useRenameTemplate()
   const remove = useDeleteTemplate()
-  const { store } = useDrafts()
   const sources = useDataSources()
   const [renaming, setRenaming] = useState<string | null>(null)
   // The bound source's *current* name, looked up rather than stored: a label
   // binds by id, so the name it was bound under can already be out of date.
   const boundName =
-    item.template === null || item.template.dataSourceId === null
+    item.template.dataSourceId === null
       ? undefined
-      : sources.data?.find((source) => source.id === item.template!.dataSourceId)?.name
-
-  const unsaved = item.kind !== 'saved'
-  const name = item.name ?? copy.labels.untitled
-  const openIt = (): void =>
-    open(
-      item.templateId === null
-        ? { kind: 'label', templateId: null, draftId: item.key }
-        : { kind: 'label', templateId: item.templateId, ...(item.kind === 'orphan-draft' ? { draftId: item.key } : {}) },
-    )
+      : sources.data?.find((source) => source.id === item.template.dataSourceId)?.name
+  const openIt = (): void => open({ kind: 'label', templateId: item.key })
 
   return (
-    <div
-      className={cn('flex flex-col gap-n3 rounded-md p-n3', 'hover:bg-foreground/4')}
-      data-gallery-tile={item.key}
-      data-unsaved={unsaved ? 'true' : undefined}
-    >
+    <div className="flex flex-col gap-n3 rounded-md p-n3 hover:bg-foreground/4" data-gallery-tile={item.key}>
       {/* The tile is the thing: name and paper are one button. */}
       <button
         type="button"
         className="flex h-[152px] w-full items-center justify-center rounded-md focus-visible:outline-2"
         onClick={openIt}
-        aria-label={name}
-        disabled={item.kind === 'corrupt-draft'}
+        aria-label={item.name}
       >
         <Paper item={item} />
       </button>
 
       <div className="flex flex-col gap-n1">
-        {renaming !== null && item.templateId !== null ? (
+        {renaming !== null ? (
           <div className="flex items-center gap-2">
             <Input aria-label={copy.templates.name} value={renaming} onChange={(e) => setRenaming(e.target.value)} />
             <Button
               size="sm"
               disabled={renaming.trim() === ''}
               onClick={() => {
-                rename.mutate({ id: item.templateId!, name: renaming.trim() })
+                rename.mutate({ id: item.key, name: renaming.trim() })
                 setRenaming(null)
               }}
             >
@@ -130,30 +99,21 @@ function Tile({ item, onDraftsChanged }: { item: GalleryItem; onDraftsChanged: (
             <span className="text-2xs text-muted-foreground">{copy.templates.renameHint}</span>
           </div>
         ) : (
-          <button type="button" className="flex items-center gap-n2 text-left text-sm" onClick={openIt} aria-label={name}>
-            <span className="truncate">{name}</span>
-            {unsaved && <span aria-hidden className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
+          <button type="button" className="truncate text-left text-sm" onClick={openIt} aria-label={item.name}>
+            {item.name}
           </button>
         )}
-        <p className="flex flex-wrap gap-x-n3 text-2xs text-muted-foreground" data-label-size>
-          <span className="num">
-            {item.widthMm} × {item.heightMm} mm
-          </span>
-          {item.kind === 'unsaved-new' && <span className="text-accent-300">{copy.labels.unsaved}</span>}
-          {item.kind === 'saved-with-draft' && <span className="text-accent-300">{copy.labels.savedWithDraft}</span>}
-          {item.kind === 'orphan-draft' && <span className="text-warning">{copy.labels.orphan}</span>}
-          {item.kind === 'corrupt-draft' && <span className="text-destructive">{copy.labels.corrupt}</span>}
+        <p className="num text-2xs text-muted-foreground" data-label-size>
+          {item.widthMm} × {item.heightMm} mm
         </p>
-        {item.template !== null && (
-          <p className="text-2xs text-muted-foreground" data-bound-source>
-            {item.template.dataSourceId === null
-              ? copy.templates.boundSourceNone
-              : copy.templates.boundSource(boundName ?? item.template.dataSourceId)}
-          </p>
-        )}
+        <p className="text-2xs text-muted-foreground" data-bound-source>
+          {item.template.dataSourceId === null
+            ? copy.templates.boundSourceNone
+            : copy.templates.boundSource(boundName ?? item.template.dataSourceId)}
+        </p>
         {/* Computed on read, never stored — a stored copy drifts towards
             "looks fine, is actually broken" (FR-028a). */}
-        {item.template !== null && item.template.bindingIssue !== null && (
+        {item.template.bindingIssue !== null && (
           <p className="text-2xs text-destructive" data-binding-issue>
             {'! '}
             {item.template.bindingIssue.kind === 'sourceMissing'
@@ -163,45 +123,25 @@ function Tile({ item, onDraftsChanged }: { item: GalleryItem; onDraftsChanged: (
         )}
       </div>
 
-      {item.templateId !== null && item.kind !== 'orphan-draft' && (
-        <div className="flex flex-wrap gap-1">
-          <Button size="sm" variant="ghost" onClick={() => setRenaming(item.name ?? '')}>
-            {copy.templates.rename}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void exportTemplates([item.templateId!], `${name}.json`)}>
-            {copy.templates.export}
-          </Button>
-          <ConfirmButton
-            size="sm"
-            variant="ghost"
-            title={copy.common.confirmTitle}
-            description={copy.templates.confirmDelete}
-            cancelLabel={copy.common.cancel}
-            confirmLabel={copy.templates.remove}
-            onConfirm={() => {
-              remove.mutate(item.templateId!)
-              store.remove(item.key)
-              onDraftsChanged()
-            }}
-          >
-            {copy.templates.remove}
-          </ConfirmButton>
-        </div>
-      )}
-      {(item.kind === 'corrupt-draft' || item.kind === 'orphan-draft') && (
-        <div className="flex flex-wrap gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              store.remove(item.key)
-              onDraftsChanged()
-            }}
-          >
-            {copy.labels.discardDraft}
-          </Button>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-1">
+        <Button size="sm" variant="ghost" onClick={() => setRenaming(item.name)}>
+          {copy.templates.rename}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => void exportTemplates([item.key], `${item.name}.json`)}>
+          {copy.templates.export}
+        </Button>
+        <ConfirmButton
+          size="sm"
+          variant="ghost"
+          title={copy.common.confirmTitle}
+          description={copy.templates.confirmDelete}
+          cancelLabel={copy.common.cancel}
+          confirmLabel={copy.templates.remove}
+          onConfirm={() => remove.mutate(item.key)}
+        >
+          {copy.templates.remove}
+        </ConfirmButton>
+      </div>
     </div>
   )
 }
@@ -211,29 +151,11 @@ export function LabelsPage(): React.JSX.Element {
   const templates = useTemplates()
   const printers = usePrinters()
   const jobs = useJobs(null)
-  const { store } = useDrafts()
   const [query, setQuery] = useState('')
-  // The store is synchronous and outside React; a change to it is announced
-  // by bumping this, which is what makes the list below read it again.
-  const [draftsVersion, refreshDrafts] = useReducer((n: number) => n + 1, 0)
-  const drafts = useMemo(() => store.list(), [store, draftsVersion])
 
   const summary = useMemo(() => summarize(printers.data, jobs.data), [printers.data, jobs.data])
-  const items = useMemo(
-    () => galleryItems(templates.data ?? [], drafts.entries, drafts.corrupt),
-    [templates.data, drafts.entries, drafts.corrupt],
-  )
-  const toClear = items
-    .filter((item) => item.kind !== 'saved')
-    .map((item) => ({
-      key: item.key,
-      name: item.name ?? copy.labels.untitled,
-      detail: item.kind === 'corrupt-draft' ? copy.labels.corrupt : `${item.widthMm} × ${item.heightMm} mm`,
-      corrupt: item.kind === 'corrupt-draft',
-    }))
-  const visible = items.filter(
-    (item) => query === '' || (item.name ?? copy.labels.untitled).toLowerCase().includes(query.toLowerCase()),
-  )
+  const items = useMemo(() => galleryItems(templates.data ?? []), [templates.data])
+  const visible = items.filter((item) => query === '' || item.name.toLowerCase().includes(query.toLowerCase()))
 
   return (
     <div className="flex flex-col gap-4">
@@ -256,7 +178,6 @@ export function LabelsPage(): React.JSX.Element {
               {copy.templates.exportAll}
             </Button>
             <ImportTemplatesButton />
-            <ClearDraftsButton items={toClear} onCleared={refreshDrafts} />
             <Button size="sm" onClick={() => open({ kind: 'label', templateId: null })}>
               {copy.labels.new}
             </Button>
@@ -265,7 +186,7 @@ export function LabelsPage(): React.JSX.Element {
       />
 
       <PausedQueueBanner />
-      <StatusStrip summary={summary} loading={{ printers: printers.isPending, jobs: jobs.isPending }} />
+      <StatusStrip summary={summary} loading={jobs.isPending} />
 
       {templates.isPending && (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">
@@ -290,7 +211,7 @@ export function LabelsPage(): React.JSX.Element {
       {/* As many tiles as fit, never narrower than the paper budget. */}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-n6 gap-y-n8">
         {visible.map((item) => (
-          <Tile key={item.key} item={item} onDraftsChanged={refreshDrafts} />
+          <Tile key={item.key} item={item} />
         ))}
       </div>
     </div>

@@ -415,7 +415,7 @@ describe('the table editor', () => {
     // knows they are unsaved.
     function Probe(): React.JSX.Element {
       const { state } = useWorkspace()
-      return <span data-probe>{String(state.unpersisted)}</span>
+      return <span data-probe>{String(state.dirty)}</span>
     }
     render(
       wrap(

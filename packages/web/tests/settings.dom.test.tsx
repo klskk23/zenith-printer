@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
+import { copy } from '../src/i18n/index.ts'
 import { chooseOption, selectedText } from './support/select.ts'
 
 function wrap(ui: React.ReactNode): React.JSX.Element {
@@ -100,5 +101,21 @@ describe('the palette', () => {
   it('leaves the document root unmarked', () => {
     render(wrap(<App />))
     expect(document.documentElement.getAttribute('data-theme')).toBeNull()
+  })
+})
+
+describe('the API console', () => {
+  /**
+   * A developer's page, kept out of the sidebar and opened in its own window
+   * from here: it talks to the running service, and submitting a print job
+   * there really prints.
+   */
+  it('opens from settings in a new window', () => {
+    const opened: string[] = []
+    vi.stubGlobal('open', (url: string) => void opened.push(url))
+    render(wrap(<App />))
+    fireEvent.click(screen.getAllByText('设置')[0]!)
+    fireEvent.click(screen.getByText(copy.settings.apiDocsOpen))
+    expect(opened).toEqual(['/api-docs'])
   })
 })

@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('no server'))))
 })
 
-const SIDEBAR = ['标签', '数据源', '打印机', '打印队列', '打印历史', '打印预设', '接口调试', '设置']
+const SIDEBAR = ['标签', '数据源', '打印机', '打印队列', '打印历史', '打印预设', '设置']
 
 describe('the shell', () => {
   it('mounts without throwing', () => {
@@ -41,7 +41,7 @@ describe('the shell', () => {
     expect(screen.getByRole('heading', { name: copy.labels.heading })).toBeDefined()
   })
 
-  it('has exactly the eight entries, in order', () => {
+  it('has exactly the seven entries, in order', () => {
     renderApp('/')
     const nav = document.querySelector('nav')!
     const labels = [...nav.querySelectorAll('[data-nav-label]')].map((el) => el.textContent?.trim())
@@ -75,7 +75,7 @@ describe('the editor', () => {
   })
 
   it('opens at a new-label address with a preset in the query', () => {
-    expect(() => renderApp('/labels/new/d-1?preset=x')).not.toThrow()
+    expect(() => renderApp('/labels/new?preset=x')).not.toThrow()
     expect(screen.getByLabelText('label canvas')).toBeTruthy()
   })
 
@@ -101,10 +101,10 @@ describe('the editor', () => {
     expect(screen.queryByText('打印预览')).toBeNull()
   })
 
-  it('has no way back but the sidebar', async () => {
+  it('has a way back, and the sidebar is still there', async () => {
     renderApp('/')
     await openNewLabel()
-    expect(screen.queryByRole('button', { name: /返回/ })).toBeNull()
+    expect(screen.getByText(copy.editor.back)).toBeDefined()
     expect(document.querySelector('nav')).not.toBeNull()
   })
 })
@@ -157,7 +157,11 @@ describe('old addresses', () => {
   it('sends /design to a new label and rewrites the address', () => {
     renderApp('/design')
     expect(screen.getByLabelText('label canvas')).toBeTruthy()
-    expect(window.location.pathname).toMatch(/^\/labels\/new\/.+/)
+    expect(window.location.pathname).toBe('/labels/new')
+  })
+
+  it('still renders the API console at its own address', () => {
+    expect(() => renderApp('/api-docs')).not.toThrow()
   })
 
   it('keeps the query when rewriting', () => {

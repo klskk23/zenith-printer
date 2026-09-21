@@ -56,51 +56,20 @@ export const copy = {
     untitledDesign: '未命名标签',
     unsavedMark: '有未保存的修改',
     leavePrompt: '有未保存的修改，确定要离开吗？',
-    leaveTitle: '离开这一页？',
-    leaveBody: '这一页有无法保留的修改：离开就会丢失。先保存，或者留在这里。',
-    leaveStay: '留在这里',
-    leaveAnyway: '仍然离开',
+    leaveTitle: '保留这些修改吗？',
+    leaveBody: '这一页有未保存的修改。留下来可以先保存；离开就会丢掉它们。',
+    leaveStay: '留下',
+    leaveAnyway: '放弃修改并离开',
     disconnectedBanner: '与打印服务的连接已断开。编辑不会中断，但保存和打印会失败。',
   },
 
-  drafts: {
-    // Three parts, as the constitution asks of every error: what, why, next.
-    unpersisted: {
-      what: '这张标签的修改无法在本机保留',
-      why: '浏览器的本机存储空间不足',
-      next: '离开前请先保存，或清理未保存的草稿腾出空间',
-    },
-    noStorage: {
-      what: '这台浏览器不允许保存草稿',
-      why: '隐私模式或策略限制了本机存储',
-      next: '离开前请先保存，否则修改会丢失',
-    },
-    anotherWindow: '这台机器上另一个窗口改过它，现在显示的是那边最后写下的样子。',
-    staleTitle: '服务器上的版本更新了',
-    staleBody: '这张标签在你这份草稿之后又被别人保存过。继续用草稿：改完保存时会被拒绝，届时可以另存为新标签；放弃草稿：改用服务器上的版本，这份草稿会被删除。',
-    keepDraft: '继续用草稿',
-    discardDraft: '放弃草稿，用服务器版本',
-    orphanTitle: '原标签已被删除',
-    orphanBody: '这份草稿所属的标签已经不在服务器上。可以继续编辑并另存为新标签，或者丢弃这份草稿。',
-  },
 
   labels: {
     heading: '标签',
     new: '新建标签',
     empty: '还没有标签',
     emptyDetail: '点「新建标签」画一张，或导入别处导出的文件',
-    untitled: '未命名',
-    unsaved: '未保存',
-    savedWithDraft: '有未保存的修改',
-    orphan: '原标签已被删除',
-    corrupt: '这份草稿无法读取',
-    discardDraft: '丢弃这份草稿',
     searchPlaceholder: '搜索标签名称',
-    clearDrafts: '清理未保存的草稿',
-    clearDraftsTitle: '清理这些草稿？',
-    clearDraftsBody: (n: number): string =>
-      `下面 ${n} 份草稿会从这台浏览器上删除，无法恢复。已保存的标签本身不受影响，会回到服务器上的版本。`,
-    clearDraftsConfirm: '清理',
   },
 
   status: {
@@ -208,6 +177,7 @@ export const copy = {
     },
     undo: '撤销',
     redo: '重做',
+    back: '返回标签',
     moduleWidth: '模块宽度',
     moduleWidthHint: (dots: number, mm: number) => `${dots} dot = ${mm.toFixed(3)} mm`,
     atMinModuleWidth: '已是可扫描的最小尺寸，无法再缩小',
@@ -330,6 +300,7 @@ export const copy = {
 
   dataSources: {
     heading: '数据源',
+    unsaved: '有未保存的改动',
     explain: '一个数据源就是一张表。标签绑定其中一张，内容里写 ${列名} 引用它的列。',
     empty: '还没有数据源。上传一份 CSV，或从表格软件里复制一片单元格粘贴进来',
     emptyTitle: '还没有数据源',
@@ -457,7 +428,6 @@ export const copy = {
     bindingColumns: (columns: string[]): string => `所绑数据源里没有这些列：${columns.join('、')}`,
     saving: '保存中…',
     discard: '取消修改',
-    unsaved: '有未保存的改动',
     discardConfirm: '取消后，这次所有未保存的表格改动都会丢失，且无法恢复。已保存的行不受影响。',
     saveTitle: '把改动提交到服务器（Ctrl+S）',
     undo: '撤销',
@@ -555,7 +525,6 @@ export const copy = {
     emptyDetail: '点「新建标签」画一张，保存后会出现在这里',
     save: '保存',
     saveAs: '另存为',
-    saveAsNew: '另存为新标签',
     saveDialogTitle: '保存这张标签',
     update: '保存',
     load: '载入',
@@ -563,7 +532,6 @@ export const copy = {
     confirmRemove: '确定删除这张标签吗？已打印的历史记录不受影响。',
     name: '标签名称',
     conflict: '这张标签已被其他人修改。重新载入会用服务器上的版本替换你的修改；要保留你的修改，用「另存为」存成新标签。',
-    reload: '重新载入',
     boundKind: '适用机型',
     searchPlaceholder: '搜索标签名称',
     open: '打开',
@@ -590,6 +558,10 @@ export const copy = {
 
   settings: {
     heading: '设置',
+    unsaved: '有未保存的修改',
+    apiDocsHeading: '接口调试',
+    apiDocsHint: '接口控制台在新窗口打开：它调用的是正在运行的这台服务，提交打印会真的出纸。',
+    apiDocsOpen: '打开接口调试',
     // The most important sentence on this page: it tells you why the thing you
     // are looking for is not here.
     scopeNote: '这里的设置只影响当前浏览器，不会影响其他人。服务端配置（空跑模式、日志级别等）由部署方式决定，界面上不提供。',
@@ -604,7 +576,6 @@ export const copy = {
     displayUnits: { mm: '毫米', dot: '打印点' },
     pollInterval: '队列刷新间隔（毫秒）',
     alwaysConfirmTabClose: '关闭标签页时总是确认',
-    unsaved: '有未保存的修改',
     maintenanceHeading: '服务端维护',
     maintenanceScope: '以下操作作用于服务端，对所有人生效——与上面只影响本浏览器的偏好不同。',
     pruneImages: '清理未引用的图片',

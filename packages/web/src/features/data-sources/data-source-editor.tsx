@@ -182,14 +182,14 @@ export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React
     setHistory(emptyHistory)
   }
 
-  // Unsaved rows live only here — there is no draft for a table — so the
-  // shell has to be told: it asks before navigating away and the browser
-  // asks before a reload. Depends on the setter, which is stable, rather than
-  // on the workspace object, whose identity changes with every state change.
-  const setUnpersisted = workspace.setUnpersisted
+  // Unsaved rows live only here, so the shell has to be told: it asks before
+  // navigating away and the browser asks before a reload. Depends on the
+  // setter, which is stable, rather than on the workspace object, whose
+  // identity changes with every state change.
+  const setDirty = workspace.setDirty
   useEffect(() => {
-    setUnpersisted(dirty)
-  }, [dirty, setUnpersisted])
+    setDirty(dirty)
+  }, [dirty, setDirty])
 
   /**
    * Bound on the container rather than on the document.

@@ -1,19 +1,16 @@
 /**
  * The gallery: the home page, and the only list of labels.
  *
- * What it must do that the old library did not: show unsaved work at the
- * top, draw every label at its real proportions, fill a bound label's
- * picture with the first row of its table, and open the editor on a click
- * with the sidebar still there. What it must not do: count, say 「模板」,
- * or wait for the table before showing the paper.
+ * What it must do that the old library did not: draw every label at its real
+ * proportions, fill a bound label's picture with the first row of its table,
+ * and open the editor on a click with the sidebar still there. What it must
+ * not do: count, say 「模板」, or wait for the table before showing the paper.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { copy } from '../src/i18n/index.ts'
-import { draftStore } from '../src/features/drafts/index.ts'
 import { thumbnailBoxPx } from '../src/features/templates/thumbnail-box.ts'
 import { renderApp, stubApi } from './support/app.tsx'
-import { draftInput, ir } from './drafts/support.ts'
 
 const base = {
   printerKind: 'niimbot', dpi: 203, variables: [], bindingIssue: null,
@@ -31,7 +28,6 @@ const SOURCE = { id: 'ds-1', name: '货架位表', columns: ['货位号'], rowCo
 let rowsFail = false
 
 beforeEach(() => {
-  draftStore.clear()
   rowsFail = false
   stubApi((url) => {
     if (url.endsWith('/templates')) return { templates: [SHELF, WAYBILL, STRIP] }
@@ -98,34 +94,21 @@ describe('the gallery', () => {
     expect(decodeURIComponent(img.src)).toContain('${')
   })
 
-  it('opens the editor on a click, with the sidebar still there and no back button', async () => {
+  it('opens the editor on a click, with the sidebar still there', async () => {
     renderApp('/')
     await screen.findAllByText('货架标签')
     fireEvent.click(screen.getAllByRole('button', { name: /货架标签/ })[0]!)
     await screen.findByLabelText('label canvas')
     expect(document.querySelector('nav')).not.toBeNull()
-    expect(screen.queryByRole('button', { name: /返回/ })).toBeNull()
     expect(window.location.pathname).toBe('/labels/tpl-shelf')
   })
 
-  it('puts an unsaved new label first, marked, and a saved label\'s draft marked in place', async () => {
-    draftStore.write(draftInput({ draftId: 'd-1', templateId: null, baseVersion: null, name: null, present: ir() }))
-    draftStore.write(draftInput({ draftId: 'tpl-shelf', templateId: 'tpl-shelf', baseVersion: 1, present: ir() }))
-    renderApp('/')
-    await screen.findAllByText('货架标签')
-    const tiles = [...document.querySelectorAll('[data-gallery-tile]')]
-    expect(tiles[0]!.getAttribute('data-unsaved')).toBe('true')
-    expect(tiles[0]!.textContent).toContain(copy.labels.untitled)
-    expect(tile('货架标签').getAttribute('data-unsaved')).toBe('true')
-    expect(tile('出货面单').getAttribute('data-unsaved')).toBeNull()
-  })
-
-  it('opens a new label from the button and lists it at once', async () => {
+  it('opens a new label from the button', async () => {
     renderApp('/')
     await screen.findAllByText('货架标签')
     fireEvent.click(screen.getAllByText(copy.labels.new)[0]!)
     await screen.findByLabelText('label canvas')
-    expect(window.location.pathname).toMatch(/^\/labels\/new\/.+/)
+    expect(window.location.pathname).toBe('/labels/new')
   })
 
   it('shows the empty state with the strip still above it', async () => {
@@ -138,45 +121,5 @@ describe('the gallery', () => {
     renderApp('/')
     expect(await screen.findByText(copy.labels.empty)).toBeDefined()
     expect(document.querySelector('[data-status-strip]')).not.toBeNull()
-  })
-})
-
-describe('clearing unsaved drafts', () => {
-  it('lists what it will clear, clears on confirm, and leaves saved labels alone', async () => {
-    for (let i = 1; i <= 3; i += 1) {
-      draftStore.write(draftInput({ draftId: `d-${i}`, templateId: null, baseVersion: null, name: `试打 ${i}`, present: ir() }))
-    }
-    draftStore.write(draftInput({ draftId: 'tpl-shelf', templateId: 'tpl-shelf', baseVersion: 1, present: ir() }))
-    draftStore.write(draftInput({ draftId: 'tpl-waybill', templateId: 'tpl-waybill', baseVersion: 1, present: ir() }))
-    renderApp('/')
-    await screen.findAllByText('货架标签')
-
-    fireEvent.click(screen.getByText(copy.labels.clearDrafts))
-    const dialog = await screen.findByRole('alertdialog')
-    expect(dialog.textContent).toContain(copy.labels.clearDraftsBody(5))
-    for (const name of ['试打 1', '试打 2', '试打 3', '货架标签', '出货面单']) {
-      expect(dialog.textContent).toContain(name)
-    }
-
-    fireEvent.click(screen.getByText(copy.labels.clearDraftsConfirm))
-    await waitFor(() => expect(draftStore.list().entries).toEqual([]))
-    await waitFor(() => expect(document.querySelectorAll('[data-unsaved]')).toHaveLength(0))
-    expect(screen.getAllByText('货架标签').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('出货面单').length).toBeGreaterThan(0)
-  })
-
-  it('does nothing on cancel', async () => {
-    draftStore.write(draftInput({ draftId: 'd-1', templateId: null, baseVersion: null, present: ir() }))
-    renderApp('/')
-    await screen.findAllByText('货架标签')
-    fireEvent.click(screen.getByText(copy.labels.clearDrafts))
-    fireEvent.click(await screen.findByText(copy.common.cancel))
-    expect(draftStore.list().entries).toHaveLength(1)
-  })
-
-  it('is disabled when there is nothing to clear', async () => {
-    renderApp('/')
-    await screen.findAllByText('货架标签')
-    expect((screen.getByText(copy.labels.clearDrafts).closest('button') as HTMLButtonElement).disabled).toBe(true)
   })
 })

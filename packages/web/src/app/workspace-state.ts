@@ -1,57 +1,33 @@
 /**
- * The workspace: which page is open.
+ * The workspace: which page is open, and whether leaving it would lose work.
  *
- * This used to be a set of tabs, kept as a reducer so that the one property
- * everything depended on — an inactive tab keeps its editing state — could be
- * asserted without rendering. That property now lives in drafts
- * (features/drafts): the editor writes its state to storage as it goes and
- * reads it back on the way in, so a page can be unmounted without losing
- * anything. With that, the set had no reason to exist, and this is what is
- * left of it.
+ * This used to be a set of tabs whose promise was that an inactive tab kept
+ * its editing state. The design settled on the opposite rule: **leaving is
+ * abandoning**. An editor's unsaved edits exist only while it is open; going
+ * anywhere else asks first and then discards them. So the state is one page
+ * and one flag, and the flag gates the question.
  */
 import { pageFromPath, type PageDescriptor } from './routes.ts'
-import { randomId } from '../lib/random-id.ts'
 
 export interface WorkspaceState {
   page: PageDescriptor
-  /**
-   * The open label's draft could not be written — the one case where leaving
-   * the page really loses work. Gates the browser's leave prompt.
-   */
-  unpersisted: boolean
-  /**
-   * The open label's draft lives only in memory (a browser without local
-   * storage): switching pages keeps it, a reload does not. Warns on reload
-   * only; the in-app guard stays quiet.
-   */
-  reloadLoses: boolean
+  /** The open page holds unsaved edits: leaving asks first. */
+  dirty: boolean
 }
 
-export type IdFactory = () => string
-
 export function initialWorkspace(): WorkspaceState {
-  return { page: { kind: 'labels' }, unpersisted: false, reloadLoses: false }
+  return { page: { kind: 'labels' }, dirty: false }
 }
 
 /**
- * Go to a page.
- *
- * A new label gets a draft id here if it did not arrive with one, so that
- * the address can carry it and a reload finds the same draft. The
- * `unpersisted` flag is cleared: the editor that set it has unmounted and
- * flushed, and a new page starts clean.
+ * Go to a page. The flag is cleared: whatever was unsaved on the previous
+ * page is gone with it, which is what the person confirmed.
  */
-export function openPage(
-  state: WorkspaceState,
-  descriptor: PageDescriptor,
-  nextDraftId: IdFactory = randomId,
-): WorkspaceState {
-  const isNewLabel = descriptor.kind === 'label' && (descriptor.templateId ?? null) === null
-  const page: PageDescriptor = isNewLabel
-    ? { ...descriptor, templateId: null, draftId: descriptor.draftId ?? nextDraftId() }
-    : descriptor
+export function openPage(state: WorkspaceState, descriptor: PageDescriptor): WorkspaceState {
   void state
-  return { page, unpersisted: false, reloadLoses: false }
+  const page: PageDescriptor =
+    descriptor.kind === 'label' ? { ...descriptor, templateId: descriptor.templateId ?? null } : descriptor
+  return { page, dirty: false }
 }
 
 /**
@@ -61,22 +37,13 @@ export function openPage(
  * state object come back, re-runs the effect, and reports again — a render
  * loop. Identity is the only thing that stops it.
  */
-export function markUnpersisted(state: WorkspaceState, unpersisted: boolean): WorkspaceState {
-  return state.unpersisted === unpersisted ? state : { ...state, unpersisted }
+export function markDirty(state: WorkspaceState, dirty: boolean): WorkspaceState {
+  return state.dirty === dirty ? state : { ...state, dirty }
 }
 
-export function markReloadLoses(state: WorkspaceState, reloadLoses: boolean): WorkspaceState {
-  return state.reloadLoses === reloadLoses ? state : { ...state, reloadLoses }
-}
-
-/** Whether switching pages would discard work — the gate for the in-app guard. */
+/** Whether leaving the page — by navigation or by reload — would discard work. */
 export function hasUnsavedWork(state: WorkspaceState): boolean {
-  return state.unpersisted
-}
-
-/** Whether a reload would discard work — the gate for the browser's prompt. */
-export function reloadWouldLose(state: WorkspaceState): boolean {
-  return state.unpersisted || state.reloadLoses
+  return state.dirty
 }
 
 /**
@@ -84,7 +51,7 @@ export function reloadWouldLose(state: WorkspaceState): boolean {
  *
  * An unrecognised address lands on the gallery rather than on nothing.
  */
-export function restoreFromPath(address: string, nextDraftId: IdFactory = randomId): WorkspaceState {
+export function restoreFromPath(address: string): WorkspaceState {
   const descriptor = pageFromPath(address) ?? { kind: 'labels' as const }
-  return openPage(initialWorkspace(), descriptor, nextDraftId)
+  return openPage(initialWorkspace(), descriptor)
 }

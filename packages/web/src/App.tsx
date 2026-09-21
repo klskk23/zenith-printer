@@ -1,20 +1,22 @@
 /**
  * Application shell.
  *
- * Status bar, sidebar, one page. There is no tab bar and no rule about
- * keeping pages mounted: leaving the editor flushes its draft, and coming back
- * reads it — see features/drafts. The page is whatever the workspace says it
- * is, and the sidebar is always there, which is why the editor has no back
- * button of its own.
+ * Sidebar and one page. There is no tab bar and no top bar: the product's
+ * name and the printers live in the sidebar, which is always there — which is
+ * why the editor's own "back" is a courtesy, not the only way out. Leaving a
+ * page with unsaved edits asks once; confirming abandons them.
  */
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { request } from './api/client.ts'
-import { DisconnectedBanner, StatusBar, type ConnectionState } from './app/status-bar.tsx'
+import { DisconnectedBanner, type ConnectionState } from './app/status-bar.tsx'
 import { Sidebar } from './app/sidebar.tsx'
+import { summarize } from './app/status-summary.ts'
 import { WorkspaceProvider, useWorkspace } from './app/workspace.tsx'
 import type { PageDescriptor } from './app/routes.ts'
 import { EditorPage } from './editor/editor-page.tsx'
 import { PrintersPage } from './features/printers/printers-page.tsx'
+import { usePrinters } from './features/printers/hooks.ts'
 import { useJobs } from './features/jobs/hooks.ts'
 import { LabelsPage } from './pages/labels-page.tsx'
 import { QueuePage } from './pages/queue-page.tsx'
@@ -38,9 +40,8 @@ import {
 } from './components/ui/alert-dialog.tsx'
 
 /**
- * Asked once, only when leaving would lose something: a table with unsaved
- * rows, or a label whose draft could not be written. A label with a draft on
- * disk is not asked about — that is what the draft is for.
+ * Asked once, only when leaving would lose something: unsaved edits on the
+ * open page. Staying is the way to keep them — save, then leave.
  */
 function LeaveDialog(): React.JSX.Element {
   const { pendingLeave, confirmLeave, stay } = useWorkspace()
@@ -72,15 +73,8 @@ function Page({ page }: { page: PageDescriptor }): React.JSX.Element {
       return <LabelsPage />
     case 'label':
       // One editor instance across a save: the first save points the page at
-      // the new template id, and the editor moves its draft key on its own.
-      return (
-        <EditorPage
-          key="label"
-          templateId={page.templateId ?? null}
-          draftId={page.draftId}
-          presetId={page.presetId}
-        />
-      )
+      // the new template id, and the editor carries on.
+      return <EditorPage key="label" templateId={page.templateId ?? null} presetId={page.presetId} />
     case 'data-sources':
       return <DataSourcesPageRoute />
     case 'data-source':
@@ -103,32 +97,31 @@ function Page({ page }: { page: PageDescriptor }): React.JSX.Element {
 function Workspace({ connection }: { connection: ConnectionState }): React.JSX.Element {
   const { page } = useWorkspace()
   const jobs = useJobs(null)
-
-  const pending = (jobs.data ?? []).filter(
-    (job) => job.status === 'queued' || job.status === 'printing',
-  ).length
+  const printers = usePrinters()
+  const summary = useMemo(() => summarize(printers.data, jobs.data), [printers.data, jobs.data])
 
   return (
     // Fixed to the viewport rather than growing with content: the editor's
     // resizable columns need a height to divide, and a page that scrolls as a
     // whole would give them an unbounded one.
-    <div className="flex h-screen flex-col overflow-hidden">
-      <StatusBar connection={connection} />
-
+    <div className="flex h-screen overflow-hidden">
       <LeaveDialog />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar pendingJobCount={pending} />
+      <Sidebar
+        pendingJobCount={summary.queue?.pending ?? 0}
+        printers={summary.printers}
+        printersLoading={printers.isPending}
+        connection={connection}
+      />
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {connection === 'disconnected' && <DisconnectedBanner />}
-          {/* The page-level scroller. Left native: the designer manages its
-              own scrolling inside it, and nesting Radix viewports makes the
-              inner one unable to reach the outer. */}
-          <div className="scrollbar-themed min-h-0 flex-1 overflow-auto p-4">
-            <Page page={page} />
-          </div>
-        </main>
-      </div>
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {connection === 'disconnected' && <DisconnectedBanner />}
+        {/* The page-level scroller. Left native: the designer manages its
+            own scrolling inside it, and nesting Radix viewports makes the
+            inner one unable to reach the outer. */}
+        <div className="scrollbar-themed min-h-0 flex-1 overflow-auto p-4">
+          <Page page={page} />
+        </div>
+      </main>
     </div>
   )
 }

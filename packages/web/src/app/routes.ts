@@ -12,7 +12,10 @@
  * workspace, query intact.
  */
 
-/** Also the sidebar's order, top to bottom. Settings last: visited once. */
+/**
+ * The sidebar, top to bottom. Settings last: visited once. The API console
+ * is not here — it is a developer's page, reached from settings.
+ */
 export const SIDEBAR_KINDS = [
   'labels',
   'data-sources',
@@ -20,15 +23,14 @@ export const SIDEBAR_KINDS = [
   'queue',
   'history',
   'print-presets',
-  'api-docs',
   'settings',
 ] as const
 
 /**
- * Every page, including the two reached from a list rather than the sidebar:
- * a label's editor and a data source's editor both need a thing to open.
+ * Every page: the sidebar's, the two reached from a list (a label's editor
+ * and a data source's editor both need a thing to open), and the API console.
  */
-export const PAGE_KINDS = [...SIDEBAR_KINDS, 'label', 'data-source'] as const
+export const PAGE_KINDS = [...SIDEBAR_KINDS, 'label', 'data-source', 'api-docs'] as const
 
 export type PageKind = (typeof PAGE_KINDS)[number]
 
@@ -36,12 +38,6 @@ export interface PageDescriptor {
   kind: PageKind
   /** Labels only. `null` is a label not yet saved. */
   templateId?: string | null
-  /**
-   * Unsaved labels only: the key their draft is stored under. In the address,
-   * so a reload of `/labels/new/<id>` finds the same draft rather than opening
-   * a fresh blank label beside it.
-   */
-  draftId?: string
   /** Data source editor only. */
   dataSourceId?: string
   /**
@@ -53,15 +49,15 @@ export interface PageDescriptor {
   presetId?: string
 }
 
-const STATIC_PATHS: Record<(typeof SIDEBAR_KINDS)[number], string> = {
+const STATIC_PATHS: Record<(typeof SIDEBAR_KINDS)[number] | 'api-docs', string> = {
   labels: '/',
   'data-sources': '/data-sources',
   printers: '/printers',
   queue: '/queue',
   history: '/history',
   'print-presets': '/print-presets',
-  'api-docs': '/api-docs',
   settings: '/settings',
+  'api-docs': '/api-docs',
 }
 
 export function pathForPage(descriptor: PageDescriptor): string {
@@ -70,12 +66,7 @@ export function pathForPage(descriptor: PageDescriptor): string {
   }
   if (descriptor.kind === 'label') {
     const id = descriptor.templateId
-    const path =
-      id === null || id === undefined
-        ? descriptor.draftId === undefined
-          ? '/labels/new'
-          : `/labels/new/${encodeURIComponent(descriptor.draftId)}`
-        : `/labels/${id}`
+    const path = id === null || id === undefined ? '/labels/new' : `/labels/${id}`
     return descriptor.presetId === undefined
       ? path
       : `${path}?preset=${encodeURIComponent(descriptor.presetId)}`
@@ -91,13 +82,8 @@ function split(address: string): { path: string; preset: string } {
   return { path, preset }
 }
 
-function label(templateId: string | null, draftId: string | undefined, preset: string): PageDescriptor {
-  return {
-    kind: 'label',
-    templateId,
-    ...(draftId === undefined ? {} : { draftId }),
-    ...(preset === '' ? {} : { presetId: preset }),
-  }
+function label(templateId: string | null, preset: string): PageDescriptor {
+  return { kind: 'label', templateId, ...(preset === '' ? {} : { presetId: preset }) }
 }
 
 /**
@@ -120,19 +106,18 @@ export function pageFromPath(address: string): PageDescriptor | null {
     return { kind: 'data-source', dataSourceId: source[1]! }
   }
 
-  // New form: /labels/:id, /labels/new, /labels/new/:draftId
-  // Old form: /design/:id, /design, /design/new, /design/new/:draftId
+  // New form: /labels/:id, /labels/new
+  // Old form: /design/:id, /design, /design/new (and /design/new/<anything>)
   const editor = /^\/(?:labels|design)(?:\/([^/]+))?(?:\/([^/]+))?$/.exec(path)
   if (editor !== null) {
     const id = editor[1]
     if (id === undefined || id === 'new') {
-      const draftId = editor[2] === undefined ? undefined : decodeURIComponent(editor[2])
-      return label(null, draftId, preset)
+      return label(null, preset)
     }
     if (editor[2] !== undefined) {
       return null
     }
-    return label(id, undefined, preset)
+    return label(id, preset)
   }
 
   if (path === '/templates') {

@@ -8,9 +8,11 @@
  * template in particular does not belong here; it belongs in the library, next
  * to the list of what would be deleted.
  *
- * Saving carries the `version` the design was loaded with, so a concurrent edit
- * produces a clear conflict rather than silently discarding somebody's work.
- * Last write wins is acceptable; last write wins *unannounced* is not.
+ * Saving carries the `version` the label was loaded with. When the server
+ * refuses because somebody saved in between, the save is retried once against
+ * their version: the rule is **last save wins**, and the person pressing the
+ * button is the last one. The token still exists so that two saves in the
+ * same instant cannot interleave on the server; it is not a lock.
  */
 import { useState } from 'react'
 import { Save } from 'lucide-react'
@@ -33,25 +35,40 @@ import { useSaveTemplate, useTemplates, type Template } from './hooks.ts'
 export interface TemplateBarProps {
   current: Template | null
   buildBody: () => Record<string, unknown>
-  onLoad: (template: Template) => void
   onSaved: (template: Template) => void
 }
 
-export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBarProps): React.JSX.Element {
+export function TemplateBar({ current, buildBody, onSaved }: TemplateBarProps): React.JSX.Element {
   const templates = useTemplates()
   const save = useSaveTemplate()
   const [naming, setNaming] = useState<string | null>(null)
 
-  const conflict = save.error instanceof ApiRequestError && save.error.status === 409
-
   const commit = (name: string, asNew: boolean): void => {
     const body = { ...buildBody(), name }
+    const onSuccess = (saved: Template): void => {
+      setNaming(null)
+      onSaved(saved)
+    }
+    if (asNew || current === null) {
+      save.mutate({ body }, { onSuccess })
+      return
+    }
     save.mutate(
-      asNew || current === null ? { body } : { id: current.id, version: current.version, body },
+      { id: current.id, version: current.version, body },
       {
-        onSuccess: (saved) => {
-          setNaming(null)
-          onSaved(saved)
+        onSuccess,
+        onError: (error) => {
+          if (!(error instanceof ApiRequestError) || error.status !== 409) {
+            return
+          }
+          // Somebody saved first. Last save wins: take their version number
+          // and save over it. Once — a second refusal is shown.
+          void templates.refetch().then((result) => {
+            const fresh = result.data?.find((t) => t.id === current.id)
+            if (fresh !== undefined) {
+              save.mutate({ id: current.id, version: fresh.version, body }, { onSuccess })
+            }
+          })
         },
       },
     )
@@ -117,9 +134,8 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
 
       {/*
         The server already worded this, so it is shown verbatim — rewording it
-        here would give one fault two descriptions. The reload button is the one
-        thing the server cannot offer: FR-081 wants a way back, and FR-082 wants
-        the current edits left alone until the user asks.
+        here would give one fault two descriptions. A version conflict is not
+        shown at all on the first refusal: it is retried (see `commit`).
       */}
       {save.error instanceof ApiRequestError && (
         // Full width on its own line: an error wedged between dropdowns is
@@ -128,32 +144,6 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
           <p className="font-medium">{save.error.body.what}</p>
           <p className="mt-1 opacity-90">{save.error.body.why}</p>
           <p className="mt-1 font-medium">{save.error.body.next}</p>
-          {conflict && current !== null && (
-            // The way out that keeps the work: a new label with this content.
-            // Reloading is the other way, and it is the one that loses it.
-            <Button size="sm" variant="outline" className="mt-2 mr-2" onClick={() => setNaming(current.name)}>
-              {copy.templates.saveAsNew}
-            </Button>
-          )}
-          {conflict && current !== null && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-2"
-              onClick={() => {
-                // Explicit, never automatic: reloading replaces what is on
-                // screen, and that is the user's call to make.
-                void templates.refetch().then(() => {
-                  const fresh = templates.data?.find((t) => t.id === current.id)
-                  if (fresh !== undefined) {
-                    onLoad(fresh)
-                  }
-                })
-              }}
-            >
-              {copy.templates.reload}
-            </Button>
-          )}
         </Alert>
       )}
     </>

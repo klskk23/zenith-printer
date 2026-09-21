@@ -11,10 +11,10 @@
  * while the chunk arrives is not a blank rectangle.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
-import { SIDEBAR_KINDS, pathForPage, pageFromPath } from '../src/app/routes.ts'
+import { PAGE_KINDS, pathForPage, pageFromPath } from '../src/app/routes.ts'
 
 function wrap(node: React.ReactNode): React.JSX.Element {
   const client = new QueryClient({
@@ -42,7 +42,7 @@ afterEach(() => {
 
 describe('the route', () => {
   it('is one of the tab kinds', () => {
-    expect(SIDEBAR_KINDS).toContain('api-docs')
+    expect(PAGE_KINDS).toContain('api-docs')
   })
 
   it('has an address, and it round-trips', () => {
@@ -54,12 +54,12 @@ describe('the route', () => {
 })
 
 describe('the page', () => {
-  it('opens from the sidebar and renders something', async () => {
+  it('opens at its address and renders something', async () => {
     render(wrap(<App />))
-    const nav = document.querySelector('nav')!
-    const entry = [...nav.querySelectorAll('button')].find((b) => b.textContent?.trim() === '接口调试')
-    expect(entry, 'no sidebar entry for the API console').toBeDefined()
-    fireEvent.click(entry!)
+    // No sidebar entry any more: the console is reached by address (from a
+    // button in settings that opens a new window).
+    window.history.replaceState(null, '', '/api-docs')
+    window.dispatchEvent(new PopStateEvent('popstate'))
 
     // The console arrives in its own chunk; what must be on screen immediately
     // is a page that says what it is rather than an empty panel. Scoped to the
@@ -72,8 +72,8 @@ describe('the page', () => {
     // So somebody can fetch it with curl, or point another tool at it, without
     // reading the source to find the path.
     render(wrap(<App />))
-    const nav = document.querySelector('nav')!
-    fireEvent.click([...nav.querySelectorAll('button')].find((b) => b.textContent?.trim() === '接口调试')!)
+    window.history.replaceState(null, '', '/api-docs')
+    window.dispatchEvent(new PopStateEvent('popstate'))
     const page = await screen.findByTestId('api-docs')
     expect(within(page).getByRole('link', { name: '/api/openapi.json' })).toBeDefined()
   })

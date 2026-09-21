@@ -29,6 +29,8 @@ import { PREFERENCE_KEYS, type Preferences } from '../features/preferences/store
 import { LOCALES } from '../features/preferences/locale.ts'
 import { FONT_FAMILIES, type FontFamilyKey } from '../editor/elements.ts'
 import { ImagePruneCard } from '../features/images/prune-card.tsx'
+import { ExternalLink } from 'lucide-react'
+import { pathForPage } from '../app/routes.ts'
 
 /**
  * One setting: its name on the left, its control on the right.
@@ -194,6 +196,24 @@ export function SettingsPage(): React.JSX.Element {
       </div>
 
       <p className="text-2xs text-muted-foreground">{copy.settings.localOnlyHint}</p>
+
+      {/* A developer's page, kept out of the sidebar. Opens in its own window:
+          it is a console, not a place to be while labels are being made. */}
+      <div className="flex flex-col gap-n2 rounded-md border border-border px-3 py-3" data-api-docs-entry>
+        <h3 className="text-xs font-medium">{copy.settings.apiDocsHeading}</h3>
+        <p className="text-2xs text-muted-foreground">{copy.settings.apiDocsHint}</p>
+        <div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => window.open(pathForPage({ kind: 'api-docs' }), '_blank', 'noopener')}
+          >
+            {copy.settings.apiDocsOpen}
+            <ExternalLink />
+          </Button>
+        </div>
+      </div>
 
       {/* Kept below the local preferences and boxed, because it is the one
           thing on this page that reaches past this browser. */}
