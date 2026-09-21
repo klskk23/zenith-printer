@@ -43,7 +43,7 @@ const template = {
 describe('the paper class', () => {
   it('is on the canvas', () => {
     render(wrap(<App />))
-    fireEvent.click(screen.getAllByText('标签设计')[0]!)
+    fireEvent.click(screen.getAllByText('新建标签')[0]!)
     const canvas = document.querySelector('[data-label-canvas]')
     expect(canvas).not.toBeNull()
     expect(canvas!.classList.contains('paper')).toBe(true)

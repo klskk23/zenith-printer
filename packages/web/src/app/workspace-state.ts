@@ -1,282 +1,90 @@
 /**
- * The tab set — this application's real view state.
+ * The workspace: which page is open.
  *
- * Kept as a pure reducer rather than component state so the rules that matter
- * can be asserted without rendering anything, and so that nothing in the render
- * tree is in a position to quietly drop a tab.
- *
- * The property everything else depends on: **an inactive tab is still there**.
- * Its editing state, zoom and undo history survive because the tab object
- * survives. Anything that unmounts inactive tabs breaks the promise that
- * switching away and back costs nothing.
+ * This used to be a set of tabs, kept as a reducer so that the one property
+ * everything depended on — an inactive tab keeps its editing state — could be
+ * asserted without rendering. That property now lives in drafts
+ * (features/drafts): the editor writes its state to storage as it goes and
+ * reads it back on the way in, so a page can be unmounted without losing
+ * anything. With that, the set had no reason to exist, and this is what is
+ * left of it.
  */
-import { isSingletonKind, tabFromPath, type TabDescriptor, type TabKind } from './routes.ts'
+import { pageFromPath, type PageDescriptor } from './routes.ts'
 import { randomId } from '../lib/random-id.ts'
 
-/**
- * Advice, not a gate. A design tab keeps a full editing state resident, so ten
- * of them is where it is worth saying so — but refusing the eleventh would
- * block someone whose labels are small and whose machine is fine.
- *
- * Counted over the editing kinds only: see `EDITING_KINDS`.
- */
-export const SOFT_TAB_LIMIT = 10
-
-export interface WorkspaceTab {
-  id: string
-  kind: TabKind
-  /** Designs only; `null` is an unsaved blank design. */
-  templateId: string | null
-  /** Data source editor only. */
-  dataSourceId?: string
+export interface WorkspaceState {
+  page: PageDescriptor
   /**
-   * Designs only: the print preset the tab was opened on, from `?preset=`.
-   *
-   * Held by the tab rather than read from the address when needed, because the
-   * address is rewritten *from* the active tab — a preset the tab did not keep
-   * would be erased by the first tab switch, and with it the only record of
-   * why this design opened with a printer already chosen.
-   */
-  presetId?: string
-  /**
-   * Unsaved designs only: what separates 「未命名设计 1」 from 「未命名设计 2」.
-   *
-   * Assigned when the tab opens and never touched again, so closing one tab
-   * cannot relabel the rest. See `nextDraftNumber`.
-   */
-  draftNumber?: number
-  /**
-   * Unsaved designs only: the key the draft is stored under. Random rather
-   * than the tab id, because it goes into the address and has to survive a
-   * reload; a saved design's draft is keyed by its template id instead.
-   */
-  draftId?: string
-  isDirty: boolean
-  /**
-   * Dirty, and the draft could not be written — the one case where leaving
-   * really loses work. Gates the browser's leave prompt.
+   * The open label's draft could not be written — the one case where leaving
+   * the page really loses work. Gates the browser's leave prompt.
    */
   unpersisted: boolean
-}
-
-export interface WorkspaceState {
-  tabs: readonly WorkspaceTab[]
-  activeId: string | null
+  /**
+   * The open label's draft lives only in memory (a browser without local
+   * storage): switching pages keeps it, a reload does not. Warns on reload
+   * only; the in-app guard stays quiet.
+   */
+  reloadLoses: boolean
 }
 
 export type IdFactory = () => string
 
-export function emptyWorkspace(): WorkspaceState {
-  return { tabs: [], activeId: null }
-}
-
-function isUntitledDesign(tab: WorkspaceTab): boolean {
-  return tab.kind === 'design' && tab.templateId === null
+export function initialWorkspace(): WorkspaceState {
+  return { page: { kind: 'labels' }, unpersisted: false, reloadLoses: false }
 }
 
 /**
- * The number a new blank design gets: the lowest one nobody is using.
+ * Go to a page.
  *
- * Two properties, and they pull in opposite directions:
- *
- *   - **Stable.** A number belongs to its tab for as long as that tab is
- *     unsaved. Deriving it from position instead would renumber 「未命名设计 3」
- *     to 「未命名设计 2」 the moment somebody closed a different tab — which is
- *     the confusion the numbers were added to end.
- *   - **Small.** Reusing the lowest free number keeps the strip readable;
- *     a counter that only ever climbs reaches 「未命名设计 17」 on a machine
- *     that has never had two open at once.
- *
- * Gaps are the price: with 1 and 3 open, the next one is 2, and closing 2
- * leaves 1 and 3. That is the honest reading — those two tabs did not change.
+ * A new label gets a draft id here if it did not arrive with one, so that
+ * the address can carry it and a reload finds the same draft. The
+ * `unpersisted` flag is cleared: the editor that set it has unmounted and
+ * flushed, and a new page starts clean.
  */
-function nextDraftNumber(tabs: readonly WorkspaceTab[]): number {
-  const taken = new Set(tabs.filter(isUntitledDesign).map((tab) => tab.draftNumber))
-  let candidate = 1
-  while (taken.has(candidate)) {
-    candidate += 1
-  }
-  return candidate
-}
-
-function findSingleton(state: WorkspaceState, kind: TabKind): WorkspaceTab | undefined {
-  return isSingletonKind(kind) ? state.tabs.find((tab) => tab.kind === kind) : undefined
-}
-
-/**
- * Open a tab, or switch to it when the kind exists at most once.
- *
- * Designs are exempt: two design tabs on the same template is a normal way to
- * compare variants. The save conflict that can follow is handled where it
- * happens rather than prevented here.
- */
-export function openTab(
+export function openPage(
   state: WorkspaceState,
-  descriptor: TabDescriptor,
-  nextId: IdFactory,
+  descriptor: PageDescriptor,
   nextDraftId: IdFactory = randomId,
 ): WorkspaceState {
-  const existing = findSingleton(state, descriptor.kind)
-  if (existing !== undefined) {
-    return { ...state, activeId: existing.id }
-  }
-
-  // A data source editor is per-table, like a design is per-template: opening
-  // the same one twice should return to it rather than stack another tab.
-  if (descriptor.kind === 'data-source') {
-    const open = state.tabs.find(
-      (tab) => tab.kind === 'data-source' && tab.dataSourceId === descriptor.dataSourceId,
-    )
-    if (open !== undefined) {
-      return { ...state, activeId: open.id }
-    }
-  }
-
-  const isBlankDesign = descriptor.kind === 'design' && (descriptor.templateId ?? null) === null
-  const tab: WorkspaceTab = {
-    id: nextId(),
-    kind: descriptor.kind,
-    templateId: descriptor.templateId ?? null,
-    ...(descriptor.dataSourceId === undefined ? {} : { dataSourceId: descriptor.dataSourceId }),
-    ...(descriptor.presetId === undefined ? {} : { presetId: descriptor.presetId }),
-    ...(isBlankDesign
-      ? { draftNumber: nextDraftNumber(state.tabs), draftId: descriptor.draftId ?? nextDraftId() }
-      : {}),
-    isDirty: false,
-    unpersisted: false,
-  }
-  return { tabs: [...state.tabs, tab], activeId: tab.id }
-}
-
-/** Activating a tab that is not open is a no-op, not an error. */
-export function activateTab(state: WorkspaceState, id: string): WorkspaceState {
-  if (!state.tabs.some((tab) => tab.id === id)) {
-    return state
-  }
-  return { ...state, activeId: id }
-}
-
-/** Closing the active tab falls back to its left neighbour, then its right. */
-export function closeTab(state: WorkspaceState, id: string): WorkspaceState {
-  const index = state.tabs.findIndex((tab) => tab.id === id)
-  if (index === -1) {
-    return state
-  }
-
-  const tabs = state.tabs.filter((tab) => tab.id !== id)
-  if (state.activeId !== id) {
-    return { ...state, tabs }
-  }
-
-  const neighbour = tabs[index - 1] ?? tabs[index] ?? null
-  return { tabs, activeId: neighbour?.id ?? null }
-}
-
-/**
- * Point a tab at a template.
- *
- * Used when an unsaved design is first saved: the tab it lives in becomes that
- * template's tab, so its title, its address and any later save all refer to the
- * same thing.
- */
-export function setTabTemplate(
-  state: WorkspaceState,
-  id: string,
-  templateId: string | null,
-): WorkspaceState {
-  return {
-    ...state,
-    tabs: state.tabs.map((tab) => {
-      if (tab.id !== id) {
-        return tab
-      }
-      // The number goes with the title. Once the tab is called after a
-      // template it is not holding one any more, so the next blank design gets
-      // it back; were the tab ever pointed at nothing again it needs a fresh
-      // one, since its old number may since have been handed out.
-      const next: WorkspaceTab = { ...tab, templateId }
-      if (templateId === null) {
-        next.draftNumber = nextDraftNumber(state.tabs.filter((other) => other.id !== id))
-      } else {
-        delete next.draftNumber
-      }
-      return next
-    }),
-  }
+  const isNewLabel = descriptor.kind === 'label' && (descriptor.templateId ?? null) === null
+  const page: PageDescriptor = isNewLabel
+    ? { ...descriptor, templateId: null, draftId: descriptor.draftId ?? nextDraftId() }
+    : descriptor
+  void state
+  return { page, unpersisted: false, reloadLoses: false }
 }
 
 /**
  * Returns the state **unchanged** when the flag already has that value.
  *
- * Not an optimisation. A page that reports its own dirtiness from an effect
- * sees the new state object come back, re-runs the effect, and reports again —
- * a render loop that hangs the tab. Identity is the only thing that stops it.
+ * Not an optimisation. A page that reports this from an effect sees the new
+ * state object come back, re-runs the effect, and reports again — a render
+ * loop. Identity is the only thing that stops it.
  */
-export function markDirty(state: WorkspaceState, id: string, isDirty: boolean): WorkspaceState {
-  if (!state.tabs.some((tab) => tab.id === id && tab.isDirty !== isDirty)) {
-    return state
-  }
-  return {
-    ...state,
-    tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, isDirty } : tab)),
-  }
+export function markUnpersisted(state: WorkspaceState, unpersisted: boolean): WorkspaceState {
+  return state.unpersisted === unpersisted ? state : { ...state, unpersisted }
 }
 
-/** Same identity rule as `markDirty`, for the same reason. */
-export function markUnpersisted(state: WorkspaceState, id: string, unpersisted: boolean): WorkspaceState {
-  if (!state.tabs.some((tab) => tab.id === id && tab.unpersisted !== unpersisted)) {
-    return state
-  }
-  return {
-    ...state,
-    tabs: state.tabs.map((tab) => (tab.id === id ? { ...tab, unpersisted } : tab)),
-  }
+export function markReloadLoses(state: WorkspaceState, reloadLoses: boolean): WorkspaceState {
+  return state.reloadLoses === reloadLoses ? state : { ...state, reloadLoses }
 }
 
-/**
- * The kinds whose tabs cost something to keep open.
- *
- * A design tab holds a live SVG editor and its undo history; the template
- * library holds a list and its thumbnails. The rest — printers, the queue,
- * history, settings — are single pages that fetch and render, and counting
- * them towards a warning about *editing* would make the advice fire for
- * reasons that have nothing to do with it.
- */
-const EDITING_KINDS: ReadonlySet<TabKind> = new Set<TabKind>(['design', 'templates'])
-
-/** How many open tabs are the kind the warning is about. */
-export function editingTabCount(state: WorkspaceState): number {
-  return state.tabs.filter((tab) => EDITING_KINDS.has(tab.kind)).length
-}
-
-export function exceedsSoftLimit(state: WorkspaceState): boolean {
-  return editingTabCount(state) >= SOFT_TAB_LIMIT
-}
-
-/**
- * Whether leaving the page would discard work — the gate for the leave prompt.
- *
- * Dirty is not enough any more: a dirty tab whose draft is on disk survives
- * a reload. Only a tab whose draft could not be written has something to lose.
- */
+/** Whether switching pages would discard work — the gate for the in-app guard. */
 export function hasUnsavedWork(state: WorkspaceState): boolean {
-  return state.tabs.some((tab) => tab.isDirty && tab.unpersisted)
+  return state.unpersisted
+}
+
+/** Whether a reload would discard work — the gate for the browser's prompt. */
+export function reloadWouldLose(state: WorkspaceState): boolean {
+  return state.unpersisted || state.reloadLoses
 }
 
 /**
- * Rebuild the workspace after a reload.
+ * Rebuild the workspace after a reload, or on back/forward.
  *
- * An address names exactly one tab, so exactly one is restored; the rest are
- * gone, which the leave prompt has already warned about. An unrecognised
- * address lands on the index rather than an empty workspace.
+ * An unrecognised address lands on the gallery rather than on nothing.
  */
-export function restoreFromPath(
-  address: string,
-  nextId: IdFactory,
-  nextDraftId: IdFactory = randomId,
-): WorkspaceState {
-  // The whole address, query included: `?preset=` is part of where a link
-  // meant to land.
-  const descriptor = tabFromPath(address) ?? { kind: 'index' as const }
-  return openTab(emptyWorkspace(), descriptor, nextId, nextDraftId)
+export function restoreFromPath(address: string, nextDraftId: IdFactory = randomId): WorkspaceState {
+  const descriptor = pageFromPath(address) ?? { kind: 'labels' as const }
+  return openPage(initialWorkspace(), descriptor, nextDraftId)
 }

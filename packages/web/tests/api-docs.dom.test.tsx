@@ -14,8 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
-import { TAB_KINDS } from '../src/app/routes.ts'
-import { pathForTab, tabFromPath } from '../src/app/routes.ts'
+import { SIDEBAR_KINDS, pathForPage, pageFromPath } from '../src/app/routes.ts'
 
 function wrap(node: React.ReactNode): React.JSX.Element {
   const client = new QueryClient({
@@ -43,14 +42,14 @@ afterEach(() => {
 
 describe('the route', () => {
   it('is one of the tab kinds', () => {
-    expect(TAB_KINDS).toContain('api-docs')
+    expect(SIDEBAR_KINDS).toContain('api-docs')
   })
 
   it('has an address, and it round-trips', () => {
     // A page with no address cannot be linked to or restored after a refresh.
-    const path = pathForTab({ kind: 'api-docs' })
+    const path = pathForPage({ kind: 'api-docs' })
     expect(path).toBe('/api-docs')
-    expect(tabFromPath(path)).toEqual({ kind: 'api-docs' })
+    expect(pageFromPath(path)).toEqual({ kind: 'api-docs' })
   })
 })
 

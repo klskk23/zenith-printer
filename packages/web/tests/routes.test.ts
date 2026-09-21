@@ -1,157 +1,100 @@
 /**
- * Path <-> tab mapping.
+ * Address ↔ page.
  *
- * The address bar projects *which tab is active*; it does not decide which tabs
- * exist. Keeping that mapping in a pure module means it can be checked without
- * a router, a DOM, or a browser.
+ * There is one page at a time now, and the address names it. Two things are
+ * pinned beyond the round trip: `?preset=` rides on a label's address and
+ * nowhere else, and the addresses the last design used — `/design/…`,
+ * `/templates` — still resolve, because the asset ledger has been handing
+ * out `/design/{id}?preset=…` links and a link that stops working is a
+ * breaking change whatever the changelog says.
  */
 import { describe, expect, it } from 'vitest'
-import { pathForTab, tabFromPath, TAB_KINDS } from '../src/app/routes.ts'
+import { PAGE_KINDS, SIDEBAR_KINDS, isLegacyAddress, pageFromPath, pathForPage } from '../src/app/routes.ts'
 
-describe('pathForTab', () => {
-  it.each([
-    ['index', '/'],
-    ['templates', '/templates'],
-    ['printers', '/printers'],
-    ['queue', '/queue'],
-    ['history', '/history'],
-    ['settings', '/settings'],
-  ] as const)('maps %s to %s', (kind, path) => {
-    expect(pathForTab({ kind })).toBe(path)
+describe('the page set', () => {
+  it('has the eight sidebar entries in the fixed order', () => {
+    expect([...SIDEBAR_KINDS]).toEqual([
+      'labels', 'data-sources', 'printers', 'queue', 'history', 'print-presets', 'api-docs', 'settings',
+    ])
   })
 
-  it('gives an unsaved design its own path', () => {
-    expect(pathForTab({ kind: 'design', templateId: null })).toBe('/design/new')
-  })
-
-  it('addresses a design opened from a template by that template', () => {
-    expect(pathForTab({ kind: 'design', templateId: 'tpl-7' })).toBe('/design/tpl-7')
-  })
-
-  it('covers every tab kind', () => {
-    for (const kind of TAB_KINDS) {
-      expect(pathForTab({ kind, templateId: null })).toMatch(/^\//)
+  it('has no home, library or design kind', () => {
+    for (const gone of ['index', 'templates', 'design']) {
+      expect((PAGE_KINDS as readonly string[]).includes(gone)).toBe(false)
     }
   })
 })
 
-describe('tabFromPath', () => {
-  it.each([
-    ['/', 'index'],
-    ['/templates', 'templates'],
-    ['/printers', 'printers'],
-    ['/queue', 'queue'],
-    ['/history', 'history'],
-    ['/settings', 'settings'],
-  ] as const)('maps %s to %s', (path, kind) => {
-    expect(tabFromPath(path)).toMatchObject({ kind })
+describe('pathForPage', () => {
+  it('puts the gallery at the root', () => {
+    expect(pathForPage({ kind: 'labels' })).toBe('/')
   })
 
-  it('reads /design/new as an unsaved design', () => {
-    expect(tabFromPath('/design/new')).toEqual({ kind: 'design', templateId: null })
+  it('names a saved label by id', () => {
+    expect(pathForPage({ kind: 'label', templateId: 'tpl-1' })).toBe('/labels/tpl-1')
   })
 
-  it('reads /design/:id as a design on that template', () => {
-    expect(tabFromPath('/design/tpl-7')).toEqual({ kind: 'design', templateId: 'tpl-7' })
+  it('names a new label by its draft id', () => {
+    expect(pathForPage({ kind: 'label', templateId: null, draftId: 'd-abc' })).toBe('/labels/new/d-abc')
   })
 
-  it('tolerates a trailing slash', () => {
-    expect(tabFromPath('/printers/')).toMatchObject({ kind: 'printers' })
+  it('carries a preset on a label only', () => {
+    expect(pathForPage({ kind: 'label', templateId: 'tpl-1', presetId: 'p 1' })).toBe('/labels/tpl-1?preset=p%201')
+    expect(pathForPage({ kind: 'printers', presetId: 'p1' } as never)).toBe('/printers')
   })
 
-  it('returns null for an unknown path rather than guessing', () => {
-    expect(tabFromPath('/nope')).toBeNull()
-    expect(tabFromPath('/design')).toBeNull()
+  it('names a data source by id', () => {
+    expect(pathForPage({ kind: 'data-source', dataSourceId: 'ds-1' })).toBe('/data-sources/ds-1')
   })
+})
 
-  it('round-trips every kind', () => {
-    for (const kind of TAB_KINDS) {
-      const descriptor =
-        kind === 'design'
-          ? { kind, templateId: 'tpl-1' }
-          : kind === 'data-source'
-            ? { kind, dataSourceId: 'ds-1' }
-            : { kind }
-      expect(tabFromPath(pathForTab(descriptor))).toMatchObject({ kind })
+describe('pageFromPath', () => {
+  it('reads every static page back', () => {
+    for (const kind of SIDEBAR_KINDS) {
+      expect(pageFromPath(pathForPage({ kind }))).toEqual({ kind })
     }
   })
 
-  it('keeps the list and the editor apart, one character of path aside', () => {
-    // `/data-sources` and `/data-sources/ds-1` differ by a segment and mean
-    // different pages; the list must not swallow the editor.
-    expect(tabFromPath('/data-sources')).toEqual({ kind: 'data-sources' })
-    expect(tabFromPath('/data-sources/ds-1')).toEqual({ kind: 'data-source', dataSourceId: 'ds-1' })
+  it('reads a saved label with its preset', () => {
+    expect(pageFromPath('/labels/tpl-1?preset=pre-1')).toEqual({ kind: 'label', templateId: 'tpl-1', presetId: 'pre-1' })
+  })
+
+  it('reads a new label with its draft id', () => {
+    expect(pageFromPath('/labels/new/d-abc')).toEqual({ kind: 'label', templateId: null, draftId: 'd-abc' })
+  })
+
+  it('treats an empty preset as none', () => {
+    expect(pageFromPath('/labels/tpl-1?preset=')).toEqual({ kind: 'label', templateId: 'tpl-1' })
+  })
+
+  it('ignores a trailing slash', () => {
+    expect(pageFromPath('/printers/')).toEqual({ kind: 'printers' })
+  })
+
+  it('returns null for an address it does not serve', () => {
+    expect(pageFromPath('/nope')).toBeNull()
   })
 })
 
-/**
- * A preset carried in the address.
- *
- * `nexus-assets` links a label as `/design/{templateId}?preset={presetId}`,
- * meaning "take me there with the settings already set" — the printer, the
- * profile and the copies that the preset records, all four of which otherwise
- * sit at their defaults no matter which link was followed.
- *
- * It stays a query rather than becoming a path segment, and the tab stays a
- * design tab: it is an initial value, not another kind of thing to open.
- */
-describe('a design address carrying a preset', () => {
-  it('is read out of the query', () => {
-    expect(tabFromPath('/design/tpl-7?preset=pre-1')).toEqual({
-      kind: 'design',
-      templateId: 'tpl-7',
-      presetId: 'pre-1',
-    })
+describe('addresses from before', () => {
+  it('sends /templates to the gallery', () => {
+    expect(pageFromPath('/templates')).toEqual({ kind: 'labels' })
   })
 
-  it('is written back, so a refresh and the back button keep it', () => {
-    expect(pathForTab({ kind: 'design', templateId: 'tpl-7', presetId: 'pre-1' })).toBe(
-      '/design/tpl-7?preset=pre-1',
-    )
+  it('sends /design/{id}?preset= to that label with the preset', () => {
+    expect(pageFromPath('/design/tpl-7?preset=pre-1')).toEqual({ kind: 'label', templateId: 'tpl-7', presetId: 'pre-1' })
   })
 
-  it('round-trips', () => {
-    const address = '/design/tpl-7?preset=pre-1'
-    expect(pathForTab(tabFromPath(address)!)).toBe(address)
+  it('sends /design and /design/new to a new label', () => {
+    expect(pageFromPath('/design')).toEqual({ kind: 'label', templateId: null })
+    expect(pageFromPath('/design/new')).toEqual({ kind: 'label', templateId: null })
+    expect(pageFromPath('/design/new/d-1')).toEqual({ kind: 'label', templateId: null, draftId: 'd-1' })
   })
 
-  it('is absent from the address when there is none', () => {
-    expect(pathForTab({ kind: 'design', templateId: 'tpl-7' })).toBe('/design/tpl-7')
-    expect(tabFromPath('/design/tpl-7')?.presetId).toBeUndefined()
-  })
-
-  it('ignores a query on the kinds that have no use for one', () => {
-    // Otherwise a stray `?preset=` on the printers page would be carried into
-    // an address that means nothing by it.
-    expect(tabFromPath('/printers?preset=pre-1')).toEqual({ kind: 'printers' })
-    expect(tabFromPath('/?preset=pre-1')).toEqual({ kind: 'index' })
-  })
-
-  it('survives other query parameters alongside it', () => {
-    expect(tabFromPath('/design/tpl-7?utm=x&preset=pre-1')?.presetId).toBe('pre-1')
-  })
-
-  it('treats an empty preset as none, rather than as a preset named ""', () => {
-    expect(tabFromPath('/design/tpl-7?preset=')?.presetId).toBeUndefined()
-  })
-})
-
-describe('an unsaved design carries its draft id in the address', () => {
-  it('writes it', () => {
-    expect(pathForTab({ kind: 'design', templateId: null, draftId: 'd-abc' })).toBe('/design/new/d-abc')
-  })
-
-  it('keeps the preset beside it', () => {
-    expect(pathForTab({ kind: 'design', templateId: null, draftId: 'd-abc', presetId: 'p1' })).toBe(
-      '/design/new/d-abc?preset=p1',
-    )
-  })
-
-  it('reads it back', () => {
-    expect(tabFromPath('/design/new/d-abc')).toEqual({ kind: 'design', templateId: null, draftId: 'd-abc' })
-  })
-
-  it('still reads the bare form, which mints a draft id later', () => {
-    expect(tabFromPath('/design/new')).toEqual({ kind: 'design', templateId: null })
+  it('knows which addresses are old, so the bar can be rewritten', () => {
+    expect(isLegacyAddress('/design/tpl-7?preset=x')).toBe(true)
+    expect(isLegacyAddress('/templates')).toBe(true)
+    expect(isLegacyAddress('/labels/tpl-7')).toBe(false)
+    expect(isLegacyAddress('/')).toBe(false)
   })
 })

@@ -1,7 +1,8 @@
 /**
- * Template selection and saving, for the editor's top bar.
+ * Saving, for the editor's top bar.
  *
- * Pared down to what the top bar is for: which design is open, and saving it.
+ * There is no picker here any more: the gallery is the picker. What is left
+ * is saving the open label.
  * The earlier version carried a permanent name field, three buttons and its own
  * inline error strip — a whole panel wedged into a row of dropdowns. Deleting a
  * template in particular does not belong here; it belongs in the library, next
@@ -27,7 +28,6 @@ import {
 } from '../../components/ui/dialog.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Label } from '../../components/ui/label.tsx'
-import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select.tsx'
 import { useSaveTemplate, useTemplates, type Template } from './hooks.ts'
 
 export interface TemplateBarProps {
@@ -59,33 +59,6 @@ export function TemplateBar({ current, buildBody, onLoad, onSaved }: TemplateBar
 
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <Label>{copy.templates.heading}</Label>
-        <Select
-          value={current?.id ?? NONE}
-          onValueChange={(value) => {
-            const found = templates.data?.find((t) => t.id === value)
-            if (found !== undefined) {
-              onLoad(found)
-            }
-          }}
-        >
-          <SelectTrigger aria-label={copy.templates.heading}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {/* An em dash, like the other selects. Naming it "untitled design"
-                read as though a template by that name existed. */}
-            <SelectItem value={NONE}>—</SelectItem>
-            {templates.data?.map((template) => (
-              <SelectItem key={template.id} value={template.id}>
-                {template.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* Default height, matching the selects it sits beside. */}
       <Button
         variant="outline"

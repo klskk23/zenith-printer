@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { LabelElement, VariableDefinition } from '@zenith/shared'
 import { request } from '../../api/client.ts'
 import type { PrinterKind } from '../../api/types.ts'
+import { useDataSourceRows } from '../data-sources/hooks.ts'
 
 export interface Template {
   id: string
@@ -80,6 +81,21 @@ export function useDeleteTemplate() {
     mutationFn: (id: string) => request<void>(`/templates/${id}`, { method: 'DELETE' }),
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   })
+}
+
+/**
+ * The first row of a table, for a gallery thumbnail to fill its fields from.
+ *
+ * The existing paged endpoint at page size one: no new route, and one
+ * request per table however many labels are bound to it, because react-query
+ * keys on the arguments. Absent while loading, absent on failure — the tile
+ * shows placeholders either way rather than waiting or breaking.
+ */
+export function useFirstRow(dataSourceId: string | null): Record<string, string> | undefined {
+  const rows = useDataSourceRows(dataSourceId, 1, 1, 'asc')
+  // Optional all the way down: a server that answers with an empty body
+  // (or a test that does) must not take the tile with it.
+  return rows.data?.rows?.[0]?.values
 }
 
 // There is no print-form hook any more. Nothing is typed in before printing:

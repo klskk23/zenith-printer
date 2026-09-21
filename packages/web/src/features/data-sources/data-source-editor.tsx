@@ -61,11 +61,9 @@ const CHROME_PX = 220
 
 export interface DataSourceEditorProps {
   dataSourceId: string
-  /** Lets the tab show a dot and ask before closing over unsaved rows. */
-  tabId: string
 }
 
-export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps): React.JSX.Element {
+export function DataSourceEditor({ dataSourceId }: DataSourceEditorProps): React.JSX.Element {
   const sources = useDataSources()
   // The whole table in one request. See the note at the top about paging.
   const rows = useDataSourceRows(dataSourceId, 1, MAX_ROWS)
@@ -184,15 +182,14 @@ export function DataSourceEditor({ dataSourceId, tabId }: DataSourceEditorProps)
     setHistory(emptyHistory)
   }
 
-  // The tab shows the dot and asks before closing; the browser asks before a
-  // reload. Neither knows about this draft unless it is told.
-  //
-  // Depends on `setDirty`, which is stable, rather than on the workspace object,
-  // whose identity changes with every state change — including this one.
-  const setDirty = workspace.setDirty
+  // Unsaved rows live only here — there is no draft for a table — so the
+  // shell has to be told: it asks before navigating away and the browser
+  // asks before a reload. Depends on the setter, which is stable, rather than
+  // on the workspace object, whose identity changes with every state change.
+  const setUnpersisted = workspace.setUnpersisted
   useEffect(() => {
-    setDirty(tabId, dirty)
-  }, [tabId, dirty, setDirty])
+    setUnpersisted(dirty)
+  }, [dirty, setUnpersisted])
 
   /**
    * Bound on the container rather than on the document.

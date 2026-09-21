@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { TemplatesPage } from '../src/pages/templates-page.tsx'
+import { LabelsPage } from '../src/pages/labels-page.tsx'
 import { WorkspaceProvider } from '../src/app/workspace.tsx'
 
 const TEMPLATE = {
@@ -81,7 +81,7 @@ afterEach(() => {
 
 /** Hand the hidden picker a file, as choosing one in the dialog would. */
 async function choose(contents: unknown): Promise<void> {
-  const input = screen.getByLabelText('选择模板文件') as HTMLInputElement
+  const input = screen.getByLabelText('选择标签文件') as HTMLInputElement
   const file = new File([JSON.stringify(contents)], 'x.json', { type: 'application/json' })
   Object.defineProperty(input, 'files', { value: [file], configurable: true })
   fireEvent.change(input)
@@ -89,23 +89,23 @@ async function choose(contents: unknown): Promise<void> {
 
 describe('exporting', () => {
   it('offers a file for one design', async () => {
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     await screen.findByText('面单')
     fireEvent.click(screen.getByRole('button', { name: '导出' }))
     await waitFor(() => expect(downloaded).toEqual(['面单.json']))
   })
 
   it('offers a file for the whole library', async () => {
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     await screen.findByText('面单')
     fireEvent.click(screen.getByRole('button', { name: '导出全部' }))
-    await waitFor(() => expect(downloaded).toEqual(['zenith-templates.json']))
+    await waitFor(() => expect(downloaded).toEqual(['zenith-labels.json']))
   })
 })
 
 describe('importing', () => {
   it('sends the file that was chosen', async () => {
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     await screen.findByText('面单')
     await choose(FILE)
     await waitFor(() => expect(importCalls).toHaveLength(1))
@@ -129,7 +129,7 @@ describe('importing', () => {
         ],
       },
     }
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     await screen.findByText('面单')
     await choose(FILE)
 
@@ -137,7 +137,7 @@ describe('importing', () => {
   })
 
   it('says so when everything resolved, rather than staying silent', async () => {
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     await screen.findByText('面单')
     await choose(FILE)
     expect(await screen.findByText('所有引用都对上了，没有需要处理的地方。')).toBeDefined()
@@ -152,11 +152,11 @@ describe('importing', () => {
         details: { templates: [{ id: 'tpl-1', name: '面单' }] },
       },
     }
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     await screen.findByText('面单')
     await choose(FILE)
 
-    expect(await screen.findByText('文件里有本机已存在的模板')).toBeDefined()
+    expect(await screen.findByText('文件里有本机已存在的标签')).toBeDefined()
     expect(importCalls[0]).toEqual({ file: FILE })
     expect(importCalls[0]).not.toHaveProperty('onConflict')
   })
@@ -169,10 +169,10 @@ describe('importing', () => {
         details: { templates: [{ id: 'tpl-1', name: '面单' }] },
       },
     }
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     await screen.findByText('面单')
     await choose(FILE)
-    await screen.findByText('文件里有本机已存在的模板')
+    await screen.findByText('文件里有本机已存在的标签')
 
     importReply = { status: 200, body: { imported: [], warnings: [] } }
     fireEvent.click(screen.getByRole('button', { name: '覆盖现有' }))

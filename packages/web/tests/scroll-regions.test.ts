@@ -68,8 +68,14 @@ describe('the editor columns', () => {
 })
 
 describe('scroll regions', () => {
-  it('finds the ScrollAreas, so an empty pass cannot look like a passing one', () => {
-    expect(scrollAreaTags().length).toBeGreaterThan(0)
+  it('finds every ScrollArea there is, so the rule cannot be dodged by a rename', () => {
+    // The product uses the native scroller for its page and its columns; a
+    // ScrollArea is the exception. Zero is a legitimate answer, so what is
+    // checked is that the scan reads the real tag: a renamed import would
+    // make it match nothing while the component was still in use.
+    const source = sourceFiles(SRC).map((file) => readFileSync(file, 'utf8')).join('\n')
+    const imported = (source.match(/import \{[^}]*\bScrollArea\b[^}]*\} from/g) ?? []).length
+    expect(scrollAreaTags().length).toBeGreaterThanOrEqual(imported === 0 ? 0 : 1)
   })
 
   it('never caps a ScrollArea with max-h, which stops it scrolling entirely', () => {

@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PrintPresetsPage } from '../src/pages/print-presets-page.tsx'
-import { TAB_KINDS, pathForTab, tabFromPath } from '../src/app/routes.ts'
+import { SIDEBAR_KINDS, pathForPage, pageFromPath } from '../src/app/routes.ts'
 
 const PRESET = {
   id: '75a4c13c-b232-42eb-98ee-90954b7a5426',
@@ -103,13 +103,13 @@ afterEach(() => {
 
 describe('the route', () => {
   it('is one of the tab kinds', () => {
-    expect(TAB_KINDS).toContain('print-presets')
+    expect(SIDEBAR_KINDS).toContain('print-presets')
   })
 
   it('has an address, and it round-trips', () => {
-    const path = pathForTab({ kind: 'print-presets' })
+    const path = pathForPage({ kind: 'print-presets' })
     expect(path).toBe('/print-presets')
-    expect(tabFromPath(path)).toEqual({ kind: 'print-presets' })
+    expect(pageFromPath(path)).toEqual({ kind: 'print-presets' })
   })
 })
 
@@ -136,7 +136,7 @@ describe('the page', () => {
     // name goes reads as missing data rather than as a broken preset.
     presets = [{ ...PRESET, templateId: 'deleted' }]
     render(wrap(<PrintPresetsPage />))
-    expect(await screen.findByText(/设计已被删除/)).toBeDefined()
+    expect(await screen.findByText(/标签已被删除/)).toBeDefined()
   })
 
   it('offers an empty state once the answer is in', async () => {
@@ -170,7 +170,7 @@ describe('creating one', () => {
     })
 
     // Radix selects: opened on pointerdown, chosen by clicking the option.
-    fireEvent.pointerDown(screen.getByRole('combobox', { name: '设计' }), { pointerType: 'mouse', button: 0 })
+    fireEvent.pointerDown(screen.getByRole('combobox', { name: '标签' }), { pointerType: 'mouse', button: 0 })
     fireEvent.click(await screen.findByRole('option', { name: '路由器面单' }))
     fireEvent.pointerDown(screen.getByRole('combobox', { name: '打印机' }), { pointerType: 'mouse', button: 0 })
     fireEvent.click(await screen.findByRole('option', { name: 'B3S_P' }))
@@ -207,7 +207,7 @@ describe('the print settings', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: '名称' }), {
       target: { value: '路由器标签' },
     })
-    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '设计' }), {
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '标签' }), {
       pointerType: 'mouse', button: 0,
     })
     fireEvent.click(await screen.findByRole('option', { name: '路由器面单' }))
@@ -273,7 +273,7 @@ describe('the create dialog', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: '名称' }), {
       target: { value: '新预设' },
     })
-    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '设计' }), {
+    fireEvent.pointerDown(await screen.findByRole('combobox', { name: '标签' }), {
       pointerType: 'mouse', button: 0,
     })
     fireEvent.click(await screen.findByRole('option', { name: '路由器面单' }))

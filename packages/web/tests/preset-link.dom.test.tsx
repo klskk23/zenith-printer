@@ -179,7 +179,7 @@ describe('a link carrying a preset', () => {
     await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
     // The address is rewritten from the active tab on every switch; a preset
     // the tab did not keep would vanish on the first one.
-    expect(window.location.pathname + window.location.search).toBe('/design/tpl-7?preset=pre-1')
+    expect(window.location.pathname + window.location.search).toBe('/labels/tpl-7?preset=pre-1')
   })
 
   it('carries the copy count into the print dialog', async () => {
@@ -204,14 +204,16 @@ describe('the back button', () => {
     land('/design/tpl-7?preset=pre-1')
     await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
 
-    fireEvent.click(screen.getAllByText('首页')[0]!)
-    await waitFor(() => expect(window.location.pathname).toBe('/'))
+    fireEvent.click(screen.getAllByText('打印机')[0]!)
+    await waitFor(() => expect(window.location.pathname).toBe('/printers'))
 
+    // Back lands on the address the ledger handed out; it resolves and is
+    // rewritten to the new form with the preset still there.
     window.history.replaceState(null, '', '/design/tpl-7?preset=pre-1')
     window.dispatchEvent(new PopStateEvent('popstate'))
 
     await waitFor(() =>
-      expect(window.location.pathname + window.location.search).toBe('/design/tpl-7?preset=pre-1'),
+      expect(window.location.pathname + window.location.search).toBe('/labels/tpl-7?preset=pre-1'),
     )
     expect(selectValue('打印机')).toContain('仓库机')
   })
@@ -302,5 +304,16 @@ describe('when the preset cannot do what the link promised', () => {
     land('/design/tpl-7?preset=pre-1')
     expect(await screen.findByText(/指向的是另一张标签/)).toBeDefined()
     await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
+  })
+})
+
+describe('the address the ledger hands out', () => {
+  it('still works, and is rewritten to the new form with the query kept', async () => {
+    // docs/nexus-assets.md tells the asset ledger to link `/design/{id}?preset=`.
+    // Those links are out in the world; a redesign does not get to break them.
+    land('/design/tpl-7?preset=pre-1')
+    expect(await screen.findByRole('toolbar', { name: '标签设计' })).toBeDefined()
+    expect(window.location.pathname).toBe('/labels/tpl-7')
+    expect(window.location.search).toBe('?preset=pre-1')
   })
 })

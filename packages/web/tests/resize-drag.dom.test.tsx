@@ -50,7 +50,7 @@ beforeEach(() => {
  */
 function openDesignWithGeometry(): SVGSVGElement {
   render(wrap(<App />))
-  fireEvent.click(screen.getAllByText('标签设计')[0]!)
+  fireEvent.click(screen.getAllByText('新建标签')[0]!)
 
   const svg = document.querySelector('[data-label-canvas] svg') as SVGSVGElement
   expect(svg, 'canvas not rendered').not.toBeNull()

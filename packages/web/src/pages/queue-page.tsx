@@ -7,7 +7,7 @@ import { PausedQueueBanner } from '../features/jobs/paused-banner.tsx'
 export function QueuePage(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-3">
-      <PageHeader title={copy.workspace.tabs.queue} />
+      <PageHeader title={copy.workspace.pages.queue} />
       {/*
         First, because a paused queue is why nothing is happening. The reason was
         recorded and shown nowhere, and resuming lived on the printer page, so

@@ -139,7 +139,7 @@ describe('history', () => {
   it('says so when no template was used', async () => {
     await open('打印历史')
     await screen.findAllByText('资产编号')
-    expect(screen.getAllByText(/未使用模板/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/未保存的标签/).length).toBeGreaterThan(0)
   })
 
   it('shows when it printed', async () => {

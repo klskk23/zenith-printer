@@ -131,7 +131,7 @@ beforeEach(() => {
 
 function openDesign(): void {
   render(wrap(<App />))
-  fireEvent.click(screen.getAllByText('标签设计')[0]!)
+  fireEvent.click(screen.getAllByText('新建标签')[0]!)
 }
 
 /**
@@ -275,7 +275,7 @@ describe('what it is not', () => {
     await pickRow(3)
     await vi.waitFor(() => expect(canvasText()).toContain('一个名字很长的零件'))
 
-    fireEvent.click(screen.getByText('保存为模板'))
+    fireEvent.click(screen.getAllByText('保存')[0]!)
     // By role inside the dialog: that Label carries no `for`, so the field is
     // not reachable by its text. Worth fixing, but not from here.
     const dialog = await screen.findByRole('dialog')

@@ -1,14 +1,16 @@
 /**
- * Sidebar navigation.
+ * Sidebar navigation: eight entries, always there.
  *
- * Every entry opens a tab; an entry already open switches to it rather than
- * making a second one. Designs are the exception — two design tabs is a normal
- * way to compare variants, so that entry always opens a fresh one.
+ * The order is the design's, not alphabetical: what people come here to do
+ * (labels), what feeds it (data sources), what it goes to (printers), what
+ * happens to it (queue, history), then the things set up once (presets, the
+ * API console, settings). The editor has no entry — it needs a label to
+ * open, and is reached by clicking one in the gallery.
  */
 import { copy } from '../i18n/index.ts'
 import { cn } from '../lib/utils.ts'
 import { Badge } from '../components/ui/badge.tsx'
-import { TAB_KINDS, type TabKind } from './routes.ts'
+import { SIDEBAR_KINDS } from './routes.ts'
 import { useWorkspace } from './workspace.tsx'
 import { Button } from '../components/ui/button.tsx'
 
@@ -18,25 +20,25 @@ export interface SidebarProps {
 }
 
 export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
-  const { open, activeTab } = useWorkspace()
+  const { open, page } = useWorkspace()
 
-  // The data source *editor* is reached from the list, never from here: it
-  // needs a table to edit, and an entry that opened an empty one would be a
-  // dead end.
-  const entries: TabKind[] = TAB_KINDS.filter((kind) => kind !== 'data-source')
+  // The gallery's entry stays lit while a label is open: the editor is a
+  // place inside 「标签」, not a page of its own.
+  const activeKind = page.kind === 'label' ? 'labels' : page.kind === 'data-source' ? 'data-sources' : page.kind
 
   return (
     // Nocturne's compact scale for the shell: the rows sit at 5.6 / 8.4px.
     <nav className="w-48 shrink-0 border-r border-border px-n3 py-n6">
       <ol className="flex flex-col gap-px">
-        {entries.map((kind) => {
-          const isActive = activeTab?.kind === kind
+        {SIDEBAR_KINDS.map((kind) => {
+          const isActive = activeKind === kind
           return (
             <li key={kind}>
               <Button
                 variant="ghost"
                 size="row"
-                onClick={() => open(kind === 'design' ? { kind, templateId: null } : { kind })}
+                onClick={() => open({ kind })}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'justify-between rounded-sm px-n3 py-n2 text-xs',
                   // The active entry: accent text on an accent tint, with the
@@ -46,7 +48,7 @@ export function Sidebar({ pendingJobCount }: SidebarProps): React.JSX.Element {
                     : 'text-foreground/72 hover:bg-foreground/6 hover:text-foreground',
                 )}
               >
-                <span data-nav-label>{copy.workspace.tabs[kind]}</span>
+                <span data-nav-label>{copy.workspace.pages[kind]}</span>
                 {kind === 'queue' && pendingJobCount > 0 && (
                   <Badge variant="secondary">{pendingJobCount}</Badge>
                 )}

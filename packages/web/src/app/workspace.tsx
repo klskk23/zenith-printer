@@ -2,157 +2,117 @@
  * React binding over the workspace reducer.
  *
  * The reducer in `workspace-state.ts` holds the rules; this file only connects
- * them to React and to the address bar. Keeping it this thin is deliberate —
- * the property that inactive tabs survive is easy to break by accident inside a
- * component tree, and impossible to break in a reducer that only ever adds to
- * or removes from a list.
+ * them to React and to the address bar. Leaving the editor flushes its draft
+ * on unmount (features/drafts/use-draft.tsx), so navigating here needs no
+ * ceremony — the page simply changes.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { copy } from '../i18n/index.ts'
-import { pathForTab, type TabDescriptor } from './routes.ts'
+import { isLegacyAddress, pathForPage, type PageDescriptor } from './routes.ts'
 import {
-  activateTab,
-  closeTab,
-  emptyWorkspace,
-  editingTabCount,
-  exceedsSoftLimit,
   hasUnsavedWork,
-  markDirty,
+  markReloadLoses,
   markUnpersisted,
-  openTab,
+  openPage,
+  reloadWouldLose,
   restoreFromPath,
-  setTabTemplate,
   type WorkspaceState,
-  type WorkspaceTab,
 } from './workspace-state.ts'
 
 export interface WorkspaceApi {
   state: WorkspaceState
-  tabs: readonly WorkspaceTab[]
-  activeTab: WorkspaceTab | null
-  open: (descriptor: TabDescriptor) => void
-  activate: (id: string) => void
-  close: (id: string) => void
-  setDirty: (id: string, isDirty: boolean) => void
-  /** Whether the tab's draft failed to reach storage — see `hasUnsavedWork`. */
-  setUnpersisted: (id: string, unpersisted: boolean) => void
-  /** Bind a tab to a template — used the first time a design is saved. */
-  setTemplate: (id: string, templateId: string | null) => void
-  /** True once the tab count reaches the soft limit; advice only. */
-  atSoftLimit: boolean
-  /** How many editing tabs are open, for the warning to state plainly. */
-  editingTabs: number
+  page: PageDescriptor
+  /**
+   * Go to a page — unless the open page holds work that would be lost, in
+   * which case the request is held and the shell asks first. Everything that
+   * navigates goes through here, so the question cannot be skipped.
+   */
+  open: (descriptor: PageDescriptor) => void
+  /** Whether the open page holds work that leaving would lose — see `hasUnsavedWork`. */
+  setUnpersisted: (unpersisted: boolean) => void
+  /** Whether the open label's draft is in memory only — a reload loses it, a page switch does not. */
+  setReloadLoses: (reloadLoses: boolean) => void
+  /** A navigation held back by unsaved work, waiting for an answer. */
+  pendingLeave: PageDescriptor | null
+  confirmLeave: () => void
+  stay: () => void
 }
 
 const WorkspaceContext = createContext<WorkspaceApi | null>(null)
 
-/**
- * The whole address, query included.
- *
- * `?preset=` decides which printer, profile and copy count a design opens
- * with. Reading only `pathname` is what made a preset link open the right
- * design with none of its settings — twice over, since the writeback below
- * would have erased the query on the next tab switch anyway.
- */
-function currentPath(): string {
+/** The whole address, query included: `?preset=` is part of where a link meant to land. */
+function currentAddress(): string {
   return typeof window === 'undefined' ? '/' : window.location.pathname + window.location.search
 }
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const counter = useRef(0)
-  const nextId = useCallback(() => `tab-${(counter.current += 1)}`, [])
+  const [state, setState] = useState<WorkspaceState>(() => restoreFromPath(currentAddress()))
+  const [pendingLeave, setPendingLeave] = useState<PageDescriptor | null>(null)
+  // Read by `open` without being a dependency of it, so the callback stays
+  // stable and pages can depend on it without re-running their effects.
+  const stateRef = useRef(state)
+  stateRef.current = state
 
-  // One tab is restored: the one the address names. The rest are gone, which
-  // the leave prompt warned about before the reload happened.
-  const [state, setState] = useState<WorkspaceState>(() => restoreFromPath(currentPath(), nextId))
-
-  const open = useCallback(
-    (descriptor: TabDescriptor) => setState((s) => openTab(s, descriptor, nextId)),
-    [nextId],
-  )
-  const activate = useCallback((id: string) => setState((s) => activateTab(s, id)), [])
-  const close = useCallback((id: string) => setState((s) => closeTab(s, id)), [])
-  const setDirty = useCallback(
-    (id: string, isDirty: boolean) => setState((s) => markDirty(s, id, isDirty)),
-    [],
-  )
-  const setTemplate = useCallback(
-    (id: string, templateId: string | null) => setState((s) => setTabTemplate(s, id, templateId)),
-    [],
-  )
-  const setUnpersisted = useCallback(
-    (id: string, unpersisted: boolean) => setState((s) => markUnpersisted(s, id, unpersisted)),
-    [],
-  )
-
-  const activeTab = useMemo(
-    () => state.tabs.find((tab) => tab.id === state.activeId) ?? null,
-    [state],
-  )
-
-  // The address follows the active tab. It never drives which tabs exist —
-  // that is what would unmount the inactive ones.
-  useEffect(() => {
-    if (activeTab === null || typeof window === 'undefined') {
+  const open = useCallback((descriptor: PageDescriptor) => {
+    if (hasUnsavedWork(stateRef.current)) {
+      setPendingLeave(descriptor)
       return
     }
-    const path = pathForTab({
-      kind: activeTab.kind,
-      templateId: activeTab.templateId,
-      ...(activeTab.draftId === undefined ? {} : { draftId: activeTab.draftId }),
-      ...(activeTab.presetId === undefined ? {} : { presetId: activeTab.presetId }),
-    })
-    if (currentPath() !== path) {
-      window.history.pushState(null, '', path)
+    setState((s) => openPage(s, descriptor))
+  }, [])
+  const confirmLeave = useCallback(() => {
+    const held = pendingLeave
+    setPendingLeave(null)
+    if (held !== null) {
+      setState((s) => openPage(s, held))
     }
-  }, [activeTab])
+  }, [pendingLeave])
+  const stay = useCallback(() => setPendingLeave(null), [])
+  const setUnpersisted = useCallback(
+    (unpersisted: boolean) => setState((s) => markUnpersisted(s, unpersisted)),
+    [],
+  )
+  const setReloadLoses = useCallback(
+    (reloadLoses: boolean) => setState((s) => markReloadLoses(s, reloadLoses)),
+    [],
+  )
 
-  // Back and forward move the active tab, opening one if the address names a
-  // tab that is not currently in the set.
+  // The address follows the page. An old-form address is rewritten in place
+  // rather than pushed, so Back does not return to the address that redirected.
   useEffect(() => {
     if (typeof window === 'undefined') {
       return
     }
-    const onPop = (): void => {
-      setState((s) => {
-        const restored = restoreFromPath(currentPath(), nextId)
-        const wanted = restored.tabs[0]
-        if (wanted === undefined) {
-          return s
-        }
-        const existing = s.tabs.find(
-          (tab) =>
-            tab.kind === wanted.kind &&
-            tab.templateId === wanted.templateId &&
-            (wanted.draftId === undefined || tab.draftId === wanted.draftId),
-        )
-        return existing === undefined
-          ? openTab(
-              s,
-              {
-                kind: wanted.kind,
-                templateId: wanted.templateId,
-                dataSourceId: wanted.dataSourceId,
-                ...(wanted.draftId === undefined ? {} : { draftId: wanted.draftId }),
-                ...(wanted.presetId === undefined ? {} : { presetId: wanted.presetId }),
-              },
-              nextId,
-            )
-          : activateTab(s, existing.id)
-      })
+    const path = pathForPage(state.page)
+    const current = currentAddress()
+    if (current === path) {
+      return
     }
+    if (isLegacyAddress(current) || /^\/labels\/new$/.test(current)) {
+      window.history.replaceState(null, '', path)
+    } else {
+      window.history.pushState(null, '', path)
+    }
+  }, [state.page])
+
+  // Back and forward change the page.
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    const onPop = (): void => setState(restoreFromPath(currentAddress()))
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [nextId])
+  }, [])
 
-  // Leaving with unsaved edits gets one prompt. Browsers show their own wording;
-  // ours is set anyway for the few that still honour it.
+  // Leaving with a draft that could not be written gets one prompt. Browsers
+  // show their own wording; ours is set anyway for the few that honour it.
   useEffect(() => {
     if (typeof window === 'undefined') {
       return
     }
     const onBeforeUnload = (event: BeforeUnloadEvent): void => {
-      if (!hasUnsavedWork(state)) {
+      if (!reloadWouldLose(state)) {
         return
       }
       event.preventDefault()
@@ -163,20 +123,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   }, [state])
 
   const api = useMemo<WorkspaceApi>(
-    () => ({
-      state,
-      tabs: state.tabs,
-      activeTab,
-      open,
-      activate,
-      close,
-      setDirty,
-      setUnpersisted,
-      setTemplate,
-      atSoftLimit: exceedsSoftLimit(state),
-      editingTabs: editingTabCount(state),
-    }),
-    [state, activeTab, open, activate, close, setDirty, setUnpersisted, setTemplate],
+    () => ({ state, page: state.page, open, setUnpersisted, setReloadLoses, pendingLeave, confirmLeave, stay }),
+    [state, open, setUnpersisted, setReloadLoses, pendingLeave, confirmLeave, stay],
   )
 
   return <WorkspaceContext.Provider value={api}>{children}</WorkspaceContext.Provider>
@@ -188,8 +136,4 @@ export function useWorkspace(): WorkspaceApi {
     throw new Error('useWorkspace must be used inside a WorkspaceProvider')
   }
   return api
-}
-
-export function emptyWorkspaceState(): WorkspaceState {
-  return emptyWorkspace()
 }

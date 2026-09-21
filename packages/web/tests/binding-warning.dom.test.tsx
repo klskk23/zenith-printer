@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { TemplatesPage } from '../src/pages/templates-page.tsx'
+import { LabelsPage } from '../src/pages/labels-page.tsx'
 import { WorkspaceProvider } from '../src/app/workspace.tsx'
 import { DataSourceBinding } from '../src/editor/data-source-binding.tsx'
 
@@ -63,20 +63,20 @@ afterEach(() => {
 
 describe('the templates list', () => {
   it('says nothing when the binding is sound', async () => {
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     await screen.findByText('面单')
     expect(document.querySelector('[data-binding-issue]')).toBeNull()
   })
 
   it('marks a design whose data source has been deleted', async () => {
     templates = [{ ...base, bindingIssue: { kind: 'sourceMissing' } }]
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     expect(await screen.findByText(/所绑的数据源已被删除/)).toBeDefined()
   })
 
   it('marks a design whose column has gone, and names the column', async () => {
     templates = [{ ...base, bindingIssue: { kind: 'columnsMissing', columns: ['收件人'] } }]
-    render(wrap(<TemplatesPage />))
+    render(wrap(<LabelsPage />))
     expect(await screen.findByText(/收件人/)).toBeDefined()
   })
 })

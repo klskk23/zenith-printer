@@ -11,13 +11,13 @@
  *     table have in common is that both are where a variable gets its value.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
 import { DataSourcesPage } from '../src/features/data-sources/data-sources-page.tsx'
 import { SettingsPage } from '../src/pages/settings-page.tsx'
 import { PreferencesProvider } from '../src/features/preferences/context.tsx'
-import { TAB_KINDS } from '../src/app/routes.ts'
+import { SIDEBAR_KINDS } from '../src/app/routes.ts'
 
 function wrap(node: React.ReactNode): React.JSX.Element {
   const client = new QueryClient({
@@ -56,8 +56,8 @@ describe('the sidebar order', () => {
   it('labels every entry so the order below can be read off the DOM', () => {
     render(wrap(<App />))
     const nav = document.querySelector('nav')!
-    const label = [...nav.querySelectorAll('button')].find((button) => button.textContent?.includes('首页'))
-    expect(label?.querySelector('[data-nav-label]')?.textContent).toBe('首页')
+    const label = [...nav.querySelectorAll('button')].find((button) => button.textContent?.includes('标签'))
+    expect(label?.querySelector('[data-nav-label]')?.textContent).toBe('标签')
   })
 
   it('puts settings last', () => {
@@ -82,7 +82,7 @@ describe('the sidebar order', () => {
     // It needs a table to open; an entry that opened an empty one is a dead end.
     render(wrap(<App />))
     const nav = document.querySelector('nav')!
-    expect(nav.querySelectorAll('button')).toHaveLength(TAB_KINDS.length - 1)
+    expect(nav.querySelectorAll('button')).toHaveLength(SIDEBAR_KINDS.length)
   })
 })
 
@@ -108,45 +108,3 @@ describe('where sequence pools live', () => {
   })
 })
 
-describe('the too-many-tabs advice', () => {
-  /** Open a sidebar entry by its label. */
-  const openTab = (label: string): void => {
-    const nav = document.querySelector('nav')!
-    const entry = [...nav.querySelectorAll('button')].find((b) => b.querySelector('[data-nav-label]')?.textContent?.trim() === label)
-    fireEvent.click(entry!)
-  }
-
-  it('stays quiet when the pages carry the tab count over the threshold', () => {
-    // Nine designs and six list pages is fifteen tabs — well past the
-    // threshold by raw count, and still nine of the kind the advice is about.
-    // Counting the pages would fire it here, which is the mistake this guards.
-    render(wrap(<App />))
-    for (let i = 0; i < 9; i += 1) {
-      openTab('标签设计')
-    }
-    for (const label of ['数据源', '打印机', '打印队列', '打印历史', '设置']) {
-      openTab(label)
-    }
-
-    expect(document.querySelectorAll('[data-tab-bar] > div').length).toBeGreaterThan(10)
-    expect(screen.queryByText(/可能影响编辑流畅度/)).toBeNull()
-  })
-
-  it('appears once enough design tabs are open', () => {
-    render(wrap(<App />))
-    // The design entry opens a fresh tab each time — comparing variants is a
-    // normal thing to do, which is exactly why the advice exists.
-    for (let i = 0; i < 10; i += 1) {
-      openTab('标签设计')
-    }
-    expect(screen.getByText(/可能影响编辑流畅度/)).toBeDefined()
-  })
-
-  it('says how many are open rather than repeating the threshold', () => {
-    render(wrap(<App />))
-    for (let i = 0; i < 12; i += 1) {
-      openTab('标签设计')
-    }
-    expect(screen.getByText(/12 个设计与模板标签页/)).toBeDefined()
-  })
-})

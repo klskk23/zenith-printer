@@ -22,7 +22,7 @@ beforeEach(() => {
 
 function openDesignWithElement(): void {
   render(wrap(<App />))
-  fireEvent.click(screen.getAllByText('标签设计')[0]!)
+  fireEvent.click(screen.getAllByText('新建标签')[0]!)
   fireEvent.click(screen.getAllByText('矩形')[0]!)
 }
 

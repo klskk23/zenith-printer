@@ -41,7 +41,7 @@ describe('heading weight', () => {
     expect(heading.className).not.toMatch(BOLD)
   })
 
-  it.each(['打印机', '打印队列', '打印历史', '设置', '模板库'])('is never bold on the %s page', (label) => {
+  it.each(['打印机', '打印队列', '打印历史', '设置', '标签'])('is never bold on the %s page', (label) => {
     render(wrap(<App />))
     fireEvent.click(screen.getAllByText(label)[0]!)
     const bold = headings().filter((h) => BOLD.test(h.className))

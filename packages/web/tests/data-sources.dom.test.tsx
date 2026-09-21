@@ -3,12 +3,10 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DataSourcesPage } from '../src/features/data-sources/data-sources-page.tsx'
 import { DataSourceEditor } from '../src/features/data-sources/data-source-editor.tsx'
-import { TabBar } from '../src/app/tab-bar.tsx'
 import { giveElementsSize } from './support/layout.ts'
 import { gridValues } from './support/grid.ts'
 import { copy } from '../src/i18n/index.ts'
 import { WorkspaceProvider, useWorkspace } from '../src/app/workspace.tsx'
-import { useEffect } from 'react'
 
 /**
  * Render assertions for the two pages this feature adds.
@@ -167,7 +165,7 @@ describe('the table editor', () => {
     render(
       wrap(
         <WorkspaceProvider>
-          <DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />
+          <DataSourceEditor dataSourceId="ds-1" />
         </WorkspaceProvider>,
       ),
     )
@@ -411,17 +409,18 @@ describe('the table editor', () => {
     expect(screen.getByText('有未保存的改动')).toBeDefined()
   })
 
-  it('marks the tab dirty, which is what makes closing it ask first', async () => {
-    // Without this the tab closes silently and the draft goes with it — the
-    // editor is the only thing that knows the rows are unsaved.
+  it('reports unsaved rows to the shell, which is what makes leaving ask first', async () => {
+    // Without this the sidebar would switch pages silently and the rows would
+    // go with it: a table has no draft, so the editor is the only thing that
+    // knows they are unsaved.
     function Probe(): React.JSX.Element {
-      const { tabs } = useWorkspace()
-      return <span data-probe>{String(tabs.find((tab) => tab.id === 'tab-1')?.isDirty)}</span>
+      const { state } = useWorkspace()
+      return <span data-probe>{String(state.unpersisted)}</span>
     }
     render(
       wrap(
         <WorkspaceProvider>
-          <DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />
+          <DataSourceEditor dataSourceId="ds-1" />
           <Probe />
         </WorkspaceProvider>,
       ),
@@ -459,42 +458,3 @@ describe('the table editor', () => {
   })
 })
 
-describe('the tab title', () => {
-  /**
-   * A tab is called after the thing it holds, not after the kind of page.
-   * Two data source tabs both reading "数据源" cannot be told apart, which is
-   * the whole point of a tab having a title.
-   */
-  function openEditorTab(): void {
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <WorkspaceProvider>
-          <OpenOnMount />
-          <TabBar />
-        </WorkspaceProvider>
-      </QueryClientProvider>,
-    )
-  }
-
-  function OpenOnMount(): null {
-    const { open } = useWorkspace()
-    useEffect(() => open({ kind: 'data-source', dataSourceId: 'ds-1' }), [])
-    return null
-  }
-
-  it('names the table, prefixed by what kind of tab it is', async () => {
-    // A bare table name in a strip that also holds designs does not say which
-    // of the two it is, and they are edited very differently.
-    openEditorTab()
-    expect(await screen.findByText('数据源-订单表')).toBeDefined()
-  })
-
-  it('falls back to the generic name only until the list arrives', async () => {
-    // A blank tab is worse than a generic one, so the fallback stays.
-    sources = []
-    openEditorTab()
-    // Two of them: the sidebar entry and the tab. Both being generic is the
-    // point — the tab has nothing better to show yet.
-    expect((await screen.findAllByText('数据源')).length).toBeGreaterThan(0)
-  })
-})

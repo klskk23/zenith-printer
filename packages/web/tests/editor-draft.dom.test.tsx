@@ -68,9 +68,8 @@ beforeEach(() => {
 
 /** Open the saved template in a design tab and wait for its canvas. */
 async function openTemplate(): Promise<void> {
-  fireEvent.click(screen.getAllByText('模板库')[0]!)
-  await screen.findAllByText('test')
-  fireEvent.click(screen.getAllByText('打开')[0]!)
+  const tiles = await screen.findAllByRole('button', { name: /test/ })
+  fireEvent.click(tiles[0]!)
   await screen.findByLabelText('label canvas')
 }
 
@@ -111,20 +110,13 @@ describe('a saved label', () => {
     expect(undoButton.disabled).toBe(false)
   })
 
-  it('flushes the draft when the tab is closed, not only after the pause', async () => {
+  it('flushes the draft when the sidebar is clicked, not only after the pause', async () => {
     render(wrap(<App />))
     await openTemplate()
     addText()
-    // Close the tab straight away, inside the debounce window.
-    // The × of the *design* tab — the strip's first close button belongs to
-    // the home tab, which has nothing to confirm.
-    const tabStrip = document.querySelector('[data-tab-bar]')!
-    const designTab = [...tabStrip.children].find((tab) => tab.textContent?.includes('test'))!
-    const closeButton = [...designTab.querySelectorAll('button')].find(
-      (b) => b.getAttribute('aria-label') === copy.workspace.close,
-    )!
-    fireEvent.click(closeButton)
-    fireEvent.click(await screen.findByText(copy.workspace.confirmCloseConfirm))
+    // Straight to another page, inside the debounce window.
+    fireEvent.click(screen.getAllByText('打印机')[0]!)
+    expect(document.querySelector('[data-label-canvas]')).toBeNull()
     expect(draftStore.read('tpl-1')).not.toBeNull()
   })
 })
@@ -132,12 +124,12 @@ describe('a saved label', () => {
 describe('a new label', () => {
   it('survives a reload at its own address', async () => {
     render(wrap(<App />))
-    fireEvent.click(screen.getAllByText('标签设计')[0]!)
+    fireEvent.click(screen.getAllByText(copy.labels.new)[0]!)
     await screen.findByLabelText('label canvas')
     addText()
     await settle()
     const address = window.location.pathname
-    expect(address).toMatch(/^\/design\/new\/.+/)
+    expect(address).toMatch(/^\/labels\/new\/.+/)
     cleanup()
 
     // Same address, fresh mount: the reload case.

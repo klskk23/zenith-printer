@@ -92,7 +92,7 @@ describe('the confirmation', () => {
   it('says so when no design is affected, and still asks', async () => {
     reply = { ...NEEDS_CONFIRMATION, affectedTemplates: [] }
     await triggerChange()
-    expect(screen.getByText(/目前没有设计引用消失的列/)).toBeDefined()
+    expect(screen.getByText(/目前没有标签引用消失的列/)).toBeDefined()
     expect(screen.getByRole('button', { name: '仍然应用' })).toBeDefined()
   })
 

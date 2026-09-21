@@ -60,7 +60,7 @@ beforeEach(() => {
 
 async function openDesign(): Promise<HTMLElement> {
   render(wrap(<App />))
-  fireEvent.click(screen.getAllByText('标签设计')[0]!)
+  fireEvent.click(screen.getAllByText('新建标签')[0]!)
   return screen.getByRole('toolbar', { name: '标签设计' })
 }
 

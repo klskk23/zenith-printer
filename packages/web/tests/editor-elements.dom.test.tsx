@@ -55,7 +55,7 @@ beforeEach(() => {
 /** Open the design page and return the editor's root, which owns the keys. */
 function openDesign(): HTMLElement {
   render(wrap(<App />))
-  fireEvent.click(screen.getAllByText('标签设计')[0]!)
+  fireEvent.click(screen.getAllByText('新建标签')[0]!)
   const toolbar = screen.getByRole('toolbar', { name: '标签设计' })
   const root = toolbar.closest('[tabindex]')
   expect(root, 'editor root not found').not.toBeNull()

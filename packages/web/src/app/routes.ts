@@ -1,117 +1,81 @@
 /**
- * Path <-> tab mapping.
+ * Address <-> page.
  *
- * The address bar projects *which tab is active*. It deliberately does not
- * decide which tabs exist: the tab set is application state, and letting the
- * router own it would unmount the inactive ones, discarding the selection,
- * zoom and undo history that switching back is supposed to restore.
+ * One page is open at a time and the address names it. `?preset=` rides on a
+ * label's address and nowhere else: it decides which printer, profile and
+ * copy count a label opens with, and any other page would have no use for it.
  *
- * Only one tab fits in an address, so a refresh restores one tab. That is the
- * accepted trade for links being shareable.
+ * The addresses the previous design used still resolve. The asset ledger has
+ * been handing out `/design/{templateId}?preset=…` links (docs/nexus-assets.md),
+ * and a link that stops working is a breaking change whatever the changelog
+ * says — so those are read here and rewritten to the new form by the
+ * workspace, query intact.
  */
 
-/**
- * Also the sidebar's order, top to bottom.
- *
- * Settings sits last because it is where somebody goes once and then rarely
- * again — the day-to-day entries should not be below it.
- */
-export const TAB_KINDS = [
-  'index',
-  'design',
-  'templates',
+/** Also the sidebar's order, top to bottom. Settings last: visited once. */
+export const SIDEBAR_KINDS = [
+  'labels',
   'data-sources',
   'printers',
   'queue',
   'history',
-  // Below the day-to-day entries: a preset is set up once and then used by
-  // something other than a person.
   'print-presets',
-  // Developer-facing, so it sits below the day-to-day entries and above
-  // settings — which is still the thing people visit once.
   'api-docs',
   'settings',
-  // Never in the sidebar: the editor needs a table to open, and an entry that
-  // opened an empty one would be a dead end. Reached from the list instead.
-  'data-source',
 ] as const
 
-export type TabKind = (typeof TAB_KINDS)[number]
+/**
+ * Every page, including the two reached from a list rather than the sidebar:
+ * a label's editor and a data source's editor both need a thing to open.
+ */
+export const PAGE_KINDS = [...SIDEBAR_KINDS, 'label', 'data-source'] as const
 
-export interface TabDescriptor {
-  kind: TabKind
-  /** Designs only. `null` is an unsaved blank design. */
+export type PageKind = (typeof PAGE_KINDS)[number]
+
+export interface PageDescriptor {
+  kind: PageKind
+  /** Labels only. `null` is a label not yet saved. */
   templateId?: string | null
+  /**
+   * Unsaved labels only: the key their draft is stored under. In the address,
+   * so a reload of `/labels/new/<id>` finds the same draft rather than opening
+   * a fresh blank label beside it.
+   */
+  draftId?: string
   /** Data source editor only. */
   dataSourceId?: string
   /**
-   * Unsaved designs only: the key their draft is stored under.
+   * Labels only: a print preset to open with, from `?preset=`.
    *
-   * In the address, so that a reload of `/design/new/<id>` finds the same
-   * draft rather than opening a fresh blank label beside it.
-   */
-  draftId?: string
-  /**
-   * Designs only: a print preset to open with, from `?preset=` in the address.
-   *
-   * An **initial value, not another kind of tab**. A link that carries one
-   * means "take me there with the settings already set" — the printer, the
-   * profile and the copies the preset records, which otherwise sit at their
-   * defaults however the design was reached. Once somebody changes any of
-   * them, the preset has had its say.
-   *
-   * It stays in the address so a refresh, a back and a forward all arrive at
-   * the same place rather than at the same design with the settings quietly
-   * back to default.
+   * An initial value, not a page of its own: "take me there with the settings
+   * already set". Once somebody changes any of them, the preset has had its say.
    */
   presetId?: string
 }
 
-/** Kinds that exist at most once; opening again switches to the open one. */
-const SINGLETON_KINDS = new Set<TabKind>([
-  'index',
-  'templates',
-  'printers',
-  'queue',
-  'history',
-  // Developer-facing, so it sits below the day-to-day entries and above
-  // settings — which is still the thing people visit once.
-  'api-docs',
-  'settings',
-  'data-sources',
-  'print-presets',
-])
-
-export function isSingletonKind(kind: TabKind): boolean {
-  return SINGLETON_KINDS.has(kind)
-}
-
-const STATIC_PATHS: Record<Exclude<TabKind, 'design' | 'data-source'>, string> = {
-  index: '/',
-  templates: '/templates',
+const STATIC_PATHS: Record<(typeof SIDEBAR_KINDS)[number], string> = {
+  labels: '/',
+  'data-sources': '/data-sources',
   printers: '/printers',
   queue: '/queue',
   history: '/history',
-  'api-docs': '/api-docs',
   'print-presets': '/print-presets',
+  'api-docs': '/api-docs',
   settings: '/settings',
-  'data-sources': '/data-sources',
 }
 
-export function pathForTab(descriptor: TabDescriptor): string {
+export function pathForPage(descriptor: PageDescriptor): string {
   if (descriptor.kind === 'data-source') {
     return `/data-sources/${descriptor.dataSourceId ?? ''}`
   }
-  if (descriptor.kind === 'design') {
-    // An unsaved design has no id to put in the address, so it gets a name of
-    // its own rather than leaving the address pointing at the previous tab.
+  if (descriptor.kind === 'label') {
     const id = descriptor.templateId
     const path =
       id === null || id === undefined
         ? descriptor.draftId === undefined
-          ? '/design/new'
-          : `/design/new/${encodeURIComponent(descriptor.draftId)}`
-        : `/design/${id}`
+          ? '/labels/new'
+          : `/labels/new/${encodeURIComponent(descriptor.draftId)}`
+        : `/labels/${id}`
     return descriptor.presetId === undefined
       ? path
       : `${path}?preset=${encodeURIComponent(descriptor.presetId)}`
@@ -119,43 +83,67 @@ export function pathForTab(descriptor: TabDescriptor): string {
   return STATIC_PATHS[descriptor.kind]
 }
 
+function split(address: string): { path: string; preset: string } {
+  const [raw = '', query = ''] = address.split('?', 2)
+  const path = raw.length > 1 ? raw.replace(/\/+$/, '') : raw
+  // An empty value is no preset, not a preset with an empty id.
+  const preset = new URLSearchParams(query).get('preset')?.trim() ?? ''
+  return { path, preset }
+}
+
+function label(templateId: string | null, draftId: string | undefined, preset: string): PageDescriptor {
+  return {
+    kind: 'label',
+    templateId,
+    ...(draftId === undefined ? {} : { draftId }),
+    ...(preset === '' ? {} : { presetId: preset }),
+  }
+}
+
 /**
  * `null` for an address this app does not serve — the caller decides what to do.
  *
  * Takes the whole address, path and query together, because the query carries
- * `?preset=`. Reading only `location.pathname` is what made a preset link open
- * the right design with none of its settings.
+ * `?preset=`.
  */
-export function tabFromPath(address: string): TabDescriptor | null {
-  const [path = '', query = ''] = address.split('?', 2)
-  const normalised = path.length > 1 ? path.replace(/\/+$/, '') : path
-  // An empty value is no preset, not a preset with an empty id.
-  const preset = new URLSearchParams(query).get('preset')?.trim() ?? ''
+export function pageFromPath(address: string): PageDescriptor | null {
+  const { path, preset } = split(address)
 
   for (const [kind, value] of Object.entries(STATIC_PATHS)) {
-    if (value === normalised) {
-      return { kind: kind as TabKind }
+    if (value === path) {
+      return { kind: kind as PageKind }
     }
   }
 
-  const source = /^\/data-sources\/([^/]+)$/.exec(normalised)
+  const source = /^\/data-sources\/([^/]+)$/.exec(path)
   if (source !== null) {
     return { kind: 'data-source', dataSourceId: source[1]! }
   }
 
-  const design = /^\/design\/([^/]+)(?:\/([^/]+))?$/.exec(normalised)
-  if (design !== null) {
-    const id = design[1]!
-    const draftId = id === 'new' && design[2] !== undefined ? decodeURIComponent(design[2]) : undefined
-    return {
-      kind: 'design',
-      templateId: id === 'new' ? null : id,
-      ...(draftId === undefined ? {} : { draftId }),
-      // Only designs: a `?preset=` on any other address would be carried into
-      // one that has no use for it.
-      ...(preset === '' ? {} : { presetId: preset }),
+  // New form: /labels/:id, /labels/new, /labels/new/:draftId
+  // Old form: /design/:id, /design, /design/new, /design/new/:draftId
+  const editor = /^\/(?:labels|design)(?:\/([^/]+))?(?:\/([^/]+))?$/.exec(path)
+  if (editor !== null) {
+    const id = editor[1]
+    if (id === undefined || id === 'new') {
+      const draftId = editor[2] === undefined ? undefined : decodeURIComponent(editor[2])
+      return label(null, draftId, preset)
     }
+    if (editor[2] !== undefined) {
+      return null
+    }
+    return label(id, undefined, preset)
+  }
+
+  if (path === '/templates') {
+    return { kind: 'labels' }
   }
 
   return null
+}
+
+/** An address from before, which the workspace rewrites to the new one. */
+export function isLegacyAddress(address: string): boolean {
+  const { path } = split(address)
+  return path === '/templates' || path === '/design' || path.startsWith('/design/')
 }

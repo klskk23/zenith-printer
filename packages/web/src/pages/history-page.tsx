@@ -21,7 +21,7 @@ export function HistoryPage(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-3">
       <PageHeader
-        title={copy.workspace.tabs.history}
+        title={copy.workspace.pages.history}
         actions={
           <JobHistoryActions
             printerId={null}

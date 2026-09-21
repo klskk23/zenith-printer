@@ -58,8 +58,7 @@ type SidePanel = 'element' | 'variables'
 
 export interface EditorPageProps {
   /** The workspace tab this editor lives in. */
-  tabId: string
-  /** Template the tab was opened on, if any. */
+  /** The saved label this page is for, if any. */
   templateId: string | null
   /**
    * A print preset to open with, from `?preset=` in the address.
@@ -73,7 +72,7 @@ export interface EditorPageProps {
   draftId?: string
 }
 
-export function EditorPage({ tabId, templateId, draftId, presetId }: EditorPageProps): React.JSX.Element {
+export function EditorPage({ templateId, draftId, presetId }: EditorPageProps): React.JSX.Element {
   const printers = usePrinters()
   const [printerId, setPrinterId] = useState<string | null>(null)
   const [profileId, setProfileId] = useState<string | null>(null)
@@ -105,7 +104,7 @@ export function EditorPage({ tabId, templateId, draftId, presetId }: EditorPageP
    * a new one — from the props, so that the first save (which points the tab
    * at the new template) moves the editor to the template's key on its own.
    */
-  const draftKey = templateId ?? draftId ?? tabId
+  const draftKey = templateId ?? draftId ?? 'new'
   const draft = useDraft(draftKey)
   /** Whether this mount picked up where a draft left off, history and all. */
   const restoredFromDraft = useRef(draft.initial !== null)
@@ -447,11 +446,7 @@ export function EditorPage({ tabId, templateId, draftId, presetId }: EditorPageP
    * keep their undo history), so a document-level listener in each of them
    * would paste the same image into every open design.
    */
-  const isActiveTab = workspace.activeTab?.id === tabId
   useEffect(() => {
-    if (!isActiveTab) {
-      return
-    }
     document.addEventListener('paste', handlePaste)
     return () => document.removeEventListener('paste', handlePaste)
   })
@@ -550,9 +545,6 @@ export function EditorPage({ tabId, templateId, draftId, presetId }: EditorPageP
    * nothing ever set the flag.
    */
   const isDirty = template === null ? ir.elements.length > 0 : history.past.length > 0
-  useEffect(() => {
-    workspace.setDirty(tabId, isDirty)
-  }, [tabId, isDirty])
 
   /**
    * Keep the draft current.
@@ -577,11 +569,15 @@ export function EditorPage({ tabId, templateId, draftId, presetId }: EditorPageP
     })
   }, [history, variables, dataSourceId, isDirty])
 
-  // The leave prompt fires only for a draft that could not be written.
+  // Two kinds of risk, told apart because the guards differ: a draft that
+  // could not be written is lost by *any* leaving, so the shell asks before
+  // switching pages; a draft held only in memory survives a page switch and
+  // is lost only by a reload, so only the browser's prompt is armed.
   const draftAtRisk = draft.status === 'unpersisted' || draft.status === 'no-storage'
   useEffect(() => {
-    workspace.setUnpersisted(tabId, isDirty && draftAtRisk)
-  }, [tabId, isDirty, draftAtRisk])
+    workspace.setUnpersisted(isDirty && draft.status === 'unpersisted')
+    workspace.setReloadLoses(isDirty && draft.status === 'no-storage')
+  }, [isDirty, draft.status])
 
   /**
    * Preselect the printer's default profile.
@@ -748,10 +744,12 @@ export function EditorPage({ tabId, templateId, draftId, presetId }: EditorPageP
             setTemplate(saved)
             setVariables(saved.variables)
             setDataSourceId(saved.dataSourceId)
-            // The tab now *is* this template's tab: its title, its address and
-            // any later save all refer to the same thing.
-            workspace.setTemplate(tabId, saved.id)
             setHistory(initUndo({ ...ir }))
+            // The page is now this label's page: its address and any later
+            // save refer to the same thing, and the draft key follows.
+            if (templateId !== saved.id) {
+              workspace.open({ kind: 'label', templateId: saved.id })
+            }
           }}
         />
 

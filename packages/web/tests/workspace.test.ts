@@ -1,434 +1,105 @@
 /**
- * The tab set.
+ * The workspace: one page at a time.
  *
- * This is the application's real view state; the address bar only names which
- * of these is showing. Modelled as a pure reducer so the rules that matter —
- * nothing gets unmounted, nothing gets silently replaced — can be asserted
- * without rendering anything.
+ * It used to be a set of tabs whose whole promise was that an inactive tab
+ * kept its editing state. That promise moved into drafts (features/drafts),
+ * and with it gone the set had no reason to exist. What is left is small and
+ * still worth pinning: which page is open, whether a new label got a draft
+ * id, and the one flag that still gates the browser's leave prompt.
  */
 import { describe, expect, it } from 'vitest'
 import {
-  SOFT_TAB_LIMIT,
-  activateTab,
-  closeTab,
-  editingTabCount,
-  emptyWorkspace,
-  exceedsSoftLimit,
   hasUnsavedWork,
-  markDirty,
+  initialWorkspace,
+  markReloadLoses,
   markUnpersisted,
-  openTab,
+  openPage,
+  reloadWouldLose,
   restoreFromPath,
-  setTabTemplate,
-  type WorkspaceState,
 } from '../src/app/workspace-state.ts'
 
-/** Deterministic ids keep the assertions readable. */
-function ids(): () => string {
+const ids = (): (() => string) => {
   let n = 0
-  return () => `tab-${(n += 1)}`
+  return () => `d-${(n += 1)}`
 }
 
-function open(
-  state: WorkspaceState,
-  descriptor: Parameters<typeof openTab>[1],
-  nextId = ids(),
-  nextDraftId = ids(),
-): WorkspaceState {
-  return openTab(state, descriptor, nextId, nextDraftId)
-}
-
-describe('opening tabs', () => {
-  it('starts empty', () => {
-    expect(emptyWorkspace().tabs).toEqual([])
-    expect(emptyWorkspace().activeId).toBeNull()
+describe('opening pages', () => {
+  it('starts on the gallery', () => {
+    expect(initialWorkspace().page).toEqual({ kind: 'labels' })
   })
 
-  it('opens a tab and activates it', () => {
-    const state = open(emptyWorkspace(), { kind: 'printers' })
-    expect(state.tabs).toHaveLength(1)
-    expect(state.activeId).toBe(state.tabs[0]!.id)
+  it('replaces the page rather than stacking one', () => {
+    let state = openPage(initialWorkspace(), { kind: 'printers' })
+    state = openPage(state, { kind: 'queue' })
+    expect(state.page).toEqual({ kind: 'queue' })
   })
 
-  it('switches to an already-open singleton rather than duplicating it', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'printers' }, next)
-    state = open(state, { kind: 'queue' }, next)
-    state = open(state, { kind: 'printers' }, next)
-
-    expect(state.tabs.filter((t) => t.kind === 'printers')).toHaveLength(1)
-    expect(state.tabs.find((t) => t.id === state.activeId)?.kind).toBe('printers')
+  it('gives a new label a draft id of its own', () => {
+    const state = openPage(initialWorkspace(), { kind: 'label', templateId: null }, ids())
+    expect(state.page).toEqual({ kind: 'label', templateId: null, draftId: 'd-1' })
   })
 
-  it('allows several design tabs at once', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
-    state = open(state, { kind: 'design', templateId: null }, next)
-
-    expect(state.tabs).toHaveLength(2)
-    expect(new Set(state.tabs.map((t) => t.id)).size).toBe(2)
+  it('keeps a draft id it was handed', () => {
+    const state = openPage(initialWorkspace(), { kind: 'label', templateId: null, draftId: 'd-kept' }, ids())
+    expect(state.page).toMatchObject({ draftId: 'd-kept' })
   })
 
-  it('allows the same template to be opened twice', () => {
-    // Deliberate: the spec handles the resulting save conflict rather than
-    // preventing the situation, because one person with two tabs is a normal
-    // way to compare two variants of a label.
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: 'tpl-1' }, next)
-    state = open(state, { kind: 'design', templateId: 'tpl-1' }, next)
-    expect(state.tabs).toHaveLength(2)
+  it('gives a saved label no draft id', () => {
+    const state = openPage(initialWorkspace(), { kind: 'label', templateId: 'tpl-1' }, ids())
+    expect(state.page).toEqual({ kind: 'label', templateId: 'tpl-1' })
+  })
+
+  it('carries a preset with the label', () => {
+    const state = openPage(initialWorkspace(), { kind: 'label', templateId: 'tpl-1', presetId: 'p' })
+    expect(state.page).toMatchObject({ presetId: 'p' })
   })
 })
 
-describe('view state is preserved across switches', () => {
-  it('keeps every tab in the set when another is activated', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
-    const first = state.tabs[0]!.id
-    state = open(state, { kind: 'printers' }, next)
-
-    expect(state.activeId).not.toBe(first)
-    // The crucial property: activating another tab must not remove this one.
-    expect(state.tabs.map((t) => t.id)).toContain(first)
-  })
-
-  it('restores the same tab object when switching back', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
-    const first = state.tabs[0]!
-    state = open(state, { kind: 'settings' }, next)
-    state = activateTab(state, first.id)
-
-    expect(state.tabs.find((t) => t.id === first.id)).toBe(first)
-    expect(state.activeId).toBe(first.id)
-  })
-
-  it('ignores activation of a tab that is not open', () => {
-    const state = open(emptyWorkspace(), { kind: 'index' })
-    expect(activateTab(state, 'missing')).toBe(state)
-  })
-})
-
-describe('closing tabs', () => {
-  it('removes the tab', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'index' }, next)
-    state = open(state, { kind: 'printers' }, next)
-    const target = state.activeId!
-    state = closeTab(state, target)
-
-    expect(state.tabs.map((t) => t.id)).not.toContain(target)
-  })
-
-  it('activates a neighbour when the active tab closes', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'index' }, next)
-    const first = state.tabs[0]!.id
-    state = open(state, { kind: 'printers' }, next)
-    state = closeTab(state, state.activeId!)
-
-    expect(state.activeId).toBe(first)
-  })
-
-  it('leaves no active tab once the last one closes', () => {
-    let state = open(emptyWorkspace(), { kind: 'index' })
-    state = closeTab(state, state.activeId!)
-    expect(state.tabs).toEqual([])
-    expect(state.activeId).toBeNull()
-  })
-
-  it('keeps the active tab when a different one closes', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'index' }, next)
-    const first = state.tabs[0]!.id
-    state = open(state, { kind: 'printers' }, next)
-    const active = state.activeId!
-    state = closeTab(state, first)
-    expect(state.activeId).toBe(active)
-  })
-})
-
-describe('unsaved marker', () => {
-  it('marks and clears a tab', () => {
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null })
-    const id = state.activeId!
-    expect(state.tabs[0]!.isDirty).toBe(false)
-
-    state = markDirty(state, id, true)
-    expect(state.tabs[0]!.isDirty).toBe(true)
-
-    state = markDirty(state, id, false)
-    expect(state.tabs[0]!.isDirty).toBe(false)
-  })
-
-  it('returns the very same state when the flag is already right', () => {
-    // Identity, not equality. A page that reports its own dirtiness from an
-    // effect sees a fresh state object come back, re-runs the effect and
-    // reports again; that loop hangs the tab, and this is what breaks it.
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null })
-    const id = state.activeId!
-    expect(markDirty(state, id, false)).toBe(state)
-
-    state = markDirty(state, id, true)
-    expect(markDirty(state, id, true)).toBe(state)
-  })
-
-  it('leaves other tabs alone when one is marked', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
-    state = open(state, { kind: 'design', templateId: null }, next)
-    const first = state.tabs[0]!.id
-
-    state = markDirty(state, first, true)
-    expect(state.tabs[0]!.isDirty).toBe(true)
-    expect(state.tabs[1]!.isDirty).toBe(false)
-  })
-
-  it('reports whether anything is unsaved, which is what gates the leave prompt', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
-    state = open(state, { kind: 'design', templateId: null }, next)
-    expect(state.tabs.some((t) => t.isDirty)).toBe(false)
-
-    state = markDirty(state, state.tabs[1]!.id, true)
-    expect(state.tabs.some((t) => t.isDirty)).toBe(true)
-  })
-
-  it('only counts work that could actually be lost', () => {
-    // A dirty tab whose draft is on disk survives a reload; the leave prompt
-    // is for the one whose draft could not be written.
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
-    state = markDirty(state, state.tabs[0]!.id, true)
+describe('the leave prompt', () => {
+  it('is quiet until a draft fails to reach storage', () => {
+    let state = openPage(initialWorkspace(), { kind: 'label', templateId: 'tpl-1' })
     expect(hasUnsavedWork(state)).toBe(false)
-    state = markUnpersisted(state, state.tabs[0]!.id, true)
+    state = markUnpersisted(state, true)
     expect(hasUnsavedWork(state)).toBe(true)
-    state = markUnpersisted(state, state.tabs[0]!.id, false)
+    state = markUnpersisted(state, false)
     expect(hasUnsavedWork(state)).toBe(false)
   })
 
-  it('returns the same state when the persistence flag is already right', () => {
-    const next = ids()
-    const state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
-    expect(markUnpersisted(state, state.tabs[0]!.id, false)).toBe(state)
+  it('arms only the reload prompt for a draft held in memory', () => {
+    // A page switch keeps an in-memory draft; only a reload loses it.
+    let state = openPage(initialWorkspace(), { kind: 'label', templateId: 'tpl-1' })
+    state = markReloadLoses(state, true)
+    expect(hasUnsavedWork(state)).toBe(false)
+    expect(reloadWouldLose(state)).toBe(true)
+  })
+
+  it('returns the same state when the flag is already right', () => {
+    const state = initialWorkspace()
+    expect(markUnpersisted(state, false)).toBe(state)
+  })
+
+  it('forgets the flag when the page changes', () => {
+    // The editor that set it has unmounted and flushed; a new page starts clean.
+    let state = markUnpersisted(openPage(initialWorkspace(), { kind: 'label', templateId: 'tpl-1' }), true)
+    state = openPage(state, { kind: 'printers' })
+    expect(hasUnsavedWork(state)).toBe(false)
   })
 })
 
-describe('draft keys', () => {
-  it('gives a blank design a draft id of its own', () => {
-    const state = open(emptyWorkspace(), { kind: 'design', templateId: null }, ids(), () => 'd-abc')
-    expect(state.tabs[0]!.draftId).toBe('d-abc')
+describe('restoring from an address', () => {
+  it('restores the page the address names', () => {
+    expect(restoreFromPath('/printers').page).toEqual({ kind: 'printers' })
   })
 
-  it('keeps the draft id when the design is first saved', () => {
-    // The key the editor writes under changes to the template id on its own
-    // (template?.id ?? draftId); the tab does not need to relabel anything.
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, ids(), () => 'd-abc')
-    state = setTabTemplate(state, state.tabs[0]!.id, 'tpl-9')
-    expect(state.tabs[0]).toMatchObject({ templateId: 'tpl-9', draftId: 'd-abc' })
-  })
-
-  it('takes the draft id from the address, so a reload finds the same draft', () => {
-    const state = restoreFromPath('/design/new/d-abc', ids())
-    expect(state.tabs[0]).toMatchObject({ kind: 'design', templateId: null, draftId: 'd-abc' })
+  it('takes a new label\'s draft id from the address', () => {
+    expect(restoreFromPath('/labels/new/d-abc', ids()).page).toMatchObject({ kind: 'label', draftId: 'd-abc' })
   })
 
   it('mints one when the address has none', () => {
-    const state = restoreFromPath('/design/new', ids(), () => 'd-minted')
-    expect(state.tabs[0]!.draftId).toBe('d-minted')
+    expect(restoreFromPath('/design', ids()).page).toMatchObject({ kind: 'label', draftId: 'd-1' })
   })
 
-  it('gives a saved design no separate draft id', () => {
-    const state = open(emptyWorkspace(), { kind: 'design', templateId: 'tpl-1' }, ids(), () => 'never')
-    expect(state.tabs[0]!.draftId).toBeUndefined()
-  })
-})
-
-describe('soft tab limit', () => {
-  it('warns at the limit but never refuses', () => {
-    const next = ids()
-    let state = emptyWorkspace()
-    for (let i = 0; i < SOFT_TAB_LIMIT; i += 1) {
-      state = open(state, { kind: 'design', templateId: null }, next)
-    }
-    expect(state.tabs).toHaveLength(SOFT_TAB_LIMIT)
-    expect(exceedsSoftLimit(state)).toBe(true)
-
-    // The point of a soft limit: it is advice, not a gate.
-    state = open(state, { kind: 'design', templateId: null }, next)
-    expect(state.tabs).toHaveLength(SOFT_TAB_LIMIT + 1)
-  })
-
-  it('stays quiet below the limit', () => {
-    const next = ids()
-    let state = emptyWorkspace()
-    for (let i = 0; i < SOFT_TAB_LIMIT - 1; i += 1) {
-      state = open(state, { kind: 'design', templateId: null }, next)
-    }
-    expect(exceedsSoftLimit(state)).toBe(false)
-  })
-
-  it('ignores pages that hold no editing state', () => {
-    // The warning is about editing being slow. A printers page and a queue
-    // page fetch and render; counting them makes the advice fire for reasons
-    // that have nothing to do with what it says.
-    const next = ids()
-    let state = emptyWorkspace()
-    for (const kind of ['printers', 'queue', 'history', 'settings', 'data-sources', 'index'] as const) {
-      state = open(state, { kind }, next)
-    }
-    for (let i = 0; i < SOFT_TAB_LIMIT - 1; i += 1) {
-      state = open(state, { kind: 'design', templateId: null }, next)
-    }
-
-    expect(state.tabs.length).toBeGreaterThan(SOFT_TAB_LIMIT)
-    expect(exceedsSoftLimit(state)).toBe(false)
-  })
-
-  it('counts the template library, which holds a list and its pictures', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'templates' }, next)
-    for (let i = 0; i < SOFT_TAB_LIMIT - 1; i += 1) {
-      state = open(state, { kind: 'design', templateId: null }, next)
-    }
-    expect(editingTabCount(state)).toBe(SOFT_TAB_LIMIT)
-    expect(exceedsSoftLimit(state)).toBe(true)
-  })
-
-  it('reports how many there actually are, not the threshold', () => {
-    // The message used to say "10" whatever the number was, so at twelve tabs
-    // it was quietly wrong about the thing it existed to report.
-    const next = ids()
-    let state = emptyWorkspace()
-    for (let i = 0; i < SOFT_TAB_LIMIT + 2; i += 1) {
-      state = open(state, { kind: 'design', templateId: null }, next)
-    }
-    expect(editingTabCount(state)).toBe(SOFT_TAB_LIMIT + 2)
-  })
-
-  it('drops back below the limit when an editing tab is closed', () => {
-    const next = ids()
-    let state = emptyWorkspace()
-    for (let i = 0; i < SOFT_TAB_LIMIT; i += 1) {
-      state = open(state, { kind: 'design', templateId: null }, next)
-    }
-    expect(exceedsSoftLimit(state)).toBe(true)
-
-    state = closeTab(state, state.tabs[0]!.id)
-    expect(exceedsSoftLimit(state)).toBe(false)
-  })
-})
-
-describe('numbering unsaved designs', () => {
-  /** The untitled designs, in tab order, by their number. */
-  const drafts = (state: WorkspaceState): (number | undefined)[] =>
-    state.tabs.filter((t) => t.kind === 'design' && t.templateId === null).map((t) => t.draftNumber)
-
-  it('numbers them from one, so three of them are three different tabs', () => {
-    const next = ids()
-    let state = emptyWorkspace()
-    for (let i = 0; i < 3; i += 1) {
-      state = open(state, { kind: 'design', templateId: null }, next)
-    }
-    expect(drafts(state)).toEqual([1, 2, 3])
-  })
-
-  it('does not renumber the survivors when one closes', () => {
-    // The property the whole scheme exists for. Deriving the number from
-    // position instead would turn 「未命名设计 3」 into 「未命名设计 2」 under
-    // the cursor of somebody who closed a different tab — which is the exact
-    // confusion the numbers were added to end.
-    const next = ids()
-    let state = emptyWorkspace()
-    for (let i = 0; i < 3; i += 1) {
-      state = open(state, { kind: 'design', templateId: null }, next)
-    }
-    state = closeTab(state, state.tabs[0]!.id)
-    expect(drafts(state)).toEqual([2, 3])
-  })
-
-  it('reuses the lowest free number rather than counting upwards forever', () => {
-    const next = ids()
-    let state = emptyWorkspace()
-    for (let i = 0; i < 3; i += 1) {
-      state = open(state, { kind: 'design', templateId: null }, next)
-    }
-    state = closeTab(state, state.tabs[1]!.id)
-    state = open(state, { kind: 'design', templateId: null }, next)
-    expect(drafts(state)).toEqual([1, 3, 2])
-  })
-
-  it('frees the number once that design is saved', () => {
-    // A saved tab is called after its template, so it is no longer holding a
-    // number — and the next blank design should get the small one back.
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'design', templateId: null }, next)
-    const first = state.tabs[0]!.id
-    state = open(state, { kind: 'design', templateId: null }, next)
-
-    state = setTabTemplate(state, first, 'tpl-1')
-    expect(state.tabs[0]!.draftNumber).toBeUndefined()
-
-    state = open(state, { kind: 'design', templateId: null }, next)
-    expect(drafts(state)).toEqual([2, 1])
-  })
-
-  it('gives no number to a design opened on a template', () => {
-    const state = open(emptyWorkspace(), { kind: 'design', templateId: 'tpl-1' })
-    expect(state.tabs[0]!.draftNumber).toBeUndefined()
-  })
-
-  it('gives no number to pages that are not designs', () => {
-    const next = ids()
-    let state = open(emptyWorkspace(), { kind: 'printers' }, next)
-    state = open(state, { kind: 'templates' }, next)
-    expect(state.tabs.map((t) => t.draftNumber)).toEqual([undefined, undefined])
-  })
-
-  it('numbers the blank design restored from an address', () => {
-    expect(restoreFromPath('/design/new', ids()).tabs[0]!.draftNumber).toBe(1)
-  })
-})
-
-describe('restoring after a refresh', () => {
-  it('restores exactly the tab the address names, and nothing else', () => {
-    const state = restoreFromPath('/printers', ids())
-    expect(state.tabs).toHaveLength(1)
-    expect(state.tabs[0]!.kind).toBe('printers')
-    expect(state.activeId).toBe(state.tabs[0]!.id)
-  })
-
-  it('restores an unsaved design as a fresh blank one', () => {
-    const state = restoreFromPath('/design/new', ids())
-    expect(state.tabs).toHaveLength(1)
-    expect(state.tabs[0]).toMatchObject({ kind: 'design', templateId: null, isDirty: false })
-  })
-
-  it('falls back to the index for an unknown address', () => {
-    expect(restoreFromPath('/nope', ids()).tabs[0]!.kind).toBe('index')
-  })
-})
-
-/**
- * A preset arriving with the design.
- *
- * The tab has to hold it, not just the address: the address is rewritten from
- * the active tab, so a preset the tab did not keep would be erased the moment
- * anything caused a rewrite — which is every tab switch.
- */
-describe('a design tab opened on a preset', () => {
-  it('keeps it, so the address can be written back from the tab', () => {
-    const state = openTab(emptyWorkspace(), { kind: 'design', templateId: 'tpl-7', presetId: 'pre-1' }, ids())
-    expect(state.tabs[0]).toMatchObject({ templateId: 'tpl-7', presetId: 'pre-1' })
-  })
-
-  it('is restored from a full address, query included', () => {
-    const state = restoreFromPath('/design/tpl-7?preset=pre-1', ids())
-    expect(state.tabs[0]).toMatchObject({ kind: 'design', templateId: 'tpl-7', presetId: 'pre-1' })
-  })
-
-  it('leaves the field off a design opened without one', () => {
-    const state = openTab(emptyWorkspace(), { kind: 'design', templateId: 'tpl-7' }, ids())
-    expect(state.tabs[0]?.presetId).toBeUndefined()
+  it('falls back to the gallery for an unknown address', () => {
+    expect(restoreFromPath('/nope').page).toEqual({ kind: 'labels' })
   })
 })

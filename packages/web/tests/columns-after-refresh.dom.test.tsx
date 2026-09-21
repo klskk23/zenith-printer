@@ -89,13 +89,13 @@ describe('opening a table nobody has read yet', () => {
      * at zero rows and one column until somebody found the refresh button,
      * which looked exactly like a category with nothing in it.
      */
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
     await screen.findByText('FancyWAN')
     await waitFor(() => expect(headers()).toEqual(EIGHT))
   })
 
   it('reads it once, not once per render', async () => {
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
     await waitFor(() => expect(headers()).toEqual(EIGHT))
     await new Promise((resolve) => setTimeout(resolve, 60))
 
@@ -113,7 +113,7 @@ describe('a first refresh that brings the columns', () => {
     // grid starts from the single column — the state a pressed refresh has to
     // move it out of.
     sources = [{ ...ONE_COLUMN, lastRefreshedAt: '2026-09-01T00:00:00.000Z' }]
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
     await screen.findByText('FancyWAN')
     await waitFor(() => expect(headers()).toEqual(['sys_id']))
 

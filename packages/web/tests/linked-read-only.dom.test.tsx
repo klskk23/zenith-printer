@@ -171,13 +171,13 @@ describe('the editor', () => {
   afterEach(() => restoreSize())
 
   it('says the table is read-only and why', async () => {
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
     await screen.findByText('本月出货')
     expect(screen.getByText(/在本机只读/)).toBeDefined()
   })
 
   it('does not offer to add rows to a linked table', async () => {
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
     await screen.findByText('本月出货')
     expect(screen.queryByRole('button', { name: '加行' })).toBeNull()
   })
@@ -186,7 +186,7 @@ describe('the editor', () => {
     // The execution path: a guard hard-coded to always refuse would pass every
     // assertion above and fail this one.
     sources = [{ ...LOCAL, id: 'ds-1', name: '本地表', columns: ['a'] }]
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
     await screen.findByText('本地表')
 
     expect(screen.getByRole('button', { name: '加行' })).toBeDefined()
@@ -198,7 +198,7 @@ describe('the editor', () => {
     // read-only grid can never become dirty, so undo, redo, discard and save
     // sat there permanently greyed out. A control that can never work is not a
     // disabled control, it is a wrong one.
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
     await screen.findByText('本月出货')
 
     for (const name of ['撤销', '重做', '取消修改', '保存']) {
@@ -208,13 +208,13 @@ describe('the editor', () => {
 
   it('keeps what a linked table does support', async () => {
     // Refreshing is the whole point of a linked table.
-    render(wrap(<DataSourceEditor dataSourceId="ds-1" tabId="tab-1" />))
+    render(wrap(<DataSourceEditor dataSourceId="ds-1" />))
     await screen.findByText('本月出货')
     expect(screen.getByRole('button', { name: /刷新/ })).toBeDefined()
   })
 
   it('still shows them for a local table', async () => {
-    render(wrap(<DataSourceEditor dataSourceId="ds-2" tabId="tab-2" />))
+    render(wrap(<DataSourceEditor dataSourceId="ds-2" />))
     expect(await screen.findByRole('button', { name: '保存' })).toBeDefined()
     expect(screen.getByRole('button', { name: '撤销' })).toBeDefined()
   })
