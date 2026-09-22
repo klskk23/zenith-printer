@@ -1,8 +1,9 @@
 /**
- * Leaving the editor: a way back, and one question when it would cost something.
+ * Leaving the editor: the way out, and one question when it would cost
+ * something.
  *
- * The rule is "leaving is abandoning". So the back button goes straight to
- * the gallery when nothing has changed, asks when something has, and on
+ * The rule is "leaving is abandoning". So stepping back to 「标签」 goes
+ * straight to the gallery when nothing has changed, asks when something has, and on
  * "discard" the edits are gone — reopening the label shows what the server
  * has. The sidebar goes through the same gate; the back button is only the
  * nearer way to the same door.
@@ -24,12 +25,11 @@ const addText = (): void => {
   fireEvent.click(screen.getAllByText('文字')[0]!)
 }
 /**
- * The way out is a symbol now, with no word beside it: the word said the same
- * thing as the first step in the bar, an inch to its right. It is still named
- * for anyone who cannot see it.
+ * The way out is the first step in the bar. There is no separate back symbol:
+ * it sat an inch to the left of 「标签」 and said the same thing.
  */
 const back = (): void => {
-  fireEvent.click(screen.getByRole('button', { name: copy.flow.back }))
+  fireEvent.click(document.querySelector('[data-step="labels"] button')!)
 }
 
 beforeEach(() => {
@@ -43,7 +43,7 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-describe('the back button', () => {
+describe('stepping back to the gallery', () => {
   it('returns to the gallery when nothing has changed', async () => {
     renderApp('/')
     await openNewLabel()

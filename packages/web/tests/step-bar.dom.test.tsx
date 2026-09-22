@@ -2,9 +2,11 @@
  * The step bar: where you are, what is behind you, what is not yet open.
  *
  * What is pinned: four steps always drawn, exactly one current, the ones behind
- * are buttons and the ones ahead are not, the way back is a symbol with no word
- * beside it (but still has an accessible name), and the right end carries what
- * this step is about rather than repeating the step's own name.
+ * are buttons and the ones ahead are not, and the right end carries what this
+ * step is about rather than repeating the step's own name.
+ *
+ * There is no separate back control. The first step *is* the way out, one click
+ * to the left of wherever you are standing.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -19,7 +21,6 @@ const bar = (overrides: Partial<React.ComponentProps<typeof StepBar>> = {}): HTM
     <StepBar
       steps={stepsFor({ page: 'label-print', canSubmit: false })}
       onGo={() => undefined}
-      onBack={() => undefined}
       context="种子路由器 · 60×40 mm"
       {...overrides}
     />,
@@ -67,22 +68,12 @@ describe('the step bar', () => {
     expect(node.querySelector('[data-step="confirm"] button')).toBeNull()
   })
 
-  it('gives the way back a symbol and no word', () => {
-    const onBack = vi.fn()
-    const node = bar({ onBack })
-    const back = node.querySelector('[data-back]') as HTMLButtonElement
-    // No text — but a name a screen reader and a tooltip can both use.
-    expect(back.textContent?.trim()).toBe('')
-    expect(back.getAttribute('aria-label')).toBe(copy.flow.back)
-    expect(back.getAttribute('title')).toBe(copy.flow.back)
-    expect(back.querySelector('svg')).not.toBeNull()
-    fireEvent.click(back)
-    expect(onBack).toHaveBeenCalled()
-  })
-
-  it('leaves the way back out on the first step', () => {
-    const node = bar({ steps: stepsFor({ page: 'labels', canSubmit: false }), onBack: undefined })
+  it('offers no separate way back — the first step is it', () => {
+    const onGo = vi.fn()
+    const node = bar({ onGo })
     expect(node.querySelector('[data-back]')).toBeNull()
+    fireEvent.click(node.querySelector('[data-step="labels"] button')!)
+    expect(onGo).toHaveBeenCalledWith('labels')
   })
 
   it('carries what this step is about at its right end', () => {

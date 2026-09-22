@@ -7,11 +7,11 @@
  * ever refuses is the last — confirming a batch that has no machine or no rows
  * is not a decision anybody can make yet.
  *
- * The way back is a symbol alone. The word beside it said the same thing as the
- * first step in the bar, two centimetres to its right.
+ * There is no separate way out. The first step *is* the way out — 「标签」 is
+ * the gallery, and from anywhere inside a label it is one click to the left of
+ * where you are standing. A back arrow beside it said the same thing twice.
  */
 import { Fragment } from 'react'
-import { ArrowLeft } from 'lucide-react'
 import { copy } from '../i18n/index.ts'
 import { cn } from '../lib/utils.ts'
 import type { Step, StepId } from '../features/print/flow.ts'
@@ -20,8 +20,6 @@ export interface StepBarProps {
   steps: readonly Step[]
   /** Called with a step that is behind the current one. */
   onGo: (step: StepId) => void
-  /** Leaving the flow entirely. Omitted on the first step, which is the way out. */
-  onBack?: () => void
   /** What this step is about — the label, or the machine. Never the step's own name. */
   context?: React.ReactNode
 }
@@ -59,7 +57,7 @@ function Marks({ step }: { step: Step }): React.JSX.Element {
 
 const ROW = 'flex shrink-0 items-center gap-n2 whitespace-nowrap'
 
-export function StepBar({ steps, onGo, onBack, context }: StepBarProps): React.JSX.Element {
+export function StepBar({ steps, onGo, context }: StepBarProps): React.JSX.Element {
   return (
     <div
       role="toolbar"
@@ -67,19 +65,6 @@ export function StepBar({ steps, onGo, onBack, context }: StepBarProps): React.J
       aria-orientation="horizontal"
       className="flex h-13 shrink-0 items-center gap-n4 border-b border-border px-n2"
     >
-      {onBack !== undefined && (
-        <button
-          type="button"
-          data-back
-          aria-label={copy.flow.back}
-          title={copy.flow.back}
-          onClick={onBack}
-          className="grid size-7 shrink-0 place-items-center rounded-sm text-muted-foreground hover:bg-foreground/6 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-        </button>
-      )}
-
       <ol className="flex shrink-0 items-center gap-n4">
         {steps.map((step, index) => (
           <Fragment key={step.id}>

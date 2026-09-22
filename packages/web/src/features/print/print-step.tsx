@@ -113,8 +113,13 @@ export function PrintStep(props: PrintStepProps): React.JSX.Element {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="scrollbar-themed mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-n8 overflow-y-auto pt-n4 pr-2">
-        <h1 className="text-xl font-medium">{copy.flow.steps.print}</h1>
+      {/*
+        Full width, and the choices above the table pressed into one line
+        each. The table is the thing people came here to work in — the wider
+        it is the fewer of its columns wrap, and the higher it starts the more
+        rows are in view before anybody scrolls.
+      */}
+      <div className="scrollbar-themed flex min-h-0 w-full flex-1 flex-col gap-n6 overflow-y-auto pt-n4 pr-n3">
 
         {props.notices.length > 0 && (
           <Alert variant="warning" data-preset-notices>
@@ -122,9 +127,9 @@ export function PrintStep(props: PrintStepProps): React.JSX.Element {
           </Alert>
         )}
 
-        <section className="flex flex-col gap-n3" aria-label={copy.print.printer}>
-          <h2 className="text-xs font-medium text-muted-foreground">{copy.print.printer}</h2>
-          <div className="flex flex-wrap gap-n3" role="radiogroup" aria-label={copy.print.printer}>
+        <section className="flex items-start gap-n4" aria-label={copy.print.printer}>
+          <h2 className="w-16 shrink-0 pt-n3 text-xs font-medium text-muted-foreground">{copy.print.printer}</h2>
+          <div className="flex flex-1 flex-wrap gap-n3" role="radiogroup" aria-label={copy.print.printer}>
             {props.printers.map((printer) => (
               <Card
                 key={printer.id}
@@ -152,9 +157,9 @@ export function PrintStep(props: PrintStepProps): React.JSX.Element {
           </div>
         </section>
 
-        <section className="flex flex-col gap-n3" aria-label={copy.profiles.heading}>
-          <h2 className="text-xs font-medium text-muted-foreground">{copy.profiles.heading}</h2>
-          <div className="flex flex-wrap gap-n3" role="radiogroup" aria-label={copy.profiles.heading}>
+        <section className="flex items-start gap-n4" aria-label={copy.profiles.heading}>
+          <h2 className="w-16 shrink-0 pt-n3 text-xs font-medium text-muted-foreground">{copy.profiles.heading}</h2>
+          <div className="flex flex-1 flex-wrap gap-n3" role="radiogroup" aria-label={copy.profiles.heading}>
             {props.profiles.map((profile) => (
               <Card
                 key={profile.id}
@@ -178,7 +183,7 @@ export function PrintStep(props: PrintStepProps): React.JSX.Element {
         </section>
 
         {props.dataSourceId !== null && (
-          <section className="flex flex-col gap-n3" aria-label={copy.rowSelection.heading}>
+          <section className="flex min-h-0 flex-col gap-n3" aria-label={copy.rowSelection.heading}>
             {linkedSource !== undefined && (
               <div data-print-refresh>
                 <RefreshButton
@@ -292,7 +297,9 @@ export function PrintStep(props: PrintStepProps): React.JSX.Element {
         </div>
       </div>
 
-      {props.blocked !== null && (
+      {/* The row panel says this one for itself, right above its own table;
+          saying it again under the bar is the same sentence twice. */}
+      {props.blocked !== null && props.blocked !== copy.rowSelection.none && (
         <p className="shrink-0 pt-n2 text-right text-2xs text-muted-foreground" data-blocked>
           {props.blocked}
         </p>

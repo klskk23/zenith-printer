@@ -104,8 +104,8 @@ describe('the editor', () => {
   it('has a way back, and the sidebar is still there', async () => {
     renderApp('/')
     await openNewLabel()
-    // A symbol, not a word: the word repeated the first step in the bar.
-    expect(screen.getByRole('button', { name: copy.flow.back })).toBeDefined()
+    // The first step is the way out; there is no separate back control.
+    expect(document.querySelector('[data-step="labels"] button')).not.toBeNull()
     expect(document.querySelector('nav')).not.toBeNull()
   })
 })

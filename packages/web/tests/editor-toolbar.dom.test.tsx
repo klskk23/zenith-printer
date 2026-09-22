@@ -46,8 +46,9 @@ describe('the design step', () => {
   it('has the step bar at the top and nothing else', async () => {
     await open()
     const bar = screen.getByRole('toolbar', { name: copy.flow.heading })
-    // The way out, four steps, and what this label is. No machine anywhere.
-    expect(bar.querySelector('[data-back]')).not.toBeNull()
+    // Four steps and what this label is. No machine, and no back symbol —
+    // the first step is the way out.
+    expect(bar.querySelector('[data-back]')).toBeNull()
     expect(bar.querySelectorAll('[data-step]')).toHaveLength(4)
     expect(bar.textContent).not.toContain(copy.print.printer)
   })

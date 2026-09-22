@@ -128,7 +128,7 @@ export function RowBrowser({
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
                 {group.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} className="whitespace-nowrap">
                     {header.isPlaceholder ? null : <table.FlexRender header={header} />}
                   </TableHead>
                 ))}
@@ -138,8 +138,12 @@ export function RowBrowser({
           <TableBody>
             {table.getRowModel().rows.map((row) => (
               <TableRow key={row.id} data-state={row.getIsSelected() ? 'selected' : undefined}>
+                {/* One line per row, always. A uuid wrapped onto four lines
+                    turns ten rows into forty lines of screen; the table already
+                    scrolls sideways, which is what a spreadsheet does with a
+                    long value. */}
                 {row.getAllCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <TableCell key={cell.id} className="whitespace-nowrap">
                     <table.FlexRender cell={cell} />
                   </TableCell>
                 ))}

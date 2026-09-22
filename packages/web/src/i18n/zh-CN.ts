@@ -267,6 +267,9 @@ export const copy = {
     needsFields: '填完上面的变量后才能预览',
     needsTemplateForSequence: '序号字段需要先保存这张标签：序号要跨批次接着往下走，而未保存的标签没有可以接续的东西。',
     failed: '无法生成预览',
+    sheet: (n: number, total: number): string => `第 ${n} 张，共 ${total} 张`,
+    expandSheets: (n: number): string => `展开全部 ${n} 张`,
+    ofSheets: (shown: number, total: number): string => `本页 ${shown} 张，共 ${total} 张`,
     expand: (rows: number): string => `展开全部 ${rows} 行`,
     collapse: '收起',
     rowLabel: (ordinal: number): string => `第 ${ordinal} 行`,
@@ -309,13 +312,14 @@ export const copy = {
     submitting: '正在提交…',
     queued: '已加入队列',
     queuedCount: (labels: number): string => `已加入队列，${labels} 张`,
+    total: '合计',
     sheets: '张',
     seconds: (n: number): string => `约 ${n} 秒`,
     clipLine: (risk: { affected: number; overflowMm: number; beyondHeadMm: number; unprobed: boolean }): string =>
       risk.unprobed
         ? '这台打印机还没探测过，无法判断能打多宽'
         : [
-            risk.affected > 0 ? `${risk.affected} 张里有内容超出标签 ${risk.overflowMm} mm` : '',
+            risk.affected > 0 ? `内容超出标签 ${risk.overflowMm} mm` : '',
             risk.beyondHeadMm > 0 ? `标签比打印头宽 ${risk.beyondHeadMm} mm` : '',
           ]
             .filter((part) => part !== '')

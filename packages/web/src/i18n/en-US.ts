@@ -259,6 +259,9 @@ export const copy: Copy = {
     needsTemplateForSequence:
       'Sequence fields need the label saved first: a sequence carries on across print runs, and an unsaved label has nothing to carry on from.',
     failed: 'Could not render a preview',
+    sheet: (n: number, total: number): string => `Label ${n} of ${total}`,
+    expandSheets: (n: number): string => `Show all ${n}`,
+    ofSheets: (shown: number, total: number): string => `${shown} shown of ${total}`,
     expand: (rows: number): string => `Show all ${rows} rows`,
     collapse: 'Show one',
     rowLabel: (ordinal: number): string => `Row ${ordinal}`,
@@ -297,13 +300,14 @@ export const copy: Copy = {
     submitting: 'Submitting…',
     queued: 'Added to the queue',
     queuedCount: (labels: number): string => `Queued, ${labels} labels`,
+    total: 'Total',
     sheets: 'labels',
     seconds: (n: number): string => `about ${n}s`,
     clipLine: (risk: { affected: number; overflowMm: number; beyondHeadMm: number; unprobed: boolean }): string =>
       risk.unprobed
         ? 'Nobody has probed this printer, so its printable width is unknown'
         : [
-            risk.affected > 0 ? `${risk.affected} labels overflow by ${risk.overflowMm} mm` : '',
+            risk.affected > 0 ? `content overflows the label by ${risk.overflowMm} mm` : '',
             risk.beyondHeadMm > 0 ? `the label is ${risk.beyondHeadMm} mm wider than the head` : '',
           ]
             .filter((part) => part !== '')

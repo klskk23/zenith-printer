@@ -23,6 +23,7 @@ import { randomId } from '../../lib/random-id.ts'
 import { useDataSources } from '../data-sources/hooks.ts'
 import type { Template } from '../templates/hooks.ts'
 import { clipSummary, type OverflowWarning, type Tally } from './flow.ts'
+import { LabelPreview } from './label-preview.tsx'
 import { toRowSelection, type Selection } from './selection.ts'
 
 export interface ConfirmStepProps {
@@ -36,6 +37,8 @@ export interface ConfirmStepProps {
   dataSourceId: string | null
   selection: Selection
   chosenRows: number
+  /** The chosen rows in print order, for the previews. */
+  rowOrdinals: readonly number[]
   keyByOrdinal: ReadonlyMap<number, string>
   copies: number
   tally: Tally
@@ -47,14 +50,24 @@ export interface ConfirmStepProps {
   onQueue: () => void
 }
 
-function Line({ term, children }: { term: string; children: React.ReactNode }): React.JSX.Element {
+/** One of the five short facts on the strip: what it is, and a line under it. */
+function Fact({
+  term,
+  value,
+  children,
+}: {
+  term: string
+  value: string
+  children?: React.ReactNode
+}): React.JSX.Element {
   return (
-    <>
-      <dt className="text-xs text-muted-foreground">{term}</dt>
-      <dd className="text-sm" data-term={term}>
-        {children}
-      </dd>
-    </>
+    <div className="flex min-w-0 flex-col gap-n1" data-term={term}>
+      <span className="text-2xs text-muted-foreground">{term}</span>
+      <span className="truncate">{value}</span>
+      {children !== undefined && children !== null && (
+        <span className="truncate text-2xs text-muted-foreground">{children}</span>
+      )}
+    </div>
   )
 }
 
@@ -171,65 +184,77 @@ export function ConfirmStep(props: ConfirmStepProps): React.JSX.Element {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="scrollbar-themed mx-auto flex w-full max-w-lg min-h-0 flex-1 flex-col gap-n8 overflow-y-auto pt-n4">
+      <div className="flex min-h-0 flex-1 flex-col gap-n6 pt-n4">
+      <div className="flex shrink-0 items-baseline gap-n4">
         <h1 className="text-xl font-medium">{copy.flow.steps.confirm}</h1>
-
-        <dl className="grid grid-cols-[6rem_1fr] items-baseline gap-x-n6 gap-y-n4">
-          <Line term={copy.presets.template}>
-            {props.template?.name ?? copy.workspace.untitledDesign}
-            <span className="mt-1 block text-2xs text-muted-foreground">
-              {props.ir.widthMm} × {props.ir.heightMm} mm
-            </span>
-          </Line>
-          <Line term={copy.print.printer}>
-            {printer?.name ?? '—'}
-            {printer !== null && (
-              <span className="mt-1 block text-2xs text-muted-foreground">{printer.address}</span>
-            )}
-          </Line>
-          <Line term={copy.profiles.heading}>
-            {props.profile?.name ?? copy.presets.profileDefault}
-            {props.profile !== null && (
-              <span className="mt-1 block text-2xs text-muted-foreground">
-                {props.profile.labelWidthMm} × {props.profile.labelHeightMm} mm
-              </span>
-            )}
-          </Line>
-          {props.dataSourceId !== null && (
-            <Line term={copy.dataSources.heading}>
-              {source?.name ?? props.dataSourceId}
-              <span className="mt-1 block text-2xs text-muted-foreground">
-                {copy.rowSelection.chosen(props.chosenRows)}
-              </span>
-            </Line>
-          )}
-          <Line term={copy.print.copiesPerRow}>{props.copies}</Line>
-          {risk !== null && (
-            <Line term={copy.print.clipTerm}>
-              <span className="text-destructive" data-clip>
-                {copy.print.clipLine(risk)}
-              </span>
-            </Line>
-          )}
-        </dl>
-
-        <div className="flex items-baseline gap-n3 border-t border-border pt-n6">
-          <span className="font-mono text-3xl font-medium" data-total>
-            {props.tally.labels}
+        {risk !== null && (
+          <span className="ml-auto truncate text-xs text-destructive" data-clip>
+            {copy.print.clipLine(risk)}
           </span>
-          <span className="text-sm">{copy.print.sheets}</span>
-          <span className="ml-auto text-xs text-muted-foreground">
-            {copy.print.seconds(props.tally.seconds)}
-          </span>
-        </div>
-
-        {error !== null && (
-          <Alert variant={error.needsSomeoneOnSite ? 'warning' : 'destructive'} data-submit-error>
-            <p className="font-medium">{error.body.what}</p>
-            <p className="mt-1 text-xs opacity-90">{error.body.why}</p>
-            <p className="mt-1 text-xs font-medium">{error.body.next}</p>
-          </Alert>
         )}
+      </div>
+
+      {/*
+        The paper is the only thing here worth the room: everything else is a
+        line of text. Collapsed it is the first label of the batch; expanded,
+        every chosen row, which is the one place a row whose barcode outgrew
+        the label can be caught before the roll says so.
+      */}
+      <LabelPreview
+        ir={props.ir}
+        printerId={printer?.id ?? null}
+        profileId={props.profileId}
+        variableValues={props.variableValues}
+        dataSourceId={props.dataSourceId}
+        rowOrdinals={props.rowOrdinals}
+        rowLabel={(ordinal) => props.keyByOrdinal.get(ordinal)}
+      />
+
+      {/* Five short facts read faster across than down, and the total they
+          add up to sits at the end of the line. */}
+      <div className="flex shrink-0 items-start gap-n8 border-t border-border py-n6 text-sm">
+        <Fact term={copy.presets.template} value={props.template?.name ?? copy.workspace.untitledDesign}>
+          {props.ir.widthMm} × {props.ir.heightMm} mm
+        </Fact>
+        <Fact term={copy.print.printer} value={printer?.name ?? '—'}>
+          {printer?.address}
+        </Fact>
+        <Fact term={copy.profiles.heading} value={props.profile?.name ?? copy.presets.profileDefault}>
+          {props.profile === null
+            ? undefined
+            : `${props.profile.labelWidthMm} × ${props.profile.labelHeightMm} mm`}
+        </Fact>
+        {props.dataSourceId !== null && (
+          <Fact term={copy.dataSources.heading} value={source?.name ?? props.dataSourceId}>
+            {`${copy.rowSelection.chosen(props.chosenRows)} · ${copy.print.copiesPerRow} ${props.copies}`}
+          </Fact>
+        )}
+        {props.dataSourceId === null && (
+          <Fact term={copy.print.copiesPerRow} value={String(props.copies)} />
+        )}
+        <div className="ml-auto flex shrink-0 flex-col items-end gap-n1">
+          <span className="text-2xs text-muted-foreground">{copy.print.total}</span>
+          <span className="flex items-baseline gap-n2">
+            <span className="font-mono text-2xl font-medium" data-total>
+              {props.tally.labels}
+            </span>
+            <span className="text-sm">{copy.print.sheets}</span>
+          </span>
+          <span className="text-2xs text-muted-foreground">{copy.print.seconds(props.tally.seconds)}</span>
+        </div>
+      </div>
+
+      {error !== null && (
+        <Alert
+          variant={error.needsSomeoneOnSite ? 'warning' : 'destructive'}
+          className="shrink-0"
+          data-submit-error
+        >
+          <p className="font-medium">{error.body.what}</p>
+          <p className="mt-1 text-xs opacity-90">{error.body.why}</p>
+          <p className="mt-1 text-xs font-medium">{error.body.next}</p>
+        </Alert>
+      )}
       </div>
 
       <div className="flex shrink-0 items-center gap-n3 border-t border-border pt-3">
@@ -251,3 +276,5 @@ export function ConfirmStep(props: ConfirmStepProps): React.JSX.Element {
     </div>
   )
 }
+
+

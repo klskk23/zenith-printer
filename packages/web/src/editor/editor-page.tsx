@@ -353,6 +353,31 @@ export function EditorPage({ step, templateId, presetId }: EditorPageProps): Rea
     ...(presetId === undefined ? {} : { presetId }),
   }
   const chosenRows = dataSourceId === null ? 0 : selectedCount(selection, rowCount)
+  /**
+   * The chosen rows in print order — ascending ordinal, never tick order.
+   *
+   * The previews on the confirm step walk this list, so the first one is the
+   * label that genuinely comes out first. A selection made by key only yields
+   * the rows whose page has been loaded: a key on a page nobody opened cannot
+   * be turned into a position, and showing fewer previews than will print is
+   * better than showing the wrong ones.
+   */
+  const rowOrdinals = useMemo(() => {
+    if (dataSourceId === null) {
+      return []
+    }
+    if (selection.kind === 'all') {
+      return Array.from({ length: rowCount }, (_unused, index) => index + 1)
+    }
+    if (selection.kind === 'keys') {
+      const byKey = new Map([...keyByOrdinal].map(([ordinal, key]) => [key, ordinal] as const))
+      return selection.keys
+        .map((key) => byKey.get(key))
+        .filter((ordinal): ordinal is number => ordinal !== undefined)
+        .sort((a, b) => a - b)
+    }
+    return [...selection.ordinals].sort((a, b) => a - b)
+  }, [dataSourceId, selection, rowCount, keyByOrdinal])
   const counts = tally({ boundRows: dataSourceId === null ? null : rowCount, chosenRows, copies })
   const blocked =
     // A design the machine cannot print at all — a canvas wider than the head,
@@ -630,7 +655,10 @@ export function EditorPage({ step, templateId, presetId }: EditorPageProps): Rea
     const fallback = profiles.data?.find((p) => p.isDefault)
     if (fallback !== undefined) {
       setProfileId(fallback.id)
-      applyProfileStock(fallback)
+      // Quietly: choosing a machine on the print step is not editing the
+      // label. The canvas follows the stock so the preview is honest, but
+      // nobody should be asked whether to keep changes they never made.
+      applyProfileStock(fallback, { quiet: true })
     }
   }, [printerId, profileId, pendingProfileId, profiles.data])
 
@@ -737,7 +765,6 @@ export function EditorPage({ step, templateId, presetId }: EditorPageProps): Rea
       <StepBar
         steps={steps}
         onGo={(id) => workspace.open({ ...address, kind: id === 'labels' ? 'labels' : id === 'design' ? 'label' : 'label-print' })}
-        onBack={() => workspace.open({ kind: 'labels' })}
         context={
           template === null ? copy.workspace.untitledDesign : `${template.name} · ${ir.widthMm}×${ir.heightMm} mm`
         }
@@ -757,7 +784,11 @@ export function EditorPage({ step, templateId, presetId }: EditorPageProps): Rea
           profileId={profileId}
           onProfile={(id) => {
             setProfileId(id)
-            applyProfileStock(profiles.data?.find((candidate) => candidate.id === id) ?? null)
+            // Also quiet, and for the same reason: this is a printing
+            // decision made on the printing step.
+            applyProfileStock(profiles.data?.find((candidate) => candidate.id === id) ?? null, {
+              quiet: true,
+            })
           }}
           dataSourceId={dataSourceId}
           selection={selection}
@@ -786,6 +817,7 @@ export function EditorPage({ step, templateId, presetId }: EditorPageProps): Rea
           dataSourceId={dataSourceId}
           selection={selection}
           chosenRows={chosenRows}
+          rowOrdinals={rowOrdinals}
           keyByOrdinal={keyByOrdinal}
           copies={copies}
           tally={counts}

@@ -57,8 +57,8 @@
 ## Phase 4: User Story 2 - 改完版面接着打印（P1）
 
 - [x] T040 [P] [US2] 改写 `packages/web/tests/editor-toolbar.dom.test.tsx`：顶栏只有返回符号与步条；无打印机/参数下拉；撤销重做在画布头部；底部有保存/另存为/继续
-- [x] T041 [P] [US2] `packages/web/tests/flow-dirty.dom.test.tsx`：改一处不保存按「继续」不问保存且服务器未变；按 `←`/侧栏才问；从「打印」点 ② 回来修改仍在
-- [x] T042 [US2] `editor-page.tsx`：顶栏改为 `←` + 步条；撤销/重做移入画布头部；底部动作条；移除打印机/参数选择器与「打印」按钮
+- [x] T041 [P] [US2] `packages/web/tests/flow-dirty.dom.test.tsx`：改一处不保存按「继续」不问保存且服务器未变；点步条 ① 或侧栏才问；从「打印」点 ② 回来修改仍在；在「打印」页选机器不算修改
+- [x] T042 [US2] `editor-page.tsx`：顶栏改为一条步条；撤销/重做移入画布头部；底部动作条；移除打印机/参数选择器与「打印」按钮
 - [x] T043 [US2] 改写 `packages/web/tests/editor-back.dom.test.tsx`：返回入口只有符号（按可访问名定位）
 
 ## Phase 5: User Story 3 - 内容会被裁掉时被告知（P2）
@@ -88,6 +88,18 @@
 
 - [x] T080 [P] [US6] `packages/web/tests/labels-header.dom.test.tsx`：无「标签」标题；页头一行含队列状态与四个动作；分隔线在页头与画廊之间
 - [x] T081 [US6] `labels-page.tsx` 调整页头；改写 `gallery.dom.test.tsx` 中受影响的断言
+
+## Phase 10: 2026-09-22 的修订（图看过之后）
+
+- [x] T100 步条去掉返回箭头；第 ① 步即出口（`step-bar.tsx` 与四处测试）
+- [x] T101 「打印」页铺满宽度、分节标题内联；行表不折行（`row-browser.tsx` 的单元格加 `whitespace-nowrap`）
+- [x] T102 「一行都没选」只由行选择面板说一次，底条不再重复
+- [x] T103 从 git 历史取回 `use-label-preview.ts`；新建 `label-preview.tsx`：收起态一张大图 + 「第 N 张，共 M 张」，展开态每页十张、可翻页、被裁的自己标红；未绑数据源或只有一行时不给展开
+- [x] T104 「确认」页改为纸居中、五件事压成一条、合计靠右；去掉「按下之后就出纸了」
+- [x] T105 裁切那行红字不再声称张数（预检只检查设计本身）
+- [x] T106 在「打印」页选机器/参数不再把标签标成已修改（`applyProfileStock` 改为静默）
+- [x] T107 `confirm-step.dom.test.tsx` 补渲染、展开、渲染失败三组；新增 `flow-dirty.dom.test.tsx`
+- [x] T108 规格、plan、research、quickstart、design-consensus §6.4、CHANGELOG 按修订改写
 
 ## Phase 9: Polish & Cross-Cutting
 

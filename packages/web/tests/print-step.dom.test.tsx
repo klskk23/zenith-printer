@@ -123,8 +123,11 @@ describe('the foot of the page', () => {
   it('refuses while a bound label has no rows ticked', async () => {
     await open()
     fireEvent.click(within(printers()).getByRole('radio', { name: '前台机' }))
-    await waitFor(() => expect(document.querySelector('[data-blocked]')?.textContent).toBe(copy.rowSelection.none))
-    expect(continueButton().disabled).toBe(true)
+    await waitFor(() => expect(continueButton().disabled).toBe(true))
+    // Said once, by the row panel that owns the question — not again under
+    // the bar, where it would be the same sentence twice on one screen.
+    expect(document.querySelector('[data-selected-summary]')?.textContent).toBe(copy.rowSelection.none)
+    expect(document.querySelector('[data-blocked]')).toBeNull()
   })
 
   it('goes on once both are answered', async () => {

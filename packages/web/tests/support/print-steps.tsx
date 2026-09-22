@@ -93,6 +93,7 @@ export function renderConfirmStep(options: ConfirmStepHarness): void {
         dataSourceId={options.dataSourceId ?? null}
         selection={EMPTY}
         chosenRows={0}
+        rowOrdinals={[]}
         keyByOrdinal={new Map()}
         copies={options.copies ?? 1}
         tally={tally({ boundRows: null, chosenRows: 0, copies: options.copies ?? 1 })}

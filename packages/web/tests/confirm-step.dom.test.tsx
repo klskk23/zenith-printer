@@ -6,7 +6,7 @@
  * about to be cut off. Then the same page becomes the receipt, because the
  * job's number is worth keeping and a dialog that closes takes it away.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { copy } from '../src/i18n/index.ts'
 import { renderApp, stubApi, apiError } from './support/app.tsx'
@@ -67,6 +67,32 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
+/**
+ * Let `/api/preview` answer with an image.
+ *
+ * The shared stub speaks JSON, and a preview is a PNG the server rendered —
+ * so this wraps it for the one endpoint that returns bytes, and stands in for
+ * `URL.createObjectURL`, which happy-dom does not implement.
+ */
+function stubPreviewImages(): void {
+  const inner = globalThis.fetch as ReturnType<typeof vi.fn>
+  vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:label', revokeObjectURL: () => undefined })
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: string | URL, init?: RequestInit) => {
+      if (String(input).includes('/api/preview')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'image/png', 'X-Clipped': 'false' }),
+          blob: () => Promise.resolve(new Blob([new Uint8Array([1])], { type: 'image/png' })),
+        } as unknown as Response)
+      }
+      return inner(input, init) as Promise<Response>
+    }),
+  )
+}
+
 /** Walk in from the print step, the way anybody arrives here. */
 async function reachConfirm(): Promise<void> {
   renderApp('/labels/tpl-1/print')
@@ -88,9 +114,42 @@ describe('the summary', () => {
     expect(line(copy.presets.template)).toContain('40 × 20 mm')
     expect(line(copy.print.printer)).toContain('前台机')
     expect(line(copy.profiles.heading)).toContain('小卷')
+    // The rows and the copies share one fact, because they are one sum.
     expect(line(copy.dataSources.heading)).toContain('资产台账')
-    expect(line(copy.print.copiesPerRow)).toContain('1')
+    expect(line(copy.dataSources.heading)).toContain(copy.rowSelection.chosen(3))
+    expect(line(copy.dataSources.heading)).toContain(copy.print.copiesPerRow)
     expect(document.querySelector('[data-total]')?.textContent).toBe('3')
+  })
+
+  it('shows the label itself, rendered by the server', async () => {
+    // The page had five lines of text and a number on it and nothing showing
+    // what would come out of the machine.
+    stubPreviewImages()
+    await reachConfirm()
+    await waitFor(() => expect(document.querySelector('[data-sheet] img')).not.toBeNull())
+  })
+
+  it('says which sheet you are looking at', async () => {
+    stubPreviewImages()
+    await reachConfirm()
+    expect(document.querySelector('[data-sheet-caption]')?.textContent).toContain(copy.preview.sheet(1, 3))
+  })
+
+  it('offers to look at every chosen row, one label each', async () => {
+    // A barcode's width follows its content, so row 87 can overflow while row
+    // 1 is perfect. This is the only place to find that out before the roll.
+    stubPreviewImages()
+    await reachConfirm()
+    fireEvent.click(await screen.findByText(copy.preview.expandSheets(3)))
+    await waitFor(() => expect(document.querySelectorAll('[data-sheet]')).toHaveLength(3))
+    expect(document.querySelector('[data-sheet-count]')?.textContent).toBe(copy.preview.ofSheets(3, 3))
+  })
+
+  it('keeps printing available when a preview will not render', async () => {
+    // The preview is advisory; a failed render is not a reason to stop anybody.
+    await reachConfirm()
+    expect(await screen.findByText(copy.preview.failed)).toBeDefined()
+    expect((document.querySelector('[data-submit]') as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('says nothing about clipping when nothing will be clipped', async () => {
@@ -173,9 +232,10 @@ describe('submitting', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/labels/tpl-1/print'))
     const group = screen.getByRole('radiogroup', { name: copy.print.printer })
     expect(within(group).getByRole('radio', { name: '前台机' }).getAttribute('aria-checked')).toBe('true')
-    // The rows are cleared: a second batch is a new question.
+    // The rows are cleared: a second batch is a new question, and the row
+    // panel says so where the rows are.
     await waitFor(() =>
-      expect(document.querySelector('[data-blocked]')?.textContent).toBe(copy.rowSelection.none),
+      expect(document.querySelector('[data-selected-summary]')?.textContent).toBe(copy.rowSelection.none),
     )
   })
 })
