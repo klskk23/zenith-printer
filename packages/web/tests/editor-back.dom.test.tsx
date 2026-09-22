@@ -79,7 +79,7 @@ describe('the back button', () => {
     expect(elementsOnCanvas()).toBe(2)
     back()
     fireEvent.click(await screen.findByText(copy.workspace.leaveAnyway))
-    await screen.findByRole('heading', { name: copy.labels.heading })
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
 
     await openLabel('test')
     await waitFor(() => expect(elementsOnCanvas()).toBe(1))

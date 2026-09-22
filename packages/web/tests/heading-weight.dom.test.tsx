@@ -41,11 +41,19 @@ describe('heading weight', () => {
     expect(heading.className).not.toMatch(BOLD)
   })
 
-  it.each(['打印机', '打印队列', '打印历史', '设置', '标签'])('is never bold on the %s page', (label) => {
+  it.each(['打印机', '打印队列', '打印历史', '设置'])('is never bold on the %s page', (label) => {
     render(wrap(<App />))
     fireEvent.click(screen.getAllByText(label)[0]!)
     const bold = headings().filter((h) => BOLD.test(h.className))
     expect(bold.map((h) => `${h.tagName}: ${h.textContent}`)).toEqual([])
     expect(headings().length).toBeGreaterThan(0)
+  })
+
+  it('has no heading at all on the label gallery', () => {
+    // It is the one page that names itself in the step bar instead, so there
+    // is nothing here to be bold.
+    render(wrap(<App />))
+    fireEvent.click(screen.getAllByText('标签')[0]!)
+    expect(headings().filter((h) => BOLD.test(h.className))).toEqual([])
   })
 })

@@ -55,8 +55,9 @@ describe('the gallery', () => {
   it('is the home page and never counts', async () => {
     renderApp('/')
     await screen.findAllByText('货架标签')
-    const heading = screen.getByRole('heading', { name: copy.labels.heading })
-    expect(heading.textContent).toBe(copy.labels.heading)
+    // No title of its own — the step bar names this place — and no count
+    // beside it either: a number there invites comparing, not choosing.
+    expect(screen.queryByRole('heading', { name: copy.labels.heading })).toBeNull()
     expect(screen.queryByText(/^\d+$/)).toBeNull()
   })
 

@@ -367,6 +367,20 @@ export function EditorPage({ step, templateId, presetId }: EditorPageProps): Rea
           chosenRows,
           labels: counts.labels,
         })
+  /**
+   * Somebody opened the confirm address without anything to confirm — a
+   * bookmark, a refresh, a typed URL. Send them one step back rather than
+   * showing a summary of nothing; `replaceState` inside the workspace keeps
+   * this out of the history, so Back does not bounce.
+   */
+  useEffect(() => {
+    if (step === 'confirm' && blocked !== null && !printers.isPending) {
+      workspace.open({ ...address, kind: 'label-print' }, { replace: true })
+    }
+    // Deliberately narrow: this watches the guard's own conditions, not the
+    // address object it navigates with, which is rebuilt every render.
+  }, [step, blocked, printers.isPending])
+
   const steps = stepsFor({
     page: step === 'print' ? 'label-print' : step === 'confirm' ? 'label-confirm' : 'label',
     canSubmit: blocked === null,

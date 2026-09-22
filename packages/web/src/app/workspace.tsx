@@ -19,7 +19,7 @@ export interface WorkspaceApi {
    * request is held and the shell asks first. Everything that navigates goes
    * through here, so the question cannot be skipped.
    */
-  open: (descriptor: PageDescriptor) => void
+  open: (descriptor: PageDescriptor, options?: { replace?: boolean }) => void
   /** Whether the open page holds unsaved edits — see `hasUnsavedWork`. */
   setDirty: (dirty: boolean) => void
   /** A navigation held back by unsaved edits, waiting for an answer. */
@@ -43,7 +43,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   const stateRef = useRef(state)
   stateRef.current = state
 
-  const open = useCallback((descriptor: PageDescriptor) => {
+  /**
+   * Set when a page change is a correction rather than a move — a guard
+   * sending somebody back from an address that could not be served. Those
+   * must not leave a history entry, or Back lands on the address that
+   * redirected and redirects again.
+   */
+  const replaceNext = useRef(false)
+
+  const open = useCallback((descriptor: PageDescriptor, options?: { replace?: boolean }) => {
+    replaceNext.current = options?.replace === true
     // Stepping between a label's own steps is not leaving it: the session
     // stays mounted and the unsaved content goes along, which is the whole
     // point of printing what is on the canvas. Only walking out of the label
@@ -79,11 +88,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     if (current === path) {
       return
     }
-    if (isLegacyAddress(current)) {
+    if (isLegacyAddress(current) || replaceNext.current) {
       window.history.replaceState(null, '', path)
     } else {
       window.history.pushState(null, '', path)
     }
+    replaceNext.current = false
   }, [state.page])
 
   // Back and forward change the page.

@@ -14,7 +14,6 @@ import { useMemo, useState } from 'react'
 import { LayoutTemplate } from 'lucide-react'
 import { collectReferences } from '@zenith/shared'
 import { copy } from '../i18n/index.ts'
-import { PageHeader } from '../components/page-header.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { ConfirmButton } from '../components/ui/confirm-button.tsx'
 import { Input } from '../components/ui/input.tsx'
@@ -124,7 +123,16 @@ function Tile({ item }: { item: GalleryItem }): React.JSX.Element {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1" data-tile-actions>
+        {/* First, because it is what most days are for: this label, those
+            rows, that machine. Laying the label out is the rarer errand. */}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => open({ kind: 'label-print', templateId: item.key })}
+        >
+          {copy.flow.steps.print}
+        </Button>
         <Button size="sm" variant="ghost" onClick={() => setRenaming(item.name)}>
           {copy.templates.rename}
         </Button>
@@ -160,37 +168,39 @@ export function LabelsPage(): React.JSX.Element {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title={copy.labels.heading}
-        actions={
-          <>
-            <Input
+      {/*
+        No page title: the step bar above already says 「标签」, and a heading
+        repeating it is furniture. The line it occupied goes to the only thing
+        here that changes — the queue, and how the last print went.
+      */}
+      <div className="flex min-h-9 items-center gap-n3" data-labels-head>
+        <StatusStrip summary={summary} loading={jobs.isPending} />
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <Input
               className="max-w-56"
               value={query}
               placeholder={copy.labels.searchPlaceholder}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={(templates.data ?? []).length === 0}
-              onClick={() => void exportTemplates([], 'zenith-labels.json')}
-            >
-              {copy.templates.exportAll}
-            </Button>
-            <ImportTemplatesButton />
-            <Button size="sm" onClick={() => open({ kind: 'label', templateId: null })}>
-              {copy.labels.new}
-            </Button>
-          </>
-        }
-      />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={(templates.data ?? []).length === 0}
+            onClick={() => void exportTemplates([], 'zenith-labels.json')}
+          >
+            {copy.templates.exportAll}
+          </Button>
+          <ImportTemplatesButton />
+          <Button size="sm" onClick={() => open({ kind: 'label', templateId: null })}>
+            {copy.labels.new}
+          </Button>
+        </div>
+      </div>
 
-      {/* A rule between the page's head and its status line — fading at
-          the ends, so it reads as a pause rather than a box edge. */}
+      {/* A rule between the head and the labels — fading at the ends, so it
+          reads as a pause rather than a box edge. */}
       <Separator fade />
       <PausedQueueBanner />
-      <StatusStrip summary={summary} loading={jobs.isPending} />
 
       {templates.isPending && (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">

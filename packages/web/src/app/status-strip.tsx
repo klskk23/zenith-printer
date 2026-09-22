@@ -37,7 +37,9 @@ export function StatusStrip({ summary, loading = false }: StatusStripProps): Rea
   const { queue, lastPrint } = summary
   return (
     <div
-      className="flex flex-wrap items-center gap-x-n8 gap-y-n2 border-b border-border px-n8 py-n3 text-xs"
+      // No border or padding of its own any more: it sits inside the
+      // gallery's head, on the line the page title used to occupy.
+      className="flex flex-wrap items-center gap-x-n6 gap-y-n2 text-xs"
       data-status-strip
     >
       {queue !== null && (
