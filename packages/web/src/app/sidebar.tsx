@@ -6,8 +6,12 @@
  * The printers sit at its foot as one small line — a dot and a count — and
  * open on a click into what the service knows about each (probed or not, and
  * whether the model can report its stock). Three lines of printer detail
- * standing permanently in a 200px column read as clutter; one line that can
+ * standing permanently in a narrow column read as clutter; one line that can
  * be asked does not.
+ *
+ * The column is set loose on purpose: 240px wide, 14px labels, a breath of
+ * air between rows. Seven entries do not need to be packed; packed, they read
+ * as a list to scan rather than places to go.
  *
  * The order is the design's, not alphabetical: what people come here to do
  * (labels), what feeds it (data sources), what it goes to (printers), what
@@ -54,7 +58,7 @@ function PrinterLine({ printer }: { printer: PrinterStatus }): React.JSX.Element
         ? copy.status.remainingSupported
         : copy.status.remainingUnsupported
   return (
-    <li className="flex items-center gap-n2 text-2xs" data-printer-status={printer.id}>
+    <li className="flex items-center gap-n3 text-xs" data-printer-status={printer.id}>
       <Dot live={printer.probed && printer.queueState === 'running'} />
       <span className="truncate text-foreground">{printer.name}</span>
       <span className="ml-auto shrink-0 text-muted-foreground">{stock}</span>
@@ -82,18 +86,18 @@ function PrintersDisclosure({
         <Button
           variant="ghost"
           size="row"
-          className="justify-between rounded-sm px-n3 py-n2 text-2xs text-foreground/72 hover:bg-foreground/6 hover:text-foreground"
+          className="justify-between rounded-sm px-n4 py-n3 text-xs text-foreground/72 hover:bg-foreground/6 hover:text-foreground"
           disabled={loading}
           data-sidebar-printers
         >
-          <span className="flex items-center gap-n2">
+          <span className="flex items-center gap-n3">
             <Dot live={allLive} />
             <span>{loading ? '…' : copy.status.printersCount(printers.length)}</span>
           </span>
           <ChevronUp className="size-3 opacity-60" aria-hidden />
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" className="w-56" data-sidebar-printers-panel>
+      <PopoverContent side="top" align="start" className="w-60" data-sidebar-printers-panel>
         {printers.length === 0 ? (
           <span className="text-2xs text-muted-foreground">{copy.status.noPrinters}</span>
         ) : (
@@ -123,14 +127,17 @@ export function Sidebar({ pendingJobCount, printers, printersLoading, connection
         : copy.connection.disconnected
 
   return (
-    // Nocturne's compact scale for the shell: the rows sit at 5.6 / 8.4px.
-    <nav className="flex w-52 shrink-0 flex-col border-r border-border px-n3 py-n6" aria-label={copy.app.title}>
-      <div className="flex items-center gap-n3 px-n3 pb-n6 text-sm font-medium" data-brand>
-        <Printer className="size-4 shrink-0 text-primary" aria-hidden />
+    // Nocturne's compact scale for the shell, opened up: rows at 8.4 / 11.2px
+    // with 5.6px of air between them.
+    <nav className="flex w-60 shrink-0 flex-col border-r border-border px-n4 py-n6" aria-label={copy.app.title}>
+      <div className="flex items-center gap-n4 px-n2 pb-n8 text-base font-medium" data-brand>
+        <span className="grid size-8 shrink-0 place-items-center rounded-md border border-primary/45 text-primary">
+          <Printer className="size-4" aria-hidden />
+        </span>
         <span>{copy.app.title}</span>
       </div>
 
-      <ol className="flex flex-col gap-px">
+      <ol className="flex flex-col gap-n2">
         {SIDEBAR_KINDS.map((kind) => {
           const isActive = activeKind === kind
           const Icon = ICONS[kind]
@@ -142,7 +149,7 @@ export function Sidebar({ pendingJobCount, printers, printersLoading, connection
                 onClick={() => open({ kind })}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'justify-between rounded-sm px-n3 py-n2 text-xs',
+                  'justify-between rounded-sm px-n4 py-n3 text-sm',
                   // The active entry: accent text on an accent tint, with the
                   // accent as a line down its left edge — never a filled bar.
                   isActive
@@ -150,8 +157,8 @@ export function Sidebar({ pendingJobCount, printers, printersLoading, connection
                     : 'text-foreground/72 hover:bg-foreground/6 hover:text-foreground',
                 )}
               >
-                <span className="flex items-center gap-n3">
-                  <Icon className={cn('shrink-0', isActive ? 'opacity-100' : 'opacity-75')} aria-hidden />
+                <span className="flex items-center gap-n4">
+                  <Icon className={cn('size-4 shrink-0', isActive ? 'opacity-100' : 'opacity-75')} aria-hidden />
                   <span data-nav-label>{copy.workspace.pages[kind]}</span>
                 </span>
                 {kind === 'queue' && pendingJobCount > 0 && (
@@ -165,9 +172,9 @@ export function Sidebar({ pendingJobCount, printers, printersLoading, connection
 
       <div className="flex-1" />
 
-      <div className="flex flex-col gap-px">
+      <div className="flex flex-col gap-n1">
         <PrintersDisclosure printers={printers} loading={printersLoading} />
-        <div className="flex items-center gap-n2 px-n3 py-n2 text-2xs" data-connection>
+        <div className="flex items-center gap-n3 px-n4 py-n3 text-xs" data-connection>
           <Dot live={connection === 'connected'} />
           <span className={connection === 'disconnected' ? 'text-destructive' : 'text-muted-foreground'}>
             {connectionLabel}
