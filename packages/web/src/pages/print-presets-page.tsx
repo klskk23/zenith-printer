@@ -70,7 +70,6 @@ export function PrintPresetsPage(): React.JSX.Element {
     <div className="flex flex-col gap-3" data-print-presets>
       <PageHeader
         title={copy.presets.heading}
-        description={copy.presets.explain}
         actions={
           <Button size="sm" onClick={openCreate}>
             {copy.presets.addOpen}

@@ -13,6 +13,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
 import { openedOptions, selectedText } from './support/select.ts'
+import { copy } from '../src/i18n/index.ts'
 
 const CAPABILITIES = {
   dpi: 203,
@@ -234,8 +235,11 @@ describe('binarisation settings', () => {
   it('says what the cut-off costs, not just what it does', async () => {
     // Raising it rescues pale artwork and fattens every stroke on the label;
     // a control that mentions only the first invites people to raise it.
+    // The sentence is behind the field's 「?」 now — a standing paragraph under
+    // every field is how this form came to be mostly prose.
     await openForm()
-    expect(screen.getByText(/笔画都会变粗/)).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: copy.common.hintFor(copy.profiles.threshold) }))
+    expect(await screen.findByText(/笔画都会变粗/)).toBeDefined()
   })
 })
 

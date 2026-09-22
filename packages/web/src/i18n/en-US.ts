@@ -326,8 +326,6 @@ export const copy: Copy = {
   dataSources: {
     heading: 'Data sources',
     unsaved: 'Unsaved changes',
-    explain:
-      'A data source is one table. A design binds to one of them and references its columns as ${column} inside content.',
     empty: 'No data sources yet. Upload a CSV, or copy a block of cells from a spreadsheet and paste it in',
     emptyTitle: 'No data sources yet',
     emptyDetail: 'Upload a CSV, paste a block of cells from a spreadsheet, or link a Google Sheet',
@@ -386,7 +384,6 @@ export const copy: Copy = {
     beforePrintLabel: 'Refresh before printing',
     beforePrintNeedsKey: 'Needs a key column first',
     keyColumnLabel: 'Key column',
-    keyColumnHint: 'Which column identifies a row across a refresh, so that rows already chosen do not shift when the other system inserts or deletes.',
     refresh: 'Refresh',
     refreshing: 'Refreshing…',
     refreshTitle: 'Fetch this table from Google again',
@@ -401,6 +398,7 @@ export const copy: Copy = {
       `That table now has ${rows} rows, over the limit of ${limit}. The refresh was cancelled and the existing rows are untouched — it does not keep the first ${limit}, because then nobody would know the rest existed`,
     linkGoogle: 'Link a Google Sheet',
     googleNotConfigured: 'Whoever deploys this must configure a Google identity first; it cannot be set from here',
+    googleShareHint: 'Share the sheet with this address (viewer is enough); this machine cannot read it otherwise',
     googleShareWith: (email: string): string => `Share the spreadsheet with ${email} (Viewer is enough) so this machine can read it`,
     googleUrl: 'Spreadsheet link',
     googleUrlHint: 'Copy the full link from the spreadsheet address bar and paste it here',
@@ -418,7 +416,6 @@ export const copy: Copy = {
     uploadProgress: (done: number, total: number): string => `parsed ${done} of ${total} rows`,
     name: 'Name',
     rename: 'Rename',
-    renameHint: 'Renaming affects no references: designs bind by id, and column references use only the column name',
     columns: 'Columns',
     rowCount: (n: number): string => `${n} rows`,
     columnList: (names: string[]): string => names.join(', '),
@@ -445,7 +442,6 @@ export const copy: Copy = {
     replaceConfirm: 'Replace anyway',
     addRow: 'Add row',
     deleteRow: 'Delete this row',
-    pasteHint: 'Select a cell and press Ctrl+V to paste a block copied from a spreadsheet',
     pasteTooWide: (needed: number, available: number): string =>
       `The pasted block is ${needed} columns wide; only ${available} remain from here. Column names are reference names and cannot be conjured up — upload a CSV to add columns`,
     page: (page: number, total: number): string => `Page ${page} of ${total}`,
@@ -505,8 +501,6 @@ export const copy: Copy = {
   },
   pools: {
     heading: 'Sequence pools',
-    explain:
-      'A pool exists in its own right and can be shared between designs — a box label and a carton label running off one series of numbers. The current value is derived from what was printed, never stored separately.',
     empty: 'No pools yet. Create one, then pick it in a design\'s variables panel',
     name: 'Name',
     digits: 'Digits',
@@ -562,8 +556,6 @@ export const copy: Copy = {
     remove: 'Delete',
     confirmRemove: 'Delete this label? Printed history is unaffected.',
     name: 'Label name',
-    conflict:
-      'Someone else has changed this label. Reloading replaces your changes with the server\'s version; to keep yours, use "Save as" to make a new label.',
     boundKind: 'Printer kind',
     searchPlaceholder: 'Search label names',
     open: 'Open',
@@ -583,7 +575,6 @@ export const copy: Copy = {
     importCleanBody: 'Every reference resolved. Nothing needs your attention.',
     importWarningsBody: 'Every design was imported. These differ from the machine they came from and are worth checking:',
     rename: 'Rename',
-    renameHint: 'A label\'s name is for people. Nothing refers to a label by name, so renaming breaks nothing.',
     boundSource: (name: string): string => `Data source: ${name}`,
     boundSourceNone: 'No data source bound',
   },
@@ -621,8 +612,6 @@ export const copy: Copy = {
     pruneStrays: (count: number): string => `Also removed ${count} file(s) with no database row.`,
     pruneKept: (referenced: number, tooNew: number): string =>
       `Kept ${referenced} still in use and ${tooNew} uploaded less than 24 hours ago.`,
-    localOnlyHint:
-      'Another browser starts from the defaults — there are no accounts, so there is nobody to remember.',
   },
 
   offset: {
@@ -671,8 +660,6 @@ export const copy: Copy = {
     marginBottom: 'Bottom',
     marginLeft: 'Left',
     marginHint: 'Margins are advice; nothing stops you placing elements inside them.',
-    canvasFollowsProfile:
-      'Choosing these settings resizes the canvas to the stock. Existing elements stay where they are.',
     noProfileSelected: 'No print settings chosen, so no margins are shown.',
     density: 'Density',
     labelType: 'Media type',
@@ -703,8 +690,6 @@ export const copy: Copy = {
       `This run uses ${start} – ${end}, ${copies} numbers in total`,
     overflow: (end: number, max: number, digits: number): string =>
       `This run would reach ${end}, beyond the ${max} that ${digits} digits can express. Add digits, or start lower.`,
-    overrideHint:
-      'Continues from the last print by default; to reprint a spoiled batch, set the original start value',
     conflict: (start: string, suggested: string): string =>
       `Start ${start} is below the suggested ${suggested}; this range has been printed before. Fine when reprinting a spoiled batch, otherwise you will produce duplicates.`,
   },
@@ -780,13 +765,11 @@ export const copy: Copy = {
 
   presets: {
     heading: 'Print presets',
-    explain: 'A preset is a name over four decisions — which design, which printer, which settings, how many copies. Another system prints by handing over rows and this id, without knowing any of them; and any of them can be changed here without that system changing anything.',
     addHeading: 'New preset',
     add: 'Create',
     addOpen: 'New preset',
     edit: 'Edit',
     editHeading: 'Edit preset',
-    editExplain: 'All four take effect immediately for the other side, with nothing to change there — because the id stays the same.',
     save: 'Save',
     saveFailed: 'Could not save. The name may clash with another preset, or the design or printer named may be gone.',
     name: 'Name',
@@ -827,6 +810,9 @@ export const copy: Copy = {
     loading: 'Loading…',
     decrease: 'Decrease',
     increase: 'Increase',
+    copy: 'Copy',
+    copied: 'Copied',
+    hintFor: (what: string): string => `About ${what}`,
     retry: 'Retry',
     error: 'Something went wrong',
   },

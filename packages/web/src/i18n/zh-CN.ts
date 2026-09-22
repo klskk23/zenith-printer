@@ -338,7 +338,6 @@ export const copy = {
   dataSources: {
     heading: '数据源',
     unsaved: '有未保存的改动',
-    explain: '一个数据源就是一张表。标签绑定其中一张，内容里写 ${列名} 引用它的列。',
     empty: '还没有数据源。上传一份 CSV，或从表格软件里复制一片单元格粘贴进来',
     emptyTitle: '还没有数据源',
     emptyDetail: '上传一份 CSV、从表格软件里复制一片单元格粘贴进来，或者链接一张 Google 表格',
@@ -397,7 +396,6 @@ export const copy = {
     beforePrintLabel: '打印前先刷新一次',
     beforePrintNeedsKey: '需要先设置 key 列才能打开',
     keyColumnLabel: 'key 列',
-    keyColumnHint: '刷新前后用哪一列认出同一行。上游插入或删除行时，已勾选的行才不会错位。',
     refresh: '刷新',
     refreshing: '刷新中…',
     refreshTitle: '从 Google 重新取一遍这张表的内容',
@@ -412,6 +410,7 @@ export const copy = {
       `这张表现在有 ${rows} 行，超过了上限 ${limit} 行。本次刷新已取消，原有的行没有变动——不会只取前 ${limit} 行，因为那样多出来的行存在与否就没人知道了`,
     linkGoogle: '链接 Google 表格',
     googleNotConfigured: '需要部署方先配置 Google 访问身份，界面上无法设置',
+    googleShareHint: '把表格分享给这个地址（查看者即可），本机才读得到',
     googleShareWith: (email: string): string => `把表格分享给 ${email}（查看者即可），本机才读得到`,
     googleUrl: '表格链接',
     googleUrlHint: '在 Google 表格的地址栏复制完整链接，粘贴到这里',
@@ -429,7 +428,6 @@ export const copy = {
     uploadProgress: (done: number, total: number): string => `已解析 ${done} / ${total} 行`,
     name: '名称',
     rename: '改名',
-    renameHint: '改名不影响任何引用：标签按 id 绑定，列引用只用列名',
     columns: '列',
     rowCount: (n: number): string => `${n} 行`,
     columnList: (names: string[]): string => names.join('、'),
@@ -455,7 +453,6 @@ export const copy = {
     replaceConfirm: '仍然替换',
     addRow: '加一行',
     deleteRow: '删除此行',
-    pasteHint: '选中一格后按 Ctrl+V，可以直接粘贴从表格软件复制的区块',
     pasteTooWide: (needed: number, available: number): string =>
       `粘贴的区块有 ${needed} 列，从这里往右只剩 ${available} 列。列名是引用用的名字，不能凭空多出来——需要增列请重新上传 CSV`,
     page: (page: number, total: number): string => `第 ${page} 页 / 共 ${total} 页`,
@@ -514,7 +511,6 @@ export const copy = {
   },
   pools: {
     heading: '序号池',
-    explain: '序号池独立于标签存在，可以被多张标签共用——小盒标签与外箱标签走同一条流水就靠它。当前值由已打印的任务推导，不单独存储。',
     empty: '还没有序号池。建一个之后，在标签的变量面板里选它',
     name: '名称',
     digits: '位数',
@@ -569,7 +565,6 @@ export const copy = {
     remove: '删除',
     confirmRemove: '确定删除这张标签吗？已打印的历史记录不受影响。',
     name: '标签名称',
-    conflict: '这张标签已被其他人修改。重新载入会用服务器上的版本替换你的修改；要保留你的修改，用「另存为」存成新标签。',
     boundKind: '适用机型',
     searchPlaceholder: '搜索标签名称',
     open: '打开',
@@ -589,7 +584,6 @@ export const copy = {
     importCleanBody: '所有引用都对上了，没有需要处理的地方。',
     importWarningsBody: '标签已经全部导入。下面这些地方和原来的机器不一样，需要你确认：',
     rename: '改名',
-    renameHint: '名称只是给人看的，别处不会按名称引用这张标签，所以改名不会影响任何东西。',
     boundSource: (name: string): string => `数据源：${name}`,
     boundSourceNone: '未绑定数据源',
   },
@@ -628,7 +622,6 @@ export const copy = {
     pruneStrays: (count: number): string => `另清理了 ${count} 个没有数据库记录的文件。`,
     pruneKept: (referenced: number, tooNew: number): string =>
       `保留 ${referenced} 张仍被引用的图片，以及 ${tooNew} 张上传不足 24 小时的图片。`,
-    localOnlyHint: '换一个浏览器会回到默认值——系统没有账号，无法记住是谁。',
   },
 
   offset: {
@@ -681,7 +674,6 @@ export const copy = {
     marginBottom: '下',
     marginLeft: '左',
     marginHint: '边距只作提示，不阻止在其中放置元素。',
-    canvasFollowsProfile: '选择参数后画布尺寸会跟随纸张尺寸，已有元素位置不变。',
     noProfileSelected: '尚未选择打印参数，因此不显示边距。',
     density: '浓度',
     labelType: '介质类型',
@@ -710,7 +702,6 @@ export const copy = {
       `本次将消耗 ${start} – ${end}，共 ${copies} 个序号`,
     overflow: (end: number, max: number, digits: number): string =>
       `本次会递增到 ${end}，超出 ${digits} 位能表示的最大值 ${max}。请增加位数或调小起始值。`,
-    overrideHint: '默认从上次打印之后接续；如需重打报废批次，可改回原来的起始值',
     conflict: (start: string, suggested: string): string =>
       `起始值 ${start} 低于建议值 ${suggested}，这一段序号此前已经打印过。若是重打报废批次则属正常，否则会出现重复序号。`,
   },
@@ -792,7 +783,6 @@ export const copy = {
 
   presets: {
     heading: '打印预设',
-    explain: '预设是「用哪张标签、哪台打印机、哪套参数、打几份」的一个具名组合。外部系统只要拿着它的 id 把数据交过来，就能打印，不必知道这四件事——而这四件事随时可以在这里改，对面不用改任何东西。',
     addHeading: '新建预设',
     add: '新建',
     addOpen: '新建预设',
@@ -804,7 +794,6 @@ export const copy = {
      * down, and a preset that could change it would be a different preset
      * wearing the old one's name.
      */
-    editExplain: '这里改动的四件事对面立刻生效，且不用改任何东西——因为 id 不变。',
     save: '保存',
     saveFailed: '保存不了。名称可能和别的预设重复了，或者所选的标签、打印机已经不在。',
     name: '名称',
@@ -850,6 +839,9 @@ export const copy = {
     loading: '加载中…',
     decrease: '减少',
     increase: '增加',
+    copy: '复制',
+    copied: '已复制',
+    hintFor: (what: string): string => `${what}的说明`,
     retry: '重试',
     error: '操作失败',
   },

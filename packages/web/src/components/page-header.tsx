@@ -19,6 +19,14 @@ export interface PageHeaderProps {
   description?: string
   /** Buttons that act on the page as a whole, not on any one row. */
   actions?: React.ReactNode
+  /**
+   * A mark that belongs to the title itself — in practice the page's `?`.
+   *
+   * Beside the title rather than under it: the explanations that used to sit
+   * under a title were read once and then skipped forever, while taking a line
+   * of every page for good.
+   */
+  titleAdornment?: React.ReactNode
   /** Smaller treatment for section headings nested inside a page. */
   compact?: boolean
   className?: string
@@ -28,6 +36,7 @@ export function PageHeader({
   title,
   description,
   actions,
+  titleAdornment,
   compact = false,
   className,
 }: PageHeaderProps): React.JSX.Element {
@@ -39,9 +48,12 @@ export function PageHeader({
             fine cut short. */}
         {/* Weight 500, never bolder: hierarchy in this palette is size and
             space, and a bold heading on the dark ground reads as shouting. */}
-        <h2 className={cn('min-w-0 truncate font-medium', compact ? 'text-sm' : 'text-base')}>
-          {title}
-        </h2>
+        <div className="flex min-w-0 items-center gap-n2">
+          <h2 className={cn('min-w-0 truncate font-medium', compact ? 'text-sm' : 'text-base')}>
+            {title}
+          </h2>
+          {titleAdornment}
+        </div>
         {actions !== undefined && (
           <div className="flex shrink-0 items-center justify-end gap-2">{actions}</div>
         )}

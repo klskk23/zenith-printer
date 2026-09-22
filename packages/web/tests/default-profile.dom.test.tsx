@@ -11,6 +11,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
 import { selectedText } from './support/select.ts'
+import { copy } from '../src/i18n/index.ts'
 
 const PRINTER = {
   id: 'prn-1', name: 'B3S_P', kind: 'niimbot', transport: 'serial', address: '/dev/ttyACM0',
@@ -167,8 +168,9 @@ describe('the profile form', () => {
     expect(await screen.findAllByText('设为默认')).not.toHaveLength(0)
   })
 
-  it('explains what being the default does', async () => {
+  it('explains what being the default does, behind the field’s mark', async () => {
     await openProfileForm()
+    fireEvent.click(screen.getByRole('button', { name: copy.common.hintFor(copy.profiles.isDefault) }))
     expect(await screen.findAllByText(/自动选中/)).not.toHaveLength(0)
   })
 })

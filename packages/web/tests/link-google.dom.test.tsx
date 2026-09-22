@@ -90,9 +90,14 @@ async function ready(): Promise<void> {
       (screen.getByRole('button', { name: '链接 Google 表格' }) as HTMLButtonElement).disabled,
     ).toBe(status.configured !== true),
   )
-  await screen.findByText(
-    status.configured ? /把表格分享给/ : /部署方/,
-  )
+  // Configured: the address moved behind the title's mark, so the mark is the
+  // page's evidence that Google is set up. Not configured: the page says so in
+  // words, because there is nothing to put behind a mark.
+  if (status.configured) {
+    await waitFor(() => expect(document.querySelector('[data-value-hint]')).not.toBeNull())
+  } else {
+    await screen.findByText(/部署方/)
+  }
 }
 
 /** Walk the dialog as far as the preview step. */
@@ -114,11 +119,18 @@ describe('the entry point', () => {
     ).toBe(false)
   })
 
-  it('says which address a spreadsheet must be shared with', async () => {
-    // On the page, not only inside a failure message: it is the one thing
-    // somebody needs before they can use the feature at all.
+  it('says which address a spreadsheet must be shared with, one click away', async () => {
+    // Still on the page rather than only inside a failure message — it is the
+    // one thing somebody needs before they can use the feature at all — but
+    // behind the title's mark, where it can be copied instead of read aloud.
     await ready()
-    expect(screen.getByText(/zenith@example\.iam\.gserviceaccount\.com/)).toBeDefined()
+    fireEvent.click(document.querySelector('[data-value-hint]') as HTMLElement)
+    const value = await waitFor(() => {
+      const node = document.querySelector('[data-hint-value]')
+      expect(node).not.toBeNull()
+      return node!
+    })
+    expect(value.textContent).toMatch(/zenith@example\.iam\.gserviceaccount\.com/)
   })
 
   it('is disabled, and says why, when none is configured', async () => {

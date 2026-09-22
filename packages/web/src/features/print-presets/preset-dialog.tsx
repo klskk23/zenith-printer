@@ -33,7 +33,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -134,9 +133,6 @@ export function PresetDialog({
           <DialogTitle>
             {preset === undefined ? copy.presets.addHeading : copy.presets.editHeading}
           </DialogTitle>
-          <DialogDescription>
-            {preset === undefined ? copy.presets.explain : copy.presets.editExplain}
-          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">

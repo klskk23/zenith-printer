@@ -34,8 +34,6 @@ export function PoolsPanel(): React.JSX.Element {
         <CardTitle>{copy.pools.heading}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <p className="text-2xs text-muted-foreground">{copy.pools.explain}</p>
-
         {pools.data?.length === 0 && (
           <p className="text-2xs text-muted-foreground">{copy.pools.empty}</p>
         )}

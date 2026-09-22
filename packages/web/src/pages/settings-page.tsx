@@ -195,8 +195,6 @@ export function SettingsPage(): React.JSX.Element {
         {dirty && <span className="text-2xs text-muted-foreground">{copy.settings.unsaved}</span>}
       </div>
 
-      <p className="text-2xs text-muted-foreground">{copy.settings.localOnlyHint}</p>
-
       {/* A developer's page, kept out of the sidebar. Opens in its own window:
           it is a console, not a place to be while labels are being made. */}
       <div className="flex flex-col gap-n2 rounded-md border border-border px-3 py-3" data-api-docs-entry>

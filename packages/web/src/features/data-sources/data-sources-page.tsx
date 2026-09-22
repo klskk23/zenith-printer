@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { ConfirmButton } from '../../components/ui/confirm-button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { copy } from '../../i18n/index.ts'
+import { ValueHint } from '../../components/ui/hint.tsx'
 import { UploadDialog } from './upload-dialog.tsx'
 import { LinkGoogleDialog } from './link-google-dialog.tsx'
 import { ConnectNexusDialog } from './connect-nexus-dialog.tsx'
@@ -84,7 +85,21 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
     <div className="flex flex-col gap-3" data-data-sources-page>
       <PageHeader
         title={copy.dataSources.heading}
-        description={copy.dataSources.explain}
+        titleAdornment={
+          // The address to share a sheet with is the one thing on this page
+          // somebody has to carry away, so it is a panel with the text
+          // selectable and a copy button — not a tooltip, which cannot be
+          // selected and vanishes when the pointer leaves.
+          google.data?.configured === true && google.data.clientEmail !== null ? (
+            <ValueHint
+              label={copy.dataSources.heading}
+              value={google.data.clientEmail}
+              className="[&]:size-4"
+            >
+              {copy.dataSources.googleShareHint}
+            </ValueHint>
+          ) : undefined
+        }
         actions={
           <>
           {/*
@@ -130,13 +145,6 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
         }
       />
 
-      {/* Says which address to share with, so the answer is on the page rather
-          than only inside a failure message. */}
-      {google.data?.configured === true && google.data.clientEmail !== null && (
-        <p className="text-2xs text-muted-foreground" data-google-robot>
-          {copy.dataSources.googleShareWith(google.data.clientEmail)}
-        </p>
-      )}
       {google.data?.configured === false && (
         <p className="text-2xs text-muted-foreground">{copy.dataSources.googleNotConfigured}</p>
       )}
@@ -262,9 +270,6 @@ export function DataSourcesPage({ onOpen }: DataSourcesPageProps): React.JSX.Ele
                 {copy.dataSources.delete}
               </ConfirmButton>
             </div>
-            {renamingId === source.id && (
-              <p className="text-2xs text-muted-foreground">{copy.dataSources.renameHint}</p>
-            )}
           </CardContent>
         </Card>
       ))}

@@ -131,11 +131,14 @@ describe('renaming a template', () => {
     expect(patched).toHaveLength(0)
   })
 
-  it('explains that renaming breaks nothing, because that is the question', async () => {
+  it('does not lecture about what renaming does or does not break', async () => {
+    // It used to say "a label's name is for people; nothing refers to a label
+    // by name, so renaming breaks nothing" — a sentence about the schema,
+    // beside a field somebody is already typing into.
     render(wrap(<LabelsPage />))
     await screen.findByText('面单')
     fireEvent.click(screen.getByRole('button', { name: '改名' }))
-    expect(screen.getByText(/不会影响任何东西/)).toBeDefined()
+    expect(screen.queryByText(/不会影响任何东西/)).toBeNull()
   })
 })
 

@@ -96,7 +96,6 @@ function Tile({ item }: { item: GalleryItem }): React.JSX.Element {
             >
               {copy.common.save}
             </Button>
-            <span className="text-2xs text-muted-foreground">{copy.templates.renameHint}</span>
           </div>
         ) : (
           <button type="button" className="truncate text-left text-sm" onClick={openIt} aria-label={item.name}>

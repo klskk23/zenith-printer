@@ -17,6 +17,7 @@ import { useState } from 'react'
 import { ApiRequestError } from '../../api/client.ts'
 import type { Capabilities } from '../../api/types.ts'
 import { copy } from '../../i18n/index.ts'
+import { Hint } from '../../components/ui/hint.tsx'
 import { Alert } from '../../components/ui/alert.tsx'
 import { Button } from '../../components/ui/button.tsx'
 import { Checkbox } from '../../components/ui/checkbox.tsx'
@@ -143,7 +144,10 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             the preview had been told.
           */}
           <div className="flex flex-col gap-1">
-            <Label>{copy.profiles.threshold}</Label>
+            <Label className="flex items-center gap-n2">
+              {copy.profiles.threshold}
+              <Hint label={copy.profiles.threshold}>{copy.profiles.thresholdHint}</Hint>
+            </Label>
             <Input
               type="number"
               min={1}
@@ -156,7 +160,6 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                 })
               }
             />
-            <p className="text-2xs text-muted-foreground">{copy.profiles.thresholdHint}</p>
           </div>
 
           {/*
@@ -165,7 +168,10 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
             rough paper, and the same design is printed on both.
           */}
           <div className="flex flex-col gap-1">
-            <Label>{copy.profiles.halftone}</Label>
+            <Label className="flex items-center gap-n2">
+              {copy.profiles.halftone}
+              <Hint label={copy.profiles.halftone}>{copy.profiles.halftoneHint}</Hint>
+            </Label>
             <Select
               value={editing.halftone ?? 'none'}
               onValueChange={(value) => setDraft({ ...editing, halftone: value as Profile['halftone'] })}
@@ -181,7 +187,6 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-2xs text-muted-foreground">{copy.profiles.halftoneHint}</p>
           </div>
 
           {/* Stock dimensions. Choosing this profile sets the canvas to them,
@@ -210,7 +215,10 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
           </div>
 
           <div className="flex flex-col gap-1">
-            <Label>{copy.profiles.margins}</Label>
+            <Label className="flex items-center gap-n2">
+              {copy.profiles.margins}
+              <Hint label={copy.profiles.margins}>{copy.profiles.marginHint}</Hint>
+            </Label>
             <div className="grid grid-cols-4 gap-1.5">
               {MARGIN_KEYS.map((key) => (
                 <div key={key} className="flex flex-col gap-1">
@@ -239,7 +247,6 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
               {copy.profiles.marginLinked}
             </Button>
             {/* Said explicitly, because a shaded region normally means "no". */}
-            <p className="text-2xs text-muted-foreground">{copy.profiles.marginHint}</p>
           </div>
 
           {/*
@@ -255,8 +262,8 @@ export function ProfilesPanel({ printerId, capabilities }: ProfilesPanelProps): 
               onCheckedChange={(checked) => setDraft({ ...editing, isDefault: checked === true })}
             />
             {copy.profiles.isDefault}
+            <Hint label={copy.profiles.isDefault}>{copy.profiles.isDefaultHint}</Hint>
           </Label>
-          <p className="text-2xs text-muted-foreground">{copy.profiles.isDefaultHint}</p>
 
           <div className="flex gap-2">
             <Button
