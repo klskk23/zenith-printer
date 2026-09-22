@@ -83,7 +83,9 @@ function Card({
       data-chosen={chosen ? '' : undefined}
       onClick={onChoose}
       className={cn(
-        'flex min-w-0 flex-1 flex-col gap-n1 rounded-md border px-n4 py-n3 text-left',
+        // Grows to share the row, but never stretches to the full width on
+        // its own: a lone card as wide as the page reads as a banner.
+        'flex min-w-52 max-w-xs flex-1 flex-col gap-n1 rounded-md border px-n4 py-n3 text-left',
         'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
         chosen ? 'border-primary bg-primary/8' : 'border-border hover:border-foreground/30',
       )}

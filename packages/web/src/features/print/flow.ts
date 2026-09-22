@@ -182,8 +182,9 @@ export function clipSummary(input: {
           0,
           round1(input.labelWidthMm - dotsToMm(input.capabilities.printheadPixels, input.capabilities.dpi)),
         )
-  const affectedLabels = new Set(input.warnings.map((warning) => warning.rowIndex))
-  const overflowMm = input.warnings.reduce(
+  const warnings = input.warnings ?? []
+  const affectedLabels = new Set(warnings.map((warning) => warning.rowIndex))
+  const overflowMm = warnings.reduce(
     (worst, warning) => Math.max(worst, round1(warning.actualWidthMm - warning.availableWidthMm)),
     0,
   )

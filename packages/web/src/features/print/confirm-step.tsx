@@ -105,7 +105,11 @@ export function ConfirmStep(props: ConfirmStepProps): React.JSX.Element {
     })
       .then((response) => {
         if (!cancelled) {
-          setWarnings(response.warnings)
+          // A body without `warnings` is not an answer this page can read, and
+          // it must not take the page down on the way to finding that out:
+          // the preflight is advisory, and the print button is not its to
+          // disable.
+          setWarnings(response.warnings ?? [])
         }
       })
       .catch(() => undefined)

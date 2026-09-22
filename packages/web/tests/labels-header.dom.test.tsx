@@ -40,6 +40,16 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('the gallery head', () => {
+  it('stands on the first of the four steps', async () => {
+    renderApp('/')
+    await screen.findByText('种子路由器')
+    const bar = screen.getByRole('toolbar', { name: copy.flow.heading })
+    expect(bar.querySelectorAll('[data-step]')).toHaveLength(4)
+    expect(bar.querySelector('[data-state="current"]')?.getAttribute('data-step')).toBe('labels')
+    // Nowhere to go back to: this is the way out.
+    expect(bar.querySelector('[data-back]')).toBeNull()
+  })
+
   it('does not name itself twice', async () => {
     renderApp('/')
     await screen.findByText('种子路由器')

@@ -18,6 +18,8 @@ import { Button } from '../components/ui/button.tsx'
 import { ConfirmButton } from '../components/ui/confirm-button.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { Skeleton } from '../components/ui/skeleton.tsx'
+import { StepBar } from '../app/step-bar.tsx'
+import { stepsFor } from '../features/print/flow.ts'
 import { Separator } from '../components/ui/separator.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../components/ui/empty.tsx'
 import { useWorkspace } from '../app/workspace.tsx'
@@ -167,6 +169,13 @@ export function LabelsPage(): React.JSX.Element {
 
   return (
     <div className="flex flex-col gap-4">
+      {/*
+        The first of the four steps. It says where this is — which is why the
+        page carries no title of its own — and it does not hold anybody back:
+        every tile below offers both the editor and the print step.
+      */}
+      <StepBar steps={stepsFor({ page: 'labels', canSubmit: false })} onGo={() => undefined} />
+
       {/*
         No page title: the step bar above already says 「标签」, and a heading
         repeating it is furniture. The line it occupied goes to the only thing

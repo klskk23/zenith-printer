@@ -57,8 +57,12 @@ describe('the gallery', () => {
     await screen.findAllByText('货架标签')
     // No title of its own — the step bar names this place — and no count
     // beside it either: a number there invites comparing, not choosing.
+    // The step bar's own 1–4 are positions, not a tally, so look past it.
     expect(screen.queryByRole('heading', { name: copy.labels.heading })).toBeNull()
-    expect(screen.queryByText(/^\d+$/)).toBeNull()
+    const outsideTheBar = [...document.querySelectorAll('body *')].filter(
+      (node) => node.closest('[role="toolbar"]') === null && /^\d+$/.test(node.textContent ?? ''),
+    )
+    expect(outsideTheBar.map((node) => node.textContent)).toEqual([])
   })
 
   it('draws each label at its own proportions, clamped to the tile', async () => {

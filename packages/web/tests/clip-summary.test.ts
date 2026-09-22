@@ -64,4 +64,12 @@ describe('clipSummary', () => {
   it('does not invent an overflow for a label that just fits', () => {
     expect(clipSummary({ warnings: [], labelWidthMm: HEAD_MM, capabilities: CAPS })).toBeNull()
   })
+
+  it('survives a preflight body that carries no warnings at all', () => {
+    // The check is advisory; a reply this function cannot read must not be
+    // what stops somebody printing.
+    expect(
+      clipSummary({ warnings: undefined as never, labelWidthMm: HEAD_MM - 8, capabilities: CAPS }),
+    ).toBeNull()
+  })
 })
