@@ -684,7 +684,7 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
         role="toolbar"
         aria-label={copy.editor.heading}
         aria-orientation="horizontal"
-        className="flex flex-wrap items-end gap-3 border-b border-border pb-3"
+        className="flex flex-wrap items-center gap-3 border-b border-border pb-3"
       >
         {/* A courtesy: the sidebar's 「标签」 does the same, but the way
             back should be where the eye is. Goes through the workspace, so
@@ -717,8 +717,8 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
           "where is this going" sits in one place instead of at both ends of the
           bar.
         */}
-        <div className="ml-auto flex items-end gap-2">
-          <div className="flex items-end gap-1">
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
               size="icon"
               variant="outline"
@@ -743,30 +743,40 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
 
           <Separator orientation="vertical" className="h-9" />
 
-          <div className="flex flex-col gap-1">
-            <Label>{copy.print.printer}</Label>
-            <Select
-              value={printerId ?? NONE}
-              onValueChange={(value) => {
-                setPrinterId(value === NONE ? null : value)
-                // Cleared here; the effect below picks this printer's default
-                // once its profiles have loaded.
-                setProfileId(null)
-              }}
-            >
-              <SelectTrigger aria-label={copy.print.printer}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>—</SelectItem>
-                {printers.data?.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/*
+            No label above the box: the name goes *inside* it while nothing is
+            chosen, the way a search field names itself. Stacked labels made
+            these two controls two rows tall next to a bar of one-row buttons,
+            and the row read as uneven because of it. The accessible name stays
+            on the trigger, so nothing is lost by dropping the label.
+          */}
+          <Select
+            value={printerId ?? NONE}
+            onValueChange={(value) => {
+              setPrinterId(value === NONE ? null : value)
+              // Cleared here; the effect below picks this printer's default
+              // once its profiles have loaded.
+              setProfileId(null)
+            }}
+          >
+            <SelectTrigger aria-label={copy.print.printer} className="w-32">
+              <SelectValue>
+                {printer === null ? (
+                  <span className="text-muted-foreground">{copy.print.printer}</span>
+                ) : (
+                  printer.name
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>—</SelectItem>
+              {printers.data?.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {/*
             A profile is chosen here, not edited here: it belongs to the printer
@@ -774,30 +784,33 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
             canvas to that stock, because designing on a canvas that is not the
             paper produces a label nobody notices is wrong until it prints.
           */}
-          <div className="flex flex-col gap-1">
-            <Label>{copy.profiles.heading}</Label>
-            <Select
-              value={profileId ?? NONE}
-              disabled={printerId === null}
-              onValueChange={(value) => {
-                const id = value === NONE ? null : value
-                setProfileId(id)
-                applyProfileStock(profiles.data?.find((p) => p.id === id) ?? null)
-              }}
-            >
-              <SelectTrigger aria-label={copy.profiles.heading}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>—</SelectItem>
-                {profiles.data?.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Select
+            value={profileId ?? NONE}
+            disabled={printerId === null}
+            onValueChange={(value) => {
+              const id = value === NONE ? null : value
+              setProfileId(id)
+              applyProfileStock(profiles.data?.find((p) => p.id === id) ?? null)
+            }}
+          >
+            <SelectTrigger aria-label={copy.profiles.heading} className="w-40">
+              <SelectValue>
+                {profile === null ? (
+                  <span className="text-muted-foreground">{copy.profiles.heading}</span>
+                ) : (
+                  `${profile.name} · ${profile.labelWidthMm}×${profile.labelHeightMm}mm`
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>—</SelectItem>
+              {profiles.data?.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <Separator orientation="vertical" className="h-9" />
 
