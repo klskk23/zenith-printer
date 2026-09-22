@@ -124,25 +124,38 @@ function Tile({ item }: { item: GalleryItem }): React.JSX.Element {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1" data-tile-actions>
+      {/*
+        One line, in every language. Four English words at the button's usual
+        padding ran past the tile and wrapped 「Delete」 onto a line of its
+        own; inside a tile these read as links anyway, so the padding goes and
+        the row stays a row.
+      */}
+      <div className="flex items-center gap-n3 px-n1" data-tile-actions>
         {/* First, because it is what most days are for: this label, those
             rows, that machine. Laying the label out is the rarer errand. */}
         <Button
           size="sm"
           variant="ghost"
+          className="px-0"
           onClick={() => open({ kind: 'label-print', templateId: item.key })}
         >
           {copy.flow.steps.print}
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => setRenaming(item.name)}>
+        <Button size="sm" variant="ghost" className="px-0" onClick={() => setRenaming(item.name)}>
           {copy.templates.rename}
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => void exportTemplates([item.key], `${item.name}.json`)}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="px-0"
+          onClick={() => void exportTemplates([item.key], `${item.name}.json`)}
+        >
           {copy.templates.export}
         </Button>
         <ConfirmButton
           size="sm"
           variant="ghost"
+          className="px-0"
           title={copy.common.confirmTitle}
           description={copy.templates.confirmDelete}
           cancelLabel={copy.common.cancel}

@@ -33,10 +33,27 @@ const TEMPLATE = {
   createdAt: 'T', updatedAt: 'T', version: 1, hasThumbnail: false,
 }
 
+/** A label bound to a table, whose first row arrives after it opens. */
+const SOURCE = { id: 'ds-1', name: '资产台账', columns: ['sn'], rowCount: 2, createdAt: 'T', updatedAt: 'T', origin: null }
+const BOUND = {
+  ...TEMPLATE,
+  id: 'tpl-2',
+  dataSourceId: 'ds-1',
+  elements: [
+    {
+      id: 'b', type: 'barcode', xMm: 2, yMm: 2, widthMm: 40, heightMm: 12, rotation: 0,
+      symbology: 'code128', content: '${sn}', showText: true, moduleWidthDots: 2,
+    },
+  ],
+}
+
 beforeEach(() => {
   stubApi((url) => {
+    if (url.includes('/templates/tpl-2')) return BOUND
     if (url.includes('/templates/')) return TEMPLATE
-    if (url.endsWith('/templates')) return { templates: [TEMPLATE] }
+    if (url.endsWith('/templates')) return { templates: [TEMPLATE, BOUND] }
+    if (url.includes('/rows')) return { rows: [{ ordinal: 1, values: { sn: 'FW-002841-LONG-VALUE' } }], page: 1, pageSize: 1, total: 2 }
+    if (url.endsWith('/data-sources')) return { dataSources: [SOURCE] }
     if (url.includes('/profiles')) return { profiles: [PROFILE] }
     if (url.includes('/printers')) return { printers: [PRINTER] }
     if (url.includes('/print-jobs')) return { jobs: [] }
@@ -59,6 +76,23 @@ describe('choosing a machine', () => {
       expect(
         screen.getByRole('radio', { name: '小卷' }).getAttribute('aria-checked'),
       ).toBe('true'),
+    )
+
+    leaveToGallery()
+    expect(screen.queryByText(copy.workspace.leaveTitle)).toBeNull()
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
+  })
+})
+
+describe('opening a label bound to a table', () => {
+  it('is not unsaved work, however the boxes settle', async () => {
+    // The first row arrives after the label does and the barcode's frame
+    // follows its content. Nobody did that, so nobody should be asked about
+    // it on the way out.
+    renderApp('/labels/tpl-2')
+    await screen.findByLabelText('label canvas')
+    await waitFor(() =>
+      expect((screen.getByLabelText(copy.editor.canvasWidth) as HTMLInputElement).value).toBe('50'),
     )
 
     leaveToGallery()

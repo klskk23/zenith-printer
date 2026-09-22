@@ -114,6 +114,15 @@ describe('the foot of the page', () => {
     expect(bar!.contains(document.querySelector('[data-row-selection], table'))).toBe(false)
   })
 
+  it('leaves the stepping to its own two buttons', async () => {
+    // The browser draws a spinner inside a number field; beside a − and a +
+    // that is two pairs of arrows doing one job.
+    await open()
+    const field = screen.getByRole('spinbutton', { name: copy.print.copiesPerRow })
+    expect(field.className).toContain('[appearance:textfield]')
+    expect(field.className).toContain('[&::-webkit-inner-spin-button]:appearance-none')
+  })
+
   it('refuses to go on until a machine is chosen, and says why', async () => {
     await open()
     expect(continueButton().disabled).toBe(true)

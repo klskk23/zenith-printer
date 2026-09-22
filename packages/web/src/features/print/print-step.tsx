@@ -267,7 +267,10 @@ export function PrintStep(props: PrintStepProps): React.JSX.Element {
                 max={100}
                 value={props.copies}
                 onChange={(event) => props.onCopies(Math.max(1, Number(event.target.value) || 1))}
-                className="h-9 w-14 rounded-none border-x-0 text-center"
+                // No native spinner: the − and + beside it are the spinner,
+                // and the browser's own pair inside the field is a second set
+                // of arrows doing the same job half a centimetre away.
+                className="h-9 w-14 rounded-none border-x-0 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
               <Button
                 variant="outline"

@@ -91,6 +91,16 @@ describe('a label tile', () => {
     ])
   })
 
+  it('keeps its four actions on one line, whatever the language', async () => {
+    // 「Print Rename Export Delete」 at the button's usual padding ran past the
+    // tile and dropped 「Delete」 onto a line of its own.
+    const actions = (await tile()).querySelector('[data-tile-actions]')!
+    expect(actions.className).not.toContain('flex-wrap')
+    for (const button of actions.querySelectorAll('button')) {
+      expect(button.className, `${button.textContent} still carries padding`).toContain('px-0')
+    }
+  })
+
   it('goes straight to the print step, skipping the editor', async () => {
     const node = await tile()
     fireEvent.click(within(node).getByRole('button', { name: copy.flow.steps.print }))

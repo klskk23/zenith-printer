@@ -100,6 +100,10 @@
 - [x] T106 在「打印」页选机器/参数不再把标签标成已修改（`applyProfileStock` 改为静默）
 - [x] T107 `confirm-step.dom.test.tsx` 补渲染、展开、渲染失败三组；新增 `flow-dirty.dom.test.tsx`
 - [x] T108 规格、plan、research、quickstart、design-consensus §6.4、CHANGELOG 按修订改写
+- [x] T109 英文界面下瓦片的四个动作不再折行（去掉按钮左右内边距，画廊最小列宽 16rem → 18rem）
+- [x] T110 份数字段隐藏浏览器自带的上下箭头（`− / +` 已经是那对箭头）
+- [x] T111 撤销/重做与画布面板边缘留出间距
+- [x] T112 打开绑了数据源的标签不再被判为「有未保存的修改」：值到达后的自动重算改为静默，且「改过什么」改由撤销栈 + 变量 + 绑定三处共同判断
 
 ## Phase 9: Polish & Cross-Cutting
 

@@ -71,6 +71,12 @@ describe('the design step', () => {
     }
   })
 
+  it('keeps undo and redo off the panel edge', async () => {
+    await open()
+    const row = screen.getByRole('button', { name: copy.editor.undo }).parentElement!
+    expect(row.className).toContain('px-n3')
+  })
+
   it('offers saving and the way on, in that order', async () => {
     await open()
     const foot = screen.getByRole('toolbar', { name: copy.editor.heading })

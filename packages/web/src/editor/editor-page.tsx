@@ -326,15 +326,21 @@ export function EditorPage({ step, templateId, presetId }: EditorPageProps): Rea
    * points at. Without it the symbol redraws at its new size and its frame —
    * the thing that says whether it fits the label — stays where it was.
    *
-   * Folded into one undo entry via a fixed merge key, so typing into a
-   * constant's value field does not leave one entry per keystroke. Commits
-   * only when something actually moved; `refitReferences` returns the same
-   * object otherwise, which is what stops this from looping.
+   * Applied **quietly** — it never lands in the undo stack, and it never makes
+   * a label count as edited. Nobody did it: the box follows the content the
+   * way a shadow follows a hand. It used to commit, which meant that merely
+   * opening a label bound to a table made the first row arrive, resize a
+   * barcode's frame, and leave the page claiming unsaved work before anybody
+   * had touched anything — so the question on the way out was asked every
+   * single time, about nothing.
+   *
+   * What somebody actually changed is tracked elsewhere: elements by the undo
+   * stack, variables and the binding by comparison with the stored label.
    */
   useEffect(() => {
     setHistory((current) => {
       const next = refitReferences(current.present, values)
-      return next === current.present ? current : commit(current, next, 'values')
+      return next === current.present ? current : { ...current, present: next }
     })
   }, [values])
 
@@ -620,7 +626,20 @@ export function EditorPage({ step, templateId, presetId }: EditorPageProps): Rea
    * the browser's leave prompt — none of which did anything before, because
    * nothing ever set the flag.
    */
-  const isDirty = template === null ? ir.elements.length > 0 : history.past.length > 0
+  /**
+   * Whether leaving would lose something somebody did.
+   *
+   * Three sources, because three things are editable and only one of them is
+   * in the undo stack: the elements (history), the design's own variables, and
+   * which table it is bound to. An unsaved label is dirty as soon as it has
+   * anything on it.
+   */
+  const isDirty =
+    template === null
+      ? ir.elements.length > 0
+      : history.past.length > 0 ||
+        dataSourceId !== template.dataSourceId ||
+        JSON.stringify(variables) !== JSON.stringify(template.variables)
 
   /**
    * Report unsaved edits to the shell.
@@ -909,7 +928,9 @@ export function EditorPage({ step, templateId, presetId }: EditorPageProps): Rea
               bar was where every control lived; with printing gone from it,
               they can sit where the drawing is.
             */}
-            <div className="flex shrink-0 items-center gap-n2 border-b border-border pb-n2">
+            {/* Inset from the panel's edge: the buttons sat flush against the
+                divider on the left, which read as a rendering fault. */}
+            <div className="flex shrink-0 items-center gap-n2 border-b border-border px-n3 pb-n3 pt-n1">
               <Button
                 size="icon"
                 variant="outline"
