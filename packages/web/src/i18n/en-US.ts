@@ -269,6 +269,23 @@ export const copy: Copy = {
     ofRows: (shown: number, total: number): string => `${shown} shown, ${total} rows in all`,
   },
 
+  /**
+   * The four steps a label goes through. The bar says where you are; it does
+   * not hold anybody back — printing can be reached from the gallery directly.
+   */
+  flow: {
+    heading: 'Label workflow',
+    back: 'Back to labels',
+    next: 'Continue',
+    previous: 'Back',
+    steps: {
+      labels: 'Labels',
+      design: 'Design',
+      print: 'Print',
+      confirm: 'Confirm',
+    },
+  },
+
   print: {
     action: 'Print',
     heading: 'Confirm printing',
@@ -279,9 +296,28 @@ export const copy: Copy = {
     cancel: 'Cancel',
     submitting: 'Submitting…',
     queued: 'Added to the queue',
+    queuedCount: (labels: number): string => `Queued, ${labels} labels`,
+    sheets: 'labels',
+    seconds: (n: number): string => `about ${n}s`,
+    clipLine: (risk: { affected: number; overflowMm: number; beyondHeadMm: number; unprobed: boolean }): string =>
+      risk.unprobed
+        ? 'Nobody has probed this printer, so its printable width is unknown'
+        : [
+            risk.affected > 0 ? `${risk.affected} labels overflow by ${risk.overflowMm} mm` : '',
+            risk.beyondHeadMm > 0 ? `the label is ${risk.beyondHeadMm} mm wider than the head` : '',
+          ]
+            .filter((part) => part !== '')
+            .join('; ') + '; what sticks out will not be printed',
+    clipTerm: 'Clipping',
     queuedDetail: (jobId: string): string => `Job ${jobId}`,
     batchTooLarge: (labels: number, max: number): string =>
       `This batch is ${labels} labels, above the per-job limit of ${max}. Reduce the rows or copies and submit in several batches`,
+    needsPrinter: 'Choose a printer first',
+    tally: (labels: number, seconds: number): string => `${labels} labels · about ${seconds}s`,
+    copiesPerRow: 'Copies per row',
+    again: 'Print again',
+    toQueue: 'Print queue',
+    backToLabels: 'Back to labels',
     needsProbe: 'This printer has not been probed, so its printable area is unknown',
     headFigure: (labelMm: number, maxMm: number): string => `Label ${labelMm} mm wide; the head prints up to ${maxMm} mm`,
     headOverflow: (overMm: number): string => `${overMm} mm over; that part will not print`,
@@ -460,6 +496,7 @@ export const copy: Copy = {
     rangePlaceholder: 'e.g. 5-12',
     rangeApply: 'Apply',
     rangeInvalid: 'Cannot read that range. Write it as 5-12, or 5-12, 20',
+    chosen: (rows: number): string => `${rows} rows chosen`,
     selected: (rows: number, labels: number): string => `${rows} rows selected, ${labels} labels`,
     none: 'No rows selected. This design uses a data source, and each row is one label',
     widthNotChecked:
@@ -758,6 +795,7 @@ export const copy: Copy = {
     copies: 'Copies per row',
     profile: 'Print settings',
     profileDefault: "The printer's default",
+    profileDefaultDetail: 'Whatever the machine is set to',
     profileOf: (name: string): string => `Print settings: ${name}`,
     profileGone: 'Those print settings were deleted',
     copiesOf: (n: number): string => `${n} per row`,
@@ -787,6 +825,8 @@ export const copy: Copy = {
     confirm: 'Confirm',
     confirmTitle: 'Confirm this action?',
     loading: 'Loading…',
+    decrease: 'Decrease',
+    increase: 'Increase',
     retry: 'Retry',
     error: 'Something went wrong',
   },

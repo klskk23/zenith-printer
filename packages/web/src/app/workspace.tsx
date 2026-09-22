@@ -8,6 +8,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { copy } from '../i18n/index.ts'
 import { isLegacyAddress, pathForPage, type PageDescriptor } from './routes.ts'
+import { isLabelKind } from './routes.ts'
 import { hasUnsavedWork, markDirty, openPage, restoreFromPath, type WorkspaceState } from './workspace-state.ts'
 
 export interface WorkspaceApi {
@@ -43,7 +44,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   stateRef.current = state
 
   const open = useCallback((descriptor: PageDescriptor) => {
-    if (hasUnsavedWork(stateRef.current)) {
+    // Stepping between a label's own steps is not leaving it: the session
+    // stays mounted and the unsaved content goes along, which is the whole
+    // point of printing what is on the canvas. Only walking out of the label
+    // — the sidebar, the back symbol, closing the tab — risks losing it.
+    const stepping =
+      isLabelKind(descriptor.kind) &&
+      isLabelKind(stateRef.current.page.kind) &&
+      (descriptor.templateId ?? null) === (stateRef.current.page.templateId ?? null)
+    if (!stepping && hasUnsavedWork(stateRef.current)) {
       setPendingLeave(descriptor)
       return
     }

@@ -53,6 +53,8 @@ const ROWS = [
 const rowRequests: Array<{ page: number; pageSize: number; order: string }> = []
 /** Preview bodies the print dialog sent, so the boundary between the two is checkable. */
 const previews: Array<Record<string, unknown>> = []
+/** Bodies posted to `/print-jobs` — both the preflight and the real thing. */
+const jobs: Array<Record<string, unknown>> = []
 let saved: Array<Record<string, unknown>> = []
 let sources: Array<Record<string, unknown>> = []
 
@@ -69,6 +71,7 @@ afterEach(() => {
 beforeEach(() => {
   rowRequests.length = 0
   previews.length = 0
+  jobs.length = 0
   saved = []
   vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:p', revokeObjectURL: () => undefined })
   sources = [SOURCE]
@@ -116,6 +119,11 @@ beforeEach(() => {
       body = { profiles: [] }
     } else if (url.includes('/sequence-pools')) {
       body = { pools: [] }
+    } else if (url.includes('/print-jobs') && init?.method === 'POST') {
+      jobs.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+      body = url.includes('preflight')
+        ? { warnings: [] }
+        : { jobId: 'job-1', status: 'queued', printerId: 'prn-1', requestedCopies: 1 }
     } else if (url.includes('/print-jobs')) {
       body = { jobs: [], total: 0 }
     }
@@ -177,14 +185,25 @@ const pickRow = async (ordinal: number): Promise<void> => {
   fireEvent.click(await screen.findByRole('radio', { name: `行号 ${ordinal}` }))
 }
 
-/** Choose the printer — the print button stays disabled until one is — and open the dialog. */
-async function openPrintDialog(): Promise<void> {
-  // The option reads "name · 50×30mm", so matched loosely.
-  chooseOption(selectTrigger('打印机'), /B3S_P/)
-  await vi.waitFor(() =>
-    expect(screen.getByRole('button', { name: '打印' })).not.toHaveProperty('disabled', true),
-  )
-  fireEvent.click(screen.getByRole('button', { name: '打印' }))
+/**
+ * Walk from the design to a submitted job.
+ *
+ * There is no dialog any more: continue to the print step, choose the machine
+ * and the rows, continue again, confirm.
+ */
+async function submitPrint(): Promise<void> {
+  fireEvent.click(screen.getByText('继续'))
+  fireEvent.click(await screen.findByRole('radio', { name: 'B3S_P' }))
+  fireEvent.click(await screen.findByRole('button', { name: /^全选/ }))
+  await vi.waitFor(() => {
+    const go = screen.getAllByText('继续').at(-1)!.closest('button')!
+    expect(go.disabled).toBe(false)
+  })
+  fireEvent.click(screen.getAllByText('继续').at(-1)!)
+  // The sidebar carries the same word, so target the confirm step's own button.
+  await vi.waitFor(() => expect(document.querySelector('[data-submit]')).not.toBeNull())
+  fireEvent.click(document.querySelector('[data-submit]')!)
+  await vi.waitFor(() => expect(jobs.filter((job) => !('warnings' in job)).length).toBeGreaterThan(0))
 }
 
 describe('the row the canvas uses', () => {
@@ -292,13 +311,12 @@ describe('what it is not', () => {
 
 describe('the boundary with printing', () => {
   /**
-   * The canvas row must not follow the design into the print dialog.
+   * The canvas row must not follow the design into the batch.
    *
-   * It is a convenience for looking at a layout. Sent as variable values it
+   * It is a convenience for looking at a layout. Sent along with the job it
    * would pin every label in the batch to whichever row happened to be on
-   * screen when the dialog was opened — and it would do it silently, since a
-   * grid of identical labels captioned as different rows looks like a working
-   * feature.
+   * screen when printing was started — silently, since a stack of identical
+   * labels captioned as different rows looks like a working feature.
    */
   it('does not send the canvas row as the batch\'s values', async () => {
     openDesign()
@@ -306,24 +324,21 @@ describe('the boundary with printing', () => {
     await pickRow(3)
     await vi.waitFor(() => expect(canvasText()).toContain('一个名字很长的零件'))
 
-    await openPrintDialog()
+    await submitPrint()
 
-    await vi.waitFor(() => expect(previews.length).toBeGreaterThan(0))
-    const values = (previews[0]?.variableValues ?? {}) as Record<string, string>
-    expect(Object.keys(values)).not.toContain('名称')
-    expect(JSON.stringify(previews[0])).not.toContain('一个名字很长的零件')
+    const job = jobs.find((candidate) => 'rowSelection' in candidate)!
+    expect(Object.keys(job)).not.toContain('variableValues')
+    expect(JSON.stringify(job)).not.toContain('一个名字很长的零件')
   })
 
-  it('names the table instead, so the server resolves the row itself', async () => {
+  it('names the rows instead, so the server resolves each one itself', async () => {
     openDesign()
     await bindAndReference()
-    // Until the row lands the reference is unresolved, and an unresolved
-    // reference is exactly what stops a preview being asked for at all.
     await vi.waitFor(() => expect(canvasText()).toContain('垫片'))
-    await openPrintDialog()
+    await submitPrint()
 
-    await vi.waitFor(() => expect(previews.length).toBeGreaterThan(0))
-    expect(previews[0]).toMatchObject({ dataSourceId: 'ds-1' })
+    const job = jobs.find((candidate) => 'rowSelection' in candidate)!
+    expect(job.rowSelection).toEqual({ all: true })
   })
 })
 

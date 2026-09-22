@@ -13,7 +13,7 @@ import { DisconnectedBanner, type ConnectionState } from './app/status-bar.tsx'
 import { Sidebar } from './app/sidebar.tsx'
 import { summarize } from './app/status-summary.ts'
 import { WorkspaceProvider, useWorkspace } from './app/workspace.tsx'
-import type { PageDescriptor } from './app/routes.ts'
+import { stepOf, type PageDescriptor } from './app/routes.ts'
 import { EditorPage } from './editor/editor-page.tsx'
 import { PrintersPage } from './features/printers/printers-page.tsx'
 import { usePrinters } from './features/printers/hooks.ts'
@@ -72,9 +72,21 @@ function Page({ page }: { page: PageDescriptor }): React.JSX.Element {
     case 'labels':
       return <LabelsPage />
     case 'label':
-      // One editor instance across a save: the first save points the page at
-      // the new template id, and the editor carries on.
-      return <EditorPage key="label" templateId={page.templateId ?? null} presetId={page.presetId} />
+    case 'label-print':
+    case 'label-confirm':
+      // One instance across all three steps and across a save. The key never
+      // changes, so React keeps the component mounted: the content on the
+      // canvas, the undo stack, the chosen machine and the ticked rows survive
+      // stepping back and forth, and the first save simply points the page at
+      // the new template id.
+      return (
+        <EditorPage
+          key="label"
+          step={stepOf(page.kind) ?? 'design'}
+          templateId={page.templateId ?? null}
+          presetId={page.presetId}
+        />
+      )
     case 'data-sources':
       return <DataSourcesPageRoute />
     case 'data-source':

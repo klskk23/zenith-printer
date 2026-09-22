@@ -27,21 +27,40 @@ export const SIDEBAR_KINDS = [
 ] as const
 
 /**
- * Every page: the sidebar's, the two reached from a list (a label's editor
- * and a data source's editor both need a thing to open), and the API console.
+ * A label's three steps, in order.
+ *
+ * One label, three places to stand: lay it out, choose what to print, look
+ * once before the paper moves. They share a session — the content on the
+ * canvas, the machine, the chosen rows — so they are named as a group wherever
+ * that session is what matters (staying mounted, asking about unsaved work).
  */
-export const PAGE_KINDS = [...SIDEBAR_KINDS, 'label', 'data-source', 'api-docs'] as const
+export const LABEL_KINDS = ['label', 'label-print', 'label-confirm'] as const
+
+/**
+ * Every page: the sidebar's, a label's three steps, the data source editor
+ * (it needs a thing to open), and the API console.
+ */
+export const PAGE_KINDS = [...SIDEBAR_KINDS, ...LABEL_KINDS, 'data-source', 'api-docs'] as const
 
 export type PageKind = (typeof PAGE_KINDS)[number]
 
+export type LabelKind = (typeof LABEL_KINDS)[number]
+
+export const isLabelKind = (kind: PageKind): kind is LabelKind =>
+  (LABEL_KINDS as readonly string[]).includes(kind)
+
+/** Which step of a label an address names; `null` for pages that are not one. */
+export const stepOf = (kind: PageKind): 'design' | 'print' | 'confirm' | null =>
+  kind === 'label' ? 'design' : kind === 'label-print' ? 'print' : kind === 'label-confirm' ? 'confirm' : null
+
 export interface PageDescriptor {
   kind: PageKind
-  /** Labels only. `null` is a label not yet saved. */
+  /** A label's three steps. `null` is a label not yet saved. */
   templateId?: string | null
   /** Data source editor only. */
   dataSourceId?: string
   /**
-   * Labels only: a print preset to open with, from `?preset=`.
+   * A label's steps only: a print preset to open with, from `?preset=`.
    *
    * An initial value, not a page of its own: "take me there with the settings
    * already set". Once somebody changes any of them, the preset has had its say.
@@ -64,12 +83,13 @@ export function pathForPage(descriptor: PageDescriptor): string {
   if (descriptor.kind === 'data-source') {
     return `/data-sources/${descriptor.dataSourceId ?? ''}`
   }
-  if (descriptor.kind === 'label') {
+  if (isLabelKind(descriptor.kind)) {
     const id = descriptor.templateId
-    const path = id === null || id === undefined ? '/labels/new' : `/labels/${id}`
+    const base = id === null || id === undefined ? '/labels/new' : `/labels/${id}`
+    const step = descriptor.kind === 'label-print' ? '/print' : descriptor.kind === 'label-confirm' ? '/confirm' : ''
     return descriptor.presetId === undefined
-      ? path
-      : `${path}?preset=${encodeURIComponent(descriptor.presetId)}`
+      ? `${base}${step}`
+      : `${base}${step}?preset=${encodeURIComponent(descriptor.presetId)}`
   }
   return STATIC_PATHS[descriptor.kind]
 }
@@ -82,9 +102,11 @@ function split(address: string): { path: string; preset: string } {
   return { path, preset }
 }
 
-function label(templateId: string | null, preset: string): PageDescriptor {
-  return { kind: 'label', templateId, ...(preset === '' ? {} : { presetId: preset }) }
+function label(kind: LabelKind, templateId: string | null, preset: string): PageDescriptor {
+  return { kind, templateId, ...(preset === '' ? {} : { presetId: preset }) }
 }
+
+const STEP_KINDS: Record<string, LabelKind> = { print: 'label-print', confirm: 'label-confirm' }
 
 /**
  * `null` for an address this app does not serve — the caller decides what to do.
@@ -106,18 +128,31 @@ export function pageFromPath(address: string): PageDescriptor | null {
     return { kind: 'data-source', dataSourceId: source[1]! }
   }
 
-  // New form: /labels/:id, /labels/new
-  // Old form: /design/:id, /design, /design/new (and /design/new/<anything>)
+  // New form: /labels/:id, /labels/new, plus /print and /confirm under either.
+  // Old form: /design/:id, /design, /design/new (and /design/new/<anything>).
   const editor = /^\/(?:labels|design)(?:\/([^/]+))?(?:\/([^/]+))?$/.exec(path)
   if (editor !== null) {
     const id = editor[1]
+    const tail = editor[2]
     if (id === undefined || id === 'new') {
-      return label(null, preset)
+      // `/design/new/<draft id>` was an interim form; it is still a new label.
+      // `/labels/new/print` is a step, and an unsaved label can be printed —
+      // the job carries the content, not an id.
+      const step = tail === undefined ? undefined : STEP_KINDS[tail]
+      if (tail !== undefined && step === undefined) {
+        return path.startsWith('/design/') ? label('label', null, preset) : null
+      }
+      return label(step ?? 'label', null, preset)
     }
-    if (editor[2] !== undefined) {
-      return null
+    if (tail !== undefined) {
+      const step = STEP_KINDS[tail]
+      return step === undefined ? null : label(step, id, preset)
     }
-    return label(id, preset)
+    // The ledger's links carry `?preset=`, which says "the machine, the
+    // settings and the count are already chosen". That is the language of
+    // printing: send those to the print step rather than into the editor.
+    const wantsPrint = preset !== '' && path.startsWith('/design/')
+    return label(wantsPrint ? 'label-print' : 'label', id, preset)
   }
 
   if (path === '/templates') {

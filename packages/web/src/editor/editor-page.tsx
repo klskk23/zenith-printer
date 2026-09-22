@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LabelElement, LabelIR } from '@zenith/shared'
 
-import { ArrowLeft, Printer, Redo2, Undo2 } from 'lucide-react'
+import { Redo2, Undo2 } from 'lucide-react'
 import { copy } from '../i18n/index.ts'
 import { usePreferences } from '../features/preferences/context.tsx'
 import { Alert } from '../components/ui/alert.tsx'
@@ -25,9 +25,12 @@ import { Separator } from '../components/ui/separator.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs.tsx'
 import { Input } from '../components/ui/input.tsx'
 import { Label } from '../components/ui/label.tsx'
-import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select.tsx'
 import { usePrinters } from '../features/printers/hooks.ts'
-import { PrintDialog } from '../features/print/print-dialog.tsx'
+import { PrintStep } from '../features/print/print-step.tsx'
+import { ConfirmStep } from '../features/print/confirm-step.tsx'
+import { blockReason, stepsFor, tally } from '../features/print/flow.ts'
+import { EMPTY, selectedCount, type Selection } from '../features/print/selection.ts'
+import { StepBar } from '../app/step-bar.tsx'
 import { TemplateBar } from '../features/templates/template-bar.tsx'
 import { useProfiles } from '../features/profiles/hooks.ts'
 import { useTemplates, type Template } from '../features/templates/hooks.ts'
@@ -56,7 +59,14 @@ import { blockingViolations, inspect } from './guards.ts'
 type SidePanel = 'element' | 'variables'
 
 export interface EditorPageProps {
-  /** The workspace tab this editor lives in. */
+  /**
+   * Which of the label's three steps to show.
+   *
+   * One component across all three: the content on the canvas, the undo stack,
+   * the chosen machine and the ticked rows are this session's, and stepping is
+   * choosing which of them is on screen — not loading another page.
+   */
+  step: 'design' | 'print' | 'confirm'
   /** The saved label this page is for, if any. */
   templateId: string | null
   /**
@@ -69,12 +79,12 @@ export interface EditorPageProps {
   presetId?: string
 }
 
-export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX.Element {
+export function EditorPage({ step, templateId, presetId }: EditorPageProps): React.JSX.Element {
   const printers = usePrinters()
   const [printerId, setPrinterId] = useState<string | null>(null)
   const [profileId, setProfileId] = useState<string | null>(null)
   /** Copies the print dialog opens on; a preset may raise it above one. */
-  const [initialCopies, setInitialCopies] = useState(1)
+
   const presets = usePrintPresets()
   /**
    * What the link could not do, said out loud.
@@ -210,7 +220,18 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
     // is what they actually read, so it is `ir` that has to be listed.
     [doRedo, doUndo, selectedId, ir, clipboard],
   )
-  const [printOpen, setPrintOpen] = useState(false)
+  /**
+   * The print choices, held by the session rather than by the step that makes
+   * them: the confirm step reads them, and "print again" clears the rows while
+   * keeping the machine.
+   */
+  const [selection, setSelection] = useState<Selection>(EMPTY)
+  const [copies, setCopies] = useState(1)
+  /**
+   * Every row key this session has seen, by position. Accumulated here because
+   * the selection panel only ever holds the ten rows it is showing.
+   */
+  const [keyByOrdinal, setKeyByOrdinal] = useState<ReadonlyMap<number, string>>(new Map())
 
   const printer = printers.data?.find((p) => p.id === printerId) ?? null
   const limits = printer?.capabilities ?? null
@@ -320,6 +341,36 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
   const preview = useMemo(() => previewIr(ir, values), [ir, values])
   const drawn = preview.ir
   const blocking = blockingViolations(violations)
+
+  /**
+   * The three steps' shared arithmetic.
+   *
+   * `address` is this label's identity in the address bar; stepping keeps it
+   * so a link followed with `?preset=` still names the preset four steps in.
+   */
+  const address = {
+    templateId: template?.id ?? templateId,
+    ...(presetId === undefined ? {} : { presetId }),
+  }
+  const chosenRows = dataSourceId === null ? 0 : selectedCount(selection, rowCount)
+  const counts = tally({ boundRows: dataSourceId === null ? null : rowCount, chosenRows, copies })
+  const blocked =
+    // A design the machine cannot print at all — a canvas wider than the head,
+    // a barcode with no content — stops printing before any of the choices
+    // matter, and says so in the words the editor already uses for it.
+    blocking.length > 0
+      ? copy.violations[blocking[0]!.code](blocking[0]!.values ?? {})
+      : blockReason({
+          printer,
+          unresolved: preview.unresolved,
+          dataSourceId,
+          chosenRows,
+          labels: counts.labels,
+        })
+  const steps = stepsFor({
+    page: step === 'print' ? 'label-print' : step === 'confirm' ? 'label-confirm' : 'label',
+    canSubmit: blocked === null,
+  })
   const selected = ir.elements.find((element) => element.id === selectedId) ?? null
 
   const addElement = (type: ElementType): void => {
@@ -624,7 +675,7 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
       notices.push(copy.editor.preset.printerGone)
     }
 
-    setInitialCopies(preset.copies)
+    setCopies(preset.copies)
     setPresetNotices(notices.length > 0 ? notices : [copy.editor.preset.applied(preset.name)])
   }, [presetId, presets.isSuccess, presets.data, printers.isSuccess, printers.data, templateId, allTemplates.data])
 
@@ -669,164 +720,72 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
       onKeyDown={onKeyDown}
       tabIndex={-1}
     >
-      {/*
-        Said before anything else on the page: a draft that cannot be kept is
-        the one thing here that can cost an afternoon. Three parts, as every
-        error in this product has — what, why, what to do.
-      */}
-      {/*
-        Top bar, in two groups: what this design *is* on the left — which
-        template, and saving it — and everything about printing on the right.
-        They were interleaved before, so answering "where will this go" meant
-        reading across the whole bar.
-      */}
-      <div
-        role="toolbar"
-        aria-label={copy.editor.heading}
-        aria-orientation="horizontal"
-        className="flex flex-wrap items-center gap-3 border-b border-border pb-3"
-      >
-        {/* A courtesy: the sidebar's 「标签」 does the same, but the way
-            back should be where the eye is. Goes through the workspace, so
-            unsaved edits get their question. */}
-        <Button variant="ghost" size="sm" className="gap-1" onClick={() => workspace.open({ kind: 'labels' })} data-back>
-          <ArrowLeft />
-          {copy.editor.back}
-        </Button>
-        <TemplateBar
-          current={template}
-          buildBody={templateBody}
-          onSaved={(saved) => {
-            setTemplate(saved)
-            setVariables(saved.variables)
-            setDataSourceId(saved.dataSourceId)
-            // Nothing is unsaved any more; the page is now this label's page,
-            // so its address and any later save refer to the same thing.
-            setHistory(initUndo({ ...ir }))
-            workspace.setDirty(false)
-            if (templateId !== saved.id) {
-              workspace.open({ kind: 'label', templateId: saved.id })
-            }
+      <StepBar
+        steps={steps}
+        onGo={(id) => workspace.open({ ...address, kind: id === 'labels' ? 'labels' : id === 'design' ? 'label' : 'label-print' })}
+        onBack={() => workspace.open({ kind: 'labels' })}
+        context={
+          template === null ? copy.workspace.untitledDesign : `${template.name} · ${ir.widthMm}×${ir.heightMm} mm`
+        }
+      />
+
+      {step === 'print' ? (
+        <PrintStep
+          printers={printers.data ?? []}
+          printerId={printerId}
+          onPrinter={(id) => {
+            setPrinterId(id)
+            // Cleared here; the effect below picks this printer's default
+            // once its profiles have loaded.
+            setProfileId(null)
           }}
+          profiles={profiles.data ?? []}
+          profileId={profileId}
+          onProfile={(id) => {
+            setProfileId(id)
+            applyProfileStock(profiles.data?.find((candidate) => candidate.id === id) ?? null)
+          }}
+          dataSourceId={dataSourceId}
+          selection={selection}
+          onSelection={setSelection}
+          keyByOrdinal={keyByOrdinal}
+          onRowKeys={setKeyByOrdinal}
+          copies={copies}
+          onCopies={setCopies}
+          tally={counts}
+          blocked={blocked}
+          notices={presetNotices}
+          onContinue={() => workspace.open({ ...address, kind: 'label-confirm' })}
+          onBack={() => workspace.open({ ...address, kind: 'label' })}
         />
-
-        {/*
-          Everything about printing, grouped at the far end and fenced off from
-          the document controls on the left. The dropdowns choose what to print
-          on; the button prints. Putting them together means the whole answer to
-          "where is this going" sits in one place instead of at both ends of the
-          bar.
-        */}
-        <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="outline"
-              disabled={!canUndo(history)}
-              aria-label={copy.editor.undo}
-              title={copy.editor.undo}
-              onClick={doUndo}
-            >
-              <Undo2 />
-            </Button>
-            <Button
-              size="icon"
-              variant="outline"
-              disabled={!canRedo(history)}
-              aria-label={copy.editor.redo}
-              title={copy.editor.redo}
-              onClick={doRedo}
-            >
-              <Redo2 />
-            </Button>
-          </div>
-
-          <Separator orientation="vertical" className="h-9" />
-
-          {/*
-            No label above the box: the name goes *inside* it while nothing is
-            chosen, the way a search field names itself. Stacked labels made
-            these two controls two rows tall next to a bar of one-row buttons,
-            and the row read as uneven because of it. The accessible name stays
-            on the trigger, so nothing is lost by dropping the label.
-          */}
-          <Select
-            value={printerId ?? NONE}
-            onValueChange={(value) => {
-              setPrinterId(value === NONE ? null : value)
-              // Cleared here; the effect below picks this printer's default
-              // once its profiles have loaded.
-              setProfileId(null)
-            }}
-          >
-            <SelectTrigger aria-label={copy.print.printer} className="w-32">
-              <SelectValue>
-                {printer === null ? (
-                  <span className="text-muted-foreground">{copy.print.printer}</span>
-                ) : (
-                  printer.name
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>—</SelectItem>
-              {printers.data?.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/*
-            A profile is chosen here, not edited here: it belongs to the printer
-            and its settings live on the printer page. Choosing one resizes the
-            canvas to that stock, because designing on a canvas that is not the
-            paper produces a label nobody notices is wrong until it prints.
-          */}
-          <Select
-            value={profileId ?? NONE}
-            disabled={printerId === null}
-            onValueChange={(value) => {
-              const id = value === NONE ? null : value
-              setProfileId(id)
-              applyProfileStock(profiles.data?.find((p) => p.id === id) ?? null)
-            }}
-          >
-            <SelectTrigger aria-label={copy.profiles.heading} className="w-40">
-              <SelectValue>
-                {profile === null ? (
-                  <span className="text-muted-foreground">{copy.profiles.heading}</span>
-                ) : (
-                  `${profile.name} · ${profile.labelWidthMm}×${profile.labelHeightMm}mm`
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>—</SelectItem>
-              {profiles.data?.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name} · {p.labelWidthMm}×{p.labelHeightMm}mm
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Separator orientation="vertical" className="h-9" />
-
-          {/* Overflow warns but never blocks (FR-067); only faults that make
-              the job impossible disable this. */}
-          <Button
-            className="gap-1.5"
-            disabled={blocking.length > 0 || printerId === null}
-            onClick={() => setPrintOpen(true)}
-          >
-            <Printer />
-            {copy.print.action}
-          </Button>
-        </div>
-      </div>
-
+      ) : step === 'confirm' ? (
+        <ConfirmStep
+          ir={ir}
+          template={template}
+          templateId={template?.id ?? null}
+          printer={printer}
+          profile={profiles.data?.find((candidate) => candidate.id === profileId) ?? null}
+          profileId={profileId}
+          // The design's own variables only. `values` also carries the row the
+          // *canvas* is standing in for, and that row is a preview convenience.
+          variableValues={designValues(variables)}
+          dataSourceId={dataSourceId}
+          selection={selection}
+          chosenRows={chosenRows}
+          keyByOrdinal={keyByOrdinal}
+          copies={copies}
+          tally={counts}
+          blocked={blocked}
+          onBack={() => workspace.open({ ...address, kind: 'label-print' })}
+          onAgain={() => {
+            setSelection(EMPTY)
+            workspace.open({ ...address, kind: 'label-print' })
+          }}
+          onLabels={() => workspace.open({ kind: 'labels' })}
+          onQueue={() => workspace.open({ kind: 'queue' })}
+        />
+      ) : (
+        <>
       {/*
         Three resizable columns. Their useful widths depend on the label being
         worked on — many elements wants a taller layer list, a barcode-heavy
@@ -898,6 +857,35 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
           {/* The viewport owns its height, centring and scrolling; a second
               scroll container here would nest two scrollbars. */}
           <div className="flex h-full min-h-0 flex-col">
+            {/*
+              Undo and redo belong to the canvas, not to the page: they reverse
+              what was just done *here*. They sat in the top bar because the top
+              bar was where every control lived; with printing gone from it,
+              they can sit where the drawing is.
+            */}
+            <div className="flex shrink-0 items-center gap-n2 border-b border-border pb-n2">
+              <Button
+                size="icon"
+                variant="outline"
+                disabled={!canUndo(history)}
+                aria-label={copy.editor.undo}
+                title={copy.editor.undo}
+                onClick={doUndo}
+              >
+                <Undo2 />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                disabled={!canRedo(history)}
+                aria-label={copy.editor.redo}
+                title={copy.editor.redo}
+                onClick={doRedo}
+              >
+                <Redo2 />
+              </Button>
+
+            </div>
             <ElementContextMenu
               ir={ir}
               selectedId={selectedId}
@@ -1071,22 +1059,45 @@ export function EditorPage({ templateId, presetId }: EditorPageProps): React.JSX
         </div>
       )}
 
-      {printOpen && printer !== null && (
-        <PrintDialog
-          ir={ir}
-          templateId={template?.id ?? null}
-          profileId={profileId}
-          printer={printer}
-          // The design's own variables only. `values` also carries the row the
-          // *canvas* is standing in for, and that row is a preview convenience
-          // — sending it would pin every label in the batch to whichever row
-          // happened to be on screen when the dialog was opened.
-          variableValues={designValues(variables)}
-          unresolved={preview.unresolved}
-          dataSourceId={dataSourceId}
-          initialCopies={initialCopies}
-          onClose={() => setPrintOpen(false)}
+      {/*
+        The design step's own bar: what this label *is* (saving it) on the
+        left, and the way on to printing at the right. Everything about the
+        machine moved to the print step, where the question is actually asked.
+      */}
+      <div
+        role="toolbar"
+        aria-label={copy.editor.heading}
+        aria-orientation="horizontal"
+        className="flex shrink-0 items-center gap-n3 border-t border-border pt-3"
+      >
+        <TemplateBar
+          current={template}
+          buildBody={templateBody}
+          onSaved={(saved) => {
+            setTemplate(saved)
+            setVariables(saved.variables)
+            setDataSourceId(saved.dataSourceId)
+            // Nothing is unsaved any more; the page is now this label's page,
+            // so its address and any later save refer to the same thing.
+            setHistory(initUndo({ ...ir }))
+            workspace.setDirty(false)
+            if (templateId !== saved.id) {
+              workspace.open({ kind: 'label', templateId: saved.id })
+            }
+          }}
         />
+        <div className="ml-auto flex items-center gap-n4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => workspace.open({ ...address, kind: 'label-print' })}
+            data-continue
+          >
+            {copy.flow.next}
+          </Button>
+        </div>
+      </div>
+        </>
       )}
     </div>
   )

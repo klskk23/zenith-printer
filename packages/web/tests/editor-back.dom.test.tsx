@@ -23,8 +23,13 @@ const elementsOnCanvas = (): number => document.querySelectorAll('[data-label-ca
 const addText = (): void => {
   fireEvent.click(screen.getAllByText('文字')[0]!)
 }
+/**
+ * The way out is a symbol now, with no word beside it: the word said the same
+ * thing as the first step in the bar, an inch to its right. It is still named
+ * for anyone who cannot see it.
+ */
 const back = (): void => {
-  fireEvent.click(screen.getByText(copy.editor.back))
+  fireEvent.click(screen.getByRole('button', { name: copy.flow.back }))
 }
 
 beforeEach(() => {
@@ -43,8 +48,8 @@ describe('the back button', () => {
     renderApp('/')
     await openNewLabel()
     back()
-    expect(await screen.findByRole('heading', { name: copy.labels.heading })).toBeDefined()
-    expect(window.location.pathname).toBe('/')
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
+    expect(screen.getAllByText(copy.labels.new).length).toBeGreaterThan(0)
   })
 
   it('asks when there are unsaved edits', async () => {

@@ -4,10 +4,10 @@ import { StrictMode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RowSelectionPanel } from '../src/features/print/row-selection.tsx'
 import { EMPTY, type Selection } from '../src/features/print/selection.ts'
-import { PrintDialog } from '../src/features/print/print-dialog.tsx'
+import { renderPrintStep } from './support/print-steps.tsx'
 
 /**
- * Choosing rows in the print dialog.
+ * Choosing rows on the print step.
  *
  * The assertions that matter are about what the control *means*: a select-all
  * that quietly covers one page prints ten labels when somebody asked for two
@@ -215,23 +215,9 @@ describe('the first page, before anything is clicked', () => {
     queueState: 'running',
   }
 
-  const IR = { widthMm: 50, heightMm: 30, dpi: 203, elements: [] }
 
-  it('shows ten rows the moment the dialog opens', async () => {
-    render(
-      wrap(
-        <PrintDialog
-          ir={IR as never}
-          templateId="tpl-1"
-          profileId={null}
-          printer={PRINTER as never}
-          variableValues={{}}
-          unresolved={[]}
-          dataSourceId="ds-1"
-          onClose={() => undefined}
-        />,
-      ),
-    )
+  it('shows ten rows the moment the step opens', async () => {
+    renderPrintStep({ printers: [PRINTER], printerId: 'prn-1', dataSourceId: 'ds-1', boundRows: TOTAL })
 
     await screen.findByText('收件人1')
     // Header plus ten. One row here is the bug.
@@ -241,20 +227,7 @@ describe('the first page, before anything is clicked', () => {
   it('reads the table total without spending a row request on it', async () => {
     // The count is already on the data source; fetching a page to read it is
     // both a wasted request and what caused the collision.
-    render(
-      wrap(
-        <PrintDialog
-          ir={IR as never}
-          templateId="tpl-1"
-          profileId={null}
-          printer={PRINTER as never}
-          variableValues={{}}
-          unresolved={[]}
-          dataSourceId="ds-1"
-          onClose={() => undefined}
-        />,
-      ),
-    )
+    renderPrintStep({ printers: [PRINTER], printerId: 'prn-1', dataSourceId: 'ds-1', boundRows: TOTAL })
 
     await screen.findByText('收件人1')
     const sizes = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls

@@ -126,31 +126,42 @@ function land(address: string): void {
   render(wrap(<App />))
 }
 
-const selectValue = (label: string): string =>
-  screen.getByRole('combobox', { name: label }).textContent ?? ''
+/**
+ * What is chosen in a group of cards.
+ *
+ * The machine and its settings are cards on the print step now, not dropdowns
+ * on the editor's toolbar — the link lands where printing is decided.
+ */
+const chosen = (group: string): string =>
+  [...screen.getByRole('radiogroup', { name: group }).querySelectorAll('[role="radio"]')]
+    .find((card) => card.getAttribute('aria-checked') === 'true')?.textContent ?? ''
 
 describe('a link carrying a preset', () => {
-  it('opens the design the address names', async () => {
+  it('lands on the print step of the label the address names', async () => {
     land('/design/tpl-7?preset=pre-1')
-    expect(await screen.findByRole('toolbar', { name: '标签设计' })).toBeDefined()
+    expect(await screen.findByRole('radiogroup', { name: '打印机' })).toBeDefined()
+    await waitFor(() => expect(window.location.pathname).toBe('/labels/tpl-7/print'))
   })
 
   it('selects the printer the preset records, not the default', async () => {
     land('/design/tpl-7?preset=pre-1')
-    await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
+    await waitFor(() => expect(chosen('打印机')).toContain('仓库机'))
   })
 
   it('selects the print settings the preset records', async () => {
     // Not the printer's default profile, which the editor would otherwise
     // preselect the moment a printer is chosen.
     land('/design/tpl-7?preset=pre-1')
-    await waitFor(() => expect(selectValue('打印参数')).toContain('小卷'))
+    await waitFor(() => expect(chosen('打印参数')).toContain('小卷'))
   })
 
   it('takes the canvas to that stock, the same as choosing it by hand would', async () => {
     // A design laid out on a canvas that is not the paper prints wrong, and
-    // nobody notices until it does.
+    // nobody notices until it does. The canvas is a step back from where the
+    // link lands, so step back to look at it.
     land('/design/tpl-7?preset=pre-1')
+    await waitFor(() => expect(chosen('打印参数')).toContain('小卷'))
+    fireEvent.click(screen.getByRole('button', { name: /设计/ }))
     await waitFor(() =>
       expect((screen.getByLabelText('宽度') as HTMLInputElement).value).toBe('40'),
     )
@@ -166,7 +177,7 @@ describe('a link carrying a preset', () => {
     // The link means "take me there with the settings ready". Paper is a
     // decision made in front of the machine.
     land('/design/tpl-7?preset=pre-1')
-    await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
+    await waitFor(() => expect(chosen('打印机')).toContain('仓库机'))
     expect(screen.queryByText('确认打印')).toBeNull()
     const posted = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
       ([, init]) => (init as RequestInit | undefined)?.method === 'POST',
@@ -176,22 +187,16 @@ describe('a link carrying a preset', () => {
 
   it('keeps the preset in the address, so a refresh lands in the same place', async () => {
     land('/design/tpl-7?preset=pre-1')
-    await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
+    await waitFor(() => expect(chosen('打印机')).toContain('仓库机'))
     // The address is rewritten from the active tab on every switch; a preset
     // the tab did not keep would vanish on the first one.
-    expect(window.location.pathname + window.location.search).toBe('/labels/tpl-7?preset=pre-1')
+    expect(window.location.pathname + window.location.search).toBe('/labels/tpl-7/print?preset=pre-1')
   })
 
-  it('carries the copy count into the print dialog', async () => {
+  it('carries the copy count onto the print step', async () => {
     land('/design/tpl-7?preset=pre-1')
-    await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
-    // The toolbar's own print button, not the sidebar entries that share the
-    // word.
-    const toolbar = screen.getByRole('toolbar', { name: '标签设计' })
-    fireEvent.click(
-      [...toolbar.querySelectorAll('button')].find((b) => b.textContent?.trim() === '打印')!,
-    )
-    const copies = await screen.findByRole('spinbutton', { name: '份数' })
+    await waitFor(() => expect(chosen('打印机')).toContain('仓库机'))
+    const copies = await screen.findByRole('spinbutton', { name: '每行份数' })
     expect((copies as HTMLInputElement).value).toBe('3')
   })
 })
@@ -202,11 +207,13 @@ describe('the back button', () => {
     // preset would come back to a design whose settings had quietly gone to
     // default, with the link that set them nowhere in sight.
     land('/design/tpl-7?preset=pre-1')
-    await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
+    await waitFor(() => expect(chosen('打印机')).toContain('仓库机'))
 
     // Arriving by link is not editing: the preset's roll was applied
-    // quietly, so leaving asks nothing.
-    fireEvent.click(screen.getAllByText('打印机')[0]!)
+    // quietly, so leaving asks nothing. Leave through the sidebar's own
+    // entry — the print step shows the same word on its cards.
+    fireEvent.click(document.querySelector('nav [data-nav-label]')!.parentElement!.parentElement!)
+    fireEvent.click([...document.querySelectorAll('nav ol button')].find((b) => b.textContent === '打印机')!)
     expect(screen.queryByText('保留这些修改吗？')).toBeNull()
     await waitFor(() => expect(window.location.pathname).toBe('/printers'))
 
@@ -216,9 +223,9 @@ describe('the back button', () => {
     window.dispatchEvent(new PopStateEvent('popstate'))
 
     await waitFor(() =>
-      expect(window.location.pathname + window.location.search).toBe('/labels/tpl-7?preset=pre-1'),
+      expect(window.location.pathname + window.location.search).toBe('/labels/tpl-7/print?preset=pre-1'),
     )
-    expect(selectValue('打印机')).toContain('仓库机')
+    expect(chosen('打印机')).toContain('仓库机')
   })
 })
 
@@ -235,13 +242,10 @@ describe('once somebody has taken over', () => {
      * which is what actually happens while somebody has the tab open.
      */
     land('/design/tpl-7?preset=pre-1')
-    await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
+    await waitFor(() => expect(chosen('打印机')).toContain('仓库机'))
 
-    fireEvent.pointerDown(screen.getByRole('combobox', { name: '打印机' }), {
-      pointerType: 'mouse', button: 0,
-    })
-    fireEvent.click(await screen.findByRole('option', { name: /前台机/ }))
-    await waitFor(() => expect(selectValue('打印机')).toContain('前台机'))
+    fireEvent.click(screen.getByRole('radio', { name: '前台机' }))
+    await waitFor(() => expect(chosen('打印机')).toContain('前台机'))
 
     // Somebody edited a preset in another tab; every list comes back changed.
     presets = [{ ...PRESET, name: '改过的名字' }, { ...PRESET, id: 'pre-2', name: '另一个' }]
@@ -255,7 +259,7 @@ describe('once somebody has taken over', () => {
       ).toBeGreaterThan(1),
     )
 
-    expect(selectValue('打印机')).toContain('前台机')
+    expect(chosen('打印机')).toContain('前台机')
   })
 })
 
@@ -264,7 +268,8 @@ describe('when the preset cannot do what the link promised', () => {
     presets = []
     land('/design/tpl-7?preset=pre-1')
     expect(await screen.findByText(/预设不存在/)).toBeDefined()
-    expect(screen.getByRole('toolbar', { name: '标签设计' })).toBeDefined()
+    // The label still opens; only the settings are missing.
+    expect(screen.getByRole('radiogroup', { name: '打印机' })).toBeDefined()
   })
 
   it('does not fall back to a printer nobody chose', async () => {
@@ -273,8 +278,8 @@ describe('when the preset cannot do what the link promised', () => {
     presets = []
     land('/design/tpl-7?preset=pre-1')
     await screen.findByText(/预设不存在/)
-    expect(selectValue('打印机')).not.toContain('前台机')
-    expect(selectValue('打印机')).not.toContain('仓库机')
+    expect(chosen('打印机')).not.toContain('前台机')
+    expect(chosen('打印机')).not.toContain('仓库机')
   })
 
   it('says so when the preset names a deleted printer', async () => {
@@ -296,7 +301,7 @@ describe('when the preset cannot do what the link promised', () => {
     profiles = [PROFILES[0]!]
     presets = [{ ...PRESET, profileId: 'prf-gone' }]
     land('/design/tpl-7?preset=pre-1')
-    await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
+    await waitFor(() => expect(chosen('打印机')).toContain('仓库机'))
   })
 
   it('keeps the design the address named when the preset points at another', async () => {
@@ -306,7 +311,7 @@ describe('when the preset cannot do what the link promised', () => {
     presets = [{ ...PRESET, templateId: 'tpl-other' }]
     land('/design/tpl-7?preset=pre-1')
     expect(await screen.findByText(/指向的是另一张标签/)).toBeDefined()
-    await waitFor(() => expect(selectValue('打印机')).toContain('仓库机'))
+    await waitFor(() => expect(chosen('打印机')).toContain('仓库机'))
   })
 })
 
@@ -315,8 +320,8 @@ describe('the address the ledger hands out', () => {
     // docs/nexus-assets.md tells the asset ledger to link `/design/{id}?preset=`.
     // Those links are out in the world; a redesign does not get to break them.
     land('/design/tpl-7?preset=pre-1')
-    expect(await screen.findByRole('toolbar', { name: '标签设计' })).toBeDefined()
-    expect(window.location.pathname).toBe('/labels/tpl-7')
+    expect(await screen.findByRole('radiogroup', { name: '打印机' })).toBeDefined()
+    expect(window.location.pathname).toBe('/labels/tpl-7/print')
     expect(window.location.search).toBe('?preset=pre-1')
   })
 })

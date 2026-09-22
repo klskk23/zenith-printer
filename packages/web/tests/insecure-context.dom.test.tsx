@@ -5,16 +5,15 @@
  * part of the Web Crypto API there: `crypto.randomUUID()` and `crypto.subtle`
  * simply are not defined. `crypto.getRandomValues()` is not gated that way.
  *
- * This is not hypothetical. The print dialog minted its idempotency key with
+ * This is not hypothetical. The confirmation minted its idempotency key with
  * `crypto.randomUUID()` inside a `useMemo`, so on every machine except the
- * server's own the dialog threw before it rendered anything — three browsers
+ * server's own it threw before rendering anything — three browsers
  * open, two of them dead, and the one that worked was the one on localhost.
  * Every test passed throughout, because happy-dom defines the whole API.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { PrintDialog } from '../src/features/print/print-dialog.tsx'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { renderConfirmStep } from './support/print-steps.tsx'
 import { labelIrSchema } from '@zenith/shared'
 
 const CAPABILITIES = {
@@ -38,10 +37,6 @@ const IR = labelIrSchema.parse({
 /** The Idempotency-Key of every submitted job, in order. */
 const submitted: Array<string | null> = []
 
-function wrap(ui: React.ReactNode): React.JSX.Element {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false } } })
-  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>
-}
 
 afterEach(() => {
   cleanup()
@@ -98,7 +93,7 @@ describe('a page served over plain HTTP', () => {
 
   it('still opens the print dialog', () => {
     open()
-    expect(screen.getByRole('heading', { name: '确认打印' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: '确认' })).toBeDefined()
   })
 
   it('still sends an idempotency key with the job', async () => {
@@ -107,25 +102,12 @@ describe('a page served over plain HTTP', () => {
     // labels; a fix that rendered but sent nothing would have quietly removed
     // that protection on every machine except the server's own.
     open()
-    fireEvent.click(screen.getByRole('button', { name: '确认打印' }))
+    fireEvent.click(document.querySelector('[data-submit]')!)
     await vi.waitFor(() => expect(submitted).toHaveLength(1))
     expect(submitted[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
   })
 })
 
 function open(): void {
-  render(
-    wrap(
-      <PrintDialog
-        ir={IR}
-        templateId={null}
-        profileId="pro-1"
-        printer={PRINTER as never}
-        variableValues={{}}
-        unresolved={[]}
-        dataSourceId={null}
-        onClose={() => undefined}
-      />,
-    ),
-  )
+  renderConfirmStep({ ir: IR, printer: PRINTER, profileId: 'pro-1' })
 }

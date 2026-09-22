@@ -1,5 +1,5 @@
 /**
- * Refreshing from inside the print dialog.
+ * Refreshing from the print step.
  *
  * The trap this exists to prevent: a row selection is a set of ordinals, and a
  * refresh replaces the table. After that the numbers point at different rows,
@@ -8,10 +8,8 @@
  * customers get the wrong parcels.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { labelIrSchema } from '@zenith/shared'
-import { PrintDialog } from '../src/features/print/print-dialog.tsx'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { renderPrintStep } from './support/print-steps.tsx'
 
 const CAPABILITIES = {
   dpi: 203, printheadPixels: 576, densityMin: 1, densityMax: 5, densityDefault: 3,
@@ -25,11 +23,6 @@ const PRINTER = {
   lastProbedAt: 'T', createdAt: 'T', offsetXDots: 0, offsetYDots: 0,
 }
 
-const IR = labelIrSchema.parse({
-  widthMm: 50, heightMm: 30, dpi: 203,
-  elements: [{ id: 'r', type: 'rect', xMm: 2, yMm: 2, widthMm: 10, heightMm: 10, strokeWidthDots: 2 }],
-})
-
 const LINKED = {
   id: 'ds-1', name: '本月出货', columns: ['订单号'], rowCount: 5,
   sourceKind: 'google-sheets', spreadsheetId: 'sheet-1', spreadsheetTitle: '出货台账',
@@ -39,12 +32,6 @@ const LINKED = {
 let sourceKind = 'google-sheets'
 let refreshes: number
 
-function wrap(ui: React.ReactNode): React.JSX.Element {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, refetchInterval: false }, mutations: { retry: false } },
-  })
-  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>
-}
 
 const json = (body: unknown): Promise<Response> =>
   Promise.resolve({
@@ -88,23 +75,10 @@ afterEach(() => {
 })
 
 function open(): void {
-  render(
-    wrap(
-      <PrintDialog
-        ir={IR}
-        templateId="tpl-1"
-        profileId="pro-1"
-        printer={PRINTER as never}
-        variableValues={{}}
-        unresolved={[]}
-        dataSourceId="ds-1"
-        onClose={() => undefined}
-      />,
-    ),
-  )
+  renderPrintStep({ printers: [PRINTER], printerId: 'prn-1', dataSourceId: 'ds-1', boundRows: 5 })
 }
 
-describe('refreshing without leaving the print dialog', () => {
+describe('refreshing without leaving the print step', () => {
   it('offers the control for a linked table', async () => {
     open()
     expect(await screen.findByRole('button', { name: '刷新' })).toBeDefined()

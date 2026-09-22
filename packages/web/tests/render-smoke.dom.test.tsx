@@ -38,7 +38,7 @@ describe('the shell', () => {
 
   it('lands on the gallery', () => {
     renderApp('/')
-    expect(screen.getByRole('heading', { name: copy.labels.heading })).toBeDefined()
+    expect(screen.getAllByText(copy.labels.new).length).toBeGreaterThan(0)
   })
 
   it('has exactly the seven entries, in order', () => {
@@ -104,7 +104,8 @@ describe('the editor', () => {
   it('has a way back, and the sidebar is still there', async () => {
     renderApp('/')
     await openNewLabel()
-    expect(screen.getByText(copy.editor.back)).toBeDefined()
+    // A symbol, not a word: the word repeated the first step in the bar.
+    expect(screen.getByRole('button', { name: copy.flow.back })).toBeDefined()
     expect(document.querySelector('nav')).not.toBeNull()
   })
 })
@@ -121,11 +122,20 @@ describe('the editor top bar', () => {
     expect(bar.querySelector('[role="combobox"][aria-label="' + copy.templates.heading + '"]')).toBeNull()
   })
 
-  it('offers saving and printing, and ends with the print button', async () => {
+  it('offers saving, and ends with the way on to printing', async () => {
+    // Printing is a step of its own now; this bar hands over to it rather
+    // than opening a dialog on top of the design.
     const bar = await topBar()
     expect(screen.getAllByText(copy.templates.save).length).toBeGreaterThan(0)
     const buttons = [...bar.querySelectorAll('button')].map((b) => b.textContent?.trim() ?? '')
-    expect(buttons[buttons.length - 1]).toBe('打印')
+    expect(buttons[buttons.length - 1]).toBe(copy.flow.next)
+  })
+
+  it('leaves the machine and its settings to the print step', async () => {
+    const bar = await topBar()
+    for (const gone of [copy.print.printer, copy.profiles.heading]) {
+      expect(bar.querySelector(`[role="combobox"][aria-label="${gone}"]`)).toBeNull()
+    }
   })
 
   it('asks for a name when saving a new label', async () => {
@@ -150,7 +160,7 @@ describe('the zoom control', () => {
 describe('old addresses', () => {
   it('sends /templates to the gallery and rewrites the address', () => {
     renderApp('/templates')
-    expect(screen.getByRole('heading', { name: copy.labels.heading })).toBeDefined()
+    expect(screen.getAllByText(copy.labels.new).length).toBeGreaterThan(0)
     expect(window.location.pathname).toBe('/')
   })
 
@@ -164,9 +174,23 @@ describe('old addresses', () => {
     expect(() => renderApp('/api-docs')).not.toThrow()
   })
 
-  it('keeps the query when rewriting', () => {
+  it('sends a preset link to the print step, query intact', () => {
+    // A preset names the machine, the settings and the count: that is the
+    // language of printing, so the link lands where printing is decided.
     renderApp('/design/tpl-7?preset=pre-1')
-    expect(window.location.pathname).toBe('/labels/tpl-7')
+    expect(window.location.pathname).toBe('/labels/tpl-7/print')
     expect(window.location.search).toBe('?preset=pre-1')
+  })
+
+  it('sends a bare /design/{id} to the design step', () => {
+    renderApp('/design/tpl-7')
+    expect(window.location.pathname).toBe('/labels/tpl-7')
+  })
+
+  it('renders both new steps of a label', () => {
+    for (const address of ['/labels/new/print', '/labels/new/confirm']) {
+      expect(() => renderApp(address)).not.toThrow()
+      cleanup()
+    }
   })
 })

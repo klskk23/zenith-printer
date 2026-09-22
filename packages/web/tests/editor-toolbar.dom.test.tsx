@@ -1,17 +1,17 @@
 /**
- * The editor's top bar is one line.
+ * The design step's two bars.
  *
- * The printer and print-settings selects used to carry a stacked label above
- * them, which made those two controls two rows tall while everything beside
- * them — back, save, undo, print — was one. The row's height came from the
- * labels, so the bar read as uneven. The name now sits inside the box while
- * nothing is chosen, the way a search field names itself, and is replaced by
- * the choice once one is made.
+ * The top of the page is the step bar and nothing else: where you are, and the
+ * way out. Everything about a machine — which one, which settings — moved to
+ * the print step, where the question is actually being asked. What is left
+ * about *this label* sits at the foot: save it, save it as something else, or
+ * carry on to printing.
+ *
+ * Undo and redo went to the canvas, because that is what they reverse.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
 import { copy } from '../src/i18n/index.ts'
-import { chooseOption, openedOptions, selectedText } from './support/select.ts'
 import { openNewLabel, renderApp, stubApi } from './support/app.tsx'
 
 const PRINTER = {
@@ -25,16 +25,9 @@ const PRINTER = {
   createdAt: '2026-09-01T00:00:00.000Z', offsetXDots: 0, offsetYDots: 0,
 }
 
-const PROFILE = {
-  id: 'p-1', printerId: 'prn-1', name: '小卷', density: 3, labelType: 1,
-  labelWidthMm: 40, labelHeightMm: 20,
-  marginTopMm: 0, marginRightMm: 0, marginBottomMm: 0, marginLeftMm: 0,
-  isDefault: true, createdAt: '2026-09-01T00:00:00.000Z',
-}
-
 beforeEach(() => {
   stubApi((url) => {
-    if (url.includes('/profiles')) return { profiles: [PROFILE] }
+    if (url.includes('/profiles')) return { profiles: [] }
     if (url.includes('/printers')) return { printers: [PRINTER] }
     if (url.endsWith('/templates')) return { templates: [] }
     if (url.includes('/print-jobs')) return { jobs: [] }
@@ -44,65 +37,51 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-async function openToolbar(): Promise<HTMLElement> {
+async function open(): Promise<void> {
   renderApp('/')
   await openNewLabel()
-  return screen.getByRole('toolbar', { name: copy.editor.heading })
 }
 
-const printerSelect = (toolbar: HTMLElement): HTMLElement =>
-  within(toolbar).getByRole('combobox', { name: copy.print.printer })
-const settingsSelect = (toolbar: HTMLElement): HTMLElement =>
-  within(toolbar).getByRole('combobox', { name: copy.profiles.heading })
-
-describe('the editor toolbar', () => {
-  it('stacks no label above its controls', async () => {
-    const toolbar = await openToolbar()
-    // The labels are what made the row two lines tall. The selects keep their
-    // accessible name through `aria-label`, so nothing is lost by dropping them.
-    expect([...toolbar.querySelectorAll('label')]).toHaveLength(0)
+describe('the design step', () => {
+  it('has the step bar at the top and nothing else', async () => {
+    await open()
+    const bar = screen.getByRole('toolbar', { name: copy.flow.heading })
+    // The way out, four steps, and what this label is. No machine anywhere.
+    expect(bar.querySelector('[data-back]')).not.toBeNull()
+    expect(bar.querySelectorAll('[data-step]')).toHaveLength(4)
+    expect(bar.textContent).not.toContain(copy.print.printer)
   })
 
-  it('names the printer select inside the box while nothing is chosen', async () => {
-    const toolbar = await openToolbar()
-    expect(selectedText(printerSelect(toolbar))).toContain(copy.print.printer)
+  it('leaves the machine and its settings to the print step', async () => {
+    await open()
+    for (const gone of [copy.print.printer, copy.profiles.heading]) {
+      expect(screen.queryByRole('combobox', { name: gone })).toBeNull()
+    }
   })
 
-  it('names the print-settings select inside the box while nothing is chosen', async () => {
-    const toolbar = await openToolbar()
-    expect(selectedText(settingsSelect(toolbar))).toContain(copy.profiles.heading)
+  it('puts undo and redo with the drawing', async () => {
+    await open()
+    const foot = screen.getByRole('toolbar', { name: copy.editor.heading })
+    for (const name of [copy.editor.undo, copy.editor.redo]) {
+      const button = screen.getByRole('button', { name })
+      expect(button).toBeDefined()
+      // Not in the bar at the foot — beside the canvas.
+      expect(foot.contains(button)).toBe(false)
+    }
   })
 
-  it('shows the choice instead of the name once one is made', async () => {
-    const toolbar = await openToolbar()
-    const printer = printerSelect(toolbar)
-    await vi.waitFor(() => expect(openedOptions(printer).length).toBeGreaterThan(1))
-    chooseOption(printer, '前台机')
-
-    await vi.waitFor(() => expect(selectedText(printer)).toContain('前台机'))
-    expect(selectedText(printer)).not.toContain(copy.print.printer)
-    // The printer's default settings come with it, so that box fills in too.
-    await vi.waitFor(() => expect(selectedText(settingsSelect(toolbar))).toContain('小卷'))
+  it('offers saving and the way on, in that order', async () => {
+    await open()
+    const foot = screen.getByRole('toolbar', { name: copy.editor.heading })
+    const buttons = [...foot.querySelectorAll('button')].map((b) => b.textContent?.trim() ?? '')
+    expect(buttons).toContain(copy.templates.save)
+    expect(buttons[buttons.length - 1]).toBe(copy.flow.next)
   })
 
-  it('takes the name back when the choice is cleared', async () => {
-    const toolbar = await openToolbar()
-    const printer = printerSelect(toolbar)
-    await vi.waitFor(() => expect(openedOptions(printer).length).toBeGreaterThan(1))
-    chooseOption(printer, '前台机')
-    await vi.waitFor(() => expect(selectedText(printer)).toContain('前台机'))
-
-    // Clearing is still offered: the box is a choice, not a commitment.
-    chooseOption(printer, '—')
-    await vi.waitFor(() => expect(selectedText(printer)).toContain(copy.print.printer))
-  })
-
-  it('keeps the print button on the same line as the selects', async () => {
-    // The complaint that started this: the row looked uneven because two of
-    // its controls were taller than the rest. Every direct child of the
-    // printing group is now the same height as the selects.
-    const toolbar = await openToolbar()
-    const group = printerSelect(toolbar).parentElement!
-    expect(group.className).not.toContain('flex-col')
+  it('reaches the print step from that bar', async () => {
+    await open()
+    const foot = screen.getByRole('toolbar', { name: copy.editor.heading })
+    within(foot).getByText(copy.flow.next).click()
+    expect(await screen.findByRole('radiogroup', { name: copy.print.printer })).toBeDefined()
   })
 })

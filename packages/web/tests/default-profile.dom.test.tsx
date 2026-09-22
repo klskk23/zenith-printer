@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from '../src/App.tsx'
-import { chooseOption, openedOptions, selectedText } from './support/select.ts'
+import { selectedText } from './support/select.ts'
 
 const PRINTER = {
   id: 'prn-1', name: 'B3S_P', kind: 'niimbot', transport: 'serial', address: '/dev/ttyACM0',
@@ -58,10 +58,15 @@ beforeEach(() => {
   }))
 })
 
-async function openDesign(): Promise<HTMLElement> {
+/**
+ * The machine is chosen on the print step now, not on the editor's toolbar.
+ * Getting there is two clicks: new label, then continue.
+ */
+async function openPrintStep(): Promise<HTMLElement> {
   render(wrap(<App />))
   fireEvent.click(screen.getAllByText('新建标签')[0]!)
-  return screen.getByRole('toolbar', { name: '标签设计' })
+  fireEvent.click(await screen.findByText('继续'))
+  return screen.getByRole('radiogroup', { name: '打印机' })
 }
 
 /**
@@ -71,11 +76,10 @@ async function openDesign(): Promise<HTMLElement> {
  * option yet — and it does so silently, which is why the first version of this
  * test reported an empty selector rather than a missing one.
  */
-async function chooseFirstPrinter(toolbar: HTMLElement): Promise<void> {
-  const printer = selectByLabel(toolbar, '打印机')
-  await vi.waitFor(() => expect(openedOptions(printer).length).toBeGreaterThan(1))
-  chooseOption(printer, 'B3S_P')
-  await vi.waitFor(() => expect(selectedText(printer)).toContain('B3S_P'))
+async function chooseFirstPrinter(group: HTMLElement): Promise<void> {
+  const card = await vi.waitFor(() => within(group).getByRole('radio', { name: 'B3S_P' }))
+  fireEvent.click(card)
+  await vi.waitFor(() => expect(card.getAttribute('aria-checked')).toBe('true'))
 }
 
 /** The canvas width field in the left column. */
@@ -85,19 +89,20 @@ function canvasWidth(): HTMLInputElement {
   return label!.parentElement!.querySelector('input') as HTMLInputElement
 }
 
-/** The select carrying a given accessible name. */
-function selectByLabel(toolbar: HTMLElement, label: string): HTMLElement {
-  return within(toolbar).getByRole('combobox', { name: label })
+/** The chosen card in a group of them, by its visible title. */
+function chosenIn(name: string): string {
+  const group = screen.getByRole('radiogroup', { name })
+  return [...group.querySelectorAll('[role="radio"]')]
+    .find((card) => card.getAttribute('aria-checked') === 'true')?.textContent ?? ''
 }
 
-describe('choosing a printer in the editor', () => {
+describe('choosing a printer on the print step', () => {
   it('preselects that printer’s default profile', async () => {
-    const toolbar = await openDesign()
-    await chooseFirstPrinter(toolbar)
+    const group = await openPrintStep()
+    await chooseFirstPrinter(group)
 
-    const profile = selectByLabel(toolbar, '打印参数')
     // Not the first in the list — the one marked default.
-    await vi.waitFor(() => expect(selectedText(profile)).toContain('原厂 50×30'))
+    await vi.waitFor(() => expect(chosenIn('打印参数')).toContain('原厂 50×30'))
   })
 
   /**
@@ -109,27 +114,25 @@ describe('choosing a printer in the editor', () => {
    * without the linkage existing at all.
    */
   it('sizes the canvas to the chosen profile’s stock', async () => {
-    const toolbar = await openDesign()
-    await chooseFirstPrinter(toolbar)
+    const group = await openPrintStep()
+    await chooseFirstPrinter(group)
+    await vi.waitFor(() => expect(chosenIn('打印参数')).toContain('原厂 50×30'))
 
-    const profile = selectByLabel(toolbar, '打印参数')
-    await vi.waitFor(() => expect(selectedText(profile)).toContain('原厂 50×30'))
+    fireEvent.click(screen.getByRole('radio', { name: '第三方 40×20' }))
 
-    chooseOption(profile, /^第三方 40×20/)
-
+    // The canvas is on the previous step; step back to see it.
+    fireEvent.click(screen.getByRole('button', { name: /设计/ }))
     await vi.waitFor(() => expect(Number(canvasWidth().value)).toBe(40))
   })
 
   it('does not override a profile the user chose', async () => {
-    const toolbar = await openDesign()
-    await chooseFirstPrinter(toolbar)
+    const group = await openPrintStep()
+    await chooseFirstPrinter(group)
+    await vi.waitFor(() => expect(chosenIn('打印参数')).toContain('原厂 50×30'))
 
-    const profile = selectByLabel(toolbar, '打印参数')
-    await vi.waitFor(() => expect(selectedText(profile)).toContain('原厂 50×30'))
-
-    chooseOption(profile, /^第三方 40×20/)
+    fireEvent.click(screen.getByRole('radio', { name: '第三方 40×20' }))
     // Refetching must not reselect the default over a deliberate choice.
-    await vi.waitFor(() => expect(selectedText(profile)).toContain('第三方 40×20'))
+    await vi.waitFor(() => expect(chosenIn('打印参数')).toContain('第三方 40×20'))
   })
 })
 

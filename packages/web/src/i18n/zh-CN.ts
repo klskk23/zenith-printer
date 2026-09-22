@@ -280,6 +280,23 @@ export const copy = {
     ofRows: (shown: number, total: number): string => `本页 ${shown} 张，共 ${total} 行`,
   },
 
+  /**
+   * The four steps a label goes through. The bar says where you are; it does
+   * not hold anybody back — printing can be reached from the gallery directly.
+   */
+  flow: {
+    heading: '标签工作流',
+    back: '返回标签',
+    next: '继续',
+    previous: '上一步',
+    steps: {
+      labels: '标签',
+      design: '设计',
+      print: '打印',
+      confirm: '确认',
+    },
+  },
+
   print: {
     action: '打印',
     heading: '确认打印',
@@ -291,9 +308,28 @@ export const copy = {
     cancel: '取消',
     submitting: '正在提交…',
     queued: '已加入队列',
+    queuedCount: (labels: number): string => `已加入队列，${labels} 张`,
+    sheets: '张',
+    seconds: (n: number): string => `约 ${n} 秒`,
+    clipLine: (risk: { affected: number; overflowMm: number; beyondHeadMm: number; unprobed: boolean }): string =>
+      risk.unprobed
+        ? '这台打印机还没探测过，无法判断能打多宽'
+        : [
+            risk.affected > 0 ? `${risk.affected} 张里有内容超出标签 ${risk.overflowMm} mm` : '',
+            risk.beyondHeadMm > 0 ? `标签比打印头宽 ${risk.beyondHeadMm} mm` : '',
+          ]
+            .filter((part) => part !== '')
+            .join('；') + '，超出部分不会被打印',
+    clipTerm: '裁切',
     queuedDetail: (jobId: string): string => `任务编号 ${jobId}`,
     batchTooLarge: (labels: number, max: number): string =>
       `这一批共 ${labels} 张，超过单个任务的上限 ${max} 张。请减少所选行或份数，分几次提交`,
+    needsPrinter: '先选一台打印机',
+    tally: (labels: number, seconds: number): string => `${labels} 张 · 约 ${seconds} 秒`,
+    copiesPerRow: '每行份数',
+    again: '再打一次',
+    toQueue: '去打印队列',
+    backToLabels: '回到标签',
     needsProbe: '这台打印机尚未探测，无法确定可打印范围',
     headFigure: (labelMm: number, maxMm: number): string => `标签宽 ${labelMm} mm，打印头最宽 ${maxMm} mm`,
     headOverflow: (overMm: number): string => `超出 ${overMm} mm，这部分不会被打印`,
@@ -470,6 +506,7 @@ export const copy = {
     rangePlaceholder: '例如 5-12',
     rangeApply: '应用',
     rangeInvalid: '读不出这个区间。写法如 5-12 或 5-12, 20',
+    chosen: (rows: number): string => `已选 ${rows} 行`,
     selected: (rows: number, labels: number): string => `已选 ${rows} 行，共 ${labels} 张`,
     none: '一行都没选。标签绑定了数据源，每一行印一张',
     widthNotChecked: '未按行检查内容宽度——某些行的条码可能超出标签，需由实物确认',
@@ -781,6 +818,7 @@ export const copy = {
      * defers to it keeps following when they change their mind.
      */
     profileDefault: '打印机默认',
+    profileDefaultDetail: '跟随机器上的设置',
     profileOf: (name: string): string => `打印参数：${name}`,
     profileGone: '打印参数已被删除',
     copiesOf: (n: number): string => `每行 ${n} 份`,
@@ -810,6 +848,8 @@ export const copy = {
     confirm: '确定',
     confirmTitle: '确认这项操作？',
     loading: '加载中…',
+    decrease: '减少',
+    increase: '增加',
     retry: '重试',
     error: '操作失败',
   },

@@ -7,7 +7,7 @@
  * anywhere else asks first and then discards them. So the state is one page
  * and one flag, and the flag gates the question.
  */
-import { pageFromPath, type PageDescriptor } from './routes.ts'
+import { isLabelKind, pageFromPath, type PageDescriptor } from './routes.ts'
 
 export interface WorkspaceState {
   page: PageDescriptor
@@ -24,10 +24,15 @@ export function initialWorkspace(): WorkspaceState {
  * page is gone with it, which is what the person confirmed.
  */
 export function openPage(state: WorkspaceState, descriptor: PageDescriptor): WorkspaceState {
-  void state
   const page: PageDescriptor =
-    descriptor.kind === 'label' ? { ...descriptor, templateId: descriptor.templateId ?? null } : descriptor
-  return { page, dirty: false }
+    isLabelKind(descriptor.kind) ? { ...descriptor, templateId: descriptor.templateId ?? null } : descriptor
+  // Stepping within one label keeps the flag: the content is still open and
+  // still unsaved, and the question has to survive as far as the way out.
+  const stepping =
+    isLabelKind(page.kind) &&
+    isLabelKind(state.page.kind) &&
+    (page.templateId ?? null) === (state.page.templateId ?? null)
+  return { page, dirty: stepping ? state.dirty : false }
 }
 
 /**
